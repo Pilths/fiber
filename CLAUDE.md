@@ -14,6 +14,7 @@ Read before working: `docs/PRD.md` (requirements), `docs/architecture.md` (desig
 ## Domain rules
 
 - Reservations are insert-only events. An upload never changes a reservation.
+- Excel imports reservations only until the one-time "Close reservation import" switch is closed (a `data_edits` row: entity 'system', entity_id 0, field 'reservation_import', new_value 'closed'). After that, reservation rows in an upload are ignored with a warning and new reservations are made only in the dashboard.
 - Release is not deletion. It adds a 'released' event and frees only the `core_holds` lock row; the reservation, its cores and its events stay. A release can cover only some cores of a route reservation.
 - Corrections are only for customer and planned date, on approved reservations, with a reason, as a 'corrected' event. Cores are never corrected or swapped: release and request again. Customer is required on every reservation.
 - Segments are labels for display and the KMZ map line. Routing runs over spans: sites are nodes, spans are edges, and any site can route to any site.
