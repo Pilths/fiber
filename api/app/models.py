@@ -41,9 +41,9 @@ def _in(col: str, values: tuple[str, ...], name: str) -> CheckConstraint:
     return CheckConstraint(f"{col} IN ({', '.join(repr(v) for v in values)})", name=name)
 
 
-def _pair_uq(name: str) -> Index:
+def _pair_ix(name: str, unique: bool = False) -> Index:
     return Index(name, func.least(text("site_a_id"), text("site_b_id")),
-                 func.greatest(text("site_a_id"), text("site_b_id")), unique=True)
+                 func.greatest(text("site_a_id"), text("site_b_id")), unique=unique)
 
 
 class User(Base):
@@ -76,7 +76,7 @@ class Span(Base):
         _in("route_type", ("Bespoke", "Trunk", "Metro"), "spans_route_type_ck"),
         _in("region", ("North", "Central", "South", "East Coast"), "spans_region_ck"),
         CheckConstraint("distance_km >= 0", name="spans_distance_ck"),
-        _pair_uq("spans_site_pair_uq"),
+        _pair_ix("spans_site_pair_uq", unique=True),
     )
     id: Mapped[int] = _id()
     site_a_id: Mapped[int] = _fk("sites")
@@ -91,7 +91,7 @@ class Segment(Base):
     __tablename__ = "segments"
     __table_args__ = (
         CheckConstraint("site_a_id <> site_b_id", name="segments_sites_differ_ck"),
-        _pair_uq("segments_site_pair_uq"),
+        _pair_ix("segments_site_pair_ix"),
     )
     id: Mapped[int] = _id()
     site_a_id: Mapped[int] = _fk("sites")
@@ -161,6 +161,11 @@ class ReservationEvent(Base):
     __tablename__ = "reservation_events"
     __table_args__ = (
         _in("type", EVENT_TYPES, "reservation_events_type_ck"),
+        CheckConstraint("type = 'corrected' OR (customer_id IS NULL AND planned_date IS NULL)",
+                        name="reservation_events_correction_ck"),
+        CheckConstraint("type <> 'corrected' OR ((customer_id IS NOT NULL OR planned_date IS NOT NULL) "
+                        "AND length(trim(coalesce(reason, ''))) > 0)",
+                        name="reservation_events_corrected_ck"),
         Index("reservation_events_res_created_ix", "reservation_id", "created_at"),
     )
     id: Mapped[int] = _id()
@@ -169,6 +174,14 @@ class ReservationEvent(Base):
     user_id: Mapped[int] = _fk("users")
     reason: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = _created()
+    customer_id: Mapped[int | None] = _fk("customers", True)
+    planned_date: Mapped[date | None] = mapped_column(Date)
+
+
+class ReleaseCore(Base):
+    __tablename__ = "release_cores"
+    event_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("reservation_events.id"), primary_key=True)
+    core_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("cores.id"), primary_key=True)
 
 
 class CoreHold(Base):
@@ -215,6 +228,8 @@ class Measurement(Base):
     tested_on: Mapped[date | None] = mapped_column(Date)
     upload_id: Mapped[int | None] = _fk("uploads", True)
     created_at: Mapped[datetime] = _created()
+    test_method: Mapped[str | None] = mapped_column(Text)
+    field_team: Mapped[str | None] = mapped_column(Text)
 
 
 class DataEdit(Base):

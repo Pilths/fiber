@@ -1,6 +1,6 @@
 # Fiber Dashboard PRD
 
-Last updated: 21 October 2026
+Last updated: 22 October 2026
 
 ## 1. Executive Summary
 
@@ -34,10 +34,12 @@ The MVP serves two personas through eight user stories; login and roles stays in
 
 - **Site:** the general term for any place a span ends: a site, a building in it or the equipment in that building, such as a data center or TOC. Some sites have latitude and longitude in the Excel.
 - **Span:** a connection between two sites (site A and site B). The app gives every span its own ID. A span carries many cores, and each core in use can carry its own circuit.
-- **Segment:** a route made of several spans end to end, with buildings or nodes in between; each KMZ route shows one segment.
+- **Segment:** a named route made of several spans end to end, with buildings or nodes in between; each KMZ route shows one segment. A segment is a label for display and the line on the map. Routing runs over spans, not segments. Several segments may share the same two end sites.
 - **Core:** one fibre core in a span's cable, connecting a port at site A to a port at site B. Its circuit ID, which comes from another system, is an optional field on the core.
 
-To confirm with the data owners: whether two sites can have more than one span of the same route type.
+Confirmed by the data owner (21 October 2026): two sites have at most one span; one span carries many cores.
+
+To confirm against the mock files arriving 22 October 2026: KMZ routes are named `<site A> - <site B>`, but several segments can share the same two end sites, so a KMZ name may match more than one segment. Such routes go to the validation report.
 
 **User Personas**
 
@@ -53,14 +55,16 @@ To confirm with the data owners: whether two sites can have more than one span o
    - The core table shows customer, circuit ID (when available), planned date, and the ports at both ends.
 2. As a planner, I want to request cores for a customer with a planned date, so that capacity is held once an admin approves it.
    - Reserve cores is available from a route option and from a span, in a side panel. Submitting it sends a request; nothing is reserved until an admin approves.
-   - The customer is picked from a customer table; adding a new customer warns about similar existing names, and the admin sees a new-customer flag on the request.
+   - The customer is required. It is picked from a customer table; the Reserve form warns and blocks submission without a customer. Adding a new customer warns about similar existing names, and the admin sees a new-customer flag on the request.
    - Each reservation records the customer, planner, planned date, request date, and the admin who approved or rejected it.
    - Reservations are append-only: no editing in place. A change, approval or release is a new record, and earlier records stay as history.
    - The planner chooses cores manually, per span on the route (for example by selecting available cells in a port grid); in use, reserved and faulty cores cannot be selected, and a counter shows cores chosen against cores needed.
    - A new request holds its cores as Requested until an admin approves or rejects it; approval reserves them and rejection frees them.
    - Admins are notified of each new request in the app (header bell count) and by email; the email moves to v1.1 first if time runs short.
    - Only an admin can approve, reject or release a reservation.
-   - An admin can correct a mistake: the correction is saved as a new record with a reason and replaces what is shown, while the original stays in history.
+   - A pending request with mistakes is rejected by the admin, with a reason, and the planner creates a new one.
+   - An approved reservation can be corrected by an admin, only for customer and planned date. The correction needs a reason and is saved as a new 'corrected' event; it replaces what is shown, while the old values stay in history.
+   - Cores are never corrected or swapped. Wrong cores mean release and a new request.
    - A route reservation is one request across all its spans, approved or rejected as a whole; a rejection needs a reason the planner can see.
    - If two planners select the same core, the first request submitted wins; the second planner sees which cores are taken and picks again.
    - An admin can submit a request too. A different admin approves it when more than one admin exists; with a single admin, that admin approves it. The history shows the approving admin's name in both cases.
@@ -68,9 +72,12 @@ To confirm with the data owners: whether two sites can have more than one span o
    - Pending requests never expire; admins see them oldest first with their age, and the bell count shows how many are waiting.
    - A planner can withdraw their own pending request; the withdrawal is saved as a new record and the held cores are freed at once.
 3. As a planner, I want stale reservations flagged and reminded, so that none is forgotten.
-   - A reservation is stale 3 months after it was approved. An imported reservation with no date starts at its import date, the upload preview warns the admin, and an admin can correct the date later with a reason. Keeping it restarts the 3-month clock, and each keep is saved as a new history record.
+   - A reservation is stale 3 months after it was approved. An imported reservation with no reserved date starts at its import date, and the upload preview warns the admin. Keeping it restarts the 3-month clock, and each keep is saved as a new history record.
    - Stale reservations appear in a Needs review list and the header bell count; so do reservations hit by an upload conflict or a core marked Faulty.
+   - The 3-month rule and "today" in the daily digest use the Asia/Kuala_Lumpur time zone.
    - The planner keeps a stale reservation or sends a release request; only an admin releases it. A release request appears in Approvals and the bell count, the cores stay Reserved until an admin releases them, and a declined release needs a reason the planner can see.
+   - A release request chooses which spans (cores) of a route reservation to free; the rest stays reserved. Releasing all its cores ends the reservation.
+   - Release is not deletion. It adds a 'released' event; the reservation, its cores and all events stay forever, and only the core's lock is freed. The event history is the log.
    - A daily email digest per planner repeats until each is kept or released; the digest moves to v1.1 first if time runs short, while the in-app list and bell count stay.
 4. As a planner, I want to compare calculated and measured loss per span, so that I can find high-loss spans.
    - Calculated loss is distance x 0.3 dB per km in the MVP. The formula lives in backend code, so it can change later, for example to add splice and connector losses. Distance comes from the Excel, per span; a segment's distance is the sum of its spans. A span with no distance has no calculated loss and shows no distance, never 0 dB.
@@ -78,28 +85,33 @@ To confirm with the data owners: whether two sites can have more than one span o
    - For each measured span, planners see calculated loss, measured loss and the deviation in percent from calculated, with a warning level: green 0 to 3%, amber 3 to 7%, red 7 to 10%, and anything above 10% red and marked off-scale. The form is open: a chart, a small scrollable list, or both.
    - Each warning level has a label or shape, so colour is never the only signal. Thresholds are fixed for now; editable thresholds: TBD.
    - Deviation = (measured - calculated) / calculated; a measured value below calculated counts as green.
-   - The difference in dB and percent, last test date, and measured or calculated-only status are available per span. Test method and field team are shown only if the source data has them: TBD.
+   - The difference in dB and percent, last test date, and measured or calculated-only status are available per span. The source data has test method and field team, which the backend cleans; both are stored and shown per span.
 5. As a planner, I want to pick two buildings and see route options, so that I can choose a route with enough free cores.
-   - Up to 3 options are shown, each with its segments, km, estimated dB, and the fewest free cores on any span of the path. Routes are labelled by segment (site A to site B); a segment expands to list its spans in order as building A to building B, with each span's km and free cores.
-   - From and To list only segment end sites in the MVP; starting or ending inside a segment comes in v1.1.
-   - A route's estimated loss is the sum of its segments; a segment's free cores is the lowest count among its spans.
-   - Each option shows loss confidence, as segments measured out of segments on the path.
+   - Routing runs over spans: sites are the graph nodes and spans are the edges, weighted by km. Segments stay as labels for display and as the KMZ line on the map.
+   - Up to 10 options are shown, each with its spans in order as building A to building B, with each span's km and free cores, grouped under their segment label where there is one. Each option shows total km, estimated dB, and the fewest free cores on any span of the path.
+   - Options can be sorted by shortest km (the default) or by most free cores: the fewest free cores on any span of the path, higher is better.
+   - The options list sits in a fixed-size box; only the list inside scrolls.
+   - From and To list all sites, so any site can route to any site, including starting or ending a route inside a segment.
+   - A route's estimated loss is the sum of its spans.
+   - Each option shows loss confidence, as measured spans out of spans on the path.
    - An option with fewer free cores than needed is flagged.
    - Invalid input clears the results and shows an inline error on the field.
 6. As a planner, I want to see real routes on a map, so that I understand where spans run.
    - MapLibre GL JS shows KMZ routes, one segment per route, with Data center and TOC markers; clicking a segment shows its spans.
    - Basemap colours come from the UI colour palette in light and dark themes; the UI is built first and the map follows.
-   - Site coordinates come from the Excel where available. Each KMZ route is matched to a segment by the site A and site B in its name; the exact name format is TBD until real KMZ files are seen. Routes that cannot be matched, or match more than one segment, are listed in the validation report. A site without coordinates takes its position from the end of a KMZ route that touches it; with neither, it is listed but not drawn on the map.
+   - Site coordinates come from the Excel where available. Each KMZ route is matched to a segment by the site A and site B in its name (`<site A> - <site B>`); the exact format is confirmed against the mock files. Because several segments can share the same two end sites, a name may match more than one segment. Routes that cannot be matched, or match more than one segment, are listed in the validation report. A site without coordinates takes its position from the end of a KMZ route that touches it; with neither, it is listed but not drawn on the map.
 7. As an admin, I want users to sign in with roles, so that reservations and uploads are attributable.
    - Roles: planner and admin. Sign-in starts with local accounts; enterprise SSO is a later option. Admins create accounts and reset passwords; there is no self-signup, and a password change is forced at first login. Accounts are deactivated, never deleted: history keeps the user's name, their pending requests stay in the admin queue, and their stale digests go to all admins.
    - Stays in the MVP, because admin-only approval and release need sign-in, and it is built right after the approval flow so it is never the story left for last.
    - Admins get admin functions (Approvals, Data upload, Users) that planners never see, and can use every planner function too; how they are reached is left to design.
 8. As an admin, I want to upload Excel and KMZ files, so that data updates without a developer.
    - A separate admin area, outside the planner functions.
-   - Python validates and cleans each file and reports rejected rows. Excel stays manually updated after go-live, so uploads repeat: a re-upload updates existing records and adds new ones without duplicates; spans are matched by their two sites plus route type (one span per site pair and route type: to be confirmed), segments by their two end sites, and ports by Port ID; a circuit ID in a row attaches to its core.
-   - New measurements are appended to history, never overwritten. The first upload imports reservations already in Excel as approved reservations; after that the dashboard is the only place reservations live, and an upload never overwrites one.
+   - Python validates and cleans each file and reports rejected rows. Excel stays manually updated after go-live, so uploads repeat: a re-upload updates existing records and adds new ones without duplicates; spans are matched by their two sites, in either order (two sites have at most one span), segments by their two end sites, and ports by Port ID; a circuit ID in a row attaches to its core.
+   - New measurements are appended to history, never overwritten. Reservations already in Excel import as approved reservations. A reservation row whose core is already held is skipped, so re-uploads never duplicate or change a reservation. New reservations are made only in the dashboard.
    - Every upload shows a validation report first; nothing is saved until the admin confirms.
-   - Where Excel reservation rows lack a customer or reserved date, the import shows Unknown and flags the row for an admin to fix; an undated reservation starts its stale clock at the import date.
+   - The customer is required in the Excel too. A reservation row without a customer is Rejected in the preview and not imported; the admin fixes the Excel and uploads again, and the fixed row imports then.
+   - A reservation row without a reserved date still imports, with the import date as the start of its stale clock and a warning in the preview.
+   - A row with a region other than North, Central, South or East Coast is Rejected in the upload report.
    - Spans are grouped into segments as the Excel states; where it does not, by chaining site pairs from the segment's site A to its site B, and any chain with more than one possible path is flagged in the report.
    - Many rows with the same two sites are normal, because one cable has many cores. The validation report warns when the same Port ID appears twice or when a cable looks listed twice between the same two sites, and the admin decides what to keep before anything is saved.
    - After the first import, the dashboard database is the source of truth and the Excel is a feed. A field edited in the dashboard is protected: a later upload that differs shows as a conflict in the preview and keeps the dashboard value unless the admin ticks the Excel value.
@@ -183,11 +195,12 @@ Files enter through the Admin page, the Python API validates and stores them, an
 
 **Data Model Foundation**
 
-The planning side comes first: reservations, customers and planners as separate tables, with reservations as insert-only rows. Around it: sites (data centers and TOCs), spans with route type (Bespoke, Trunk, Metro) and region (North, Central, South, East Coast), segments (several spans end to end), cores, ports, and measurements kept as history. Ports connect through cores to another site. The app assigns its own internal ID to every site, span and segment. A circuit ID comes from another system and is an optional field on the core, because one span carries many circuits; uploads match spans by the two sites plus route type, and ports by Port ID. Site is the general term for a site, a building or the equipment in it, and measurements are stored per span. After the first import the dashboard database is the source of truth and the Excel is a feed; fields edited in the dashboard are protected from later uploads, and every edit is kept as history with a reason.
+The planning side comes first: reservations, customers and planners as separate tables, with reservations as insert-only rows. Around it: sites (data centers and TOCs), spans with route type (Bespoke, Trunk, Metro) and region (North, Central, South, East Coast), segments (several spans end to end), cores, ports, and measurements kept as history. Site names are unique across all regions, and many sites can share a region. The four regions stay as they are; new values come by migration when real data shows them. Measurements also store test method and field team. Ports connect through cores to another site. The app assigns its own internal ID to every site, span and segment. A circuit ID comes from another system and is an optional field on the core, because one span carries many circuits; uploads match spans by the two sites, and ports by Port ID. Site is the general term for a site, a building or the equipment in it, and measurements are stored per span. After the first import the dashboard database is the source of truth and the Excel is a feed; fields edited in the dashboard are protected from later uploads, and every edit is kept as history with a reason.
 
 **Non-Functional Requirements**
 
 - Up to 50 concurrent users; potentially around 100 points of interest.
+- Time zone: all date logic (the 3-month stale rule, the daily digest's "today") and date display use Asia/Kuala_Lumpur. Timestamps are stored in UTC (timestamptz).
 - Light and dark themes; text contrast of at least 4.5:1 (WCAG 2.1 AA).
 - Keyboard-operable navigation, controls and side panels. Automated tests cover the reservation flow (request, approve, reject, release, correct), upload validation and the loss bands; the UI also gets a manual check in light and dark themes.
 
@@ -205,7 +218,7 @@ All five MVP items are planned for 31 October 2026, about 11 days from this draf
 **Phased Rollout**
 
 1. **MVP, by 31 October 2026:** fiber health (cores and ports, reservations and link loss) and route planning; the MapLibre map with KMZ routes; Reserve cores with admin approval; admin upload with a preview step; admin editing of core status, spans and sites; email digest; login and roles. If time runs short, the email digest moves to v1.1 first; the next cut is the real KMZ routes on the map, with the simple map as the fallback; after that, span and site editing moves to v1.1 and core status editing stays. Gate to ship: tested on real exported data.
-2. **v1.1:** email digest and admin request emails if cut or the SMTP relay is not ready (the in-app Needs review list ships first either way); undo of a finished upload; starting or ending a route inside a segment; a mini map in the upload step to compare a new KMZ route with existing routes (idea, to decide); verification of reservation data; editing of ports, customers and other data in the app; PMTiles zoom detail review.
+2. **v1.1:** email digest and admin request emails if cut or the SMTP relay is not ready (the in-app Needs review list ships first either way); undo of a finished upload; a mini map in the upload step to compare a new KMZ route with existing routes (idea, to decide); verification of reservation data; editing of ports, customers and other data in the app; PMTiles zoom detail review.
 3. **v2.0:** joint closures on the map; scheduled imports; production shipping model.
 
 **Technical Risks**

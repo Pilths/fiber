@@ -2,7 +2,7 @@
 goal: Fiber Dashboard MVP, built in sessions 0 to 12 and following the PRD cut order
 version: 1.0
 date_created: 2026-10-21
-last_updated: 2026-10-21
+last_updated: 2026-10-22
 owner: Fiber Dashboard developer (one person, AI-assisted)
 status: 'Planned'
 tags: [feature, architecture, mvp]
@@ -19,15 +19,16 @@ The plan is saved at `docs/plan.md`, the path the workflow names, instead of the
 ## 1. Requirements & Constraints
 
 - **REQ-001**: Planners search by customer, span, circuit ID and core, and see a port grid per span with each core's status (PRD story 1).
-- **REQ-002**: Planners request cores for a customer with a planned date. A request holds its cores as Requested, approval reserves them, and rejection or withdrawal frees them. The first request submitted wins (PRD story 2).
+- **REQ-002**: Planners request cores for a customer (required, in the app and in the Excel) with a planned date. A request holds its cores as Requested, approval reserves them, and rejection or withdrawal frees them. The first request submitted wins (PRD story 2).
 - **REQ-003**: A reservation is stale 3 months after approval or its latest keep. Stale reservations, release requests, upload conflicts and faulty held cores appear in Needs review and in the header bell count (PRD story 3).
 - **REQ-004**: Per span, show calculated loss (distance × 0.3 dB/km), the latest measured loss, deviation in percent and a warning level. A span with no distance shows no calculated loss, never 0 dB (PRD story 4).
-- **REQ-005**: Route planning between two segment end sites returns up to 3 options with km, estimated dB, fewest free cores and loss confidence (PRD story 5).
+- **REQ-005**: Route planning between any two sites runs over spans and returns up to 10 options, sortable by km (default) or free cores, with km, estimated dB, fewest free cores and loss confidence (measured spans out of spans on the path) (PRD story 5).
 - **REQ-006**: A MapLibre map shows KMZ routes, one per segment, with data center and TOC markers (PRD story 6).
 - **REQ-007**: Local accounts with planner and admin roles, forced password change at first login, deactivation instead of deletion (PRD story 7).
 - **REQ-008**: Admins upload Excel and KMZ in three steps (Upload, Preview, Confirm). Nothing is saved before Confirm (PRD story 8).
 - **REQ-009**: Admins edit core status (Faulty or Available), span details and site details, each with a reason (PRD story 8).
 - **REQ-010**: A daily email digest per planner of their stale reservations, and an email to admins on each new request (PRD stories 2 and 3; first cut).
+- **REQ-011**: Release is not deletion. A release adds a `released` event and frees only the `core_holds` rows. A release request chooses which cores of a route reservation to free; the rest stays reserved, and releasing all cores ends the reservation. Table `release_cores` records the cores each release event covers (PRD stories 2 and 3).
 - **SEC-001**: Every write stores the acting `user_id`. Every data edit stores a reason. Nothing is deleted; accounts are deactivated.
 - **SEC-002**: Secrets (database password, session secret, SMTP credentials) come from environment variables. `.env` is never committed.
 - **SEC-003**: Admin endpoints require the admin role on the server. Hiding them in the UI is not enough.
@@ -37,15 +38,17 @@ The plan is saved at `docs/plan.md`, the path the workflow names, instead of the
 - **CON-002**: Cut order if time runs short: (1) email digest and request emails, (2) real KMZ routes on the map (fall back to the SVG map from the v6 mock), (3) span and site editing. Core status editing always stays.
 - **CON-003**: Versions are pinned as listed in `docs/architecture.md`, section 4. TypeScript stays on 6.x.
 - **CON-004**: Desktop first. WCAG 2.1 AA, text contrast at least 4.5:1, status and warning levels never shown by colour alone, light and dark themes, keyboard-operable controls and side panels.
-- **CON-005**: Two sites have at most one span. Uploads match spans by the site pair in either order, segments by their two end sites, and ports by Port ID.
-- **CON-006**: KMZ route names have the form `<site A name> - <site B name>`.
+- **CON-005**: Two sites have at most one span. Uploads match spans by the site pair in either order, segments by their two end sites, and ports by Port ID. Several segments may share the same two end sites (RISK-008).
+- **CON-006**: KMZ route names have the form `<site A name> - <site B name>`. A name may match more than one segment (RISK-008).
 - **CON-007**: The code is developed on a personal laptop, then tested on a work laptop, then on a dev server, then deployed to the production server. The same Docker Compose setup must run unchanged on all four. Anything that differs between machines lives only in `.env`.
 - **CON-008**: Source code travels by Outlook email, so only source goes by email: one zip made with `git archive --format=zip -o fiber.zip HEAD` (no `node_modules`, no `.env`, no images, no map tiles). Images are built on each machine from Docker Hub, npm and PyPI, the only approved download sources. Any other source needs an IT ticket.
 - **CON-009**: Dependency installs must be reproducible on every machine. Commit `web/package-lock.json`, and an exact Python lock file `api/requirements.lock` generated with `pip freeze` inside the api container. The api Dockerfile installs from the lock file.
+- **CON-010**: All date logic (the 3-month stale rule, the daily digest's "today") and date display use Asia/Kuala_Lumpur. Timestamps are stored in UTC (`timestamptz`).
+- **CON-011**: Regions are North, Central, South and East Coast. New values come by migration when real data shows them; an unknown region is a Rejected row in the upload report. Site names are unique across all regions, and many sites can share a region.
 - **GUD-001**: Stub first, then real. Each endpoint exists first as a stub returning mock data, the TypeScript client is generated from FastAPI's OpenAPI spec, and the stub is replaced by real logic later.
 - **GUD-002**: Delegate per `CLAUDE.md`: Haiku for mechanical work, Sonnet for code and doc edits needing judgment, main chat for decisions and reviewing diffs.
 - **GUD-003**: One phase per session. A phase is done only when its completion criteria pass and the diff has been reviewed (workflow Step 8).
-- **PAT-001**: Append-only history. Tables `reservation_events`, `measurements` and `data_edits` reject UPDATE and DELETE with a database trigger.
+- **PAT-001**: Append-only history. Tables `reservation_events`, `measurements` and `data_edits` reject UPDATE and DELETE with a database trigger. Migration 0002 (TASK-067) adds the same trigger to `reservations` and `reservation_cores`.
 - **PAT-002**: Database constraints over application checks. "First request wins" is the primary key on `core_holds.core_id`.
 - **PAT-003**: Derived state over stored flags. Core status, stale reservations, Needs review and the bell count are computed by queries at read time.
 - **PAT-004**: One FastAPI app split into modules under `api/app/`: `inventory`, `reservations`, `loss`, `routing`, `ingest`, `auth`, `notify`. Each module has `router.py`, `service.py` and, where needed, `schemas.py`.
@@ -87,8 +90,9 @@ Completion: `docker compose up` shows all three services healthy; `curl localhos
 | TASK-014 | Trigger function `forbid_change()` raising an exception on UPDATE or DELETE, attached to `reservation_events`, `measurements` and `data_edits` (PAT-001). | ✅ | 2026-10-21 |
 | TASK-015 | View `core_status_v` (core_id, status) with priority: latest `data_edits` core status Faulty, else `in_use` → In use, else approved hold → Reserved, else pending hold → Requested, else Available. | ✅ | 2026-10-21 |
 | TASK-016 | Script `api/app/seed.py` loading the mock Excel and creating one planner (`planner1`) and one admin (`admin1`) for the dev header. Run with `docker compose exec api python -m app.seed`. | | |
+| TASK-067 | Migration 0002: correction fields on reservation_events, append-only triggers on reservations and reservation_cores, release_cores table, measurement test_method and field_team, segment end-site index no longer unique | ✅ | 2026-10-22 |
 
-Completion: `alembic upgrade head` succeeds on an empty database; `alembic downgrade base` then `upgrade head` succeeds; an UPDATE on `reservation_events` fails; a second insert into `core_holds` for the same core fails; the seed script loads the mock data without errors. Then run the second grill against the migrations (workflow).
+Completion: `alembic upgrade head` succeeds on an empty database; `alembic downgrade base` then `upgrade head` succeeds; an UPDATE on `reservation_events` fails; a second insert into `core_holds` for the same core fails; migration 0002 (TASK-067) applies and an UPDATE on `reservations` fails; the seed script loads the mock data without errors. Then run the second grill against the migrations (workflow).
 
 ### Implementation Phase 3 (Session 2, 22 October): Search, span and core endpoints, typed client
 
@@ -114,7 +118,7 @@ Completion: pytest covers search by each of the four keys and the span detail sh
 | TASK-023 | Span list with region and route type filters, labelled by site A and site B, showing free cores and status mix. | | |
 | TASK-024 | Port grid component: one cell per core with a pattern or symbol per status (outlined Available, hatched Reserved, crossed Faulty, distinct marks for Requested and In use), text label on hover and focus, arrow-key navigation, Space or Enter to select. Only Available cells are selectable. | | |
 | TASK-025 | Core table under the grid: customer, circuit ID, planned date, ports at both ends. | | |
-| TASK-026 | Reserve side panel: customer picker with similar-name warning on new names, planned date (`<input type="date">`), counter of cores chosen against cores needed, submit to `POST /api/reservations`, focus trapped while open, Escape closes. | | |
+| TASK-026 | Reserve side panel: customer picker with similar-name warning on new names, planned date (`<input type="date">`), counter of cores chosen against cores needed, a warning that blocks submission without a customer, submit to `POST /api/reservations`, focus trapped while open, Escape closes. | | |
 | TASK-027 | Run workflow Step 7 on the port grid: the 30-minute Impeccable trial, `/impeccable audit`, and the Playwright check in `web/e2e/port-grid.spec.ts`. | | |
 
 Completion: Playwright passes for keyboard selection, non-colour status marks and contrast in both themes; the panel submits a request to the stub.
@@ -125,10 +129,10 @@ Completion: Playwright passes for keyboard selection, non-colour status marks an
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-028 | `POST /api/reservations` (real): in one transaction insert the reservation, its cores, a `requested` event and one `core_holds` row per core. On primary-key conflict, roll back and return 409 with the taken core IDs. A route request covers all its spans in one reservation. | | |
+| TASK-028 | `POST /api/reservations` (real): `customer_id` is required (422 without it). In one transaction insert the reservation, its cores, a `requested` event and one `core_holds` row per core. On primary-key conflict, roll back and return 409 with the taken core IDs. A route request covers all its spans in one reservation. | | |
 | TASK-029 | `POST /api/customers` (real): on a new name, return names with `pg_trgm` similarity ≥ 0.4; the client must resend with `confirm_new=true`; set `is_new_customer` on the reservation. | | |
-| TASK-030 | Admin actions: `POST /api/reservations/{id}/approve`, `/reject` (reason required, deletes holds), `/release` (deletes holds), `/decline-release` (reason required), `/correct` (reason required, allowed only when the reservation is Reserved, that is its latest event is approved, kept, release_requested, release_declined or corrected; returns 409 otherwise; new event replaces what is shown). An admin may approve their own request only when they are the only active admin. | | |
-| TASK-031 | Planner actions: `POST /api/reservations/{id}/withdraw` (own pending only, deletes holds), `/keep` (restarts the stale clock), `/request-release`. | | |
+| TASK-030 | Admin actions: `POST /api/reservations/{id}/approve`, `/reject` (reason required, deletes holds), `/release` (body: the cores to free, which must be covered by a release request or chosen by the admin; adds a `released` event and `release_cores` rows, deletes the holds of those cores only; the reservation ends when all its cores are released), `/decline-release` (reason required), `/correct` (reason required; approved reservations only, that is its latest event is approved, kept, release_requested, release_declined or corrected, else 409; changes customer and planned date only, and a request to change cores is refused; saved as a `corrected` event that replaces what is shown, old values stay in history). An admin may approve their own request only when they are the only active admin. | | |
+| TASK-031 | Planner actions: `POST /api/reservations/{id}/withdraw` (own pending only, deletes holds), `/keep` (restarts the stale clock), `/request-release` (body: the cores of the reservation to free; the rest stays reserved; recorded in `release_cores`). | | |
 | TASK-032 | `GET /api/reservations?mine=true&status=pending|rejected|approved` for the planner list; `GET /api/approvals` for admins, oldest first with age; `GET /api/needs-review` (stale, release requested, conflict, faulty held core); `GET /api/bell` returning counts. | | |
 | TASK-033 | UI: My reservations list with Pending and Rejected filters and visible rejection reasons; admin Approvals list; Needs review list; bell count in the header. | | |
 
@@ -154,7 +158,7 @@ Completion: TEST-007 passes; `APP_ENV=production` rejects `X-Dev-User`.
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
 | TASK-038 | `api/app/loss/service.py`: `calculated_loss_db(distance_km)` returns `distance_km * 0.3`, or `None` when distance is missing; `deviation_pct(measured, calculated)`; `warning_level(deviation_pct)` returning green, amber, red or off_scale, with values below calculated counted as green. | | |
-| TASK-039 | `GET /api/loss/spans` (calculated, latest measured, difference in dB and percent, level, last test date, measured or calculated-only); `GET /api/loss/coverage` (spans with at least one measurement out of all spans); segment summary with x of y spans measured. | | |
+| TASK-039 | `GET /api/loss/spans` (calculated, latest measured, difference in dB and percent, level, last test date, test method, field team, measured or calculated-only); `GET /api/loss/coverage` (spans with at least one measurement out of all spans); segment summary with x of y spans measured. | | |
 | TASK-040 | UI: the visual form is open. Candidate forms are a Recharts chart, and/or a box of any size holding a scrollable list of spans sorted with the highest warning level first, each showing its deviation percentage. These are options, not limits. Whatever form is chosen: each level has a text label and shape; spans with no distance show "No distance", never 0 dB; coverage figure shown. Run Step 7 checks. | | |
 
 Completion: TEST-008 passes; the loss view passes contrast and non-colour checks in both themes.
@@ -167,8 +171,8 @@ Completion: TEST-008 passes; the loss view passes contrast and non-colour checks
 |------|-------------|-----------|------|
 | TASK-041 | `api/app/ingest/columns.py`: map of Excel column headers to fields, built from the mock Excel headers. `api/app/ingest/excel.py` parses with pandas and openpyxl, cleans values, and returns valid rows and rejected rows with reasons. | | |
 | TASK-042 | `api/app/ingest/kmz.py`: open the KMZ with `zipfile`, parse `doc.kml` with `xml.etree.ElementTree`, read each Placemark name as `<site A> - <site B>` and its LineString coordinates. A name that matches no segment or more than one goes to Rejected. | | |
-| TASK-043 | `POST /api/admin/uploads` stages rows in `upload_rows` grouped as New, Changed, Conflicts, Not in this file, Rejected. Warnings: duplicate Port ID, a cable that looks listed twice, chained segments with more than one path, reservations missing a customer or date, rows conflicting with a Requested or Reserved core. Fields with a `data_edits` row are Conflicts that keep the dashboard value by default. | | |
-| TASK-044 | `GET /api/admin/uploads/{id}` returns the preview. `POST /api/admin/uploads/{id}/confirm` (body: Excel-wins field list, duplicate decisions) applies everything in one transaction: upserts by natural keys, appends measurements, imports reservations as approved only on the first upload, never touches existing reservations, and writes the upload summary. | | |
+| TASK-043 | `POST /api/admin/uploads` stages rows in `upload_rows` grouped as New, Changed, Conflicts, Not in this file, Rejected. Warnings: duplicate Port ID, a cable that looks listed twice, chained segments with more than one path, rows conflicting with a Requested or Reserved core. A reservation row without a customer, or a row with an unknown region, goes to Rejected and is not imported. A reservation row without a reserved date still imports, with the import date as the start of its stale clock and a warning. A reservation row whose core is already held is skipped. Fields with a `data_edits` row are Conflicts that keep the dashboard value by default. | | |
+| TASK-044 | `GET /api/admin/uploads/{id}` returns the preview. `POST /api/admin/uploads/{id}/confirm` (body: Excel-wins field list, duplicate decisions) applies everything in one transaction: upserts by natural keys, appends measurements, imports reservation rows as approved (skipping rows whose core is already held), never touches existing reservations, and writes the upload summary. | | |
 | TASK-045 | UI: admin upload page with Upload, Preview and Confirm steps; each group expandable with its warnings; ticks for Excel values on conflicts. | | |
 
 Completion: TEST-009 and TEST-010 pass.
@@ -187,13 +191,13 @@ Completion: TEST-011 passes.
 
 ### Implementation Phase 10 (Session 9, 28 October): Routing
 
-- GOAL-010: Planners pick two segment end sites and see up to 3 route options.
+- GOAL-010: Planners pick any two sites and see up to 10 route options.
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-049 | `api/app/routing/graph.py`: build a NetworkX `Graph` with sites as nodes and segments as edges (weight = segment km, the sum of its spans). Build at startup and after each confirmed upload or span edit. | | |
-| TASK-050 | `GET /api/routes/endpoints` lists segment end sites. `GET /api/routes?from=&to=&cores_needed=` takes the first 3 paths from `shortest_simple_paths`; each option returns segments (with ordered spans, km and free cores), total km, estimated dB (null when any span has no distance), fewest free cores, measured segments out of total, and an insufficient-cores flag. Invalid input returns 422 with a field name. | | |
-| TASK-051 | UI: From and To pickers, option list with expandable segments, inline field errors, and Reserve cores from an option opening the side panel with that route's spans. | | |
+| TASK-049 | `api/app/routing/graph.py`: build a NetworkX `Graph` from the Postgres span table, with sites as nodes and spans as edges (weight = span km). Segments are not in the graph. Build at startup and after each confirmed upload or span edit. | | |
+| TASK-050 | `GET /api/routes/endpoints` lists all sites. `GET /api/routes?from=&to=&cores_needed=&sort=km|free_cores` takes the first 10 paths from `shortest_simple_paths`, then sorts by km (default) or by fewest free cores on any span of the path, highest first; each option returns its ordered spans (with km, free cores and segment label), total km, estimated dB (null when any span has no distance), fewest free cores, measured spans out of spans on the path, and an insufficient-cores flag. Invalid input returns 422 with a field name. | | |
+| TASK-051 | UI: From and To pickers listing all sites, a sort control (km or free cores), the options list in a fixed-size box where only the list scrolls, expandable options showing spans grouped by segment label, inline field errors, and Reserve cores from an option opening the side panel with that route's spans. | | |
 
 Completion: TEST-012 passes.
 
@@ -217,7 +221,7 @@ Completion: the map loads with no request leaving the network (checked in Playwr
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
 | TASK-056 | `api/app/notify/email.py` using stdlib `smtplib` and `email.message`; does nothing when `SMTP_HOST` is empty. | | |
-| TASK-057 | APScheduler job in `api/app/notify/jobs.py`, daily: take PostgreSQL advisory lock, insert into `job_runs` for today (skip on conflict), send each active planner their stale list; stale items of deactivated planners go to all active admins. | | |
+| TASK-057 | APScheduler job in `api/app/notify/jobs.py`, daily: take PostgreSQL advisory lock, insert into `job_runs` for today in Asia/Kuala_Lumpur (skip on conflict), send each active planner their stale list; stale items of deactivated planners go to all active admins. | | |
 | TASK-058 | On each new request, email all active admins (same no-op rule). | | |
 
 Completion: TEST-013 passes. SMTP access is not available yet, so this phase is expected to move to v1.1; the in-app Needs review and bell count already cover the requirement.
@@ -282,17 +286,18 @@ All backend tests run with `docker compose exec api pytest` against the PostGIS 
 - **TEST-001**: Two concurrent `POST /api/reservations` for the same core: exactly one succeeds, the other returns 409 listing the taken core.
 - **TEST-002**: Request, then approve: cores show Reserved. Request, then reject without a reason: 422. Reject with a reason: cores Available, reason visible to the planner.
 - **TEST-003**: Withdraw own pending request frees cores at once; withdrawing another planner's request returns 403.
-- **TEST-004**: Request release, decline without reason (422), decline with reason, request again, release: cores Available, full event history kept.
-- **TEST-005**: A reservation approved more than 3 months ago appears in Needs review; after keep it does not; an imported undated reservation counts from its import date.
-- **TEST-006**: Admin self-approval is refused while another active admin exists and allowed when the admin is the only one. Correction requires a reason, is refused with 409 on a pending, rejected, withdrawn or released reservation, and leaves the original event in history.
+- **TEST-004**: Approved two-span route reservation. Request release of one span's cores, decline without reason (422), decline with reason, request again, release: those cores are Available and the other span's cores stay Reserved. The reservation, its cores and the full event history are kept, and `release_cores` lists the cores of each release event. Releasing the remaining cores ends the reservation.
+- **TEST-005**: A reservation approved more than 3 months ago appears in Needs review; after keep it does not; an imported undated reservation counts from its import date, and its date cannot be corrected.
+- **TEST-006**: Admin self-approval is refused while another active admin exists and allowed when the admin is the only one. Correction requires a reason, changes only customer and planned date (a change to cores is refused), is refused with 409 on a pending, rejected, withdrawn or released reservation, and leaves the original values in history.
 - **TEST-007**: Login with a wrong password fails; a deactivated user cannot log in; a new user is forced to change their password; a planner gets 403 on every `/api/admin/` endpoint.
 - **TEST-008**: Loss bands: deviation below calculated is green; boundary values at 3%, 7% and 10%; above 10% is off_scale; missing distance gives no calculated loss.
 - **TEST-009**: Upload validation: rejected rows with reasons, duplicate Port ID warning, duplicate cable warning, ambiguous segment chain flagged, nothing saved before confirm.
 - **TEST-010**: Re-upload: no duplicates, missing rows untouched, protected fields kept unless ticked, measurements appended, reservations never changed, a row marking a held core Faulty sends the reservation to Needs review.
 - **TEST-011**: Core status edit without a reason returns 422; with a reason writes `data_edits`; a distance edit changes calculated loss.
-- **TEST-012**: Routing on a small fixture graph returns at most 3 options in km order, the correct fewest free cores, null estimated dB when a span has no distance, and the insufficient flag.
+- **TEST-012**: Routing on a small fixture graph (sites as nodes, spans as edges) returns at most 10 options, in km order by default and by most free cores with `sort=free_cores`, the correct fewest free cores, loss confidence as measured spans out of spans, null estimated dB when a span has no distance, the insufficient flag, and a route that starts or ends at a site inside a segment.
 - **TEST-013**: The daily job run twice on the same day sends once.
 - **TEST-014**: Playwright: port grid keyboard operation, non-colour status marks, 4.5:1 contrast in light and dark themes.
+- **TEST-015**: Reservation rows in an upload: a row without a customer is Rejected and not imported, and imports after the Excel is fixed and uploaded again; an undated row imports with a warning; a row whose core is already held is skipped; a row with an unknown region is Rejected.
 
 ## 7. Risks & Assumptions
 
@@ -302,6 +307,7 @@ All backend tests run with `docker compose exec api pytest` against the PostGIS 
 - **RISK-004**: Loss band boundaries are not stated as inclusive or exclusive in the PRD. TEST-008 fixes whichever rule is agreed. Until decided, a value exactly on 3%, 7% or 10% belongs to the lower level.
 - **RISK-006**: A Southeast Asia extract capped at zoom 14 may be too large to ship easily between machines. Map tiles cannot travel by email (CON-008), so the PMTiles extract must be downloaded or built on each target machine, which may need its own IT ticket for the download source. Option to decide in the workflow's Step 3 spike: Malaysia at zoom 14 plus the rest of Southeast Asia at a lower zoom.
 - **RISK-007**: Outlook may block or strip zip attachments, or attachments above a size limit. Fallback to agree with IT: a shared drive or an internal Git host.
+- **RISK-008**: KMZ routes are named `<site A> - <site B>`, but several segments can share the same two end sites, so a KMZ name may match more than one segment. Such routes go to the validation report. Check against the mock files arriving 22 October 2026.
 - **ASSUMPTION-001**: The span key is the unordered site pair; Excel may list a span as A to B or B to A.
 - **ASSUMPTION-002**: Phase 12 moves to v1.1 because SMTP access comes later.
 - **ASSUMPTION-003**: Planned workflow Steps 3 (spike) and 4 (tickets) run before Phase 1 starts, unless skipped by decision.

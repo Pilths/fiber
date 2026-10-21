@@ -14,6 +14,10 @@ Read before working: `docs/PRD.md` (requirements), `docs/architecture.md` (desig
 ## Domain rules
 
 - Reservations are insert-only events. An upload never changes a reservation.
+- Release is not deletion. It adds a 'released' event and frees only the `core_holds` lock row; the reservation, its cores and its events stay. A release can cover only some cores of a route reservation.
+- Corrections are only for customer and planned date, on approved reservations, with a reason, as a 'corrected' event. Cores are never corrected or swapped: release and request again. Customer is required on every reservation.
+- Segments are labels for display and the KMZ map line. Routing runs over spans: sites are nodes, spans are edges, and any site can route to any site.
+- Time zone is Asia/Kuala_Lumpur for date logic (stale rule, daily digest) and date display. Timestamps are stored in UTC (timestamptz).
 - Every write is attributable to a user, and every data edit needs a reason and is kept as history.
 - Nothing is deleted. Accounts are deactivated.
 - After the first import the dashboard database is the source of truth and the Excel is a feed. A field edited in the dashboard is protected from uploads.

@@ -41,6 +41,68 @@ def test_append_only(db, ids, table, op):
         db.execute(text(op.format(t=table)))
 
 
+def release_event(db, i):
+    return one(db, "INSERT INTO reservation_events (reservation_id, type, user_id) "
+                   "VALUES (:res,'release_requested',:user) RETURNING id", **i)
+
+
+@pytest.mark.parametrize("table, col", [("reservations", "created_at"), ("reservation_cores", "core_id"),
+                                        ("release_cores", "core_id")])
+@pytest.mark.parametrize("op", ["UPDATE {t} SET {c} = {c}", "DELETE FROM {t}"])
+def test_append_only_reservation_tables(db, ids, table, col, op):
+    db.execute(text("INSERT INTO reservation_cores (reservation_id, core_id) VALUES (:res,:core)"), ids)
+    db.execute(text("INSERT INTO release_cores (event_id, core_id) VALUES (:ev,:core)"),
+               {**ids, "ev": release_event(db, ids)})
+    with pytest.raises(DBAPIError, match="append-only"):
+        db.execute(text(op.format(t=table, c=col)))
+
+
+def correction(db, i, kind, **p):
+    db.execute(text("INSERT INTO reservation_events (reservation_id, type, user_id, reason, customer_id, planned_date) "
+                    "VALUES (:res,:k,:user,:reason,:customer_id,:planned_date)"),
+               {**i, "k": kind, "reason": None, "customer_id": None, "planned_date": None, **p})
+
+
+def test_customer_on_non_corrected_fails(db, ids):
+    cust = one(db, "SELECT id FROM customers")
+    with pytest.raises(IntegrityError):
+        correction(db, ids, "approved", customer_id=cust)
+
+
+def test_corrected_without_change_fails(db, ids):
+    with pytest.raises(IntegrityError):
+        correction(db, ids, "corrected", reason="typo")
+
+
+def test_corrected_without_reason_fails(db, ids):
+    with pytest.raises(IntegrityError):
+        correction(db, ids, "corrected", reason="  ", planned_date="2026-12-01")
+
+
+def test_corrected_inserts(db, ids):
+    correction(db, ids, "corrected", reason="moved", planned_date="2026-12-01")
+
+
+def test_duplicate_release_core_fails(db, ids):
+    sql = "INSERT INTO release_cores (event_id, core_id) VALUES (:ev,:core)"
+    p = {**ids, "ev": release_event(db, ids)}
+    db.execute(text(sql), p)
+    with pytest.raises(IntegrityError):
+        db.execute(text(sql), p)
+
+
+def test_segments_share_end_sites(db, ids):
+    sql = "INSERT INTO segments (site_a_id, site_b_id) VALUES (:x,:y)"
+    db.execute(text(sql), {"x": ids["a"], "y": ids["b"]})
+    db.execute(text(sql), {"x": ids["a"], "y": ids["b"]})
+    db.execute(text(sql), {"x": ids["b"], "y": ids["a"]})
+
+
+def test_measurement_method_and_team(db, ids):
+    db.execute(text("INSERT INTO measurements (span_id, loss_db, test_method, field_team) "
+                    "VALUES (:span, 1.5, 'OTDR', 'Team A')"), ids)
+
+
 def test_second_hold_fails(db, ids):
     sql = "INSERT INTO core_holds (core_id, reservation_id) VALUES (:core, :res)"
     db.execute(text(sql), ids)

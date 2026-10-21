@@ -101,7 +101,7 @@ Do not create a separate agent per phase. Make an agent only when it needs a dif
 - A release request shows in Approvals and the bell count. Cores stay Reserved until an admin releases them. A declined release needs a reason.
 - Accounts are deactivated, never deleted. Their pending requests stay in the admin queue and their digests go to all admins.
 - Login stays in the MVP and is built right after the approval flow.
-- Uploads match spans by the two sites plus route type, and ports by Port ID. A circuit ID in a row attaches to its core. Rows missing from a file are left untouched. Conflicts with a Requested or Reserved core go to Needs review.
+- Uploads match spans by the two sites (two sites have at most one span), and ports by Port ID. A circuit ID in a row attaches to its core. Rows missing from a file are left untouched. Conflicts with a Requested or Reserved core go to Needs review.
 - One span carries many circuits, so circuit ID lives on the core.
 - Link loss coverage counts spans with a reading.
 - Page count, navigation, layout and the visual form of each feature are open for design. The PRD fixes behaviour and accessibility only.
