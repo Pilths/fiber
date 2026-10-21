@@ -68,7 +68,7 @@ Dates assume work every day, including weekends. Session dates are targets, not 
 | TASK-006 | Scaffold `web/` with Vite (React + TypeScript template) and the npm pins from `docs/architecture.md`, TypeScript `6.0.3`. Add Tailwind CSS 4 and initialise shadcn/ui. `web/Dockerfile` from `node:24.22.1-slim`. In `web/vite.config.ts`, proxy `/api` to `http://api:8000`. `web/src/App.tsx` fetches `/api/health` and prints the result. | ✅ | 2026-10-21 |
 | TASK-007 | Add the "Rules for CLAUDE.md" from `docs/fiber-dashboard-workflow.md` to `CLAUDE.md`, plus the commands: `docker compose up`, `docker compose exec api pytest`, `docker compose exec api alembic upgrade head`, `npm run gen:api` (in `web/`). | ✅ | 2026-10-21 |
 | TASK-008 | After the first pull, replace the `db` image tag with its digest (`postgis/postgis:18-3.6@sha256:...`) and record the PostGIS patch version from `SELECT postgis_full_version()` in `docs/architecture.md`. | ✅ | 2026-10-21 |
-| TASK-009 | First commit on branch `main` (rename from `master`). | | |
+| TASK-009 | First commit on branch `main` (rename from `master`). | ✅ | 2026-10-21 |
 | TASK-065 | Corporate certificate support (DEP-009). Both Dockerfiles accept an optional CA certificate file `certs/corporate-ca.crt`. The `certs/` folder is git-ignored except a README. If the file is present, add it to the image's trust store and point `PIP_CERT`, `REQUESTS_CA_BUNDLE` and `NODE_EXTRA_CA_CERTS` at it. If it is absent, the build works unchanged. | ✅ | 2026-10-21 |
 | TASK-066 | Transfer check. Create the zip with `git archive --format=zip -o fiber.zip HEAD`, email it to the work laptop, unzip, copy `.env.example` to `.env`, run `docker compose up --build`, and confirm the completion criteria below there. | | |
 
