@@ -1,0 +1,9 @@
+.env
+node_modules/
+__pycache__/
+.venv/
+dist/
+*:Zone.Identifier
+test-results/
+playwright-report/
+certs/*.crt
