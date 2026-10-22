@@ -124,9 +124,9 @@ Do not create a separate agent per phase. Make an agent only when it needs a dif
 - [x] Step 0: Grill and PRD update (21 October 2026)
 - [x] Step 1: Architecture (`docs/architecture.md`, 21 October 2026)
 - [x] Step 2: Phased plan (`docs/plan.md`, 21 October 2026)
-- [ ] Step 3: Risk spike
-- [ ] Step 4: Tickets
-- [ ] Step 5: CLAUDE.md and docs/PRD.md (export ready: Fiber_Dashboard_PRD.md, 21 October 2026)
-- [ ] Step 6: Build loop (sessions 0 to 11)
+- [ ] Step 3: Risk spike (moved: map spike runs before Session 10)
+- [x] Step 4: Tickets (skipped by decision: task tables in `docs/plan.md` replace tickets)
+- [x] Step 5: CLAUDE.md and docs/PRD.md (21 October 2026)
+- [ ] Step 6: Build loop (sessions 0 to 11). Done: Session 0, Session 1 (seed waits for mock data), Session 2. Next: Session 3
 - [ ] Step 7: UI quality (per UI session)
 - [ ] Step 8: Review (per session)
