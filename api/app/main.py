@@ -5,8 +5,12 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.db import get_db
+from app.inventory.router import router as inventory_router
+from app.reservations.router import router as reservations_router
 
 app = FastAPI(title="Fiber Dashboard API")
+app.include_router(inventory_router)
+app.include_router(reservations_router)
 
 
 @app.get("/api/health")

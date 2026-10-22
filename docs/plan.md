@@ -100,11 +100,11 @@ Completion: `alembic upgrade head` succeeds on an empty database; `alembic downg
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-017 | `api/app/auth/deps.py`: `get_current_user` reads header `X-Dev-User: <username>` only when `APP_ENV=development`, returns 401 otherwise; `require_admin` returns 403 for non-admins. | | |
-| TASK-018 | `GET /api/search?q=` matching customer name, span site names, circuit ID and core number (ILIKE plus `pg_trgm` similarity), returning typed results with span ID. | | |
-| TASK-019 | `GET /api/spans?region=&route_type=&q=` returning span ID, site A and B names, route type, region, distance, free core count and status mix (count per status). `GET /api/spans/{id}` returning the span plus every core with status, customer, circuit ID, planned date and ports at both ends. | | |
-| TASK-020 | `GET /api/customers?q=` and stub `POST /api/customers` returning similar names. Stub `POST /api/reservations` (body: customer_id, planned_date, cores per span) returning a fake request ID. | | |
-| TASK-021 | In `web/`, script `gen:api` = `openapi-typescript http://localhost:8000/openapi.json -o src/api/schema.d.ts`, and `web/src/api/client.ts` as a typed fetch wrapper that sends `X-Dev-User` in development. | | |
+| TASK-017 | `api/app/auth/deps.py`: `get_current_user` reads header `X-Dev-User: <username>` only when `APP_ENV=development`, returns 401 otherwise; `require_admin` returns 403 for non-admins. | ✅ | 2026-10-22 |
+| TASK-018 | `GET /api/search?q=` matching customer name, span site names, circuit ID and core number (ILIKE plus `pg_trgm` similarity), returning typed results with span ID. | ✅ | 2026-10-22 |
+| TASK-019 | `GET /api/spans?region=&route_type=&q=` returning span ID, site A and B names, route type, region, distance, free core count and status mix (count per status). `GET /api/spans/{id}` returning the span plus every core with status, customer, circuit ID, planned date and ports at both ends. | ✅ | 2026-10-22 |
+| TASK-020 | `GET /api/customers?q=` and stub `POST /api/customers` returning similar names. Stub `POST /api/reservations` (body: customer_id, planned_date, cores per span) returning a fake request ID. | ✅ | 2026-10-22 |
+| TASK-021 | In `web/`, script `gen:api` = `openapi-typescript http://localhost:8000/openapi.json -o src/api/schema.d.ts`, and `web/src/api/client.ts` as a typed fetch wrapper that sends `X-Dev-User` in development. | ✅ | 2026-10-22 |
 
 Completion: pytest covers search by each of the four keys and the span detail shape; `npm run gen:api` produces `schema.d.ts` with no type errors in `npm run build`.
 
