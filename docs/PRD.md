@@ -28,7 +28,7 @@ The MVP serves two personas through eight user stories; login and roles stays in
 - Page count, navigation, layout and the visual form of each feature are open. The UI is explored in design, not fixed here.
 - The requirements below say what a user must be able to see and do, not how it looks.
 - Fixed constraints: WCAG 2.1 AA, status and warning levels never shown by colour alone, light and dark themes, desktop first.
-- Earlier preferences, not binding: a map-first route planning screen, a port grid for cores, top navigation, a small scrollable list for link loss.
+- Earlier preferences, not binding: a map-first route planning screen, a port grid for cores, top navigation, a list of spans for link loss.
 
 **Terms**
 
@@ -82,7 +82,7 @@ To confirm against the mock files arriving 22 October 2026: KMZ routes are named
 4. As a planner, I want to compare calculated and measured loss per span, so that I can find high-loss spans.
    - Calculated loss is distance x 0.3 dB per km in the MVP. The formula lives in backend code, so it can change later, for example to add splice and connector losses. Distance comes from the Excel, per span; a segment's distance is the sum of its spans. A span with no distance has no calculated loss and shows no distance, never 0 dB.
    - Every measurement is kept as history; the latest is shown. Measurements are stored per span. A segment shows how many of its spans are measured (x of y); how it summarises its spans' levels is left to design.
-   - For each measured span, planners see calculated loss, measured loss and the deviation in percent from calculated, with a warning level: green 0 to 3%, amber 3 to 7%, red 7 to 10%, and anything above 10% red and marked off-scale. The form is open: a chart, a small scrollable list, or both.
+   - For each measured span, planners see calculated loss, measured loss and the deviation in percent from calculated, with a warning level: green 0 to 3%, amber 3 to 7%, red 7 to 10%, and anything above 10% red and marked off-scale. The form is open: a chart, a list of spans sorted with the highest warning first, or both. The user must be able to see every span in the list, none hidden or cut off.
    - Each warning level has a label or shape, so colour is never the only signal. Thresholds are fixed for now; editable thresholds: TBD.
    - Deviation = (measured - calculated) / calculated; a measured value below calculated counts as green.
    - The difference in dB and percent, last test date, and measured or calculated-only status are available per span. The source data has test method and field team, which the backend cleans; both are stored and shown per span.
@@ -90,7 +90,7 @@ To confirm against the mock files arriving 22 October 2026: KMZ routes are named
    - Routing runs over spans: sites are the graph nodes and spans are the edges, weighted by km. Segments stay as labels for display and as the KMZ line on the map.
    - Up to 10 options are shown, each with its spans in order as building A to building B, with each span's km and free cores, grouped under their segment label where there is one. Each option shows total km, estimated dB, and the fewest free cores on any span of the path.
    - Options can be sorted by shortest km (the default) or by most free cores: the fewest free cores on any span of the path, higher is better.
-   - The options list sits in a fixed-size box; only the list inside scrolls.
+   - The user must be able to see every option returned (up to 10), none hidden or cut off. The visual form of the list is open for design.
    - From and To list all sites, so any site can route to any site, including starting or ending a route inside a segment.
    - A route's estimated loss is the sum of its spans.
    - Each option shows loss confidence, as measured spans out of spans on the path.

@@ -159,7 +159,7 @@ Completion: TEST-007 passes; `APP_ENV=production` rejects `X-Dev-User`.
 |------|-------------|-----------|------|
 | TASK-038 | `api/app/loss/service.py`: `calculated_loss_db(distance_km)` returns `distance_km * 0.3`, or `None` when distance is missing; `deviation_pct(measured, calculated)`; `warning_level(deviation_pct)` returning green, amber, red or off_scale, with values below calculated counted as green. | | |
 | TASK-039 | `GET /api/loss/spans` (calculated, latest measured, difference in dB and percent, level, last test date, test method, field team, measured or calculated-only); `GET /api/loss/coverage` (spans with at least one measurement out of all spans); segment summary with x of y spans measured. | | |
-| TASK-040 | UI: the visual form is open. Candidate forms are a Recharts chart, and/or a box of any size holding a scrollable list of spans sorted with the highest warning level first, each showing its deviation percentage. These are options, not limits. Whatever form is chosen: each level has a text label and shape; spans with no distance show "No distance", never 0 dB; coverage figure shown. Run Step 7 checks. | | |
+| TASK-040 | UI: the visual form is open. Candidate forms are a Recharts chart, and/or a list of spans sorted with the highest warning level first, each showing its deviation percentage. These are options, not limits. Whatever form is chosen: every span in the loss list is visible, none hidden or cut off; each level has a text label and shape; spans with no distance show "No distance", never 0 dB; coverage figure shown. Run Step 7 checks. | | |
 
 Completion: TEST-008 passes; the loss view passes contrast and non-colour checks in both themes.
 
@@ -197,7 +197,7 @@ Completion: TEST-011 passes.
 |------|-------------|-----------|------|
 | TASK-049 | `api/app/routing/graph.py`: build a NetworkX `Graph` from the Postgres span table, with sites as nodes and spans as edges (weight = span km). Segments are not in the graph. Build at startup and after each confirmed upload or span edit. | | |
 | TASK-050 | `GET /api/routes/endpoints` lists all sites. `GET /api/routes?from=&to=&cores_needed=&sort=km|free_cores` takes the first 10 paths from `shortest_simple_paths`, then sorts by km (default) or by fewest free cores on any span of the path, highest first; each option returns its ordered spans (with km, free cores and segment label), total km, estimated dB (null when any span has no distance), fewest free cores, measured spans out of spans on the path, and an insufficient-cores flag. Invalid input returns 422 with a field name. | | |
-| TASK-051 | UI: From and To pickers listing all sites, a sort control (km or free cores), the options list in a fixed-size box where only the list scrolls, expandable options showing spans grouped by segment label, inline field errors, and Reserve cores from an option opening the side panel with that route's spans. | | |
+| TASK-051 | UI: From and To pickers listing all sites, a sort control (km or free cores), the options list showing every option returned (up to 10), none hidden or cut off, in a form left open for design, expandable options showing spans grouped by segment label, inline field errors, and Reserve cores from an option opening the side panel with that route's spans. | | |
 
 Completion: TEST-012 passes.
 
