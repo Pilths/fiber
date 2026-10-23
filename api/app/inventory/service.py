@@ -12,7 +12,8 @@ PER_TYPE = 20
 # Span list with free cores and status mix; status always comes from core_status_v.
 SPAN_SQL = """
 SELECT s.id, a.name AS site_a, b.name AS site_b, s.route_type, s.region, s.distance_km,
-       COALESCE(mix.m, '{}'::jsonb) AS status_mix
+       s.survey_cores, s.cable_size, COALESCE(mix.m, '{}'::jsonb) AS status_mix,
+       COALESCE((SELECT sum(u.remaining) FROM reservation_unassigned_v u WHERE u.span_id = s.id), 0)::int AS unassigned_reserved
 FROM spans s
 JOIN sites a ON a.id = s.site_a_id
 JOIN sites b ON b.id = s.site_b_id
@@ -58,7 +59,11 @@ ORDER BY c.number
 
 
 def _summary(row: dict[str, Any]) -> dict[str, Any]:
-    return {**row, "free_cores": row["status_mix"].get("Available", 0)}
+    free = row["status_mix"].get("Available", 0)
+    surveyed = row["survey_cores"] is not None
+    return {**row, "free_cores": free,
+            "not_surveyed": row["cable_size"] - row["survey_cores"] if surveyed else None,
+            "free_to_reserve": max(free - row["unassigned_reserved"], 0) if surveyed else 0}
 
 
 def list_spans(db: Session, region: str | None, route_type: str | None, q: str | None,
@@ -93,6 +98,17 @@ def similar_customers(db: Session, name: str) -> list[Customer]:
         text("SELECT id, name FROM customers WHERE similarity(name, :n) >= 0.4 "
              "ORDER BY similarity(name, :n) DESC, name"), {"n": name}).mappings()
     return [Customer(**r) for r in rows]
+
+
+def find_customer(db: Session, name: str) -> Customer | None:
+    row = db.execute(text("SELECT id, name FROM customers WHERE lower(name) = lower(:n)"), {"n": name}).mappings().first()
+    return Customer(**row) if row else None
+
+
+def create_customer(db: Session, name: str, user_id: int) -> Customer:
+    row = db.execute(text("INSERT INTO customers (name, created_by) VALUES (:n, :u) "
+                          "ON CONFLICT (lower(name)) DO NOTHING RETURNING id, name"), {"n": name, "u": user_id}).mappings().first()
+    return Customer(**row) if row else find_customer(db, name)  # type: ignore[arg-type]
 
 
 # One query per key; each returns (label, span_id, core_id). q is escaped for LIKE by the caller.

@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { Bell, Moon, Search, Sun } from "lucide-react";
-import { api } from "@/api/client";
+import { Bell as BellIcon, Moon, Search, Sun } from "lucide-react";
+import { api, DEV_USERS } from "@/api/client";
 import type { components } from "@/api/schema";
 import { Button } from "@/components/ui/button";
 import { inputCls } from "@/lib/status";
@@ -147,24 +147,50 @@ function GlobalSearch({ onPick }: { onPick: (r: Result) => void }) {
   );
 }
 
-export function Header({ onPick }: { onPick: (r: Result) => void }) {
+export type View = "spans" | "mine" | "approvals" | "review";
+type Me = components["schemas"]["CurrentUser"];
+type Bell = components["schemas"]["Bell"];
+
+export function Header({ onPick, view, onView, me, bell }: {
+  onPick: (r: Result) => void;
+  view: View;
+  onView: (v: View) => void;
+  me: Me | null;
+  bell: Bell | null;
+}) {
   const [theme, cycle] = useTheme();
   const Icon = theme === "dark" ? Moon : Sun;
+  const nav: [View, string][] = [["spans", "Spans"], ["mine", "My reservations"], ...(me?.role === "admin" ? [["approvals", "Approvals"] as [View, string]] : []), ["review", "Needs review"]];
+  const total = bell?.total ?? 0;
+  const switchUser = (u: string) => {
+    try { localStorage.setItem("devUser", u); } catch { /* storage unavailable */ }
+    location.reload();
+  };
   return (
     <header className="sticky top-0 z-20 flex flex-wrap items-center gap-3 border-b bg-background px-4 py-2">
       <h1 className="text-base font-semibold">Fiber Dashboard</h1>
-      <nav aria-label="Main" className="flex gap-1">
-        <Button variant="secondary" size="sm" aria-current="page">Spans</Button>
-        {/* Placeholders until Sessions 4 and 8 */}
-        <Button variant="ghost" size="sm" aria-disabled="true" title="Planner: coming in Session 4">My reservations</Button>
-        <Button variant="ghost" size="sm" aria-disabled="true" title="Admin: coming in Session 4">Admin</Button>
+      <nav aria-label="Main" className="flex flex-wrap gap-1">
+        {nav.map(([v, label]) => (
+          <Button key={v} variant={view === v ? "secondary" : "ghost"} size="sm" aria-current={view === v ? "page" : undefined} onClick={() => onView(v)}>
+            {label}
+            {v === "approvals" && bell ? ` (${bell.approvals})` : ""}
+            {v === "review" && bell ? ` (${bell.needs_review})` : ""}
+          </Button>
+        ))}
       </nav>
       <div className="order-last w-full md:order-none md:flex-1 md:w-auto md:flex md:justify-center">
         <GlobalSearch onPick={onPick} />
       </div>
-      <Button variant="outline" size="sm" aria-label="Notifications: 0 pending">
-        <Bell aria-hidden /> <span>0</span>
+      <Button variant="outline" size="sm" aria-label={`Notifications: ${total} waiting`} onClick={() => onView(me?.role === "admin" && bell?.approvals ? "approvals" : "review")}>
+        <BellIcon aria-hidden /> <span>{total}</span>
       </Button>
+      {import.meta.env.DEV && me && (
+        <label className="text-sm">Dev user{" "}
+          <select className={inputCls} value={me.username} onChange={(e) => switchUser(e.target.value)}>
+            {DEV_USERS.map((u) => <option key={u}>{u}</option>)}
+          </select>
+        </label>
+      )}
       <Button variant="outline" size="sm" onClick={cycle} aria-label={`Theme: ${theme}. Click to change`}>
         <Icon aria-hidden /> Theme: {theme}
       </Button>

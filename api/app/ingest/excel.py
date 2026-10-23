@@ -113,8 +113,19 @@ def _reservation(r: RowResult, f: dict[str, Any], label: str | None, known: set[
             reasons.append(why)
     else:
         reasons.append("Nodes is not in the form AABB-BBCC")
+    count = f.get("no of core requested")
     blocks, why = checks.pair_ports(f.get("core assignment"))
-    if why:
+    p["unassigned_cores"] = 0
+    if blank(f.get("core assignment")) and not blank(count):
+        # count-only reservation: cores wanted, ports not assigned yet
+        try:
+            p["unassigned_cores"] = int(float(str(count).strip()))
+            if p["unassigned_cores"] < 1 or p["unassigned_cores"] != float(str(count).strip()):
+                raise ValueError
+        except ValueError:
+            p["unassigned_cores"] = 0
+            reasons.append(f"cannot read no of core requested '{count}'")
+    elif why:
         reasons.append(why)
     elif blocks and nodes and {b[0] for b in blocks} != set(nodes[:2]):
         reasons.append("core assignment sites do not match Nodes")

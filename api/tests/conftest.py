@@ -5,6 +5,7 @@ from alembic import command
 from alembic.config import Config
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import make_url
+from sqlalchemy.orm import Session
 from sqlalchemy.pool import NullPool
 
 _base = make_url(os.environ["DATABASE_URL"])
@@ -37,3 +38,19 @@ def db(engine):
         outer = conn.begin()
         yield conn
         outer.rollback()
+
+
+@pytest.fixture
+def client(db):
+    from fastapi.testclient import TestClient
+
+    from app.db import get_db
+    from app.main import app
+
+    def override():
+        with Session(bind=db) as s:
+            yield s
+
+    app.dependency_overrides[get_db] = override
+    yield TestClient(app)
+    app.dependency_overrides.clear()

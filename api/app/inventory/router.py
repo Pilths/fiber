@@ -3,11 +3,11 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from app.auth.deps import get_current_user
+from app.auth.deps import CurrentUser, get_current_user
 from app.db import get_db
 from app.inventory import service
 from app.inventory.schemas import (
-    Customer, CustomerCreate, CustomerStub, SearchResult, SpanDetail, SpanSummary,
+    Customer, CustomerCreate, CustomerResult, SearchResult, SpanDetail, SpanSummary,
 )
 
 router = APIRouter(prefix="/api", dependencies=[Depends(get_current_user)])
@@ -39,6 +39,17 @@ def list_customers(db: DB, q: str | None = None) -> list[Customer]:
 
 
 @router.post("/customers")
-def create_customer(db: DB, body: CustomerCreate) -> CustomerStub:
-    """STUB (real one is TASK-029): inserts nothing, only returns similar existing names."""
-    return CustomerStub(name=body.name, similar=service.similar_customers(db, body.name))
+def create_customer(db: DB, user: Annotated[CurrentUser, Depends(get_current_user)], body: CustomerCreate) -> CustomerResult:
+    """Existing name (any case): returned as is. Similar names (>= 0.4) need confirm_new=true before a new one is created."""
+    name = " ".join(body.name.split())
+    if not name:
+        raise HTTPException(422, "Customer name is required")
+    exact = service.find_customer(db, name)
+    if exact:
+        return CustomerResult(created=False, customer=exact, similar=[])
+    similar = service.similar_customers(db, name)
+    if similar and not body.confirm_new:
+        return CustomerResult(created=False, customer=None, similar=similar)
+    created = service.create_customer(db, name, user.id)
+    db.commit()
+    return CustomerResult(created=True, customer=created, similar=[])

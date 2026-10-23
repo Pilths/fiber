@@ -13,13 +13,20 @@ test("keyboard: roving tabindex, arrows, Space/Enter select only Available", asy
   await openSpan(page);
   const cells = page.getByRole("gridcell");
   expect(await cells.count()).toBe(24);
+  await expect(page.getByTestId("capacity")).toContainText("Surveyed 24 of cable 144");
+  await expect(page.getByTestId("capacity")).toContainText("Free to reserve 18");
+  // 12 cores per row, and the whole row fits the panel at 1280px (no horizontal scroll)
+  const tops = await cells.evaluateAll((els) => els.slice(0, 13).map((e) => Math.round(e.getBoundingClientRect().top)));
+  expect(new Set(tops.slice(0, 12)).size).toBe(1);
+  expect(tops[12]).toBeGreaterThan(tops[0]);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await expect(page.locator('[role=gridcell][tabindex="0"]')).toHaveCount(1);
 
   await cells.first().focus();
   await page.keyboard.press("ArrowRight");
   await expect(cells.nth(1)).toBeFocused();
   await page.keyboard.press("ArrowDown");
-  await expect(cells.nth(7)).toBeFocused();
+  await expect(cells.nth(13)).toBeFocused(); // 12 cores per row
   await page.keyboard.press("End");
   await expect(cells.last()).toBeFocused();
   await page.keyboard.press("Home");
@@ -140,3 +147,42 @@ for (const theme of ["light", "dark"] as const) {
     for (const [k, v] of Object.entries(ratios)) expect(v, `${k} ${v.toFixed(2)}`).toBeGreaterThanOrEqual(4.5);
   });
 }
+
+test("count-only reservation shows on the span and in My reservations; admin sees Approvals", async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem("theme", "light"));
+  await page.goto("/");
+  await page.getByRole("button", { name: /Cyberjaya DC - DEV Bukit Jalil/ }).click();
+  await expect(page.getByTestId("capacity")).toContainText("+3 reserved, not assigned");
+  await expect(page.getByTestId("capacity")).toContainText("Free to reserve 17");
+  await page.getByRole("button", { name: "My reservations" }).click();
+  await expect(page.getByTestId("reservation").filter({ hasText: "3 not assigned yet" })).toBeVisible();
+  await page.getByRole("button", { name: "Rejected" }).click();
+  await expect(page.getByText("No reservations that are rejected.")).toBeVisible();
+});
+
+test("planner books and withdraws a core request, admin sees Approvals", async ({ browser }) => {
+  const planner = await (await browser.newContext({ viewport: { width: 1280, height: 900 } })).newPage();
+  await planner.addInitScript(() => localStorage.setItem("devUser", "planner2"));
+  await planner.goto("/");
+  await planner.getByRole("button", { name: /DEV Bukit Jalil TOC - DEV Kuantan Hut/ }).click();
+  await planner.locator('[role=gridcell][data-status="Available"]').first().click();
+  await planner.getByRole("button", { name: /Reserve cores/ }).click();
+  const dlg = planner.getByRole("dialog");
+  await dlg.getByLabel("Search customers").fill("DEV Telco Alpha");
+  await dlg.getByRole("button", { name: "DEV Telco Alpha" }).click();
+  await dlg.getByRole("button", { name: "Submit request" }).click();
+  await expect(dlg.getByRole("status")).toContainText("sent (pending)");
+  await planner.keyboard.press("Escape");
+  await planner.getByRole("button", { name: /My reservations/ }).click();
+  await expect(planner.getByTestId("reservation").first()).toContainText("Pending approval");
+  await planner.getByRole("button", { name: "Withdraw" }).first().click(); // leave the dev data as found
+  await expect(planner.getByText("Withdrawn").first()).toBeVisible();
+
+  const admin = await (await browser.newContext()).newPage();
+  await admin.addInitScript(() => localStorage.setItem("devUser", "admin1"));
+  await admin.goto("/");
+  await admin.getByRole("button", { name: /^Approvals/ }).click();
+  await expect(admin.getByRole("heading", { name: /^Approvals/ })).toBeVisible();
+  await expect(admin.getByRole("button", { name: "Approve" }).first()).toBeVisible();
+  await expect(admin.getByRole("button", { name: "Reject" }).first()).toBeVisible();
+});

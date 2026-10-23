@@ -43,7 +43,12 @@ export function SpanList({ spans, selectedId, onSelect }: { spans: Span[]; selec
               <span className="block text-sm text-muted-foreground">
                 {[s.region, s.route_type, s.distance_km && `${Number(s.distance_km)} km`].filter(Boolean).join(" / ")}
               </span>
-              <span className="mt-1 block text-sm"><strong>{s.free_cores} free</strong> of {Object.values(s.status_mix).reduce((a, b) => a + b, 0)}</span>
+              <span className="mt-1 block text-sm">
+                {s.survey_cores == null
+                  ? <strong>Not surveyed</strong>
+                  : <><strong>{s.free_to_reserve} free to reserve</strong> of {s.survey_cores} surveyed</>}
+                {s.unassigned_reserved > 0 && ` (+${s.unassigned_reserved} reserved, not assigned)`}
+              </span>
               <span className="block text-xs text-muted-foreground">
                 {STATUS_ORDER.filter((k) => s.status_mix[k]).map((k) => `${STATUS[k].symbol} ${k} ${s.status_mix[k]}`).join("  ")}
               </span>

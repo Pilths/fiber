@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { api, ApiError } from "@/api/client";
+import { api, ApiError, errorText } from "@/api/client";
 import type { components } from "@/api/schema";
 import { Button } from "@/components/ui/button";
 import { inputCls } from "@/lib/status";
@@ -24,6 +24,7 @@ export function ReservePanel({ spanLabel, cores, onClose, onDone }: {
   const [tried, setTried] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [sent, setSent] = useState(false);
 
   useEffect(() => {
     dlg.current?.showModal();
@@ -40,13 +41,11 @@ export function ReservePanel({ spanLabel, cores, onClose, onDone }: {
   }, [q, customer]);
 
   const exact = matches.some((m) => m.name.toLowerCase() === q.trim().toLowerCase());
-  const addNew = async () => {
-    const name = q.trim();
+  const addNew = async (confirmNew: boolean) => {
     try {
-      const r = await api.post("/api/customers", { body: { name } });
-      setSimilar(r.similar);
-      // STUB: the endpoint stores nothing and returns no id yet (TASK-029); id 0 is a placeholder.
-      if (!r.similar.length) setCustomer({ id: 0, name, isNew: true });
+      const r = await api.post("/api/customers", { body: { name: q.trim(), confirm_new: confirmNew } });
+      if (r.customer) setCustomer({ ...r.customer, isNew: r.created });
+      else setSimilar(r.similar); // similar names exist: warn, the planner confirms
     } catch {
       setMsg("Could not check the customer name. Try again.");
     }
@@ -71,10 +70,11 @@ export function ReservePanel({ spanLabel, cores, onClose, onDone }: {
     setBusy(true);
     try {
       const r = await api.post("/api/reservations", { body: { customer_id: customer.id, planned_date: date || null, cores: cores.map((c) => c.id) } });
-      setMsg(`Request sent (${r.status}, id ${r.id}). Nothing is reserved until an admin approves.`);
+      setMsg(`Request #${r.id} sent (${r.status}). Nothing is reserved until an admin approves.`);
+      setSent(true);
       onDone();
     } catch (err) {
-      setMsg(err instanceof ApiError && err.status === 409 ? "Some cores were taken. Close this panel and pick again." : "Submit failed. Try again.");
+      setMsg(errorText(err, "Submit failed. Try again.") + (err instanceof ApiError && err.status === 409 ? " Close this panel and pick again." : ""));
     } finally {
       setBusy(false);
     }
@@ -109,14 +109,14 @@ export function ReservePanel({ spanLabel, cores, onClose, onDone }: {
                   <li key={m.id}><Button type="button" variant="ghost" size="sm" className="w-full justify-start" onClick={() => setCustomer(m)}>{m.name}</Button></li>
                 ))}
               </ul>
-              {q.trim() && !exact && <Button type="button" variant="secondary" size="sm" onClick={addNew}>Add "{q.trim()}" as a new customer</Button>}
+              {q.trim() && !exact && <Button type="button" variant="secondary" size="sm" onClick={() => addNew(false)}>Add "{q.trim()}" as a new customer</Button>}
               {similar && similar.length > 0 && (
                 <div role="alert" className="rounded-lg border-2 border-foreground p-2 text-sm">
                   <strong>Warning: similar customers already exist:</strong>
                   <ul className="list-disc pl-5">{similar.map((s) => <li key={s.id}>{s.name}</li>)}</ul>
                   <div className="mt-2 flex flex-wrap gap-2">
                     {similar.map((s) => <Button key={s.id} type="button" size="sm" variant="outline" onClick={() => setCustomer(s)}>Use {s.name}</Button>)}
-                    <Button type="button" size="sm" variant="outline" onClick={() => setCustomer({ id: 0, name: q.trim(), isNew: true })}>Create new anyway</Button>
+                    <Button type="button" size="sm" variant="outline" onClick={() => addNew(true)}>Create new anyway</Button>
                   </div>
                 </div>
               )}
@@ -138,7 +138,7 @@ export function ReservePanel({ spanLabel, cores, onClose, onDone }: {
 
         {tried && problem && customer && <p role="alert" className="text-sm font-medium text-destructive">{problem}</p>}
         {msg && <p role="status" className="rounded-lg border p-2 text-sm">{msg}</p>}
-        <Button type="submit" disabled={busy}>Submit request</Button>
+        <Button type="submit" disabled={busy || sent}>Submit request</Button>
       </form>
     </dialog>
   );

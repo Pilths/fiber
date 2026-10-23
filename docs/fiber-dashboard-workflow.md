@@ -2,7 +2,7 @@
 
 How to use this file: Claude (chat or Claude Code) reads it to know which step the project is on, which tool to use, and what the output of each step is. Update the status checklist at the bottom as steps finish.
 
-Constraints: 11 days from 20 October 2026, MVP by 31 October. Cut order from the PRD: email digest first, then real KMZ routes on the map (simple SVG map as fallback), then span and site editing. Core status editing stays. v6 mock already exists. Keep the skill set small, because overlapping skills give conflicting instructions.
+Constraints: 11 days from 20 October 2026, MVP by 31 October. Cut order from the PRD: email digest first, then real KMZ routes on the map (simple SVG map as fallback), then span and site editing. Core status editing stays. The v6 mock is dropped: new mock dashboard designs are made in this project first (Step 7 trial). Keep the skill set small, because overlapping skills give conflicting instructions.
 
 ## Flowchart
 
@@ -57,20 +57,20 @@ The order builds the last-to-be-cut items first.
 - Session 1: Schema and Alembic. Reservations are insert-only events. Internal span ID is the key. Circuit ID is an optional field on the core. Measurements per span. `user_id` on every write. Edit history with reasons. Seed from the mock Excel.
 - Session 2: Search, span and core endpoints. Generate the TypeScript client. A dev-only header stands in for the acting user.
 - Session 3: Span list, port grid and the Reserve side panel. UI session, runs Step 7.
-- Session 4: Approval flow: request, approve, reject, withdraw, release request. Needs review list and bell count.
+- Session 4: Approval flow: request, approve, reject, withdraw, release request. Needs review list and bell count. Also migration 0004 (cable size, count-only reservations, `assign` action) and the free to reserve limit.
 - Session 5: Minimal login: local accounts, planner and admin roles, forced password change, deactivate. Replaces the dev header.
 - Session 6: Loss warning levels per span (green 0 to 3%, amber 3 to 7%, red 7 to 10%). The form is open: chart, small scrollable list, or both. A segment shows x of y spans measured. No distance shown instead of 0 dB. UI session.
 - Session 7: Admin upload in three steps: Upload, Preview, Confirm. Protected edits, first import of reservations, upload log.
 - Session 8: Admin editing. Core status first (stays in MVP), then span and site details (third cut).
 - Session 9: NetworkX routing.
-- Session 10: Map, time-boxed. Fall back to the SVG map from the v6 mock if it overruns (second cut).
+- Session 10: Map, time-boxed. Fall back to a plain SVG map of sites and straight span lines, without a basemap, if it overruns (second cut).
 - Session 11: Email digest, admin request emails and the in-app scheduler (first cut).
 
 After Session 1, run a second grill in Claude Code against the real Alembic migrations.
 
 ## Step 7 trial (Session 3)
 
-Before committing to Impeccable, run a 30 minute trial on the port grid. Give Claude the v6 mock and the PRD acceptance criteria, build the component, then run `/impeccable audit`. If it fails the criteria, swap the skill.
+Before committing to Impeccable, run a 30 minute trial on the port grid. Give Claude the new mockups (span view, approvals, routing, map and admin upload, picked by the owner) and the PRD acceptance criteria, build the component, then run `/impeccable audit`. If it fails the criteria, swap the skill.
 
 Checks the UI must pass:
 - Status is never shown by colour alone.
@@ -127,6 +127,6 @@ Do not create a separate agent per phase. Make an agent only when it needs a dif
 - [ ] Step 3: Risk spike (moved: map spike runs before Session 10)
 - [x] Step 4: Tickets (skipped by decision: task tables in `docs/plan.md` replace tickets)
 - [x] Step 5: CLAUDE.md and docs/PRD.md (21 October 2026)
-- [ ] Step 6: Build loop (sessions 0 to 11). Done: Session 0, Session 1 (seed waits for mock data), Session 2. Next: Session 3
+- [ ] Step 6: Build loop (sessions 0 to 11). Done: Session 0, Session 1 (seed waits for mock data), Session 2, Session 3 and Session 4 (24 October 2026). Next: Session 5
 - [ ] Step 7: UI quality (per UI session)
 - [ ] Step 8: Review (per session)

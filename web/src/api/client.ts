@@ -12,10 +12,28 @@ type Body<O> = O extends { requestBody: { content: { "application/json": infer B
 type Options<O, M extends Method> = {
   path?: Part<Part<O, "parameters">, "path">;
   query?: Part<Part<O, "parameters">, "query">;
-} & (M extends "post" ? { body: Body<O> } : unknown);
+} & (M extends "post" ? ([Body<O>] extends [never] ? { body?: undefined } : { body: Body<O> }) : unknown);
 
 // Only sent in development; the real sign-in replaces it (TASK-034).
-const devUser = import.meta.env.DEV ? (import.meta.env.VITE_DEV_USER ?? "planner1") : undefined;
+// The header switcher stores another dev user in localStorage.
+export const DEV_USERS = ["planner1", "planner2", "admin1", "admin2"];
+export const devUser = (): string | undefined => {
+  if (!import.meta.env.DEV) return undefined;
+  try {
+    const u = localStorage.getItem("devUser");
+    if (u && DEV_USERS.includes(u)) return u;
+  } catch {
+    /* storage unavailable */
+  }
+  return import.meta.env.VITE_DEV_USER ?? "planner1";
+};
+
+export const errorText = (e: unknown, fallback: string): string => {
+  const d = e instanceof ApiError ? (e.detail as { detail?: unknown } | null)?.detail : null;
+  if (typeof d === "string") return d;
+  if (d && typeof d === "object" && "message" in d) return String((d as { message: unknown }).message);
+  return fallback;
+};
 
 export class ApiError extends Error {
   status: number;
@@ -38,7 +56,8 @@ async function request<P extends Path<M>, M extends Method>(
   const qs = new URLSearchParams();
   for (const [k, v] of Object.entries(o.query ?? {})) if (v != null) qs.set(k, String(v));
   const headers: Record<string, string> = {};
-  if (devUser) headers["X-Dev-User"] = devUser;
+  const dev = devUser();
+  if (dev) headers["X-Dev-User"] = dev;
   if (o.body !== undefined) headers["Content-Type"] = "application/json";
   const res = await fetch(qs.size ? `${href}?${qs}` : href, {
     method: method.toUpperCase(),
@@ -51,5 +70,6 @@ async function request<P extends Path<M>, M extends Method>(
 
 export const api = {
   get: <P extends Path<"get">>(url: P, opts?: Options<Op<P, "get">, "get">) => request("get", url, opts),
-  post: <P extends Path<"post">>(url: P, opts: Options<Op<P, "post">, "post">) => request("post", url, opts),
+  post: <P extends Path<"post">>(url: P, ...[opts]: {} extends Options<Op<P, "post">, "post"> ? [opts?: Options<Op<P, "post">, "post">] : [opts: Options<Op<P, "post">, "post">]) =>
+    request("post", url, opts),
 };

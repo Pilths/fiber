@@ -3,7 +3,7 @@ import type { components } from "@/api/schema";
 import { STATUS, STATUS_ORDER } from "@/lib/status";
 
 type Core = components["schemas"]["CoreDetail"];
-const COLS = 6;
+const COLS = 12; // one fibre tube per row
 
 export function PortGrid({ cores, selected, onToggle, focusCoreId }: {
   cores: Core[];
@@ -49,9 +49,9 @@ export function PortGrid({ cores, selected, onToggle, focusCoreId }: {
           </li>
         ))}
       </ul>
-      <div role="grid" aria-label="Cores" aria-multiselectable="true" className="inline-flex flex-col gap-2">
+      <div role="grid" aria-label="Cores" aria-multiselectable="true" className="flex max-w-full flex-col gap-1 overflow-x-auto">
         {rows.map((row, r) => (
-          <div role="row" key={r} className="flex gap-2">
+          <div role="row" key={r} aria-label={`Tube ${r + 1}`} className="flex gap-1">
             {row.map((c, j) => {
               const i = r * COLS + j;
               const avail = c.status === "Available";
@@ -66,14 +66,14 @@ export function PortGrid({ cores, selected, onToggle, focusCoreId }: {
                   aria-disabled={!avail}
                   title={label(c)}
                   data-status={c.status}
-                  className={`core ${STATUS[c.status].cls} flex h-14 w-[5.5rem] cursor-pointer select-none flex-col items-center justify-center rounded-md text-xs`}
+                  className={`core ${STATUS[c.status].cls} flex h-12 w-16 shrink-0 cursor-pointer select-none flex-col items-center justify-center rounded-md text-[11px] leading-tight`}
                   onClick={() => { setIdx(i); if (avail) onToggle(c.id); }}
                   onFocus={() => { setIdx(i); setCaption(c); }}
                   onMouseEnter={() => setCaption(c)}
                   onMouseLeave={() => setCaption(null)}
                   onKeyDown={(e) => onKey(e, i, c)}
                 >
-                  <span className="text-sm font-semibold">
+                  <span className="text-xs font-semibold">
                     <span aria-hidden>{selected.has(c.id) ? "✓" : STATUS[c.status].symbol}</span> {c.number}
                   </span>
                   <span>{c.status}</span>

@@ -1,10 +1,5 @@
 import pytest
-from fastapi.testclient import TestClient
 from sqlalchemy import text
-from sqlalchemy.orm import Session
-
-from app.db import get_db
-from app.main import app
 
 H = {"X-Dev-User": "planner1"}
 
@@ -22,6 +17,7 @@ def net(db):
                for n in ("Alpha Hub", "Bravo Hub", "Charlie Hub"))
     s1 = one(db, "INSERT INTO spans (site_a_id, site_b_id, region, route_type, distance_km) "
                  "VALUES (:a,:b,'North','Trunk',10) RETURNING id", a=a, b=b)
+    db.execute(text("UPDATE spans SET survey_cores = 5 WHERE id = :s"), dict(s=s1))
     s2 = one(db, "INSERT INTO spans (site_a_id, site_b_id, region) VALUES (:a,:b,'Central') RETURNING id", a=b, b=c)
     cores = {}
     for n in range(1, 6):
@@ -46,17 +42,6 @@ def net(db):
     db.execute(text("INSERT INTO data_edits (entity, entity_id, field, new_value, reason, user_id) "
                     "VALUES ('core', :c, 'status', 'Faulty', 'test', :u)"), dict(c=cores[5], u=adm))
     return dict(s1=s1, s2=s2, cores=cores)
-
-
-@pytest.fixture
-def client(db):
-    def override():
-        with Session(bind=db) as s:
-            yield s
-
-    app.dependency_overrides[get_db] = override
-    yield TestClient(app)
-    app.dependency_overrides.clear()
 
 
 def test_requires_user(client, net):
@@ -99,7 +84,10 @@ def test_span_list_filter(client, net):
     s = r[0]
     assert (s["site_a"], s["site_b"], s["route_type"], s["free_cores"]) == ("Alpha Hub", "Bravo Hub", "Trunk", 1)
     assert s["status_mix"] == {"Available": 1, "Requested": 1, "Reserved": 1, "In use": 1, "Faulty": 1}
-    assert len(client.get("/api/spans", headers=H).json()) == 2
+    assert (s["survey_cores"], s["cable_size"], s["not_surveyed"]) == (5, 144, 139)
+    assert (s["unassigned_reserved"], s["free_to_reserve"]) == (0, 1)
+    other = client.get("/api/spans", headers=H).json()[1]  # never surveyed: not bookable
+    assert (other["survey_cores"], other["not_surveyed"], other["free_to_reserve"]) == (None, None, 0)
 
 
 def test_span_detail(client, net):
@@ -124,6 +112,13 @@ def test_customers(client, net):
     assert len(client.get("/api/customers", headers=H).json()) == 1  # stub inserted nothing
 
 
-def test_reservation_stub(client, net):
-    r = client.post("/api/reservations", json={"customer_id": 1, "cores": [1]}, headers=H)
-    assert r.json() == {"id": 0, "status": "stub"}
+def test_customer_create_and_confirm_new(client, net):
+    r = client.post("/api/customers", json={"name": "Telekom Zetta"}, headers=H).json()
+    assert r["created"] is False and r["customer"] is None and [c["name"] for c in r["similar"]] == ["Telekom Zeta"]
+    r = client.post("/api/customers", json={"name": "Telekom Zetta", "confirm_new": True}, headers=H).json()
+    assert r["created"] is True and r["customer"]["name"] == "Telekom Zetta"
+    assert len(client.get("/api/customers", headers=H).json()) == 2
+    r = client.post("/api/customers", json={"name": "  telekom   zetta "}, headers=H).json()  # same name, any case
+    assert r["created"] is False and r["customer"]["name"] == "Telekom Zetta"
+    assert client.post("/api/customers", json={"name": "Unrelated Name Ltd"}, headers=H).json()["created"] is True
+    assert client.post("/api/customers", json={"name": "  "}, headers=H).status_code == 422

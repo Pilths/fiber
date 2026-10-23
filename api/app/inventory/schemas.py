@@ -21,8 +21,13 @@ class SpanSummary(BaseModel):
     route_type: str | None
     region: str | None
     distance_km: Decimal | None
-    free_cores: int
+    free_cores: int  # Available cores
     status_mix: dict[str, int]
+    survey_cores: int | None  # cores found at the onsite survey; None = not surveyed (no cells, not bookable)
+    cable_size: int
+    not_surveyed: int | None  # cable_size - survey_cores
+    unassigned_reserved: int  # cores reserved by count only, ports not assigned yet
+    free_to_reserve: int  # free_cores - unassigned_reserved (0 when not surveyed)
 
 
 class CoreDetail(BaseModel):
@@ -47,10 +52,11 @@ class Customer(BaseModel):
 
 class CustomerCreate(BaseModel):
     name: str
+    confirm_new: bool = False
 
 
-class CustomerStub(BaseModel):
-    """STUB response: nothing is inserted yet (real endpoint is TASK-029)."""
-    name: str
+class CustomerResult(BaseModel):
+    """created=False with similar names means: resend with confirm_new=true to create it anyway."""
+    created: bool
+    customer: Customer | None
     similar: list[Customer]
-    created: bool = False

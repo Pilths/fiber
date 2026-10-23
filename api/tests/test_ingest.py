@@ -174,3 +174,44 @@ def test_seed_refuses_non_empty(db, workbook):
     db.execute(text("INSERT INTO sites (name, kind) VALUES ('X', 'site')"))
     with pytest.raises(SystemExit):
         seed.load(db, str(workbook))
+
+
+@pytest.fixture
+def count_workbook(workbook):
+    """The fixture plus two rows: blank assignment with a count (count-only), and blank assignment with no count."""
+    wb = openpyxl.load_workbook(workbook)
+    ws = wb["Reservation"]
+    count_only = res("Central", "AABB-BBCC", who="Gamma")
+    count_only[13], count_only[14] = 3, None
+    neither = res("Central", "AABB-BBCC", who="Gamma")
+    neither[13], neither[14] = None, None
+    ws.append(count_only)
+    ws.append(neither)
+    wb.save(workbook)
+    return workbook
+
+
+def test_blank_assignment_with_count_is_ready(count_workbook):
+    rows = by_row(parse_workbook(count_workbook), "Reservation")
+    assert (rows[14].status, rows[14].reason) == ("ready", None)
+    assert rows[14].parsed["unassigned_cores"] == 3 and not rows[14].parsed.get("ports")
+    assert rows[15].status == "needs_review" and "core assignment is blank" in rows[15].reason
+    assert rows[3].parsed["unassigned_cores"] == 0  # a row with ports is not count-only
+
+
+def test_seed_surveyed_cores_and_count_only(db, count_workbook):
+    counts, skipped = seed.load(db, str(count_workbook))
+    n = lambda sql: db.execute(text(sql)).scalar_one()
+    assert counts["reservations"] == 4 and any("row 15 [needs_review]" in s for s in skipped)
+    assert n("SELECT survey_cores FROM spans") == 4 == n("SELECT count(*) FILTER (WHERE number <= 4) FROM cores")
+    assert n("SELECT count(*) FROM cores") == 6  # 4 surveyed + 2 beyond the survey that named ports
+    assert n("SELECT min(number) FROM cores WHERE port_a_id IS NOT NULL") == 1  # ports take numbers in order
+    assert n("SELECT count(*) FROM cores WHERE port_a_id IS NULL") == 0
+    row = db.execute(text("SELECT unassigned_cores, unassigned_span_id = (SELECT id FROM spans) FROM reservations "
+                          "WHERE unassigned_cores > 0")).one()
+    assert tuple(row) == (3, True)
+    rid = n("SELECT id FROM reservations WHERE unassigned_cores = 3")
+    assert db.execute(text("SELECT type FROM reservation_events WHERE reservation_id = :r ORDER BY id"), {"r": rid}).scalars().all() == ["requested", "approved"]
+    assert n(f"SELECT count(*) FROM reservation_cores WHERE reservation_id = {rid}") == 0
+    assert n(f"SELECT count(*) FROM core_holds WHERE reservation_id = {rid}") == 0
+    assert n("SELECT remaining FROM reservation_unassigned_v") == 3

@@ -54,8 +54,8 @@ def run(db: Session) -> None:
     span: list[int] = []
     cores: dict[int, dict[int, int]] = {}  # span id -> core number -> core id
     for n, (a, b, route, region, km, factor) in enumerate(SPANS, start=1):
-        sid = one("INSERT INTO spans (site_a_id, site_b_id, route_type, region, distance_km) "
-                  "VALUES (:a, :b, :r, :g, :d) RETURNING id", a=site[a], b=site[b], r=route, g=region, d=km)
+        sid = one("INSERT INTO spans (site_a_id, site_b_id, route_type, region, distance_km, survey_cores) "
+                  "VALUES (:a, :b, :r, :g, :d, :n) RETURNING id", a=site[a], b=site[b], r=route, g=region, d=km, n=CORES)
         span.append(sid)
         cores[sid] = {}
         for num in range(1, CORES + 1):
@@ -99,6 +99,13 @@ def run(db: Session) -> None:
 
     reserve(cust[0], "planner1", span[0], [1, 2], "admin1")
     reserve(cust[1], "planner2", span[3], [1, 2], None)
+
+    # count-only reservation, as an Excel import makes it: 3 cores wanted on CJ-BJ, ports not assigned yet
+    res = one("INSERT INTO reservations (customer_id, planner_id, imported, unassigned_cores, unassigned_span_id) "
+              "VALUES (:c, :u, true, 3, :s) RETURNING id", c=cust[2], u=user["planner1"], s=span[1])
+    for who, kind in (("planner1", "requested"), ("admin1", "approved")):
+        ins("INSERT INTO reservation_events (reservation_id, type, user_id) VALUES (:r, :t, :u)",
+            r=res, t=kind, u=user[who])
 
     ins("INSERT INTO data_edits (entity, entity_id, field, old_value, new_value, reason, user_id) "
         "VALUES ('core', :c, 'status', 'Available', 'Faulty', 'DEV: dark fibre fails OTDR test', :u)",

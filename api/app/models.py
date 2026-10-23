@@ -82,6 +82,7 @@ class Span(Base):
         _in("route_type", ("Bespoke", "Trunk", "Metro"), "spans_route_type_ck"),
         _in("region", ("North", "Central", "South", "East Coast"), "spans_region_ck"),
         CheckConstraint("distance_km >= 0", name="spans_distance_ck"),
+        CheckConstraint("cable_size > 0", name="spans_cable_size_ck"),
         _pair_ix("spans_site_pair_uq", unique=True),
     )
     id: Mapped[int] = _id()
@@ -91,6 +92,7 @@ class Span(Base):
     region: Mapped[str | None] = mapped_column(Text)
     distance_km: Mapped[Decimal | None] = mapped_column(Numeric(10, 3))
     survey_cores: Mapped[int | None] = mapped_column(Integer)
+    cable_size: Mapped[int] = mapped_column(Integer, server_default=text("144"))
     created_at: Mapped[datetime] = _created()
 
 
@@ -145,7 +147,11 @@ class Customer(Base):
 
 class Reservation(Base):
     __tablename__ = "reservations"
-    __table_args__ = (_in("fiber_monitored", ("Y", "N", "WIP"), "reservations_fiber_monitored_ck"),)
+    __table_args__ = (
+        _in("fiber_monitored", ("Y", "N", "WIP"), "reservations_fiber_monitored_ck"),
+        CheckConstraint("unassigned_cores >= 0", name="reservations_unassigned_ck"),
+        CheckConstraint("unassigned_cores = 0 OR unassigned_span_id IS NOT NULL", name="reservations_unassigned_span_ck"),
+    )
     id: Mapped[int] = _id()
     customer_id: Mapped[int] = _fk("customers")
     planner_id: Mapped[int] = _fk("users")
@@ -161,6 +167,8 @@ class Reservation(Base):
     port_info_raw: Mapped[str | None] = mapped_column(Text)
     monitoring_code: Mapped[str | None] = mapped_column(Text)
     fiber_monitored: Mapped[str | None] = mapped_column(Text)
+    unassigned_cores: Mapped[int] = mapped_column(Integer, server_default=text("0"))  # set at INSERT only
+    unassigned_span_id: Mapped[int | None] = _fk("spans", True)
 
 
 class ReservationCore(Base):
@@ -170,7 +178,7 @@ class ReservationCore(Base):
 
 
 EVENT_TYPES = ("requested", "approved", "rejected", "withdrawn", "kept", "release_requested",
-               "released", "release_declined", "corrected")
+               "released", "release_declined", "corrected", "assigned")
 
 
 class ReservationEvent(Base):
