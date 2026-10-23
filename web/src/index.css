@@ -60,7 +60,7 @@
     --secondary: oklch(0.97 0 0);
     --secondary-foreground: oklch(0.205 0 0);
     --muted: oklch(0.97 0 0);
-    --muted-foreground: oklch(0.556 0 0);
+    --muted-foreground: oklch(0.48 0 0);
     --accent: oklch(0.97 0 0);
     --accent-foreground: oklch(0.205 0 0);
     --destructive: oklch(0.577 0.245 27.325);
@@ -128,3 +128,22 @@
     @apply font-sans;
     }
 }
+
+/* Core cell patterns: each status differs in border, fill pattern and symbol (plus a text label). */
+.core { background-color: var(--card); color: var(--card-foreground); border: 2px solid var(--foreground); }
+.core-available { border-style: solid; }
+.core-requested { border-style: dashed; }
+.core-reserved {
+  border-width: 1px;
+  background-image: repeating-linear-gradient(45deg, transparent 0 5px, color-mix(in oklch, var(--foreground) 40%, transparent) 5px 6px);
+}
+.core-faulty {
+  border-style: dotted;
+  background-image:
+    linear-gradient(to top right, transparent calc(50% - 1px), var(--foreground) 50%, transparent calc(50% + 1px)),
+    linear-gradient(to bottom right, transparent calc(50% - 1px), var(--foreground) 50%, transparent calc(50% + 1px));
+}
+.core-inuse { background-color: var(--foreground); color: var(--background); }
+.core[aria-selected="true"] { outline: 3px solid var(--ring); outline-offset: 2px; }
+.core:focus-visible { outline: 3px solid var(--foreground); outline-offset: 2px; }
+.core[aria-disabled="true"] { cursor: not-allowed; }
