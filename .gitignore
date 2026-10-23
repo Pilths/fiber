@@ -10,3 +10,6 @@ certs/*.crt
 
 # Sample and real data files (never commit)
 Sample/
+
+# Basemap tiles, fetched per machine by scripts/get-tiles.sh
+web/public/map/

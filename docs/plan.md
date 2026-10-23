@@ -213,9 +213,9 @@ Completion: TEST-012 passes.
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-052 | Produce the PMTiles extract for the region bounding box (Southeast Asia, with about 90% of use in Malaysia), capped at zoom 14, plus glyphs and sprites, into `web/public/map/`. Light and dark styles taken from the UI colour tokens. | | |
+| TASK-052 | `scripts/get-tiles.sh` downloads a Malaysia PMTiles extract (bbox 99.5,0.8,119.5,7.5, zoom 0 to 14) from a Protomaps daily build into `web/public/map/malaysia.pmtiles` (git-ignored), using the pinned `protomaps/go-pmtiles:v1.31.2` image. It runs once on each machine with internet, including the dev and prod VMs, so the file never travels by email or git. Southeast Asia beyond Malaysia is a later second file. Glyphs, sprites and light and dark styles from the UI colour tokens go in `web/public/map/`. | ✅ (tiles) | 2026-10-24 |
 | TASK-053 | `GET /api/map/segments` and `GET /api/map/sites` returning GeoJSON. By default sites are only those with spans; the other sites come from an optional clustered layer endpoint. No caching in the MVP; test performance after the MVP and cache only if slow. Sites without coordinates take the end point of a touching KMZ route; sites with neither are listed but not drawn. | | |
-| TASK-054 | Map view with MapLibre: segment lines, data center and TOC markers with distinct shapes, click a segment to list its spans. | | |
+| TASK-054 | Map view with MapLibre: each span drawn as a straight line between its two sites' coordinates (works with the Excel alone); a KMZ route, when imported, replaces that line's shape only. KMZ files cannot be shared with the developer, so the KMZ import is built against the standard KML format with a synthetic test file and tried on real files by the owner. Segment lines, data center and TOC markers with distinct shapes, click a segment to list its spans. | | |
 | TASK-055 | Fallback, second cut: if TASK-052 to TASK-054 are not working by the end of 29 October, port the SVG map from the v6 mock instead. | | |
 
 Completion: the map loads with no request leaving the network (checked in Playwright with external requests blocked), or the SVG fallback is in place.
@@ -263,7 +263,7 @@ Completion: real data uploaded without blocking errors; the success criteria in 
 - **DEP-003**: The sample Excel workbook, needed by TASK-016, TASK-041 and TASK-069. Received 22 October 2026 at `Sample/Sample Excel Structure.xlsx`. The mock KMZ file is still pending.
 - **DEP-004**: The v6 mock, needed by TASK-027 and TASK-055. Still pending.
 - **DEP-005**: A real Excel export and real KMZ files, needed by TASK-062.
-- **DEP-006**: An OpenStreetMap PMTiles source and the region bounding box, needed by TASK-052. The region is Southeast Asia, with about 90% of use in Malaysia.
+- **DEP-006**: Internet access on each machine that runs `scripts/get-tiles.sh` (Protomaps daily builds, OpenStreetMap data). Decided 24 October 2026: Malaysia only for the MVP, downloaded directly on the dev and prod VMs. Self-hosted, so there is no tile rate limit for 50 planners.
 - **DEP-007**: SMTP relay access and a registered sender address, needed by Phase 12. Expected later.
 - **DEP-008**: The production server and its access, confirmed with IT, needed by TASK-063.
 - **DEP-009**: Either an IT fix for the PyPI certificate error in the work laptop's WSL (likely corporate TLS inspection), or the corporate CA certificate file for TASK-065.
