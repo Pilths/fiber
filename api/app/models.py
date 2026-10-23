@@ -61,11 +61,17 @@ class User(Base):
 
 class Site(Base):
     __tablename__ = "sites"
-    __table_args__ = (_in("kind", ("site", "building", "equipment", "data_center", "toc"), "sites_kind_ck"),)
+    __table_args__ = (
+        _in("kind", ("site", "building", "equipment", "data_center", "toc"), "sites_kind_ck"),
+        Index("sites_geom_gix", "geom", postgresql_using="gist"),
+        Index("sites_name_trgm_ix", "name", postgresql_using="gin", postgresql_ops={"name": "gin_trgm_ops"}),
+    )
     id: Mapped[int] = _id()
     name: Mapped[str] = mapped_column(Text, unique=True)
     kind: Mapped[str] = mapped_column(Text)
     geom: Mapped[Any] = mapped_column(Geometry("Point"), nullable=True)
+    details: Mapped[Any] = mapped_column(JSONB, nullable=True)
+    lrd_site_id: Mapped[int | None] = _fk("sites", True)
     created_at: Mapped[datetime] = _created()
 
 
@@ -84,6 +90,7 @@ class Span(Base):
     route_type: Mapped[str | None] = mapped_column(Text)
     region: Mapped[str | None] = mapped_column(Text)
     distance_km: Mapped[Decimal | None] = mapped_column(Numeric(10, 3))
+    survey_cores: Mapped[int | None] = mapped_column(Integer)
     created_at: Mapped[datetime] = _created()
 
 
@@ -138,6 +145,7 @@ class Customer(Base):
 
 class Reservation(Base):
     __tablename__ = "reservations"
+    __table_args__ = (_in("fiber_monitored", ("Y", "N", "WIP"), "reservations_fiber_monitored_ck"),)
     id: Mapped[int] = _id()
     customer_id: Mapped[int] = _fk("customers")
     planner_id: Mapped[int] = _fk("users")
@@ -145,6 +153,14 @@ class Reservation(Base):
     is_new_customer: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
     imported: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
     created_at: Mapped[datetime] = _created()
+    group_label: Mapped[str | None] = mapped_column(Text)
+    additional: Mapped[bool | None] = mapped_column(Boolean)
+    cv_ready_date: Mapped[date | None] = mapped_column(Date)
+    contractor: Mapped[str | None] = mapped_column(Text)
+    remark: Mapped[str | None] = mapped_column(Text)
+    port_info_raw: Mapped[str | None] = mapped_column(Text)
+    monitoring_code: Mapped[str | None] = mapped_column(Text)
+    fiber_monitored: Mapped[str | None] = mapped_column(Text)
 
 
 class ReservationCore(Base):
@@ -209,7 +225,8 @@ class Upload(Base):
 class UploadRow(Base):
     __tablename__ = "upload_rows"
     __table_args__ = (
-        _in("row_group", ("new", "changed", "conflict", "missing", "rejected"), "upload_rows_group_ck"),
+        _in("row_group", ("new", "changed", "conflict", "missing", "rejected", "needs_review"), "upload_rows_group_ck"),
+        _in("status", ("ready", "needs_review", "rejected"), "upload_rows_status_ck"),
     )
     id: Mapped[int] = _id()
     upload_id: Mapped[int] = _fk("uploads")
@@ -217,6 +234,11 @@ class UploadRow(Base):
     entity: Mapped[str] = mapped_column(Text)
     payload: Mapped[Any] = mapped_column(JSONB)
     warnings: Mapped[Any] = mapped_column(JSONB, nullable=True)
+    sheet: Mapped[str | None] = mapped_column(Text)
+    row_number: Mapped[int | None] = mapped_column(Integer)
+    status: Mapped[str | None] = mapped_column(Text)
+    reason: Mapped[str | None] = mapped_column(Text)
+    raw: Mapped[Any] = mapped_column(JSONB, nullable=True)
 
 
 class Measurement(Base):
