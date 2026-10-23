@@ -7,3 +7,6 @@ dist/
 test-results/
 playwright-report/
 certs/*.crt
+
+# Sample and real data files (never commit)
+Sample/

@@ -17,7 +17,10 @@ Read before working: `docs/PRD.md` (requirements), `docs/architecture.md` (desig
 - Excel imports reservations only until the one-time "Close reservation import" switch is closed (a `data_edits` row: entity 'system', entity_id 0, field 'reservation_import', new_value 'closed'). After that, reservation rows in an upload are ignored with a warning and new reservations are made only in the dashboard.
 - Release is not deletion. It adds a 'released' event and frees only the `core_holds` lock row; the reservation, its cores and its events stay. A release can cover only some cores of a route reservation.
 - Corrections are only for customer and planned date, on approved reservations, with a reason, as a 'corrected' event. Cores are never corrected or swapped: release and request again. Customer is required on every reservation.
-- Segments are labels for display and the KMZ map line. Routing runs over spans: sites are nodes, spans are edges, and any site can route to any site.
+- Segments are labels for display and the KMZ map line. Routing runs over spans: each span joins two sites, weighted by km, and any site can route to any site.
+- "Nodes" is only an Excel column name, used by the parser. It is not a database or domain term. Its value is a site pair `LRD-LRD` and becomes a span. A site is one place with one 4-letter LRD code.
+- Uploads are layered: every row is kept raw in staging with sheet name and row number, and gets a status Ready, Needs review or Rejected with a reason. Raw text is always kept and parsed fields are added on top; a parser failure never blocks the import. Needs review means a row the admin must look at. Never guess a value to make a row pass.
+- Real data files must not be committed.
 - Time zone is Asia/Kuala_Lumpur for date logic (stale rule, daily digest) and date display. Timestamps are stored in UTC (timestamptz).
 - Every write is attributable to a user, and every data edit needs a reason and is kept as history.
 - Nothing is deleted. Accounts are deactivated.

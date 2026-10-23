@@ -1,6 +1,6 @@
 # Fiber Dashboard: Epic Architecture Specification
 
-Source: `docs/PRD.md` (22 October 2026). Where this document and the PRD disagree, the PRD wins.
+Source: `docs/PRD.md` (24 October 2026). Where this document and the PRD disagree, the PRD wins.
 
 Note on the template: the `breakdown-epic-arch` template assumes Next.js, tRPC, Stack Auth, Redis, Qdrant and n8n. The PRD fixes a different stack (React + Vite, FastAPI, local accounts, PostgreSQL + PostGIS), so those template components are left out on purpose.
 
@@ -95,9 +95,9 @@ Solid lines are synchronous request paths. Dotted lines are asynchronous or sche
 | F3 | Needs review and bell count | 2, 3 | A query, not a stored flag: stale reservations, release requests, upload conflicts, faulty cores, pending approvals. |
 | F4 | Login and roles | 7 | Local accounts, planner and admin, forced password change, deactivation only. Built right after F2. |
 | F5 | Link loss | 4 | Calculated loss in one backend function (distance × 0.3 dB/km). Measurements kept as history; the latest is shown. Coverage is spans with a reading out of all spans. |
-| F6 | Admin upload | 8 | Upload, Preview, Confirm. Preview groups New, Changed, Conflicts, Not in this file, Rejected. Upload never touches reservations. |
+| F6 | Admin upload | 8 | Upload, Preview, Confirm. Preview groups New, Changed, Conflicts, Not in this file, Needs review, Rejected. Every row is kept raw in staging with sheet name, row number, status (Ready, Needs review, Rejected) and reason. Upload never touches reservations. See E6a for the sample workbook rules. |
 | F7 | Admin editing | 8 | Core status (Faulty or Available), then span and site details (third cut). Every edit needs a reason and protects the field. |
-| F8 | Route planning | 5 | NetworkX graph of spans (sites are nodes, spans are edges); any site to any site; up to 10 options with km, estimated dB, minimum free cores, loss confidence; sort by km or free cores. |
+| F8 | Route planning | 5 | NetworkX graph of spans (each span joins two sites, weighted by km); any site to any site; up to 10 options with km, estimated dB, minimum free cores, loss confidence; sort by km or free cores. |
 | F9 | Map | 6 | MapLibre with KMZ routes (second cut; fallback is the SVG map from the v6 mock). |
 | F10 | Email digest and request emails | 3, 2 | Daily digest and new-request emails through SMTP (first cut). |
 
@@ -105,7 +105,7 @@ Solid lines are synchronous request paths. Dotted lines are asynchronous or sche
 
 **E1. Docker Compose stack (Session 0).** Three services: `db` (PostGIS image), `api` (FastAPI, Uvicorn), `web` (Vite dev server in development, static build in production). One `.env` file for secrets, kept out of the repository.
 
-**E2. Schema and migrations (Session 1).** Alembic migrations. Internal IDs for sites, spans and segments. Natural keys for upload matching: span by (site A, site B), since two sites never share more than one span; segment by its two end sites (several segments can share the same two end sites, so that index is not unique); port by Port ID. Route type is an attribute of the span, not part of its key. Circuit ID is an optional column on the core. Site names are unique across all regions. Regions are North, Central, South and East Coast; a new value comes by migration, and an unknown region is a Rejected upload row. Measurements store `test_method` and `field_team`. All timestamps are `timestamptz` stored in UTC.
+**E2. Schema and migrations (Session 1).** Alembic migrations. Internal IDs for sites, spans and segments. Natural keys for upload matching: span by (site A, site B), since two sites never share more than one span; segment by its two end sites (several segments can share the same two end sites, so that index is not unique); port by Port ID. Route type is an attribute of the span, not part of its key. Circuit ID is an optional column on the core. Site names are unique across all regions. Regions are North, Central, South and East Coast; a new value comes by migration, and an unknown region (after spelling variants are mapped) is a Needs review upload row. Sites also get `kind` 'dc' with a link to the LRD site the DC connects through, and a `details` jsonb column for every non-core Excel column (migration 0003). Spans get `survey_cores`. Measurements store `test_method` and `field_team`. All timestamps are `timestamptz` stored in UTC.
 
 **E3. Derived core status.** One SQL view gives each core's current status, in priority order:
 
@@ -123,15 +123,27 @@ Available  otherwise
 
 **E6. Two-phase upload.** Parse and validate into a staging area keyed by upload ID (pandas + openpyxl for Excel, zip + XML for KMZ). Compute the preview diff against current data and protected fields. On confirm, apply everything in one transaction and write the upload log (who, when, counts, changes). Nothing outside staging changes before confirm. Reservation rows from Excel are a separate preview group and import only until the one-time "Close reservation import" switch is closed. The switch is a `data_edits` row (entity 'system', entity_id 0, field 'reservation_import', new_value 'closed', with user and reason), so no new table is needed; staging and confirm both check it, and it cannot be reopened in the MVP. After it is closed, reservation rows are ignored and shown as a warning.
 
+**E6a. Layered parsing, row status and the sample workbook.** Every row of every imported sheet is first stored raw in `upload_rows` (sheet name, row number, raw cells as jsonb). Parsers then add parsed fields on top; the raw text is never dropped, and a parser failure sets the row to Needs review instead of stopping the upload. Each row has a status (Ready, Needs review, Rejected) and a reason; Needs review means a row the admin must look at. The admin fixes a row in the dashboard with a reason (a `data_edits` row, protected from later uploads) or cleans the Excel and uploads again. One module, `api/app/ingest/checks.py`, holds the check functions (coordinate box, site lookup, region spelling map, port range pairing, blank requestor, duplicate site names). Two entry points use them: the upload preview and the command `docker compose exec api python -m app.ingest.excel_check <file>`, which prints a report and writes nothing to the database.
+
+Sheet handling (workbook received 22 October 2026):
+
+- **Reservation** (header row 1): forward-fill merged Region cells and title rows (stored as `group_label`); map region spellings; split Nodes `AABB-BBCC` on '-' and match the span by the unordered site pair, stripping "(additional core)" and setting the reservation's `additional` flag; take Distance(KM) and Core Secured (`spans.survey_cores`) from it; pair the two sites' Core assignment port ranges in order, and mark the row Needs review on a length mismatch or malformed range such as `P23-282`; map Fiber core requestor to the customer (blank is Rejected, trigram near-matches shown in the preview); ignore Aging(days) and Core balance. Port Info, Contractor and Remark are stored raw. Fiber core monitoring is free text; the UI suggests values already in use (no list table, no hardcoded codes). Fiber monitored is stored as Y, N or WIP.
+- **Monitoring**: not imported in the MVP.
+- **Site Location** (header on row 4, about 36,000 rows): every row is a site. Name, kind, lat/long (PostGIS point) and region are columns; every other Excel column goes into `sites.details` jsonb. Coordinates outside the Southeast Asia box (about latitude -11 to 21, longitude 92 to 141) are Needs review.
+- **DC List** (about 100 rows): a site of kind 'dc' with its own lat/long, linked to its LRD site. E2E Status, Fiber Leg, State, City and Cluster go in `details`.
+- "Nodes" is only an Excel column name in the parser. No table, column or class uses the word.
+
+Reservations are insert-only, so the new reservation fields (`group_label`, `additional`, `cv_ready_date`, `contractor`, `remark`, `port_info_raw`, `monitoring_code`, `fiber_monitored`) are all set in the INSERT. None needs an UPDATE, so the `forbid_change` trigger stays untouched.
+
 **E7. Stale rule as a query.** A reservation is stale when its latest approve or keep event (or its import date when undated) is more than 3 months old and it has no release. Computed at read time, so there is no flag to drift. "Today" and the 3-month boundary use the Asia/Kuala_Lumpur date; the daily digest uses the same date.
 
-**E8. Routing graph.** A NetworkX graph with sites as nodes and spans as edges (weight = km), built in memory from the Postgres span table at startup and rebuilt after an upload is confirmed or a span is edited. Any site can route to any site. Up to 10 options via `shortest_simple_paths`, sorted by km (default) or by free cores (the fewest free cores on any span of the path, higher is better). Segments are labels only. About 100 points of interest, so the graph is tiny. No graph database: NetworkX in memory is enough at this size.
+**E8. Routing graph.** A NetworkX graph in which each span joins two sites (weight = km), built in memory from the Postgres span table at startup and rebuilt after an upload is confirmed or a span is edited. Any site can route to any site. Up to 10 options via `shortest_simple_paths`, sorted by km (default) or by free cores (the fewest free cores on any span of the path, higher is better). Segments are labels only. The graph holds only sites that have spans (hundreds), even though the database holds about 36,000 sites, so NetworkX in memory stays. There is no graph database. 36,000 sites and up to about 100,000 cores are small for PostgreSQL with indexes: pg_trgm GIN on site names, btree on `cores.span_id`, GiST on site location.
 
 **E9. Scheduler with run record.** APScheduler inside the `api` container. A `job_runs` table records each run by date, so a restart never sends twice. A PostgreSQL advisory lock makes sure only one Uvicorn worker runs the job.
 
 **E10. Auth.** Passwords hashed with Argon2. An httpOnly session cookie on the same origin as the SPA (no token storage in the browser). Role checks are FastAPI dependencies. A dev-only header supplies the user until Session 5 and is disabled outside development.
 
-**E11. Map assets.** One PMTiles extract capped at zoom 14, plus glyphs, sprites, and light and dark styles, all served as static files by `web` (PMTiles is read with HTTP range requests, so no tile server is needed). KMZ routes are stored as PostGIS LineStrings and served to the map as GeoJSON. KMZ routes are named `<site A name> - <site B name>`; the name is split on ` - ` and matched exactly to a segment by its two end sites. No match, or more than one, goes to the validation report. Several segments can share the same two end sites, so multiple matches are expected; to be checked against the mock files arriving 22 October 2026.
+**E11. Map assets.** One PMTiles extract capped at zoom 14, plus glyphs, sprites, and light and dark styles, all served as static files by `web` (PMTiles is read with HTTP range requests, so no tile server is needed). KMZ routes are stored as PostGIS LineStrings and served to the map as GeoJSON. By default the map shows only sites that have spans plus span lines; the other sites are an optional clustered layer. No tile or response caching in the MVP: test performance after the MVP and cache only if slow. KMZ routes are named `<site A name> - <site B name>`; the name is split on ` - ` and matched exactly to a segment by its two end sites. No match, or more than one, goes to the validation report. Several segments can share the same two end sites, so multiple matches are expected; to be checked against the mock files arriving 22 October 2026.
 
 **E12. Typed API client.** `openapi-typescript` generates the frontend types from FastAPI's OpenAPI spec. Regenerate after every endpoint change.
 
@@ -188,7 +200,7 @@ Latest stable at the time of pinning, per the data owner's "latest" rule. Source
 
 ## 6. T-Shirt Size Estimate
 
-**L.** Ten features on a small, well-known stack with modest data (about 100 points of interest, 50 users). The size is in the rules, not the scale: event-sourced reservations, two-phase upload with conflict handling, and the first use of PostGIS, MapLibre and PMTiles. For one person in about 11 days it is at the edge of feasible, so the PRD's cut order (email, then real KMZ map, then span and site editing) is part of the plan, not a fallback.
+**L.** Ten features on a small, well-known stack with modest data (about 36,000 sites, up to about 100,000 cores, 50 users). The size is in the rules, not the scale: event-sourced reservations, two-phase upload with conflict handling, and the first use of PostGIS, MapLibre and PMTiles. For one person in about 11 days it is at the edge of feasible, so the PRD's cut order (email, then real KMZ map, then span and site editing) is part of the plan, not a fallback.
 
 ## Open decisions that affect the architecture
 

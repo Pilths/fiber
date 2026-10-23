@@ -1,6 +1,6 @@
 # Fiber Dashboard PRD
 
-Last updated: 22 October 2026
+Last updated: 24 October 2026
 
 ## 1. Executive Summary
 
@@ -32,9 +32,10 @@ The MVP serves two personas through eight user stories; login and roles stays in
 
 **Terms**
 
-- **Site:** the general term for any place a span ends: a site, a building in it or the equipment in that building, such as a data center or TOC. Some sites have latitude and longitude in the Excel.
+- **Site:** the general term for any place a span ends: a site, a building in it or the equipment in that building, such as a data center or TOC. Every site has latitude and longitude in the Excel. One site is one place with one 4-letter LRD code. A data center (DC) is a site of kind 'dc', linked to the LRD site it connects through.
+- **Nodes:** an Excel column name only, used by the parser. It is not a domain or database term, because it means different things to different people. Its value is a site pair `LRD-LRD` and becomes a span.
 - **Span:** a connection between two sites (site A and site B). The app gives every span its own ID. A span carries many cores, and each core in use can carry its own circuit.
-- **Segment:** a named route made of several spans end to end, with buildings or nodes in between; each KMZ route shows one segment. A segment is a label for display and the line on the map. Routing runs over spans, not segments. Several segments may share the same two end sites.
+- **Segment:** a named route made of several spans end to end, with sites in between; each KMZ route shows one segment. A segment is a label for display and the line on the map. Routing runs over spans, not segments. Several segments may share the same two end sites.
 - **Core:** one fibre core in a span's cable, connecting a port at site A to a port at site B. Its circuit ID, which comes from another system, is an optional field on the core.
 
 Confirmed by the data owner (21 October 2026): two sites have at most one span; one span carries many cores.
@@ -87,7 +88,7 @@ To confirm against the mock files arriving 22 October 2026: KMZ routes are named
    - Deviation = (measured - calculated) / calculated; a measured value below calculated counts as green.
    - The difference in dB and percent, last test date, and measured or calculated-only status are available per span. The source data has test method and field team, which the backend cleans; both are stored and shown per span.
 5. As a planner, I want to pick two buildings and see route options, so that I can choose a route with enough free cores.
-   - Routing runs over spans: sites are the graph nodes and spans are the edges, weighted by km. Segments stay as labels for display and as the KMZ line on the map.
+   - Routing runs over spans: each span joins two sites, weighted by km. Segments stay as labels for display and as the KMZ line on the map.
    - Up to 10 options are shown, each with its spans in order as building A to building B, with each span's km and free cores, grouped under their segment label where there is one. Each option shows total km, estimated dB, and the fewest free cores on any span of the path.
    - Options can be sorted by shortest km (the default) or by most free cores: the fewest free cores on any span of the path, higher is better.
    - The user must be able to see every option returned (up to 10), none hidden or cut off. The visual form of the list is open for design.
@@ -99,6 +100,7 @@ To confirm against the mock files arriving 22 October 2026: KMZ routes are named
 6. As a planner, I want to see real routes on a map, so that I understand where spans run.
    - MapLibre GL JS shows KMZ routes, one segment per route, with Data center and TOC markers; clicking a segment shows its spans.
    - Basemap colours come from the UI colour palette in light and dark themes; the UI is built first and the map follows.
+   - By default the map shows only sites that have spans, plus span lines. The other sites (about 36,000 from the Site Location sheet) are an optional clustered layer. No tile or response caching in the MVP; performance is tested after the MVP and cached only if slow.
    - Site coordinates come from the Excel where available. Each KMZ route is matched to a segment by the site A and site B in its name (`<site A> - <site B>`); the exact format is confirmed against the mock files. Because several segments can share the same two end sites, a name may match more than one segment. Routes that cannot be matched, or match more than one segment, are listed in the validation report. A site without coordinates takes its position from the end of a KMZ route that touches it; with neither, it is listed but not drawn on the map.
 7. As an admin, I want users to sign in with roles, so that reservations and uploads are attributable.
    - Roles: planner and admin. Sign-in starts with local accounts; enterprise SSO is a later option. Admins create accounts and reset passwords; there is no self-signup, and a password change is forced at first login. Accounts are deactivated, never deleted: history keeps the user's name, their pending requests stay in the admin queue, and their stale digests go to all admins.
@@ -111,11 +113,15 @@ To confirm against the mock files arriving 22 October 2026: KMZ routes are named
    - Every upload shows a validation report first; nothing is saved until the admin confirms.
    - The customer is required in the Excel too. A reservation row without a customer is Rejected in the preview and not imported; the admin fixes the Excel and uploads again, and the fixed row imports then.
    - A reservation row without a reserved date still imports, with the import date as the start of its stale clock and a warning in the preview.
-   - A row with a region other than North, Central, South or East Coast is Rejected in the upload report.
+   - Every upload row is kept raw in staging with its sheet name and row number, and gets a status: Ready, Needs review or Rejected, with a reason shown in the preview. Needs review means a row the admin must look at before it can import; Rejected means it cannot import until the Excel is fixed. The admin fixes a row in the dashboard with a reason (kept as history and protected from later uploads), or cleans the Excel and uploads again.
+   - Parsing is layered: the raw text is always kept and parsed fields are added on top. A parser failure never blocks the import; the row goes to Needs review.
+   - A region spelling variant (for example "Nothern") is mapped to North, Central, South or East Coast. A region value that cannot be mapped goes to Needs review with a reason, never a silent guess.
+   - A site or DC with latitude and longitude outside a Southeast Asia box (roughly latitude -11 to 21, longitude 92 to 141; Malaysia is latitude 0.8 to 7.4, longitude 99.6 to 119.3) goes to Needs review, because swapped values, 0,0 and typos would plot in the wrong place and break distances.
+   - A standalone checker, `python -m app.ingest.excel_check <file>`, reads a workbook and prints a report of bad coordinates, unknown sites, malformed or unpairable port ranges, blank requestors, unknown region spellings and duplicate site names. The upload preview uses the same check functions.
    - Spans are grouped into segments as the Excel states; where it does not, by chaining site pairs from the segment's site A to its site B, and any chain with more than one possible path is flagged in the report.
    - Many rows with the same two sites are normal, because one cable has many cores. The validation report warns when the same Port ID appears twice or when a cable looks listed twice between the same two sites, and the admin decides what to keep before anything is saved.
    - After the first import, the dashboard database is the source of truth and the Excel is a feed. A field edited in the dashboard is protected: a later upload that differs shows as a conflict in the preview and keeps the dashboard value unless the admin ticks the Excel value.
-   - The Admin area runs an upload in three steps: Upload, Preview and Confirm. The preview groups rows as New, Changed, Conflicts, Not in this file and Rejected, each with its warnings. Rows missing from a file are left untouched and listed as Not in this file.
+   - The Admin area runs an upload in three steps: Upload, Preview and Confirm. The preview groups rows as New, Changed, Conflicts, Not in this file, Needs review and Rejected, each with its warnings and row status. Rows missing from a file are left untouched and listed as Not in this file.
    - An upload never changes a reservation. If an uploaded row conflicts with a Requested or Reserved core, for example the core is marked Faulty or no longer exists, the preview flags it and the reservation goes to Needs review.
    - Admins can edit data in the app, because the Excel is a feed and not the source of truth. The MVP covers core status (Faulty or Available only; In use comes from the Excel and Reserved from the reservation flow), span details (distance, route type, region, sites A and B) and site details (name, coordinates). Everything else is v1.1. Each edit needs a reason and is saved as a new history record; a changed distance recalculates loss, and marking a Requested or Reserved core Faulty sends its reservation to Needs review.
    - Each upload is logged with who, when and what changed.
@@ -187,7 +193,7 @@ Files enter through the Admin page, the Python API validates and stores them, an
 
 | Integration | Purpose | Status |
 | --- | --- | --- |
-| Excel exports from the source system | Sites (some with latitude and longitude), spans, segments, cores, ports, measurements; schema built from the column headers; after the first import a feed, not the source of truth | Real data not yet available |
+| Excel exports from the source system | Sites (all with latitude and longitude), spans, segments, cores, ports, measurements; schema built from the column headers; after the first import a feed, not the source of truth | Sample workbook received 22 October 2026 (see Sample Excel workbook below); real data not yet available |
 | KMZ files | Route coordinates, one KMZ route per segment, matched to Excel; join key TBD | Tested with mock KMZ data; real files to come |
 | SMTP relay | Daily stale-reservation email digest; email to admins on each new reservation request | Sender address must be registered under the company domain; access and registration TBD, and they decide whether email ships in the MVP |
 | Daily scheduler | Digest and stale checks | In-app scheduler (APScheduler) inside the FastAPI container; it records its last run, so a restart never sends the digest twice |
@@ -197,9 +203,42 @@ Files enter through the Admin page, the Python API validates and stores them, an
 
 The planning side comes first: reservations, customers and planners as separate tables, with reservations as insert-only rows. Around it: sites (data centers and TOCs), spans with route type (Bespoke, Trunk, Metro) and region (North, Central, South, East Coast), segments (several spans end to end), cores, ports, and measurements kept as history. Site names are unique across all regions, and many sites can share a region. The four regions stay as they are; new values come by migration when real data shows them. Measurements also store test method and field team. Ports connect through cores to another site. The app assigns its own internal ID to every site, span and segment. A circuit ID comes from another system and is an optional field on the core, because one span carries many circuits; uploads match spans by the two sites, and ports by Port ID. Site is the general term for a site, a building or the equipment in it, and measurements are stored per span. After the first import the dashboard database is the source of truth and the Excel is a feed; fields edited in the dashboard are protected from later uploads, and every edit is kept as history with a reason.
 
+**Sample Excel workbook**
+
+Walked through with the data owner on 22 to 24 October 2026 (`Sample/Sample Excel Structure.xlsx`, four sheets). Real data is uncleaned, so the rules below keep raw values and flag what they cannot read.
+
+| Sheet | MVP | Rows |
+| --- | --- | --- |
+| Reservation | Imported (the only operational sheet) | About 102 |
+| Monitoring | Not imported; the planner says the data is not accurate. v1.1 or later | |
+| Site Location | Imported as sites | About 36,000 |
+| DC List | Imported as DCs | About 100 |
+
+Reservation sheet (header on row 1):
+
+- **Region:** some blocks are merged cells, others repeat per row. Merged cells are filled forward. Spelling variants (for example "Nothern") map to North, Central, South or East Coast; an unknown value is Needs review with a reason.
+- **Nodes:** `AABB-BBCC`, split on '-' and matched to a span by the unordered site pair. The suffix "(additional core)" means another reservation on the same span: it is stripped to match the span, and the reservation gets an `additional` flag. An unknown site code is Needs review.
+- **Distance(KM):** the span's distance comes from this sheet.
+- **Core Secured:** the number of cores found available at the onsite survey (core verification). Stored on the span as `survey_cores`.
+- **Expected CV Ready:** the core verification date (an Excel serial date). Stored on the reservation as `cv_ready_date`.
+- **Port Info:** physical labels from both sites, free text with checklists, quality comments, sometimes dB loss and distance. Stored raw only in the MVP. Parsing it is a nice-to-have for later.
+- **Contractor, Remark:** free text, stored raw.
+- **Fiber core monitoring:** one of two 3-letter codes the data owner cannot disclose. Stored as free text; the dashboard suggests values already in use. The codes are never hardcoded.
+- **Fiber monitored Y/N/WIP:** stored as is (Y, N or WIP) and displayed only; its meaning is still vague.
+- **Fiber core requestor:** a company name or "internal usage", free text, uncleaned, may contain comments. It becomes the reservation customer. The customer stays required, so a blank requestor is Rejected. The preview shows near-matches by trigram similarity so the admin can merge customers.
+- **Fiber core request date:** the reservation date.
+- **Aging(days):** ignored on import; computed live in Asia/Kuala_Lumpur from the reservation date.
+- **No of core requested and Core assignment:** the real reservation. Core assignment holds port ranges per site, for example `AABB Tray 1 P1-P2` and `BBCC MOD B P23-24`. The two sites' ranges are paired in order (P1 with P23, P2 with P24). A length mismatch or a malformed range (for example `P23-282`) makes the row Needs review. Never guessed.
+- **Core balance:** computed; ignored on import.
+- **Title rows** (for example "DWDM Trunk Route 1", "DWDM Route 2", "Company A project") are group labels. They apply to the rows below until the next title and are stored as `group_label` on each reservation.
+
+Site Location sheet: the header is on row 4 (rows 1 to 3 are a title and blank). Every row is a site. Columns: SITE_NAME, LATITUDE_IN_DECIMAL, LONGITUDE_IN_DECIMAL, then 2G, 3G, 4G, REMOTE VSAT, CPE, PDH Microwave, SITE_TYPE, STRUCTURE_TYPE, PMSHIP, SHARING_TYPE, STRUCTURE_HEIGHT, DESCRIPTION, CREATED_BY, CREATED_WHEN, MODIFIEDBY, MODIFIEDWHEN, STRUCTURE_OWNER. Name, kind, location and region are real columns on the site. Every other column goes into one `details` JSON field, shown in the site panel, so a new Excel column needs no schema change. All sites are expected to have latitude and longitude; the coordinate check above applies.
+
+DC List sheet: columns No, State, City, Cluster, DC NAME / LINK, LRD, E2E Status, Fiber Leg, lat, long. A DC is a site of kind 'dc', linked to its LRD site. A DC has its own latitude and longitude, which differ from its LRD site. E2E Status, Fiber Leg (the number of cables entering the DC), State, City and Cluster go in `details`.
+
 **Non-Functional Requirements**
 
-- Up to 50 concurrent users; potentially around 100 points of interest.
+- Up to 50 concurrent users. About 36,000 sites, about 100 DCs, hundreds of sites with spans, and up to about 100,000 cores. This is small for PostgreSQL with indexes (pg_trgm GIN on site names, btree on `cores.span_id`, GiST on site location).
 - Time zone: all date logic (the 3-month stale rule, the daily digest's "today") and date display use Asia/Kuala_Lumpur. Timestamps are stored in UTC (timestamptz).
 - Light and dark themes; text contrast of at least 4.5:1 (WCAG 2.1 AA).
 - Keyboard-operable navigation, controls and side panels. Automated tests cover the reservation flow (request, approve, reject, release, correct), upload validation and the loss bands; the UI also gets a manual check in light and dark themes.
@@ -218,13 +257,14 @@ All five MVP items are planned for 31 October 2026, about 11 days from this draf
 **Phased Rollout**
 
 1. **MVP, by 31 October 2026:** fiber health (cores and ports, reservations and link loss) and route planning; the MapLibre map with KMZ routes; Reserve cores with admin approval; admin upload with a preview step; admin editing of core status, spans and sites; email digest; login and roles. If time runs short, the email digest moves to v1.1 first; the next cut is the real KMZ routes on the map, with the simple map as the fallback; after that, span and site editing moves to v1.1 and core status editing stays. Gate to ship: tested on real exported data.
-2. **v1.1:** email digest and admin request emails if cut or the SMTP relay is not ready (the in-app Needs review list ships first either way); undo of a finished upload; a mini map in the upload step to compare a new KMZ route with existing routes (idea, to decide); verification of reservation data; editing of ports, customers and other data in the app; PMTiles zoom detail review.
+2. **v1.1:** email digest and admin request emails if cut or the SMTP relay is not ready (the in-app Needs review list ships first either way); undo of a finished upload; a mini map in the upload step to compare a new KMZ route with existing routes (idea, to decide); verification of reservation data; import of the Monitoring sheet once the planner confirms the data is accurate; parsing of the Port Info text; editing of ports, customers and other data in the app; PMTiles zoom detail review.
 3. **v2.0:** joint closures on the map; scheduled imports; production shipping model.
 
 **Technical Risks**
 
 | Risk | Impact | Mitigation |
 | --- | --- | --- |
+| Data is uncleaned: free-text requestors, merged cells, region typos, malformed port ranges and bad coordinates in the sample workbook | Bad rows save silently, plot in the wrong place or create wrong reservations | Raw staging with a status per row (Ready, Needs review, Rejected), the `excel_check` command, and the same checks in the upload preview; nothing is guessed |
 | Five features in about 11 days, built with AI assistance by one person | MVP slips | Fixed cut order, starting with the email digest; build the UI (inventory and reservations) first, then the map, admin upload and email |
 | Login slips past the MVP | Reserved-by cannot be trusted; admin upload is open; admin-only approval and release cannot be enforced | Build minimal login right after the approval flow, with a dev-only header standing in for the user until then; if it still slips, protect the Admin page at network level and hold approvals until login lands |
 | Real data not yet available; the schema comes from Excel headers and the port data in the mock is not real; Excel stays manually updated after go-live | Matching on site pairs and Port IDs, or loss calculations break on first or later uploads | Upload validation report; test with a real export as soon as one is available; an upload never overwrites reservations made in the dashboard |
