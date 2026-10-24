@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fiber - AABB - BBCC</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;500;600;700&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --sheet:#e9eeee; --paper:#ffffff; --ink:#12262e; --ink-2:#44585f; --rule:#b7c4c6; --rule-soft:#d6dfe0;
+  --blue:#0b5a8a; --blue-bg:#e3f0f7; --amber:#8a4a0a; --amber-bg:#fbefd9; --navy:#17323f;
+  --red:#a8281c; --red-bg:#fbe6e3; --green:#1b6b43; --hatch:#dfe5e6;
+  --font:"Atkinson Hyperlegible Next",system-ui,sans-serif; --cond:"Barlow Condensed","Arial Narrow",sans-serif;
+  --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:24px; --s6:32px;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--sheet);color:var(--ink);font:400 14px/1.45 var(--font);font-variant-numeric:tabular-nums}
+::selection{background:var(--blue);color:#fff}
+a{color:var(--blue)}
+:focus-visible{outline:3px solid var(--blue);outline-offset:2px;border-radius:3px}
+h1,h2,h3,p,ul,dl,dd{margin:0;padding:0}
+ul{list-style:none}
+
+/* top bar */
+.top{display:flex;align-items:center;gap:var(--s5);padding:0 var(--s5);height:52px;background:var(--navy);color:#fff}
+.brand{font:700 22px/1 var(--cond);letter-spacing:.04em;text-transform:uppercase;color:#fff;text-decoration:none;display:flex;align-items:center;gap:var(--s2)}
+.brand svg{display:block}
+.nav{display:flex;gap:2px;height:100%;flex:1;overflow-x:auto;scrollbar-width:none}
+.nav a{display:flex;align-items:center;gap:var(--s2);padding:0 var(--s4);color:#d3e1e6;text-decoration:none;font-weight:500;white-space:nowrap;border-bottom:3px solid transparent}
+.nav a:hover{background:#21414f;color:#fff}
+.nav a[aria-current=page]{color:#fff;border-bottom-color:#8fd0f2;font-weight:700}
+.badge{background:#ffd479;color:#2b1a00;font-weight:700;font-size:12px;border-radius:10px;padding:0 7px;line-height:18px}
+.acct{color:#d3e1e6;font-size:13px;white-space:nowrap;gap:6px}
+.acct b{color:#fff}
+
+/* layout */
+.wrap{display:grid;grid-template-columns:232px minmax(0,1fr) 312px;gap:var(--s4);padding:var(--s4) var(--s5);max-width:1600px;margin:0 auto;align-items:start}
+.spans{grid-column:1;grid-row:1}
+.main{grid-column:2;grid-row:1;display:grid;gap:var(--s5);min-width:0}
+.side{grid-column:3;grid-row:1;display:grid;gap:var(--s5);position:sticky;top:var(--s4);min-width:0}
+.main>*,.side>*{min-width:0}
+.panel{background:var(--paper);border:1px solid var(--rule)}
+.ph{display:flex;justify-content:space-between;align-items:baseline;gap:var(--s3);padding:var(--s3) var(--s4);border-bottom:1px solid var(--rule)}
+.ph h2{font:700 13px/1.2 var(--font);text-transform:uppercase;letter-spacing:.07em;color:var(--ink-2)}
+.ph .meta{font-size:12px;color:var(--ink-2)}
+
+/* span list */
+.spans ul{display:block}
+.spans li a{display:flex;justify-content:space-between;align-items:center;gap:var(--s2);padding:10px var(--s4);border-bottom:1px solid var(--rule-soft);text-decoration:none;color:var(--ink);min-height:44px}
+.spans li a:hover{background:var(--blue-bg)}
+.spans li a[aria-current=page]{background:var(--navy);color:#fff}
+.sn{font:600 19px/1 var(--cond);letter-spacing:.03em}
+.sf{font-size:13px;color:var(--ink-2);text-align:right}
+.sf b{font:700 20px/1 var(--cond);color:var(--ink);margin-right:4px}
+.spans li a[aria-current=page] .sf,.spans li a[aria-current=page] .sf b{color:#fff}
+.sf.zero b{color:var(--red)}
+.foot{padding:var(--s3) var(--s4);font-size:12px;color:var(--ink-2)}
+
+/* span header */
+.head{display:grid;grid-template-columns:1fr auto;gap:var(--s5);align-items:end;padding:var(--s5);}
+.crumb{font-size:13px;color:var(--ink-2)}
+h1{font:700 52px/1 var(--cond);letter-spacing:.02em;margin:var(--s1) 0 var(--s3)}
+.facts{display:grid;grid-template-columns:repeat(3,max-content);gap:var(--s3) var(--s5);font-size:14px}
+.facts div{display:flex;flex-direction:column}
+.facts dt{font-size:12px;color:var(--ink-2)}
+.facts dd{font-weight:600}
+.free{text-align:right;border-left:1px solid var(--rule);padding-left:var(--s5)}
+.free .big{font:700 96px/.85 var(--cond);color:var(--blue)}
+.free .cap{font-weight:700;font-size:15px;margin-top:var(--s2)}
+.free .eq{font-size:13px;color:var(--ink-2);margin-top:2px}
+.tally{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--rule)}
+.tally div{padding:var(--s3) var(--s4);border-right:1px solid var(--rule-soft)}
+.tally div:last-child{border-right:0}
+.tally b{display:block;font:700 26px/1 var(--cond)}
+.tally span{font-size:12px;color:var(--ink-2)}
+
+/* core sheet */
+.sheet{padding:var(--s4) var(--s3)}
+.neat{border:1px solid var(--ink);outline:1px solid var(--ink);outline-offset:3px;margin:4px;padding:var(--s3) var(--s2)}
+.cols{display:grid;grid-template-columns:54px repeat(12,1fr);gap:3px;margin-bottom:var(--s1);font-size:11px;color:var(--ink-2);text-align:center}
+.tube{display:grid;grid-template-columns:54px repeat(12,1fr);gap:3px;margin-bottom:3px}
+.tlab{display:flex;flex-direction:column;justify-content:center;font-size:12px;line-height:1.2;color:var(--ink-2);padding-right:var(--s2)}
+.tlab b{color:var(--ink);font-size:13px}
+.core{all:unset;box-sizing:border-box;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;height:62px;min-width:0;background:#fff;border:1.5px solid var(--blue);color:var(--blue);font-family:var(--font);text-align:center}
+.core .num{font:700 17px/1 var(--cond);color:var(--ink)}
+.core .lbl{font-size:11px;line-height:1;white-space:nowrap;letter-spacing:-.02em}
+.core .sy{width:12px;height:12px}
+.core:hover:not(:disabled){background:var(--blue-bg)}
+.core:focus-visible{outline:3px solid var(--ink);outline-offset:2px;z-index:1;position:relative}
+.core:disabled{cursor:not-allowed}
+.c-sel{background:var(--blue)!important;color:#fff;border-color:var(--blue);border-width:2px;box-shadow:inset 0 0 0 2px #fff}
+.c-sel .num{color:#fff}
+.c-req{background:var(--amber-bg);border:1.5px dashed var(--amber);color:var(--amber)}
+.c-res{background:var(--navy);border-color:var(--navy);color:#fff}
+.c-res .num{color:#fff}
+.c-use{background:repeating-linear-gradient(135deg,var(--hatch) 0 4px,#f4f7f7 4px 8px);border-color:#5f7279;color:#34464c}
+.c-bad{background:var(--red-bg);border:1.5px solid var(--red);color:var(--red)}
+.c-bad .num{color:var(--red)}
+.legend{display:flex;flex-wrap:wrap;gap:var(--s2) var(--s5);padding:var(--s3) var(--s4);border-top:1px solid var(--rule);font-size:13px;align-items:center}
+.legend li{display:flex;align-items:center;gap:6px}
+.legend .sy{width:16px;height:16px;padding:2px;border:1.5px solid currentColor;background:#fff}
+.k-avail{color:var(--blue)}.k-sel{color:var(--blue)}.legend .k-sel .sy{background:var(--blue);color:#fff;border-color:var(--blue)}
+.k-req{color:var(--amber)}.legend .k-req .sy{background:var(--amber-bg);border-style:dashed}
+.k-res{color:var(--navy)}.legend .k-res .sy{background:var(--navy);color:#fff}
+.k-use{color:#34464c}.legend .k-use .sy{background:var(--hatch)}
+.k-bad{color:var(--red)}.legend .k-bad .sy{background:var(--red-bg)}
+.legend li span{color:var(--ink)}
+.unsv{margin-left:auto;color:var(--ink-2)}
+.unsv b{color:var(--ink)}
+
+/* held table */
+table{width:100%;border-collapse:collapse}
+th{font-size:12px;font-weight:700;text-align:left;color:var(--ink-2);padding:var(--s2) var(--s4);border-bottom:1px solid var(--rule);background:#f4f7f7}
+td{padding:10px var(--s4);border-bottom:1px solid var(--rule-soft);vertical-align:top}
+tr:last-child td{border-bottom:0}
+td .st{display:inline-flex;align-items:center;gap:6px;font-weight:600;white-space:nowrap}
+td .st .sy{width:14px;height:14px}
+.st.k-res{color:var(--navy)}
+.ports{font-size:13px;color:var(--ink-2);display:block}
+.nowrap{white-space:nowrap}
+.scroll{overflow-x:auto}
+
+/* reserve */
+.rs{padding:var(--s4);display:grid;gap:var(--s3)}
+.chosen{display:flex;align-items:baseline;gap:var(--s2);flex-wrap:wrap}
+.chosen b{font:700 30px/1 var(--cond);color:var(--blue)}
+.chosen span{color:var(--ink-2);font-size:13px}
+label{display:grid;gap:4px;font-weight:600;font-size:13px}
+input{font:400 15px var(--font);color:var(--ink);padding:10px var(--s3);border:1.5px solid #6b7f86;background:#fff;border-radius:2px;min-height:44px;width:100%}
+input::placeholder{color:#55676d;opacity:1}
+.btn{font:700 15px var(--font);min-height:46px;padding:0 var(--s4);border:0;border-radius:2px;background:var(--blue);color:#fff;cursor:pointer}
+.btn:hover{background:#08486f}
+.btn.ghost{background:#fff;color:var(--blue);border:1.5px solid var(--blue);min-height:36px;font-size:13px;padding:0 var(--s3)}
+.btn.ghost:hover{background:var(--blue-bg)}
+.hint{font-size:12px;color:var(--ink-2)}
+
+/* approvals */
+.ap{padding:var(--s4);border-bottom:1px solid var(--rule-soft);display:grid;gap:6px}
+.ap:last-child{border-bottom:0}
+.ap h3{font:600 20px/1.1 var(--cond);letter-spacing:.02em}
+.ap .row{display:flex;justify-content:space-between;gap:var(--s2);font-size:13px;color:var(--ink-2)}
+.warn{display:flex;gap:var(--s2);align-items:flex-start;background:var(--amber-bg);color:#5a3000;padding:var(--s2) var(--s3);font-size:13px}
+.warn svg{flex:none;margin-top:2px}
+.ap .acts{display:flex;gap:var(--s2);margin-top:2px}
+
+.bar{display:none}
+@media (max-width:900px){.bar{display:flex;position:sticky;bottom:0;z-index:5;align-items:center;justify-content:center;min-height:52px;background:var(--blue);color:#fff;font-weight:700;text-decoration:none;box-shadow:0 -2px 8px rgba(18,38,46,.25)}}
+@media (max-width:1180px){
+  .wrap{grid-template-columns:minmax(0,1fr) 300px}
+  .spans{grid-column:1/-1;grid-row:3}
+  .spans ul{display:grid;grid-template-columns:repeat(3,1fr)}
+  .main{grid-column:1;grid-row:1}
+  .side{grid-column:2;grid-row:1}
+}
+@media (max-width:900px){
+  .wrap{grid-template-columns:minmax(0,1fr);padding:var(--s4)}
+  .main,.side,.spans{grid-column:1;position:static}
+  .main{grid-row:1}.side{grid-row:2;grid-template-columns:1fr 1fr;align-items:start}.spans{grid-row:3}
+  .spans ul{grid-template-columns:repeat(2,1fr)}
+}
+@media (max-width:640px){
+  .top{gap:var(--s3);padding:0 var(--s4);flex-wrap:wrap;height:auto}
+  .acct{gap:6px}
+  .brand{height:44px}.acct{margin-left:auto;height:44px;display:flex;align-items:center}
+  .nav{order:3;flex-basis:100%;height:44px}
+  .nav{margin:0 calc(var(--s4)*-1);padding:0 var(--s2)}
+  .nav a{padding:0 var(--s3)}
+  .side{grid-template-columns:1fr}
+  .spans ul{grid-template-columns:1fr}
+  .head{grid-template-columns:1fr;padding:var(--s4);gap:var(--s3)}
+  .facts{grid-template-columns:repeat(3,auto);gap:var(--s2) var(--s3);font-size:13px;justify-content:start}
+  .facts div:nth-child(4){grid-column:span 2}.facts div:nth-child(5),.facts div:nth-child(6){grid-column:auto}
+  .head > div:first-child{display:flex;flex-direction:column;gap:var(--s2)}
+  h1{margin:0}
+  h1{font-size:42px}
+  .crumb{display:none}
+  .free{text-align:left;border-left:0;border-top:1px solid var(--rule);padding:var(--s3) 0 0;display:flex;align-items:baseline;gap:var(--s3);flex-wrap:wrap}
+  .free .big{font-size:60px}.free{border-top:0;padding:0}.head{display:flex;flex-direction:column;align-items:stretch}.tally div{padding:var(--s2) var(--s3)}.tally b{font-size:22px}
+  .tally{grid-template-columns:1fr 1fr}
+  .tally div:nth-child(2){border-right:0}
+  .tally div:nth-child(-n+2){border-bottom:1px solid var(--rule-soft)}
+  .sheet{padding:var(--s2)}
+  .neat{margin:3px;padding:var(--s2) var(--s1)}
+  .cols,.tube{grid-template-columns:repeat(12,1fr);gap:2px}
+  .cols span:first-child{display:none}
+  .tlab{grid-column:1/-1;flex-direction:row;justify-content:flex-start;gap:var(--s2);align-items:baseline;padding:var(--s1) 2px}
+  .core{height:48px}
+  .core .lbl{display:none}
+  .core .num{font-size:15px}
+  .core .sy{width:11px;height:11px}
+  .unsv{margin-left:0}
+  .scroll table{min-width:520px}
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="#"><svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true"><circle cx="13" cy="13" r="11" fill="none" stroke="#8fd0f2" stroke-width="2"></circle><circle cx="13" cy="13" r="6" fill="none" stroke="#8fd0f2" stroke-width="2"></circle><circle cx="13" cy="13" r="2" fill="#8fd0f2"></circle></svg>Fiber</a>
+  <nav class="nav" aria-label="Main">
+    <a href="#" aria-current="page">Spans</a>
+    <a href="#">Routes</a>
+    <a href="#">Map</a>
+    <a href="#">Approvals <span class="badge" aria-label="2 waiting">2</span></a>
+    <a href="#">Upload</a>
+  </nav>
+  <div class="acct">Signed in <b>planner1</b></div>
+</header>
+
+<div class="wrap">
+<aside class="spans panel" aria-label="North region spans">
+  <div class="ph"><h2>North spans</h2><span class="meta">Free to reserve</span></div>
+  <ul>
+    <li><a href="#" aria-current="page"><span class="sn">AABB - BBCC</span><span class="sf"><b>22</b>free</span></a></li>
+    <li><a href="#"><span class="sn">BBCC - CCDD</span><span class="sf"><b>20</b>free</span></a></li>
+    <li><a href="#"><span class="sn">BBCC - FFGG</span><span class="sf"><b>11</b>free</span></a></li>
+    <li><a href="#"><span class="sn">CCDD - DDEE</span><span class="sf"><b>3</b>free</span></a></li>
+    <li><a href="#"><span class="sn">DDEE - EERR</span><span class="sf zero"><b>0</b>free</span></a></li>
+    <li><a href="#"><span class="sn">EERR - TTEE</span><span class="sf">not surveyed</span></a></li>
+    <li><a href="#"><span class="sn">FFGG - GGHH</span><span class="sf"><b>17</b>free</span></a></li>
+    <li><a href="#"><span class="sn">GGHH - HHJJ</span><span class="sf"><b>9</b>free</span></a></li>
+    <li><a href="#"><span class="sn">HHJJ - JJKK</span><span class="sf"><b>31</b>free</span></a></li>
+  </ul>
+  <p class="foot">9 of 14 North spans shown</p>
+</aside>
+
+<main class="main">
+  <section class="panel" aria-labelledby="t">
+    <div class="head">
+      <div>
+        <p class="crumb">Spans / North region</p>
+        <h1 id="t">AABB - BBCC</h1>
+        <dl class="facts">
+          <div><dt>Region</dt><dd>North</dd></div>
+          <div><dt>Route</dt><dd>Trunk</dd></div>
+          <div><dt>Distance</dt><dd>32.5 km</dd></div>
+          <div><dt>Group</dt><dd>DWDM Trunk Route 1</dd></div>
+          <div><dt>Cable size</dt><dd>144 cores</dd></div>
+          <div><dt>Surveyed</dt><dd>36 (tubes 1 to 3)</dd></div>
+        </dl>
+      </div>
+      <div class="free">
+        <div class="big" aria-label="22 free to reserve">22</div>
+        <div class="cap">Free to reserve</div>
+        <div class="eq">26 Available &minus; 4 held by count only</div>
+      </div>
+    </div>
+    <div class="tally">
+      <div><b>26</b><span>Available (incl. 1 chosen)</span></div>
+      <div><b>9</b><span>Held with cores: 2 reserved, 1 requested, 6 in use</span></div>
+      <div><b>1</b><span>Faulty</span></div>
+      <div><b>4</b><span>Held, not assigned ([Customer B])</span></div>
+    </div>
+  </section>
+
+  <section class="panel" aria-labelledby="g">
+    <div class="ph"><h2 id="g">Cores, 36 surveyed</h2><span class="meta">Select Available cores, then Reserve</span></div>
+    <div class="sheet">
+      <div class="neat">
+        <div class="cols" aria-hidden="true"><span></span><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>10</span><span>11</span><span>12</span></div>
+<div class="tube" role="group" aria-label="Tube 1, cores 1 to 12"><div class="tlab"><b>Tube 1</b><span>1&ndash;12</span></div><button type="button" class="core c-res" data-n="1" disabled aria-label="Core 1, Reserved, reserved for DWDM(R)"><span class="num">1</span><svg class="sy" viewBox="0 0 12 12" aria-hidden="true"><rect x="2" y="2" width="8" height="8" fill="currentColor"></rect></svg><span class="lbl">Reserved</span></button><button type="button" class="core c-res" data-n="2" disabled aria-label="Core 2, Reserved, reserved for DWDM(R)"><span class="num">2</span><svg class="sy" viewBox="0 0 12 12" aria-hidden="true"><rect x="2" y="2" width="8" height="8" fill="currentColor"></rect></svg><span class="lbl">Reserved</span></button><button type="button" class="core c-req" data-n="3" disabled aria-label="Core 3, Requested, requested, waiting for approval"><span class="num">3</span><svg class="sy" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4.2" fill="none" stroke="currentColor" stroke-width="1.4"></circle><path d="M6 1.8 A4.2 4.2 0 0 1 6 10.2 Z" fill="currentColor"></path></svg><span class="lbl">Requested</span></button><button type="button" class="core c-avail" data-n="4" aria-pressed="false" aria-label="Core 4, Available"><span class="num">4</span><svg class="sy" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4" fill="none" stroke="currentColor" stroke-width="1.6"></circle></svg><span class="lbl">Available</span></button><button type="button" class="core c-avail" data-n="5" aria-pressed="false" aria-label="Core 5, Available"><span class="num">5</span><svg class="sy" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4" fill="none" stroke="currentColor" stroke-width="1.6"></circle></svg><span class="lbl">Available</span></button><button type="button" class="core c-avail" data-n="6" aria-pressed="false" aria-label="Core 6, Available"><span class="num">6</span><svg class="sy" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4" fill="none" stroke="currentColor" stroke-width="1.6"></circle></svg><span class="lbl">Available</span></button><button type="button" class="core c-sel" data-n="7" aria-pressed="true" aria-label="Core 7, Available, chosen"><span class="num">7</span><svg class="sy" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6.5 L5 9.5 L10.5 2.5" stroke="currentColor" stroke-width="2.2" fill="none"></path></svg><span class="lbl">Chosen</span></button><button type="button" class="core c-avail" data-n="8" aria-pressed="false" aria-label="Core 8, Available"><span class="num">8</span><svg class="sy" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4" fill="none" stroke="currentColor" stroke-width="1.6"></circle></svg><span class="lbl">Available</span></button><button type="button" class="core c-avail" data-n="9" aria-pressed="false" aria-label="Core 9, Available"><span class="num">9</span><svg class="sy" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4" fill="none" stroke="currentColor" stroke-width="1.6"></circle></svg><span class="lbl">Available</span></button><button type="button" class="core c-avail" data-n="10" aria-pressed="false" aria-label="Core 10, Available"><span class="num">10</span><svg class="sy" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4" fill="none" stroke="currentColor" stroke-width="1.6"></circle></svg><span class="lbl">Available</span></button><button type="button" class="core c-avail" data-n="11" aria-pressed="false" aria-label="Core 11, Available"><span class="num">11</span><svg class="sy" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4" fill="none" stroke="currentColor" stroke-width="1.6"></circle></svg><span class="lbl">Available</span></button><button type="button" class="core c-avail" data-n="12" aria-pressed="false" aria-label="Core 12, Available"><span class="num">12</span><svg class="sy" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4" fill="none" stroke="currentColor" stroke-width="1.6"></circle></svg><span class="lbl">Available</span></button></div>
+<div class="tube" role="group" aria-label="Tube 2, cores 13 to 24"><div class="tlab"><b>Tube 2</b><span>13&ndash;24</span></div><button type="button" class="core c-use" data-n="13" disabled aria-label="Core 13, In use, circuit CKT-1011"><span class="num">13</span><svg class="sy" viewBox="0 0 12 12" aria-hidden="true"><path d="M6 1.5 L10.5 10.5 L1.5 10.5 Z" fill="currentColor"></path></svg><span class="lbl">In use</span></button><button type="button" class="core c-use" data-n="14" disabled aria-label="Core 14, In use, circuit CKT-1012"><span class="num">14</span><svg class="sy" viewBox="0 0 12 12" aria-hidden="true"><path d="M6 1.5 L10.5 10.5 L1.5 10.5 Z" fill="currentColor"></path></svg><span class="lbl">In use</span></button><button type="button" class="core c-use" data-n="15" disabled aria-label="Core 15, In use, circuit CKT-1013"><span class="num">15</span><svg class="sy" viewBox="0 0 12 12" aria-hidden="true"><path d="M6 1.5 L10.5 10.5 L1.5 10.5 Z" fill="currentColor"></path></svg><span class="lbl">In use</span></button><button type="button" class="core c-use" data-n="16" disabled aria-label="Core 16, In use, circuit CKT-1014"><span class="num">16</span><svg class="sy" viewBox="0 0 12 12" aria-hidden="true"><path d="M6 1.5 L10.5 10.5 L1.5 10.5 Z" fill="currentColor"></path></svg><span class="lbl">In use</span></button><button type="button" class="core c-use" data-n="17" disabled aria-label="Core 17, In use, circuit CKT-1015"><span class="num">17</span><svg class="sy" viewBox="0 0 12 12" aria-hidden="true"><path d="M6 1.5 L10.5 10.5 L1.5 10.5 Z" fill="currentColor"></path></svg><span class="lbl">In use</span></button><button type="button" class="core c-use" data-n="18" disabled aria-label="Core 18, In use, circuit CKT-1016"><span class="num">18</span><svg class="sy" viewBox="0 0 12 12" aria-hidden="true"><path d="M6 1.5 L10.5 10.5 L1.5 10.5 Z" fill="currentColor"></path></svg><span class="lbl">In use</span></button><button type="button" class="core c-avail" data-n="19" aria-pressed="false" aria-label="Core 19, Available"><span class="num">19</span><svg class="sy" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4" fill="none" stroke="currentColor" stroke-width="1.6"></circle></svg><span class="lbl">Available</span></button><button type="button" class="core c-avail" data-n="20" aria-pressed="false" aria-label="Core 20, Available"><span class="num">20</span><svg class="sy" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4" fill="none" stroke="currentColor" stroke-width="1.6"></circle></svg><span class="lbl">Available</span></button><button type="button" class="core c-avail" data-n="21" aria-pressed="false" aria-label="Core 21, Available"><span class="num">21</span><svg class="sy" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4" fill="none" stroke="currentColor" stroke-width="1.6"></circle></svg><span class="lbl">Available</span></button><button type="button" class="core c-avail" data-n="22" aria-pressed="false" aria-label="Core 22, Available"><span class="num">22</span><svg class="sy" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4" fill="none" stroke="currentColor" stroke-width="1.6"></circle></svg><span class="lbl">Available</span></button><button type="button" class="core c-avail" data-n="23" aria-pressed="false" aria-label="Core 23, Available"><span class="num">23</span><svg class="sy" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4" fill="none" stroke="currentColor" stroke-width="1.6"></circle></svg><span class="lbl">Available</span></button><button type="button" class="core c-avail" data-n="24" aria-pressed="false" aria-label="Core 24, Available"><span class="num">24</span><svg class="sy" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4" fill="none" stroke="currentColor" stroke-width="1.6"></circle></svg><span class="lbl">Available</span></button></div>
+<div class="tube" role="group" aria-label="Tube 3, cores 25 to 36"><div class="tlab"><b>Tube 3</b><span>25&ndash;36</span></div><button type="button" class="core c-avail" data-n="25" aria-pressed="false" aria-label="Core 25, Available"><span class="num">25</span><svg class="sy" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4" fill="none" stroke="currentColor" stroke-width="1.6"></circle></svg><span class="lbl">Available</span></button><button type="button" class="core c-avail" data-n="26" aria-pressed="false" aria-label="Core 26, Available"><span class="num">26</span><svg class="sy" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4" fill="none" stroke="currentColor" stroke-width="1.6"></circle></svg><span class="lbl">Available</span></button><button type="button" class="core c-avail" data-n="27" aria-pressed="false" aria-label="Core 27, Available"><span class="num">27</span><svg class="sy" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4" fill="none" stroke="currentColor" stroke-width="1.6"></circle></svg><span class="lbl">Available</span></button><button type="button" class="core c-avail" data-n="28" aria-pressed="false" aria-label="Core 28, Available"><span class="num">28</span><svg class="sy" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4" fill="none" stroke="currentColor" stroke-width="1.6"></circle></svg><span class="lbl">Available</span></button><button type="button" class="core c-avail" data-n="29" aria-pressed="false" aria-label="Core 29, Available"><span class="num">29</span><svg class="sy" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4" fill="none" stroke="currentColor" stroke-width="1.6"></circle></svg><span class="lbl">Available</span></button><button type="button" class="core c-bad" data-n="30" disabled aria-label="Core 30, Faulty"><span class="num">30</span><svg class="sy" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 2.5 L9.5 9.5 M9.5 2.5 L2.5 9.5" stroke="currentColor" stroke-width="2" fill="none"></path></svg><span class="lbl">Faulty</span></button><button type="button" class="core c-avail" data-n="31" aria-pressed="false" aria-label="Core 31, Available"><span class="num">31</span><svg class="sy" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4" fill="none" stroke="currentColor" stroke-width="1.6"></circle></svg><span class="lbl">Available</span></button><button type="button" class="core c-avail" data-n="32" aria-pressed="false" aria-label="Core 32, Available"><span class="num">32</span><svg class="sy" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4" fill="none" stroke="currentColor" stroke-width="1.6"></circle></svg><span class="lbl">Available</span></button><button type="button" class="core c-avail" data-n="33" aria-pressed="false" aria-label="Core 33, Available"><span class="num">33</span><svg class="sy" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4" fill="none" stroke="currentColor" stroke-width="1.6"></circle></svg><span class="lbl">Available</span></button><button type="button" class="core c-avail" data-n="34" aria-pressed="false" aria-label="Core 34, Available"><span class="num">34</span><svg class="sy" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4" fill="none" stroke="currentColor" stroke-width="1.6"></circle></svg><span class="lbl">Available</span></button><button type="button" class="core c-avail" data-n="35" aria-pressed="false" aria-label="Core 35, Available"><span class="num">35</span><svg class="sy" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4" fill="none" stroke="currentColor" stroke-width="1.6"></circle></svg><span class="lbl">Available</span></button><button type="button" class="core c-avail" data-n="36" aria-pressed="false" aria-label="Core 36, Available"><span class="num">36</span><svg class="sy" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4" fill="none" stroke="currentColor" stroke-width="1.6"></circle></svg><span class="lbl">Available</span></button></div>
+      </div>
+    </div>
+    <ul class="legend" aria-label="Legend">
+<li class="k-avail"><svg class="sy" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4" fill="none" stroke="currentColor" stroke-width="1.6"></circle></svg><span>Available</span></li><li class="k-sel"><svg class="sy" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6.5 L5 9.5 L10.5 2.5" stroke="currentColor" stroke-width="2.2" fill="none"></path></svg><span>Chosen</span></li><li class="k-req"><svg class="sy" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4.2" fill="none" stroke="currentColor" stroke-width="1.4"></circle><path d="M6 1.8 A4.2 4.2 0 0 1 6 10.2 Z" fill="currentColor"></path></svg><span>Requested</span></li><li class="k-res"><svg class="sy" viewBox="0 0 12 12" aria-hidden="true"><rect x="2" y="2" width="8" height="8" fill="currentColor"></rect></svg><span>Reserved</span></li><li class="k-use"><svg class="sy" viewBox="0 0 12 12" aria-hidden="true"><path d="M6 1.5 L10.5 10.5 L1.5 10.5 Z" fill="currentColor"></path></svg><span>In use</span></li><li class="k-bad"><svg class="sy" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 2.5 L9.5 9.5 M9.5 2.5 L2.5 9.5" stroke="currentColor" stroke-width="2" fill="none"></path></svg><span>Faulty</span></li>
+      <li class="unsv"><b>108</b>&nbsp;cores (37 to 144) not surveyed, not drawn</li>
+    </ul>
+  </section>
+
+  <section class="panel" aria-labelledby="h">
+    <div class="ph"><h2 id="h">Held cores and holds</h2><span class="meta">What is on this span</span></div>
+    <div class="scroll"><table>
+      <thead><tr><th scope="col">Cores</th><th scope="col">Status</th><th scope="col">Held by</th><th scope="col">Detail</th></tr></thead>
+      <tbody>
+        <tr><td class="nowrap"><b>1&ndash;2</b></td><td><span class="st k-res"><svg class="sy" viewBox="0 0 12 12" aria-hidden="true"><rect x="2" y="2" width="8" height="8" fill="currentColor"></rect></svg>Reserved</span></td><td>DWDM(R)</td><td>Planned 2026-11-21<span class="ports">AABB Tray 1 P1 / P2 to BBCC MOD B P23 / P24</span></td></tr>
+        <tr><td class="nowrap"><b>3</b></td><td><span class="st" style="color:var(--amber)"><svg class="sy" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4.2" fill="none" stroke="currentColor" stroke-width="1.4"></circle><path d="M6 1.8 A4.2 4.2 0 0 1 6 10.2 Z" fill="currentColor"></path></svg>Requested</span></td><td>[Customer A] (planner2)</td><td>Planned 2026-12-01, waiting for approval</td></tr>
+        <tr><td class="nowrap"><b>13&ndash;18</b></td><td><span class="st" style="color:#34464c"><svg class="sy" viewBox="0 0 12 12" aria-hidden="true"><path d="M6 1.5 L10.5 10.5 L1.5 10.5 Z" fill="currentColor"></path></svg>In use</span></td><td>Live circuits</td><td>CKT-1011 to CKT-1016</td></tr>
+        <tr><td class="nowrap"><b>30</b></td><td><span class="st" style="color:var(--red)"><svg class="sy" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 2.5 L9.5 9.5 M9.5 2.5 L2.5 9.5" stroke="currentColor" stroke-width="2" fill="none"></path></svg>Faulty</span></td><td>None</td><td>Not bookable</td></tr>
+        <tr><td class="nowrap"><b>4 cores</b></td><td><span class="st">Not assigned</span></td><td>[Customer B]</td><td>Count-only reservation from the Excel import, planned 2026-09-02. Lowers free to reserve; marks no cell.</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+</main>
+
+<div class="side">
+  <section class="panel" aria-labelledby="r">
+    <div class="ph"><h2 id="r">Reserve</h2><span class="meta">AABB - BBCC</span></div>
+    <form class="rs" onsubmit="return false">
+      <div class="chosen"><b id="cnt">1</b><span id="lst">core chosen: 7</span></div>
+      <label>Customer<input type="text" placeholder="Customer name (required)" autocomplete="off"></label>
+      <label>Planned date<input type="date"></label>
+      <button class="btn" type="submit" id="go">Reserve 1 core</button>
+      <p class="hint">22 free to reserve. The 4 count-only cores are not on any cell, so Available cells can exceed what you may book.</p>
+    </form>
+  </section>
+
+  <section class="panel" aria-labelledby="w">
+    <div class="ph"><h2 id="w">Waiting for approval (2)</h2><a href="#" class="meta">All approvals</a></div>
+    <article class="ap">
+      <h3>[Customer A]</h3>
+      <div class="row"><span>Route AABB - BBCC - CCDD</span><span>2 cores per span</span></div>
+      <div class="row"><span>Planned 2026-12-01</span><span>planner2, 2 days ago</span></div>
+      <p class="warn"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M7 1 L13.5 12.5 L0.5 12.5 Z" fill="none" stroke="#5a3000" stroke-width="1.5"></path><path d="M7 5.5 V8.8 M7 10.2 V11" stroke="#5a3000" stroke-width="1.6"></path></svg>New customer name, close to existing "[Customer A] Sdn Bhd"</p>
+      <div class="acts"><button class="btn ghost" type="button">Review</button></div>
+    </article>
+    <article class="ap">
+      <h3>DWDM(R)</h3>
+      <div class="row"><span>KKLL - LLMM, cores 7, 8</span><span>Planned 2026-12-01</span></div>
+      <div class="row"><span>planner1</span><span>5 hours ago</span></div>
+      <div class="acts"><button class="btn ghost" type="button">Review</button></div>
+    </article>
+  </section>
+</div>
+</div>
+<a class="bar" href="#r" id="bar">Reserve 1 core</a>
+<script>
+(function(){var g=document.querySelectorAll('.core[data-n]'),c=document.getElementById('cnt'),l=document.getElementById('lst'),b=document.getElementById('go');
+function up(){var s=[].filter.call(g,function(x){return x.getAttribute('aria-pressed')==='true'}).map(function(x){return x.dataset.n});
+c.textContent=s.length;l.textContent=s.length?(s.length+' core'+(s.length>1?'s':'')+' chosen: '+s.join(', ')):'no cores chosen';b.textContent='Reserve '+s.length+' core'+(s.length==1?'':'s');b.disabled=!s.length;document.getElementById('bar').textContent=b.textContent;}
+[].forEach.call(g,function(x){x.addEventListener('click',function(){var on=x.getAttribute('aria-pressed')==='true';x.setAttribute('aria-pressed',on?'false':'true');x.classList.toggle('c-sel',!on);x.classList.toggle('c-avail',on);up();});});})();
+</script>
+</body>
+</html>
