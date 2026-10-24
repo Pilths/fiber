@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UI comparison</title>
+<style>
+  body { margin: 0; font: 14px system-ui, sans-serif; background: #f4f4f5; color: #18181b; }
+  nav { display: flex; gap: 8px; padding: 12px 16px; background: #fff; border-bottom: 1px solid #d4d4d8; flex-wrap: wrap; align-items: center; }
+  nav b { margin-right: 8px; }
+  button { font: inherit; padding: 6px 12px; border: 1px solid #a1a1aa; background: #fff; border-radius: 6px; cursor: pointer; }
+  button[aria-pressed="true"] { background: #18181b; color: #fff; border-color: #18181b; }
+  #grid { display: grid; gap: 12px; padding: 12px; grid-template-columns: 1fr; }
+  #grid.all { grid-template-columns: 1fr 1fr; }
+  figure { margin: 0; background: #fff; border: 1px solid #d4d4d8; border-radius: 8px; overflow: hidden; }
+  figcaption { padding: 8px 12px; font-weight: 600; border-bottom: 1px solid #d4d4d8; }
+  figcaption a { font-weight: 400; margin-left: 8px; }
+  iframe { display: block; width: 100%; height: calc(100vh - 110px); border: 0; }
+  #grid.all iframe { height: 900px; }
+  [hidden] { display: none; }
+</style>
+</head>
+<body>
+<nav>
+  <b>Span view, 4 versions</b>
+  <button data-show="all" aria-pressed="true">All 4</button>
+  <button data-show="opus-taste">Opus + Taste</button>
+  <button data-show="fable-taste">Fable + Taste</button>
+  <button data-show="opus-impeccable">Opus + Impeccable</button>
+  <button data-show="fable-impeccable">Fable + Impeccable</button>
+</nav>
+<div id="grid" class="all">
+  <figure data-id="opus-taste"><figcaption>Opus 5.5 + Taste <a href="opus-taste/index.html" target="_blank">open full</a></figcaption><iframe src="opus-taste/index.html" title="Opus + Taste"></iframe></figure>
+  <figure data-id="fable-taste"><figcaption>Fable 5.1 + Taste <a href="fable-taste/index.html" target="_blank">open full</a></figcaption><iframe src="fable-taste/index.html" title="Fable + Taste"></iframe></figure>
+  <figure data-id="opus-impeccable"><figcaption>Opus 5.5 + Impeccable <a href="opus-impeccable/index.html" target="_blank">open full</a></figcaption><iframe src="opus-impeccable/index.html" title="Opus + Impeccable"></iframe></figure>
+  <figure data-id="fable-impeccable"><figcaption>Fable 5.1 + Impeccable <a href="fable-impeccable/index.html" target="_blank">open full</a></figcaption><iframe src="fable-impeccable/index.html" title="Fable + Impeccable"></iframe></figure>
+</div>
+<script>
+  const grid = document.getElementById('grid');
+  document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
+    const show = b.dataset.show;
+    document.querySelectorAll('nav button').forEach(x => x.setAttribute('aria-pressed', x === b));
+    grid.classList.toggle('all', show === 'all');
+    grid.querySelectorAll('figure').forEach(f => f.hidden = show !== 'all' && f.dataset.id !== show);
+  });
+</script>
+</body>
+</html>
