@@ -16,3 +16,20 @@ web/public/map/
 
 # Taste skill working files
 .taste-skill/
+
+# Claude Code and design-tool working files (local only)
+.claude/
+.impeccable/
+.taste-skill/
+.playwright-mcp/
+.mcp.json
+.cartographer/
+.codegraph/
+
+# Editor and OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+*.log
+*.zip
