@@ -39,7 +39,8 @@ Read before working: `docs/PRD.md` (requirements), `docs/architecture.md` (desig
 The main chat stays on one model so its cache is kept. Hand work to a subagent by setting `model` on the Agent call:
 
 - Haiku: mechanical work with obvious output. Renames, moving text, ticking checklists, version lookups, running a command and reporting its output.
-- Sonnet: applying the user's answers to a doc where wording or consistency matters (plan, architecture, PRD), and all code: schema, reservation rules, upload logic, tests.
+- Sonnet: applying the user's answers to a doc where wording or consistency matters (plan, architecture, PRD), and backend code: schema, reservation rules, upload logic, tests.
+- Opus 5.5 or Fable: all UI and design work (mockups, React components, styling, layout). Not Sonnet.
 - Main chat: asking questions, design calls, trade-offs, and reviewing the result.
 
 If a wrong edit would take real judgment to spot, use Sonnet. A subagent starts with no context, so put the answers and the exact edits in its prompt. Review every subagent diff before reporting it as done.

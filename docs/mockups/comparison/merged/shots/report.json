@@ -1,0 +1,1904 @@
+{
+ "url": "/tmp/cmp/merged/index.html",
+ "at": "2026-10-24T16:59:50.705Z",
+ "allow": [],
+ "viewports": [
+  {
+   "width": 1440,
+   "height": 900,
+   "load": "load",
+   "screens": 2,
+   "filled": [
+    0.72,
+    0.79
+   ],
+   "motion": {
+    "elements": 0,
+    "css": 0,
+    "transitions": 0,
+    "scripted": 0,
+    "videos": 0,
+    "playingVideos": 0
+   },
+   "metrics": {
+    "viewport": {
+     "w": 1440,
+     "h": 900
+    },
+    "page": {
+     "height": 1490,
+     "screens": 1.7,
+     "words": 450,
+     "img": 0,
+     "video": 0,
+     "canvas": 0,
+     "svg": 58,
+     "sections": 6,
+     "horizontalOverflow": 0,
+     "overflowCulprits": [],
+     "uiFragments": 2,
+     "uiAbuse": false,
+     "realPictures": 0,
+     "videoCount": 0,
+     "uiPictures": 1,
+     "pictureSamples": [],
+     "blendText": 0,
+     "sideScrollers": 0,
+     "brokenImages": [],
+     "emoji": [],
+     "videosNoPoster": 0
+    },
+    "hero": {
+     "text": "AABB - BBCC",
+     "words": 3,
+     "chars": 11,
+     "lines": 1,
+     "size": 32,
+     "vw": 2.2,
+     "font": "Barlow Condensed",
+     "weight": 700,
+     "tracking": 0.02,
+     "leading": 1,
+     "top": 52,
+     "tag": "h1",
+     "kind": "heading",
+     "align": "left",
+     "position": "left"
+    },
+    "h1": {
+     "text": "AABB - BBCC",
+     "words": 3,
+     "lines": 1,
+     "size": 32,
+     "font": "Barlow Condensed"
+    },
+    "headings": [
+     {
+      "text": "AABB - BBCC",
+      "words": 3,
+      "chars": 11,
+      "lines": 1,
+      "size": 32,
+      "vw": 2.2,
+      "font": "Barlow Condensed",
+      "weight": 700,
+      "tracking": 0.02,
+      "leading": 1,
+      "upper": true,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "right",
+      "widthRatio": 0.81,
+      "top": 52,
+      "tag": "h1",
+      "kind": "heading"
+     },
+     {
+      "text": "22",
+      "words": 1,
+      "chars": 2,
+      "lines": 1,
+      "size": 40,
+      "vw": 2.8,
+      "font": "Barlow Condensed",
+      "weight": 700,
+      "tracking": 0,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.15,
+      "top": 189,
+      "tag": "div",
+      "kind": "heading"
+     },
+     {
+      "text": "9",
+      "words": 1,
+      "chars": 1,
+      "lines": 1,
+      "size": 34,
+      "vw": 2.4,
+      "font": "Barlow Condensed",
+      "weight": 700,
+      "tracking": 0,
+      "leading": 1.12,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.1,
+      "top": 189,
+      "tag": "div",
+      "kind": "heading"
+     },
+     {
+      "text": "1",
+      "words": 1,
+      "chars": 1,
+      "lines": 1,
+      "size": 34,
+      "vw": 2.4,
+      "font": "Barlow Condensed",
+      "weight": 700,
+      "tracking": 0,
+      "leading": 1.12,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.1,
+      "top": 189,
+      "tag": "div",
+      "kind": "heading"
+     },
+     {
+      "text": "36of 144",
+      "words": 2,
+      "chars": 8,
+      "lines": 1,
+      "size": 34,
+      "vw": 2.4,
+      "font": "Barlow Condensed",
+      "weight": 700,
+      "tracking": 0,
+      "leading": 1.12,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "right",
+      "widthRatio": 0.1,
+      "top": 189,
+      "mixedFonts": [
+       "Barlow Condensed",
+       "Atkinson Hyperlegible Next"
+      ],
+      "tag": "div",
+      "kind": "heading"
+     }
+    ],
+    "headingSummary": {
+     "count": 5,
+     "maxLines": 1,
+     "over2Lines": 0,
+     "statements": 0,
+     "centered": 0,
+     "medianWords": 3,
+     "mixedFontHeadings": 1
+    },
+    "type": {
+     "families": [
+      {
+       "family": "Atkinson Hyperlegible Next",
+       "share": 0.9,
+       "mono": false
+      },
+      {
+       "family": "Barlow Condensed",
+       "share": 0.1,
+       "mono": false
+      }
+     ],
+     "familyCount": 2,
+     "sizes": [
+      12,
+      13,
+      14,
+      15,
+      16,
+      18,
+      22,
+      32,
+      34,
+      40
+     ],
+     "sizeCount": 10,
+     "notLoaded": [],
+     "body": {
+      "font": "Atkinson Hyperlegible Next",
+      "size": 13,
+      "leading": 1.54,
+      "weight": 400,
+      "tracking": 0,
+      "contrast": 6.4
+     },
+     "measureChars": 122,
+     "max": {
+      "size": 40,
+      "vw": 2.8,
+      "font": "Barlow Condensed",
+      "text": "22"
+     },
+     "monoShare": 0,
+     "monoProseShare": 0,
+     "monoFamilies": [],
+     "monoSamples": [],
+     "microLabels": 0,
+     "microLabelShare": 0,
+     "microSamples": [],
+     "upperShare": 0.07,
+     "centerShare": 0.19,
+     "smallText": 14
+    },
+    "eyebrows": [
+     {
+      "text": "Free to reserve",
+      "above": "22",
+      "upper": false,
+      "tracked": false,
+      "mono": false,
+      "pill": false,
+      "size": 13,
+      "top": 167
+     },
+     {
+      "text": "Held with cores",
+      "above": "9",
+      "upper": false,
+      "tracked": false,
+      "mono": false,
+      "pill": false,
+      "size": 13,
+      "top": 167
+     },
+     {
+      "text": "Faulty",
+      "above": "1",
+      "upper": false,
+      "tracked": false,
+      "mono": false,
+      "pill": false,
+      "size": 13,
+      "top": 167
+     },
+     {
+      "text": "Surveyed",
+      "above": "36of 144",
+      "upper": false,
+      "tracked": false,
+      "mono": false,
+      "pill": false,
+      "size": 13,
+      "top": 167
+     }
+    ],
+    "numbered": [],
+    "color": {
+     "bodyBg": "#e9eeee",
+     "bodyBgHsl": {
+      "h": 180,
+      "s": 0.13,
+      "l": 0.92
+     },
+     "dark": false,
+     "sectionBgs": [
+      {
+       "color": "#ffffff",
+       "top": 886,
+       "hsl": {
+        "h": 0,
+        "s": 0,
+        "l": 1
+       }
+      }
+     ],
+     "textColors": [
+      {
+       "color": "#44585f",
+       "share": 0.4
+      },
+      {
+       "color": "#12262e",
+       "share": 0.31
+      },
+      {
+       "color": "#0b5a8a",
+       "share": 0.17
+      },
+      {
+       "color": "#ffffff",
+       "share": 0.03
+      },
+      {
+       "color": "#34464c",
+       "share": 0.02
+      }
+     ],
+     "button": {
+      "bg": "#21414f",
+      "hsl": {
+       "h": 198,
+       "s": 0.41,
+       "l": 0.22
+      },
+      "fg": "#ffffff"
+     },
+     "lowContrast": []
+    },
+    "buttons": {
+     "count": 2,
+     "inHero": 2,
+     "radius": 3,
+     "height": 36,
+     "withShadow": 0,
+     "withGradient": 0,
+     "mono": 0,
+     "upper": 0,
+     "heroLabels": [
+      "Spans",
+      "Reserve 1 core"
+     ]
+    },
+    "surfaces": {
+     "shadowStatic": 0,
+     "shadowOverlay": 0,
+     "shadowSamples": [],
+     "gradients": 0,
+     "scrims": 0,
+     "gradientSamples": [],
+     "gradientText": 0,
+     "hairlines": 8,
+     "hairlineSamples": [
+      "div.req 286px",
+      "div.req 286px",
+      "li 354px",
+      "li 354px",
+      "li 354px"
+     ],
+     "outlinedBoxes": 6,
+     "dashed": 0,
+     "blurred": 0,
+     "roundedBoxes": 0,
+     "boxRadius": 0,
+     "squareMedia": 0,
+     "roundedMedia": 0,
+     "mediaRadius": 0,
+     "textShadow": 0,
+     "cardRows": []
+    },
+    "heroMedia": [],
+    "nav": {
+     "links": 2,
+     "fixed": true,
+     "height": 900,
+     "floatingPill": false,
+     "blur": false
+    },
+    "fontsLoaded": [
+     "atkinson hyperlegible next",
+     "barlow condensed"
+    ]
+   },
+   "layout": {
+    "viewport": {
+     "w": 1440,
+     "h": 900
+    },
+    "pageH": 1490,
+    "margins": {
+     "left": 48,
+     "right": 41
+    },
+    "sections": [
+     {
+      "sel": "div.cols",
+      "tag": "div",
+      "top": 152,
+      "height": 722,
+      "words": 240,
+      "media": 0,
+      "middle": 46,
+      "heading": {
+       "text": "22",
+       "size": 40,
+       "tag": "div"
+      },
+      "left": 273,
+      "right": 41,
+      "textLeft": 273,
+      "textRight": 41,
+      "fullBleed": false,
+      "footer": false,
+      "hero": true,
+      "continues": false,
+      "pinned": false
+     },
+     {
+      "sel": "div.stack",
+      "tag": "div",
+      "top": 886,
+      "height": 564,
+      "words": 115,
+      "media": 0,
+      "middle": 190,
+      "heading": {
+       "text": "Cores held, 9 with numbers and 4 without",
+       "size": 16,
+       "tag": "h2"
+      },
+      "left": 273,
+      "right": 41,
+      "textLeft": 273,
+      "textRight": 41,
+      "fullBleed": false,
+      "footer": true,
+      "hero": false,
+      "continues": false,
+      "pinned": false
+     }
+    ],
+    "gaps": [],
+    "h1s": [
+     {
+      "text": "AABB - BBCC",
+      "size": 32,
+      "top": 52,
+      "firstScreen": true
+     }
+    ],
+    "edgeText": [],
+    "edges": [
+     {
+      "x": 273,
+      "n": 3
+     },
+     {
+      "x": 1113,
+      "n": 2
+     },
+     {
+      "x": 256,
+      "n": 1
+     },
+     {
+      "x": 456,
+      "n": 1
+     }
+    ],
+    "leftBlocks": 7,
+    "bodySize": 13,
+    "stage": false,
+    "explains": false,
+    "slivers": [],
+    "voidShare": 0.18,
+    "voidBox": {
+     "x": 120,
+     "y": 660,
+     "w": 960,
+     "h": 240
+    }
+   },
+   "app": {
+    "viewport": {
+     "w": 1440,
+     "h": 900
+    },
+    "dark": false,
+    "ground": "#e9eeee",
+    "sidebar": {
+     "w": 232,
+     "tag": "aside",
+     "links": 5,
+     "share": 0.16
+    },
+    "topbar": null,
+    "canvas": {
+     "left": 41,
+     "right": 41
+    },
+    "hero": {
+     "text": "AABB - BBCC",
+     "words": 3,
+     "chars": 11,
+     "lines": 1,
+     "size": 32,
+     "vw": 2.2,
+     "font": "Barlow Condensed",
+     "weight": 700,
+     "tracking": 0.02,
+     "leading": 1,
+     "top": 52,
+     "tag": "h1",
+     "kind": "heading",
+     "align": "left",
+     "position": "left"
+    },
+    "charts": 0,
+    "layout": {
+     "panels": 7,
+     "firstScreen": 5,
+     "ragged": [
+      {
+       "diff": 198,
+       "top": 152
+      }
+     ],
+     "voids": []
+    },
+    "tiles": 0,
+    "panels": {
+     "count": 10,
+     "radii": [
+      [
+       3,
+       6
+      ],
+      [
+       0,
+       4
+      ]
+     ],
+     "heavyBorders": 1,
+     "borderSamples": [
+      "#12262e on #ffffff (15.64:1)"
+     ],
+     "heavyShadows": 0,
+     "softShadows": 0,
+     "shadowSamples": [],
+     "glass": 0
+    },
+    "chips": {
+     "count": 0,
+     "hues": 0,
+     "samples": []
+    },
+    "numbers": {
+     "cells": 3,
+     "leftAligned": 3,
+     "figures": 41,
+     "tabularShare": 1,
+     "kpiMax": 40
+    },
+    "rows": {
+     "count": 5,
+     "median": 53
+    },
+    "chartHues": 0,
+    "placeholders": [],
+    "type": {
+     "under13": 0.38,
+     "tiny": 0,
+     "tinySamples": [],
+     "sizes": [
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      18,
+      22,
+      32,
+      34,
+      40
+     ]
+    },
+    "title": {
+     "text": "AABB - BBCC",
+     "size": 32,
+     "top": 52
+    },
+    "colourShare": 0.017
+   },
+   "consoleErrors": []
+  },
+  {
+   "width": 768,
+   "height": 1024,
+   "load": "load",
+   "screens": 3,
+   "filled": [
+    0.89,
+    0.96,
+    0.96
+   ],
+   "motion": {
+    "elements": 0,
+    "css": 0,
+    "transitions": 0,
+    "scripted": 0,
+    "videos": 0,
+    "playingVideos": 0
+   },
+   "metrics": {
+    "viewport": {
+     "w": 768,
+     "h": 1024
+    },
+    "page": {
+     "height": 2107,
+     "screens": 2.1,
+     "words": 399,
+     "img": 0,
+     "video": 0,
+     "canvas": 0,
+     "svg": 58,
+     "sections": 6,
+     "horizontalOverflow": 0,
+     "overflowCulprits": [],
+     "uiFragments": 2,
+     "uiAbuse": false,
+     "realPictures": 0,
+     "videoCount": 0,
+     "uiPictures": 0,
+     "pictureSamples": [],
+     "blendText": 0,
+     "sideScrollers": 0,
+     "brokenImages": [],
+     "emoji": [],
+     "videosNoPoster": 0
+    },
+    "hero": {
+     "text": "AABB - BBCC",
+     "words": 3,
+     "chars": 11,
+     "lines": 1,
+     "size": 32,
+     "vw": 4.2,
+     "font": "Barlow Condensed",
+     "weight": 700,
+     "tracking": 0.02,
+     "leading": 1,
+     "top": 88,
+     "tag": "h1",
+     "kind": "heading",
+     "align": "left",
+     "position": "left"
+    },
+    "h1": {
+     "text": "AABB - BBCC",
+     "words": 3,
+     "lines": 1,
+     "size": 32,
+     "font": "Barlow Condensed"
+    },
+    "headings": [
+     {
+      "text": "AABB - BBCC",
+      "words": 3,
+      "chars": 11,
+      "lines": 1,
+      "size": 32,
+      "vw": 4.2,
+      "font": "Barlow Condensed",
+      "weight": 700,
+      "tracking": 0.02,
+      "leading": 1,
+      "upper": true,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.96,
+      "top": 88,
+      "tag": "h1",
+      "kind": "heading"
+     },
+     {
+      "text": "22",
+      "words": 1,
+      "chars": 2,
+      "lines": 1,
+      "size": 40,
+      "vw": 5.2,
+      "font": "Barlow Condensed",
+      "weight": 700,
+      "tracking": 0,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.43,
+      "top": 225,
+      "tag": "div",
+      "kind": "heading"
+     },
+     {
+      "text": "9",
+      "words": 1,
+      "chars": 1,
+      "lines": 1,
+      "size": 34,
+      "vw": 4.4,
+      "font": "Barlow Condensed",
+      "weight": 700,
+      "tracking": 0,
+      "leading": 1.12,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "right",
+      "widthRatio": 0.42,
+      "top": 225,
+      "tag": "div",
+      "kind": "heading"
+     },
+     {
+      "text": "1",
+      "words": 1,
+      "chars": 1,
+      "lines": 1,
+      "size": 34,
+      "vw": 4.4,
+      "font": "Barlow Condensed",
+      "weight": 700,
+      "tracking": 0,
+      "leading": 1.12,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.43,
+      "top": 334,
+      "tag": "div",
+      "kind": "heading"
+     },
+     {
+      "text": "36of 144",
+      "words": 2,
+      "chars": 8,
+      "lines": 1,
+      "size": 34,
+      "vw": 4.4,
+      "font": "Barlow Condensed",
+      "weight": 700,
+      "tracking": 0,
+      "leading": 1.12,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "right",
+      "widthRatio": 0.42,
+      "top": 334,
+      "mixedFonts": [
+       "Barlow Condensed",
+       "Atkinson Hyperlegible Next"
+      ],
+      "tag": "div",
+      "kind": "heading"
+     }
+    ],
+    "headingSummary": {
+     "count": 5,
+     "maxLines": 1,
+     "over2Lines": 0,
+     "statements": 0,
+     "centered": 0,
+     "medianWords": 2,
+     "mixedFontHeadings": 1
+    },
+    "type": {
+     "families": [
+      {
+       "family": "Atkinson Hyperlegible Next",
+       "share": 0.88,
+       "mono": false
+      },
+      {
+       "family": "Barlow Condensed",
+       "share": 0.12,
+       "mono": false
+      }
+     ],
+     "familyCount": 2,
+     "sizes": [
+      12,
+      13,
+      14,
+      15,
+      16,
+      18,
+      20,
+      32,
+      34,
+      40
+     ],
+     "sizeCount": 10,
+     "notLoaded": [],
+     "body": {
+      "font": "Atkinson Hyperlegible Next",
+      "size": 13,
+      "leading": 1.54,
+      "weight": 400,
+      "tracking": 0,
+      "contrast": 6.4
+     },
+     "measureChars": 108,
+     "max": {
+      "size": 40,
+      "vw": 5.2,
+      "font": "Barlow Condensed",
+      "text": "22"
+     },
+     "monoShare": 0,
+     "monoProseShare": 0,
+     "monoFamilies": [],
+     "monoSamples": [],
+     "microLabels": 0,
+     "microLabelShare": 0,
+     "microSamples": [],
+     "upperShare": 0.08,
+     "centerShare": 0.05,
+     "smallText": 13
+    },
+    "eyebrows": [
+     {
+      "text": "Free to reserve",
+      "above": "22",
+      "upper": false,
+      "tracked": false,
+      "mono": false,
+      "pill": false,
+      "size": 13,
+      "top": 203
+     },
+     {
+      "text": "Held with cores",
+      "above": "9",
+      "upper": false,
+      "tracked": false,
+      "mono": false,
+      "pill": false,
+      "size": 13,
+      "top": 203
+     },
+     {
+      "text": "Faulty",
+      "above": "1",
+      "upper": false,
+      "tracked": false,
+      "mono": false,
+      "pill": false,
+      "size": 13,
+      "top": 312
+     },
+     {
+      "text": "Surveyed",
+      "above": "36of 144",
+      "upper": false,
+      "tracked": false,
+      "mono": false,
+      "pill": false,
+      "size": 13,
+      "top": 312
+     }
+    ],
+    "numbered": [],
+    "color": {
+     "bodyBg": "#e9eeee",
+     "bodyBgHsl": {
+      "h": 180,
+      "s": 0.13,
+      "l": 0.92
+     },
+     "dark": false,
+     "sectionBgs": [
+      {
+       "color": "#ffffff",
+       "top": 417,
+       "hsl": {
+        "h": 0,
+        "s": 0,
+        "l": 1
+       }
+      }
+     ],
+     "textColors": [
+      {
+       "color": "#44585f",
+       "share": 0.48
+      },
+      {
+       "color": "#12262e",
+       "share": 0.37
+      },
+      {
+       "color": "#0b5a8a",
+       "share": 0.07
+      },
+      {
+       "color": "#5a3000",
+       "share": 0.02
+      },
+      {
+       "color": "#d3e1e6",
+       "share": 0.02
+      }
+     ],
+     "button": {
+      "bg": "#0b5a8a",
+      "hsl": {
+       "h": 203,
+       "s": 0.85,
+       "l": 0.29
+      },
+      "fg": "#ffffff"
+     },
+     "lowContrast": []
+    },
+    "buttons": {
+     "count": 1,
+     "inHero": 0,
+     "radius": 3,
+     "height": 44,
+     "withShadow": 0,
+     "withGradient": 0,
+     "mono": 0,
+     "upper": 0,
+     "heroLabels": []
+    },
+    "surfaces": {
+     "shadowStatic": 0,
+     "shadowOverlay": 0,
+     "shadowSamples": [],
+     "gradients": 0,
+     "scrims": 0,
+     "gradientSamples": [],
+     "gradientText": 0,
+     "hairlines": 11,
+     "hairlineSamples": [
+      "div.kpi 367px",
+      "div.kpi 367px",
+      "div.req 702px",
+      "div.req 702px",
+      "li 335px"
+     ],
+     "outlinedBoxes": 6,
+     "dashed": 0,
+     "blurred": 0,
+     "roundedBoxes": 0,
+     "boxRadius": 0,
+     "squareMedia": 0,
+     "roundedMedia": 0,
+     "mediaRadius": 0,
+     "textShadow": 0,
+     "cardRows": []
+    },
+    "heroMedia": [],
+    "nav": {
+     "links": 0,
+     "fixed": true,
+     "height": 0,
+     "floatingPill": false,
+     "blur": false
+    },
+    "fontsLoaded": [
+     "atkinson hyperlegible next",
+     "barlow condensed"
+    ]
+   },
+   "layout": {
+    "viewport": {
+     "w": 768,
+     "h": 1024
+    },
+    "pageH": 2107,
+    "margins": {
+     "left": 16,
+     "right": 33
+    },
+    "sections": [
+     {
+      "sel": "div.cols",
+      "tag": "div",
+      "top": 188,
+      "height": 1231,
+      "words": 198,
+      "media": 0,
+      "middle": 0,
+      "heading": {
+       "text": "22",
+       "size": 40,
+       "tag": "div"
+      },
+      "left": 33,
+      "right": 33,
+      "textLeft": 33,
+      "textRight": 33,
+      "fullBleed": false,
+      "footer": false,
+      "hero": true,
+      "continues": false,
+      "pinned": false
+     },
+     {
+      "sel": "div.stack",
+      "tag": "div",
+      "top": 1431,
+      "height": 644,
+      "words": 115,
+      "media": 0,
+      "middle": 49,
+      "heading": {
+       "text": "Cores held, 9 with numbers and 4 without",
+       "size": 16,
+       "tag": "h2"
+      },
+      "left": 33,
+      "right": 33,
+      "textLeft": 33,
+      "textRight": 33,
+      "fullBleed": false,
+      "footer": true,
+      "hero": false,
+      "continues": false,
+      "pinned": false
+     }
+    ],
+    "gaps": [],
+    "h1s": [
+     {
+      "text": "AABB - BBCC",
+      "size": 32,
+      "top": 88,
+      "firstScreen": true
+     }
+    ],
+    "edgeText": [],
+    "edges": [
+     {
+      "x": 33,
+      "n": 5
+     },
+     {
+      "x": 16,
+      "n": 1
+     },
+     {
+      "x": 216,
+      "n": 1
+     }
+    ],
+    "leftBlocks": 7,
+    "bodySize": 13,
+    "stage": false,
+    "explains": false,
+    "slivers": [],
+    "voidShare": 0,
+    "voidBox": null
+   },
+   "app": {
+    "viewport": {
+     "w": 768,
+     "h": 1024
+    },
+    "dark": false,
+    "ground": "#e9eeee",
+    "sidebar": null,
+    "topbar": {
+     "h": 48
+    },
+    "canvas": {
+     "left": 16,
+     "right": 33
+    },
+    "hero": {
+     "text": "AABB - BBCC",
+     "words": 3,
+     "chars": 11,
+     "lines": 1,
+     "size": 32,
+     "vw": 4.2,
+     "font": "Barlow Condensed",
+     "weight": 700,
+     "tracking": 0.02,
+     "leading": 1,
+     "top": 88,
+     "tag": "h1",
+     "kind": "heading",
+     "align": "left",
+     "position": "left"
+    },
+    "charts": 0,
+    "layout": {
+     "panels": 6,
+     "firstScreen": 3,
+     "ragged": [],
+     "voids": []
+    },
+    "tiles": 0,
+    "panels": {
+     "count": 11,
+     "radii": [
+      [
+       3,
+       6
+      ],
+      [
+       0,
+       5
+      ]
+     ],
+     "heavyBorders": 1,
+     "borderSamples": [
+      "#12262e on #ffffff (15.64:1)"
+     ],
+     "heavyShadows": 0,
+     "softShadows": 0,
+     "shadowSamples": [],
+     "glass": 0
+    },
+    "chips": {
+     "count": 5,
+     "hues": 3,
+     "samples": [
+      {
+       "hue": 200,
+       "size": 47,
+       "radius": "2px"
+      },
+      {
+       "hue": 200,
+       "size": 47,
+       "radius": "2px"
+      },
+      {
+       "hue": 39,
+       "size": 47,
+       "radius": "2px"
+      },
+      {
+       "hue": 203,
+       "size": 47,
+       "radius": "2px"
+      }
+     ]
+    },
+    "numbers": {
+     "cells": 3,
+     "leftAligned": 3,
+     "figures": 41,
+     "tabularShare": 1,
+     "kpiMax": 40
+    },
+    "rows": {
+     "count": 5,
+     "median": 53
+    },
+    "chartHues": 0,
+    "placeholders": [],
+    "type": {
+     "under13": 0.27,
+     "tiny": 0,
+     "tinySamples": [],
+     "sizes": [
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      18,
+      20,
+      22,
+      32,
+      34,
+      40
+     ]
+    },
+    "title": {
+     "text": "AABB - BBCC",
+     "size": 32,
+     "top": 88
+    },
+    "colourShare": 0.007
+   },
+   "consoleErrors": []
+  },
+  {
+   "width": 390,
+   "height": 844,
+   "load": "load",
+   "screens": 4,
+   "filled": [
+    0.84,
+    0.86,
+    0.92,
+    0.8
+   ],
+   "motion": {
+    "elements": 0,
+    "css": 0,
+    "transitions": 0,
+    "scripted": 0,
+    "videos": 0,
+    "playingVideos": 0
+   },
+   "metrics": {
+    "viewport": {
+     "w": 390,
+     "h": 844
+    },
+    "page": {
+     "height": 2811,
+     "screens": 3.3,
+     "words": 386,
+     "img": 0,
+     "video": 0,
+     "canvas": 0,
+     "svg": 58,
+     "sections": 6,
+     "horizontalOverflow": 0,
+     "overflowCulprits": [],
+     "uiFragments": 2,
+     "uiAbuse": false,
+     "realPictures": 0,
+     "videoCount": 0,
+     "uiPictures": 1,
+     "pictureSamples": [],
+     "blendText": 0,
+     "sideScrollers": 0,
+     "brokenImages": [],
+     "emoji": [],
+     "videosNoPoster": 0
+    },
+    "hero": {
+     "text": "AABB - BBCC",
+     "words": 3,
+     "chars": 11,
+     "lines": 1,
+     "size": 28,
+     "vw": 7.2,
+     "font": "Barlow Condensed",
+     "weight": 700,
+     "tracking": 0.02,
+     "leading": 1,
+     "top": 88,
+     "tag": "h1",
+     "kind": "heading",
+     "align": "left",
+     "position": "left"
+    },
+    "h1": {
+     "text": "AABB - BBCC",
+     "words": 3,
+     "lines": 1,
+     "size": 28,
+     "font": "Barlow Condensed"
+    },
+    "headings": [
+     {
+      "text": "AABB - BBCC",
+      "words": 3,
+      "chars": 11,
+      "lines": 1,
+      "size": 28,
+      "vw": 7.2,
+      "font": "Barlow Condensed",
+      "weight": 700,
+      "tracking": 0.02,
+      "leading": 1,
+      "upper": true,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.92,
+      "top": 88,
+      "tag": "h1",
+      "kind": "heading"
+     },
+     {
+      "text": "22",
+      "words": 1,
+      "chars": 2,
+      "lines": 1,
+      "size": 34,
+      "vw": 8.7,
+      "font": "Barlow Condensed",
+      "weight": 700,
+      "tracking": 0,
+      "leading": 1.06,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.38,
+      "top": 259,
+      "tag": "div",
+      "kind": "heading"
+     },
+     {
+      "text": "9",
+      "words": 1,
+      "chars": 1,
+      "lines": 1,
+      "size": 28,
+      "vw": 7.2,
+      "font": "Barlow Condensed",
+      "weight": 700,
+      "tracking": 0,
+      "leading": 1.14,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "right",
+      "widthRatio": 0.38,
+      "top": 259,
+      "tag": "div",
+      "kind": "heading"
+     },
+     {
+      "text": "1",
+      "words": 1,
+      "chars": 1,
+      "lines": 1,
+      "size": 28,
+      "vw": 7.2,
+      "font": "Barlow Condensed",
+      "weight": 700,
+      "tracking": 0,
+      "leading": 1.14,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.38,
+      "top": 376,
+      "tag": "div",
+      "kind": "heading"
+     },
+     {
+      "text": "36of 144",
+      "words": 2,
+      "chars": 8,
+      "lines": 1,
+      "size": 28,
+      "vw": 7.2,
+      "font": "Barlow Condensed",
+      "weight": 700,
+      "tracking": 0,
+      "leading": 1.14,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "right",
+      "widthRatio": 0.38,
+      "top": 376,
+      "mixedFonts": [
+       "Barlow Condensed",
+       "Atkinson Hyperlegible Next"
+      ],
+      "tag": "div",
+      "kind": "heading"
+     }
+    ],
+    "headingSummary": {
+     "count": 5,
+     "maxLines": 1,
+     "over2Lines": 0,
+     "statements": 0,
+     "centered": 0,
+     "medianWords": 2,
+     "mixedFontHeadings": 1
+    },
+    "type": {
+     "families": [
+      {
+       "family": "Atkinson Hyperlegible Next",
+       "share": 0.88,
+       "mono": false
+      },
+      {
+       "family": "Barlow Condensed",
+       "share": 0.12,
+       "mono": false
+      }
+     ],
+     "familyCount": 2,
+     "sizes": [
+      12,
+      13,
+      14,
+      15,
+      16,
+      18,
+      20,
+      28,
+      34
+     ],
+     "sizeCount": 9,
+     "notLoaded": [],
+     "body": {
+      "font": "Atkinson Hyperlegible Next",
+      "size": 13,
+      "leading": 1.54,
+      "weight": 400,
+      "tracking": 0,
+      "contrast": 6.4
+     },
+     "measureChars": 51,
+     "max": {
+      "size": 34,
+      "vw": 8.7,
+      "font": "Barlow Condensed",
+      "text": "22"
+     },
+     "monoShare": 0,
+     "monoProseShare": 0,
+     "monoFamilies": [],
+     "monoSamples": [],
+     "microLabels": 0,
+     "microLabelShare": 0,
+     "microSamples": [],
+     "upperShare": 0.08,
+     "centerShare": 0.05,
+     "smallText": 13
+    },
+    "eyebrows": [
+     {
+      "text": "Free to reserve",
+      "above": "22",
+      "upper": false,
+      "tracked": false,
+      "mono": false,
+      "pill": false,
+      "size": 13,
+      "top": 237
+     },
+     {
+      "text": "Held with cores",
+      "above": "9",
+      "upper": false,
+      "tracked": false,
+      "mono": false,
+      "pill": false,
+      "size": 13,
+      "top": 237
+     },
+     {
+      "text": "Faulty",
+      "above": "1",
+      "upper": false,
+      "tracked": false,
+      "mono": false,
+      "pill": false,
+      "size": 13,
+      "top": 354
+     },
+     {
+      "text": "Surveyed",
+      "above": "36of 144",
+      "upper": false,
+      "tracked": false,
+      "mono": false,
+      "pill": false,
+      "size": 13,
+      "top": 354
+     }
+    ],
+    "numbered": [],
+    "color": {
+     "bodyBg": "#e9eeee",
+     "bodyBgHsl": {
+      "h": 180,
+      "s": 0.13,
+      "l": 0.92
+     },
+     "dark": false,
+     "sectionBgs": [
+      {
+       "color": "#ffffff",
+       "top": 467,
+       "hsl": {
+        "h": 0,
+        "s": 0,
+        "l": 1
+       }
+      }
+     ],
+     "textColors": [
+      {
+       "color": "#44585f",
+       "share": 0.46
+      },
+      {
+       "color": "#12262e",
+       "share": 0.38
+      },
+      {
+       "color": "#0b5a8a",
+       "share": 0.07
+      },
+      {
+       "color": "#5a3000",
+       "share": 0.02
+      },
+      {
+       "color": "#d3e1e6",
+       "share": 0.02
+      }
+     ],
+     "button": {
+      "bg": "#21414f",
+      "hsl": {
+       "h": 198,
+       "s": 0.41,
+       "l": 0.22
+      },
+      "fg": "#ffffff"
+     },
+     "lowContrast": []
+    },
+    "buttons": {
+     "count": 2,
+     "inHero": 1,
+     "radius": 3,
+     "height": 44,
+     "withShadow": 0,
+     "withGradient": 0,
+     "mono": 0,
+     "upper": 0,
+     "heroLabels": []
+    },
+    "surfaces": {
+     "shadowStatic": 0,
+     "shadowOverlay": 0,
+     "shadowSamples": [],
+     "gradients": 0,
+     "scrims": 0,
+     "gradientSamples": [],
+     "gradientText": 0,
+     "hairlines": 10,
+     "hairlineSamples": [
+      "div.req 332px",
+      "div.req 332px",
+      "li 332px",
+      "li 332px",
+      "li 332px"
+     ],
+     "outlinedBoxes": 6,
+     "dashed": 0,
+     "blurred": 0,
+     "roundedBoxes": 0,
+     "boxRadius": 0,
+     "squareMedia": 0,
+     "roundedMedia": 0,
+     "mediaRadius": 0,
+     "textShadow": 0,
+     "cardRows": []
+    },
+    "heroMedia": [],
+    "nav": {
+     "links": 0,
+     "fixed": true,
+     "height": 0,
+     "floatingPill": false,
+     "blur": false
+    },
+    "fontsLoaded": [
+     "atkinson hyperlegible next",
+     "barlow condensed"
+    ]
+   },
+   "layout": {
+    "viewport": {
+     "w": 390,
+     "h": 844
+    },
+    "pageH": 2811,
+    "margins": {
+     "left": 16,
+     "right": 29
+    },
+    "sections": [
+     {
+      "sel": "header.head",
+      "tag": "header",
+      "top": 64,
+      "height": 144,
+      "words": 45,
+      "media": 0,
+      "middle": 0,
+      "heading": {
+       "text": "AABB - BBCC",
+       "size": 28,
+       "tag": "h1"
+      },
+      "left": 16,
+      "right": 27,
+      "textLeft": 16,
+      "textRight": 27,
+      "fullBleed": false,
+      "footer": false,
+      "hero": true,
+      "continues": false,
+      "pinned": false
+     },
+     {
+      "sel": "div.stack",
+      "tag": "div",
+      "top": 224,
+      "height": 745,
+      "words": 116,
+      "media": 0,
+      "middle": 0,
+      "heading": {
+       "text": "22",
+       "size": 34,
+       "tag": "div"
+      },
+      "left": 29,
+      "right": 33,
+      "textLeft": 29,
+      "textRight": 33,
+      "fullBleed": false,
+      "footer": false,
+      "hero": true,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "aside.stack",
+      "tag": "aside",
+      "top": 981,
+      "height": 678,
+      "words": 82,
+      "media": 0,
+      "middle": 0,
+      "heading": {
+       "text": "Reserve cores",
+       "size": 16,
+       "tag": "h2"
+      },
+      "left": 29,
+      "right": 29,
+      "textLeft": 29,
+      "textRight": 29,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "div.stack",
+      "tag": "div",
+      "top": 1671,
+      "height": 1108,
+      "words": 109,
+      "media": 0,
+      "middle": 0,
+      "heading": {
+       "text": "Cores held, 9 with numbers and 4 without",
+       "size": 16,
+       "tag": "h2"
+      },
+      "left": 29,
+      "right": 29,
+      "textLeft": 29,
+      "textRight": 29,
+      "fullBleed": false,
+      "footer": true,
+      "hero": false,
+      "continues": false,
+      "pinned": false
+     }
+    ],
+    "gaps": [],
+    "h1s": [
+     {
+      "text": "AABB - BBCC",
+      "size": 28,
+      "top": 88,
+      "firstScreen": true
+     }
+    ],
+    "edgeText": [],
+    "edges": [
+     {
+      "x": 29,
+      "n": 5
+     },
+     {
+      "x": 16,
+      "n": 2
+     }
+    ],
+    "leftBlocks": 7,
+    "bodySize": 13,
+    "stage": false,
+    "explains": false,
+    "slivers": [],
+    "voidShare": 0,
+    "voidBox": null
+   },
+   "app": {
+    "viewport": {
+     "w": 390,
+     "h": 844
+    },
+    "dark": false,
+    "ground": "#e9eeee",
+    "sidebar": null,
+    "topbar": {
+     "h": 48
+    },
+    "canvas": {
+     "left": 16,
+     "right": 29
+    },
+    "hero": {
+     "text": "AABB - BBCC",
+     "words": 3,
+     "chars": 11,
+     "lines": 1,
+     "size": 28,
+     "vw": 7.2,
+     "font": "Barlow Condensed",
+     "weight": 700,
+     "tracking": 0.02,
+     "leading": 1,
+     "top": 88,
+     "tag": "h1",
+     "kind": "heading",
+     "align": "left",
+     "position": "left"
+    },
+    "charts": 0,
+    "layout": {
+     "panels": 6,
+     "firstScreen": 2,
+     "ragged": [],
+     "voids": []
+    },
+    "tiles": 0,
+    "panels": {
+     "count": 12,
+     "radii": [
+      [
+       3,
+       6
+      ],
+      [
+       0,
+       6
+      ]
+     ],
+     "heavyBorders": 1,
+     "borderSamples": [
+      "#12262e on #ffffff (15.64:1)"
+     ],
+     "heavyShadows": 0,
+     "softShadows": 0,
+     "shadowSamples": [],
+     "glass": 0
+    },
+    "chips": {
+     "count": 0,
+     "hues": 0,
+     "samples": []
+    },
+    "numbers": {
+     "cells": 3,
+     "leftAligned": 3,
+     "figures": 41,
+     "tabularShare": 1,
+     "kpiMax": 34
+    },
+    "rows": {
+     "count": 5,
+     "median": 131
+    },
+    "chartHues": 0,
+    "placeholders": [],
+    "type": {
+     "under13": 0.27,
+     "tiny": 0,
+     "tinySamples": [],
+     "sizes": [
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      18,
+      20,
+      22,
+      28,
+      34
+     ]
+    },
+    "title": {
+     "text": "AABB - BBCC",
+     "size": 28,
+     "top": 88
+    },
+    "colourShare": 0.005
+   },
+   "consoleErrors": []
+  }
+ ],
+ "findings": [
+  {
+   "level": "WARN",
+   "id": "mixed-font-headline",
+   "width": 1440,
+   "message": "1 headline(s) switch typeface or to italic mid-line (the \"one italic serif word\" move).",
+   "fix": "Set the whole headline in one face. Emphasis comes from the words.",
+   "alsoAt": [
+    768,
+    390
+   ]
+  },
+  {
+   "level": "WARN",
+   "id": "ragged-row",
+   "width": 1440,
+   "message": "1 pair(s) of cards in one row end at different heights (by 198px).",
+   "fix": "Cards that share a row share a bottom edge: balance them by their content (the same number of rows, a block of similar height beside it), or stack them. In testing, ragged rows were marked down every time."
+  },
+  {
+   "level": "FAIL",
+   "id": "icon-chips",
+   "width": 768,
+   "message": "5 icons sit in tinted squares or circles in 3 different colours.",
+   "fix": "This is the commonest tell of a generated dashboard. Drop the tinted square: a KPI is a label and a number; an icon, if it helps, is plain and in the text colour."
+  }
+ ],
+ "images": [
+  {
+   "viewport": "desktop",
+   "width": 1440,
+   "fold": "/tmp/cmp/merged/.taste-skill/inspect/desktop-fold.jpg",
+   "pages": [
+    "/tmp/cmp/merged/.taste-skill/inspect/desktop-page-01.jpg"
+   ],
+   "film": []
+  },
+  {
+   "viewport": "tablet",
+   "width": 768,
+   "fold": "/tmp/cmp/merged/.taste-skill/inspect/tablet-fold.jpg",
+   "pages": [
+    "/tmp/cmp/merged/.taste-skill/inspect/tablet-page-01.jpg"
+   ],
+   "film": []
+  },
+  {
+   "viewport": "mobile",
+   "width": 390,
+   "fold": "/tmp/cmp/merged/.taste-skill/inspect/mobile-fold.jpg",
+   "pages": [
+    "/tmp/cmp/merged/.taste-skill/inspect/mobile-page-01.jpg"
+   ],
+   "film": []
+  }
+ ]
+}
