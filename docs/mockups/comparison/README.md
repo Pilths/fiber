@@ -5,6 +5,7 @@ Same one-page brief (`BRIEF.md`: light span view for AABB - BBCC), built four wa
 | Folder | Model | Skill |
 |---|---|---|
 | `route/` | Opus 5.5 | Route planning page with the 2D route diagram (final theme) |
+| `v3/` | Fable 5.1 | Fable Taste look and data strip, V2 ruled structure, no boxes |
 | `v2/` | Opus 5.5 | Built from the owner's likes list: Opus Garden base, simple, desktop only |
 | `final/` | Opus 5.5 | Rejected by the owner |
 | `merged/` | Opus 5.5 | Fable Taste layout + Fable Impeccable theme (proposed UI style) |

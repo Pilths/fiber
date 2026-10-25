@@ -23,6 +23,7 @@
 <body>
 <nav>
   <b>Fiber mockups</b>
+  <button data-show="v3">V3 (Fable Taste, no boxes)</button>
   <button data-show="v2">V2 (from your likes)</button>
   <button data-show="final">Final (rejected)</button>
   <button data-show="route">Route planning</button>
@@ -38,6 +39,7 @@
   <button data-show="fable-impeccable">Fable + Impeccable</button>
 </nav>
 <div id="grid" class="all">
+  <figure data-id="v3" hidden><figcaption>V3: Fable Taste data, V2 rules, no boxes <a href="v3/index.html" target="_blank">open full</a></figcaption><iframe src="v3/index.html" title="V3"></iframe></figure>
   <figure data-id="v2" hidden><figcaption>V2: built from the likes list <a href="v2/index.html" target="_blank">open full</a></figcaption><iframe src="v2/index.html" title="V2"></iframe></figure>
   <figure data-id="route" hidden><figcaption>Route planning with 2D route diagram <a href="route/index.html" target="_blank">open full</a></figcaption><iframe src="route/index.html" title="Route planning"></iframe></figure>
   <figure data-id="final" hidden><figcaption>Final desktop span view <a href="final/index.html" target="_blank">open full</a></figcaption><iframe src="final/index.html" title="Final"></iframe></figure>
@@ -57,7 +59,7 @@
     const show = b.dataset.show;
     document.querySelectorAll('nav button').forEach(x => x.setAttribute('aria-pressed', x === b));
     grid.classList.toggle('all', show === 'all');
-    grid.querySelectorAll('figure').forEach(f => f.hidden = show === 'all' ? ['v2','route','final','merged','fable-garden','fable-tastemaker','opus-garden','opus-tastemaker'].includes(f.dataset.id) : f.dataset.id !== show);
+    grid.querySelectorAll('figure').forEach(f => f.hidden = show === 'all' ? ['v3','v2','route','final','merged','fable-garden','fable-tastemaker','opus-garden','opus-tastemaker'].includes(f.dataset.id) : f.dataset.id !== show);
   });
 </script>
 </body>
