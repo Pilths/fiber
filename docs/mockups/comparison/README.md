@@ -5,6 +5,8 @@ Same one-page brief (`BRIEF.md`: light span view for AABB - BBCC), built four wa
 | Folder | Model | Skill |
 |---|---|---|
 | `merged/` | Opus 5.5 | Fable Taste layout + Fable Impeccable theme (proposed UI style) |
+| `bakeoff/fable-garden/` | Fable 5.1 | Garden Skills `web-design-engineer` |
+| `bakeoff/fable-tastemaker/` | Fable 5.1 | Tastemaker |
 | `opus-taste/` | Opus 5.5 | Taste |
 | `fable-taste/` | Fable 5.1 | Taste |
 | `opus-impeccable/` | Opus 5.5 | Impeccable |

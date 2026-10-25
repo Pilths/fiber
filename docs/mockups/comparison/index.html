@@ -24,6 +24,8 @@
 <nav>
   <b>Span view, 4 versions</b>
   <button data-show="merged">Merged (proposed)</button>
+  <button data-show="fable-garden">Fable + Garden</button>
+  <button data-show="fable-tastemaker">Fable + Tastemaker</button>
   <button data-show="all" aria-pressed="true">All 4</button>
   <button data-show="opus-taste">Opus + Taste</button>
   <button data-show="fable-taste">Fable + Taste</button>
@@ -32,6 +34,8 @@
 </nav>
 <div id="grid" class="all">
   <figure data-id="merged" hidden><figcaption>Merged: Fable + Taste layout, Impeccable theme <a href="merged/index.html" target="_blank">open full</a></figcaption><iframe src="merged/index.html" title="Merged"></iframe></figure>
+  <figure data-id="fable-garden" hidden><figcaption>Fable 5.1 + Garden (bake-off) <a href="bakeoff/fable-garden/index.html" target="_blank">open full</a></figcaption><iframe src="bakeoff/fable-garden/index.html" title="Fable 5.1 + Garden (bake-off)"></iframe></figure>
+  <figure data-id="fable-tastemaker" hidden><figcaption>Fable 5.1 + Tastemaker (bake-off) <a href="bakeoff/fable-tastemaker/index.html" target="_blank">open full</a></figcaption><iframe src="bakeoff/fable-tastemaker/index.html" title="Fable 5.1 + Tastemaker (bake-off)"></iframe></figure>
   <figure data-id="opus-taste"><figcaption>Opus 5.5 + Taste <a href="opus-taste/index.html" target="_blank">open full</a></figcaption><iframe src="opus-taste/index.html" title="Opus + Taste"></iframe></figure>
   <figure data-id="fable-taste"><figcaption>Fable 5.1 + Taste <a href="fable-taste/index.html" target="_blank">open full</a></figcaption><iframe src="fable-taste/index.html" title="Fable + Taste"></iframe></figure>
   <figure data-id="opus-impeccable"><figcaption>Opus 5.5 + Impeccable <a href="opus-impeccable/index.html" target="_blank">open full</a></figcaption><iframe src="opus-impeccable/index.html" title="Opus + Impeccable"></iframe></figure>
@@ -43,7 +47,7 @@
     const show = b.dataset.show;
     document.querySelectorAll('nav button').forEach(x => x.setAttribute('aria-pressed', x === b));
     grid.classList.toggle('all', show === 'all');
-    grid.querySelectorAll('figure').forEach(f => f.hidden = show === 'all' ? f.dataset.id === 'merged' : f.dataset.id !== show);
+    grid.querySelectorAll('figure').forEach(f => f.hidden = show === 'all' ? ['merged','fable-garden','fable-tastemaker'].includes(f.dataset.id) : f.dataset.id !== show);
   });
 </script>
 </body>
