@@ -1,0 +1,1542 @@
+{
+ "url": "/tmp/cmp/route/index.html",
+ "at": "2026-10-25T14:27:08.688Z",
+ "allow": [],
+ "viewports": [
+  {
+   "width": 1440,
+   "height": 900,
+   "load": "load",
+   "screens": 1,
+   "filled": [
+    0.83
+   ],
+   "motion": {
+    "elements": 0,
+    "css": 0,
+    "transitions": 0,
+    "scripted": 0,
+    "videos": 0,
+    "playingVideos": 0
+   },
+   "metrics": {
+    "viewport": {
+     "w": 1440,
+     "h": 900
+    },
+    "page": {
+     "height": 900,
+     "screens": 1,
+     "words": 429,
+     "img": 0,
+     "video": 0,
+     "canvas": 0,
+     "svg": 16,
+     "sections": 4,
+     "horizontalOverflow": 0,
+     "overflowCulprits": [],
+     "uiFragments": 0,
+     "uiAbuse": false,
+     "realPictures": 0,
+     "videoCount": 0,
+     "uiPictures": 0,
+     "pictureSamples": [],
+     "blendText": 0,
+     "sideScrollers": 0,
+     "brokenImages": [],
+     "emoji": [],
+     "videosNoPoster": 0
+    },
+    "hero": {
+     "text": "Plan a route",
+     "words": 3,
+     "chars": 12,
+     "lines": 1,
+     "size": 34,
+     "vw": 2.4,
+     "font": "Barlow Condensed",
+     "weight": 700,
+     "tracking": 0.02,
+     "leading": 1,
+     "top": 99,
+     "tag": "h1",
+     "kind": "heading",
+     "align": "left",
+     "position": "left"
+    },
+    "h1": {
+     "text": "Plan a route",
+     "words": 3,
+     "lines": 1,
+     "size": 34,
+     "font": "Barlow Condensed"
+    },
+    "headings": [
+     {
+      "text": "Plan a route",
+      "words": 3,
+      "chars": 12,
+      "lines": 1,
+      "size": 34,
+      "vw": 2.4,
+      "font": "Barlow Condensed",
+      "weight": 700,
+      "tracking": 0.02,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.13,
+      "top": 99,
+      "tag": "h1",
+      "kind": "heading"
+     }
+    ],
+    "headingSummary": {
+     "count": 1,
+     "maxLines": 1,
+     "over2Lines": 0,
+     "statements": 0,
+     "centered": 0,
+     "medianWords": null,
+     "mixedFontHeadings": 0
+    },
+    "type": {
+     "families": [
+      {
+       "family": "Atkinson Hyperlegible Next",
+       "share": 0.87,
+       "mono": false
+      },
+      {
+       "family": "Barlow Condensed",
+       "share": 0.13,
+       "mono": false
+      }
+     ],
+     "familyCount": 2,
+     "sizes": [
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      20,
+      22,
+      34
+     ],
+     "sizeCount": 11,
+     "notLoaded": [],
+     "body": {
+      "font": "Atkinson Hyperlegible Next",
+      "size": 13,
+      "leading": 1.54,
+      "weight": 400,
+      "tracking": 0,
+      "contrast": 7.5
+     },
+     "measureChars": 39,
+     "max": {
+      "size": 34,
+      "vw": 2.4,
+      "font": "Barlow Condensed",
+      "text": "Plan a route"
+     },
+     "monoShare": 0,
+     "monoProseShare": 0,
+     "monoFamilies": [],
+     "monoSamples": [],
+     "microLabels": 2,
+     "microLabelShare": 0.009,
+     "microSamples": [
+      "North",
+      "Central"
+     ],
+     "upperShare": 0.12,
+     "centerShare": 0.06,
+     "smallText": 1
+    },
+    "eyebrows": [],
+    "numbered": [],
+    "color": {
+     "bodyBg": "#e9eeee",
+     "bodyBgHsl": {
+      "h": 180,
+      "s": 0.13,
+      "l": 0.92
+     },
+     "dark": false,
+     "sectionBgs": [],
+     "textColors": [
+      {
+       "color": "#44585f",
+       "share": 0.45
+      },
+      {
+       "color": "#12262e",
+       "share": 0.4
+      },
+      {
+       "color": "#ffffff",
+       "share": 0.04
+      },
+      {
+       "color": "#0b5a8a",
+       "share": 0.04
+      },
+      {
+       "color": "#a8281c",
+       "share": 0.03
+      }
+     ],
+     "button": {
+      "bg": "#21414f",
+      "hsl": {
+       "h": 198,
+       "s": 0.41,
+       "l": 0.22
+      },
+      "fg": "#ffffff"
+     },
+     "lowContrast": []
+    },
+    "buttons": {
+     "count": 2,
+     "inHero": 2,
+     "radius": 3,
+     "height": 38,
+     "withShadow": 0,
+     "withGradient": 0,
+     "mono": 0,
+     "upper": 0,
+     "heroLabels": [
+      "Routes",
+      "Reserve 6 cores"
+     ]
+    },
+    "surfaces": {
+     "shadowStatic": 0,
+     "shadowOverlay": 0,
+     "shadowSamples": [],
+     "gradients": 0,
+     "scrims": 0,
+     "gradientSamples": [],
+     "gradientText": 0,
+     "hairlines": 1,
+     "hairlineSamples": [
+      "header.top 1232px"
+     ],
+     "outlinedBoxes": 7,
+     "dashed": 1,
+     "blurred": 0,
+     "roundedBoxes": 0,
+     "boxRadius": 0,
+     "squareMedia": 0,
+     "roundedMedia": 0,
+     "mediaRadius": 0,
+     "textShadow": 0,
+     "cardRows": [
+      {
+       "count": 3,
+       "iconTopped": false,
+       "rounded": false,
+       "top": 293
+      }
+     ]
+    },
+    "heroMedia": [],
+    "nav": {
+     "links": 3,
+     "fixed": false,
+     "height": 900,
+     "floatingPill": false,
+     "blur": false
+    },
+    "fontsLoaded": [
+     "atkinson hyperlegible next",
+     "barlow condensed"
+    ]
+   },
+   "layout": {
+    "viewport": {
+     "w": 1440,
+     "h": 900
+    },
+    "pageH": 900,
+    "margins": {
+     "left": 45,
+     "right": 45
+    },
+    "sections": [
+     {
+      "sel": "section.card.plan",
+      "tag": "section",
+      "top": 80,
+      "height": 140,
+      "words": 29,
+      "media": 0,
+      "middle": 37,
+      "heading": {
+       "text": "Plan a route",
+       "size": 34,
+       "tag": "h1"
+      },
+      "left": 253,
+      "right": 45,
+      "textLeft": 253,
+      "textRight": 55,
+      "fullBleed": false,
+      "footer": false,
+      "hero": true,
+      "continues": false,
+      "pinned": false
+     },
+     {
+      "sel": "div.cols",
+      "tag": "div",
+      "top": 240,
+      "height": 592,
+      "words": 246,
+      "media": 0,
+      "middle": 62,
+      "heading": {
+       "text": "Route options",
+       "size": 16,
+       "tag": "h2"
+      },
+      "left": 253,
+      "right": 45,
+      "textLeft": 253,
+      "textRight": 64,
+      "fullBleed": false,
+      "footer": true,
+      "hero": true,
+      "continues": false,
+      "pinned": false
+     }
+    ],
+    "gaps": [],
+    "h1s": [
+     {
+      "text": "Plan a route",
+      "size": 34,
+      "top": 99,
+      "firstScreen": true
+     }
+    ],
+    "edgeText": [],
+    "edges": [
+     {
+      "x": 253,
+      "n": 2
+     },
+     {
+      "x": 521,
+      "n": 2
+     },
+     {
+      "x": 569,
+      "n": 1
+     },
+     {
+      "x": 1141,
+      "n": 1
+     }
+    ],
+    "leftBlocks": 6,
+    "bodySize": 13,
+    "stage": false,
+    "explains": false,
+    "slivers": [],
+    "voidShare": 0.1,
+    "voidBox": {
+     "x": 0,
+     "y": 300,
+     "w": 240,
+     "h": 540
+    }
+   },
+   "app": {
+    "viewport": {
+     "w": 1440,
+     "h": 900
+    },
+    "dark": false,
+    "ground": "#e9eeee",
+    "sidebar": {
+     "w": 208,
+     "tag": "nav",
+     "links": 6,
+     "share": 0.14
+    },
+    "topbar": {
+     "h": 56
+    },
+    "canvas": {
+     "left": 45,
+     "right": 45
+    },
+    "hero": {
+     "text": "Plan a route",
+     "words": 3,
+     "chars": 12,
+     "lines": 1,
+     "size": 34,
+     "vw": 2.4,
+     "font": "Barlow Condensed",
+     "weight": 700,
+     "tracking": 0.02,
+     "leading": 1,
+     "top": 99,
+     "tag": "h1",
+     "kind": "heading",
+     "align": "left",
+     "position": "left"
+    },
+    "charts": 0,
+    "layout": {
+     "panels": 6,
+     "firstScreen": 6,
+     "ragged": [
+      {
+       "diff": 89,
+       "top": 240
+      },
+      {
+       "diff": 120,
+       "top": 240
+      }
+     ],
+     "voids": []
+    },
+    "tiles": 0,
+    "panels": {
+     "count": 10,
+     "radii": [
+      [
+       3,
+       8
+      ],
+      [
+       0,
+       1
+      ],
+      [
+       2,
+       1
+      ]
+     ],
+     "heavyBorders": 3,
+     "borderSamples": [
+      "#0b5a8a on #e3f0f7 (6.36:1)",
+      "#b9c5c8 on #ffffff (1.77:1)",
+      "#b9c5c8 on #ffffff (1.77:1)"
+     ],
+     "heavyShadows": 0,
+     "softShadows": 0,
+     "shadowSamples": [],
+     "glass": 0
+    },
+    "chips": {
+     "count": 0,
+     "hues": 0,
+     "samples": []
+    },
+    "numbers": {
+     "cells": 12,
+     "leftAligned": 3,
+     "figures": 15,
+     "tabularShare": 0.67,
+     "kpiMax": 20
+    },
+    "rows": {
+     "count": 3,
+     "median": 40
+    },
+    "chartHues": 0,
+    "placeholders": [],
+    "type": {
+     "under13": 0.08,
+     "tiny": 0,
+     "tinySamples": [],
+     "sizes": [
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      20,
+      22,
+      34
+     ]
+    },
+    "title": {
+     "text": "Plan a route",
+     "size": 34,
+     "top": 99
+    },
+    "colourShare": 0.015
+   },
+   "consoleErrors": []
+  },
+  {
+   "width": 768,
+   "height": 1024,
+   "load": "load",
+   "screens": 2,
+   "filled": [
+    0.91,
+    0.81
+   ],
+   "motion": {
+    "elements": 0,
+    "css": 0,
+    "transitions": 0,
+    "scripted": 0,
+    "videos": 0,
+    "playingVideos": 0
+   },
+   "metrics": {
+    "viewport": {
+     "w": 768,
+     "h": 1024
+    },
+    "page": {
+     "height": 1058,
+     "screens": 1,
+     "words": 432,
+     "img": 0,
+     "video": 0,
+     "canvas": 0,
+     "svg": 16,
+     "sections": 4,
+     "horizontalOverflow": 432,
+     "overflowCulprits": [
+      "label.vh (+73px)",
+      "circle (+95px)",
+      "path (+97px)"
+     ],
+     "uiFragments": 0,
+     "uiAbuse": false,
+     "realPictures": 0,
+     "videoCount": 0,
+     "uiPictures": 0,
+     "pictureSamples": [],
+     "blendText": 0,
+     "sideScrollers": 0,
+     "brokenImages": [],
+     "emoji": [],
+     "videosNoPoster": 0
+    },
+    "hero": {
+     "text": "Plan a route",
+     "words": 3,
+     "chars": 12,
+     "lines": 1,
+     "size": 34,
+     "vw": 4.4,
+     "font": "Barlow Condensed",
+     "weight": 700,
+     "tracking": 0.02,
+     "leading": 1,
+     "top": 99,
+     "tag": "h1",
+     "kind": "heading",
+     "align": "left",
+     "position": "left"
+    },
+    "h1": {
+     "text": "Plan a route",
+     "words": 3,
+     "lines": 1,
+     "size": 34,
+     "font": "Barlow Condensed"
+    },
+    "headings": [
+     {
+      "text": "Plan a route",
+      "words": 3,
+      "chars": 12,
+      "lines": 1,
+      "size": 34,
+      "vw": 4.4,
+      "font": "Barlow Condensed",
+      "weight": 700,
+      "tracking": 0.02,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.23,
+      "top": 99,
+      "tag": "h1",
+      "kind": "heading"
+     }
+    ],
+    "headingSummary": {
+     "count": 1,
+     "maxLines": 1,
+     "over2Lines": 0,
+     "statements": 0,
+     "centered": 0,
+     "medianWords": null,
+     "mixedFontHeadings": 0
+    },
+    "type": {
+     "families": [
+      {
+       "family": "Atkinson Hyperlegible Next",
+       "share": 0.87,
+       "mono": false
+      },
+      {
+       "family": "Barlow Condensed",
+       "share": 0.13,
+       "mono": false
+      }
+     ],
+     "familyCount": 2,
+     "sizes": [
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      20,
+      22,
+      34
+     ],
+     "sizeCount": 11,
+     "notLoaded": [],
+     "body": {
+      "font": "Atkinson Hyperlegible Next",
+      "size": 13,
+      "leading": 1.54,
+      "weight": 400,
+      "tracking": 0,
+      "contrast": 7.5
+     },
+     "measureChars": 34,
+     "max": {
+      "size": 34,
+      "vw": 4.4,
+      "font": "Barlow Condensed",
+      "text": "Plan a route"
+     },
+     "monoShare": 0,
+     "monoProseShare": 0,
+     "monoFamilies": [],
+     "monoSamples": [],
+     "microLabels": 3,
+     "microLabelShare": 0.012,
+     "microSamples": [
+      "North",
+      "North",
+      "Central"
+     ],
+     "upperShare": 0.13,
+     "centerShare": 0.06,
+     "smallText": 1
+    },
+    "eyebrows": [],
+    "numbered": [],
+    "color": {
+     "bodyBg": "#e9eeee",
+     "bodyBgHsl": {
+      "h": 180,
+      "s": 0.13,
+      "l": 0.92
+     },
+     "dark": false,
+     "sectionBgs": [
+      {
+       "color": "#ffffff",
+       "top": 236,
+       "hsl": {
+        "h": 0,
+        "s": 0,
+        "l": 1
+       }
+      }
+     ],
+     "textColors": [
+      {
+       "color": "#44585f",
+       "share": 0.46
+      },
+      {
+       "color": "#12262e",
+       "share": 0.4
+      },
+      {
+       "color": "#ffffff",
+       "share": 0.04
+      },
+      {
+       "color": "#0b5a8a",
+       "share": 0.04
+      },
+      {
+       "color": "#a8281c",
+       "share": 0.03
+      }
+     ],
+     "button": {
+      "bg": "#21414f",
+      "hsl": {
+       "h": 198,
+       "s": 0.41,
+       "l": 0.22
+      },
+      "fg": "#ffffff"
+     },
+     "lowContrast": []
+    },
+    "buttons": {
+     "count": 2,
+     "inHero": 2,
+     "radius": 3,
+     "height": 38,
+     "withShadow": 0,
+     "withGradient": 0,
+     "mono": 0,
+     "upper": 0,
+     "heroLabels": [
+      "Routes",
+      "Reserve 6 cores"
+     ]
+    },
+    "surfaces": {
+     "shadowStatic": 0,
+     "shadowOverlay": 0,
+     "shadowSamples": [],
+     "gradients": 0,
+     "scrims": 0,
+     "gradientSamples": [],
+     "gradientText": 0,
+     "hairlines": 1,
+     "hairlineSamples": [
+      "header.top 1016px"
+     ],
+     "outlinedBoxes": 7,
+     "dashed": 1,
+     "blurred": 0,
+     "roundedBoxes": 0,
+     "boxRadius": 0,
+     "squareMedia": 0,
+     "roundedMedia": 0,
+     "mediaRadius": 0,
+     "textShadow": 0,
+     "cardRows": [
+      {
+       "count": 3,
+       "iconTopped": false,
+       "rounded": false,
+       "top": 289
+      }
+     ]
+    },
+    "heroMedia": [],
+    "nav": {
+     "links": 3,
+     "fixed": false,
+     "height": 1058,
+     "floatingPill": false,
+     "blur": false
+    },
+    "fontsLoaded": [
+     "atkinson hyperlegible next",
+     "barlow condensed"
+    ]
+   },
+   "layout": {
+    "viewport": {
+     "w": 768,
+     "h": 1024
+    },
+    "pageH": 1058,
+    "margins": {
+     "left": 45,
+     "right": 7
+    },
+    "sections": [
+     {
+      "sel": "section.card.plan",
+      "tag": "section",
+      "top": 80,
+      "height": 140,
+      "words": 29,
+      "media": 0,
+      "middle": 241,
+      "heading": {
+       "text": "Plan a route",
+       "size": 34,
+       "tag": "h1"
+      },
+      "left": 225,
+      "right": 0,
+      "textLeft": 225,
+      "textRight": -381,
+      "fullBleed": false,
+      "footer": false,
+      "hero": true,
+      "continues": false,
+      "pinned": false
+     },
+     {
+      "sel": "div.cols",
+      "tag": "div",
+      "top": 236,
+      "height": 782,
+      "words": 249,
+      "media": 0,
+      "middle": 299,
+      "heading": {
+       "text": "Route options",
+       "size": 16,
+       "tag": "h2"
+      },
+      "left": 219,
+      "right": 0,
+      "textLeft": 219,
+      "textRight": -391,
+      "fullBleed": false,
+      "footer": true,
+      "hero": true,
+      "continues": false,
+      "pinned": false
+     }
+    ],
+    "gaps": [],
+    "h1s": [
+     {
+      "text": "Plan a route",
+      "size": 34,
+      "top": 99,
+      "firstScreen": true
+     }
+    ],
+    "edgeText": [],
+    "edges": [
+     {
+      "x": 219,
+      "n": 2
+     },
+     {
+      "x": 459,
+      "n": 2
+     },
+     {
+      "x": 507,
+      "n": 1
+     },
+     {
+      "x": 947,
+      "n": 1
+     }
+    ],
+    "leftBlocks": 6,
+    "bodySize": 13,
+    "stage": false,
+    "explains": false,
+    "slivers": [],
+    "voidShare": 0,
+    "voidBox": null
+   },
+   "app": {
+    "viewport": {
+     "w": 768,
+     "h": 1024
+    },
+    "dark": false,
+    "ground": "#e9eeee",
+    "sidebar": {
+     "w": 184,
+     "tag": "nav",
+     "links": 6,
+     "share": 0.24
+    },
+    "topbar": {
+     "h": 56
+    },
+    "canvas": {
+     "left": 35,
+     "right": -397
+    },
+    "hero": {
+     "text": "Plan a route",
+     "words": 3,
+     "chars": 12,
+     "lines": 1,
+     "size": 34,
+     "vw": 4.4,
+     "font": "Barlow Condensed",
+     "weight": 700,
+     "tracking": 0.02,
+     "leading": 1,
+     "top": 99,
+     "tag": "h1",
+     "kind": "heading",
+     "align": "left",
+     "position": "left"
+    },
+    "charts": 0,
+    "layout": {
+     "panels": 5,
+     "firstScreen": 5,
+     "ragged": [
+      {
+       "diff": 122,
+       "top": 236
+      }
+     ],
+     "voids": []
+    },
+    "tiles": 0,
+    "panels": {
+     "count": 11,
+     "radii": [
+      [
+       3,
+       8
+      ],
+      [
+       0,
+       2
+      ],
+      [
+       2,
+       1
+      ]
+     ],
+     "heavyBorders": 4,
+     "borderSamples": [
+      "#0b5a8a on #e3f0f7 (6.36:1)",
+      "#b9c5c8 on #ffffff (1.77:1)",
+      "#b9c5c8 on #ffffff (1.77:1)"
+     ],
+     "heavyShadows": 0,
+     "softShadows": 0,
+     "shadowSamples": [],
+     "glass": 0
+    },
+    "chips": {
+     "count": 0,
+     "hues": 0,
+     "samples": []
+    },
+    "numbers": {
+     "cells": 12,
+     "leftAligned": 3,
+     "figures": 15,
+     "tabularShare": 0.67,
+     "kpiMax": 20
+    },
+    "rows": {
+     "count": 3,
+     "median": 40
+    },
+    "chartHues": 0,
+    "placeholders": [],
+    "type": {
+     "under13": 0.08,
+     "tiny": 0,
+     "tinySamples": [],
+     "sizes": [
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      20,
+      22,
+      34
+     ]
+    },
+    "title": {
+     "text": "Plan a route",
+     "size": 34,
+     "top": 99
+    },
+    "colourShare": 0.01
+   },
+   "consoleErrors": []
+  },
+  {
+   "width": 390,
+   "height": 844,
+   "load": "load",
+   "screens": 4,
+   "filled": [
+    0.36,
+    0.36,
+    0.36,
+    0.36
+   ],
+   "motion": {
+    "elements": 0,
+    "css": 0,
+    "transitions": 0,
+    "scripted": 0,
+    "videos": 0,
+    "playingVideos": 0
+   },
+   "metrics": {
+    "viewport": {
+     "w": 1200,
+     "h": 2597
+    },
+    "page": {
+     "height": 2597,
+     "screens": 1,
+     "words": 432,
+     "img": 0,
+     "video": 0,
+     "canvas": 0,
+     "svg": 16,
+     "sections": 4,
+     "horizontalOverflow": 0,
+     "overflowCulprits": [],
+     "uiFragments": 0,
+     "uiAbuse": false,
+     "realPictures": 0,
+     "videoCount": 0,
+     "uiPictures": 0,
+     "pictureSamples": [],
+     "blendText": 0,
+     "sideScrollers": 0,
+     "brokenImages": [],
+     "emoji": [],
+     "videosNoPoster": 0
+    },
+    "hero": {
+     "text": "Plan a route",
+     "words": 3,
+     "chars": 12,
+     "lines": 1,
+     "size": 34,
+     "vw": 2.8,
+     "font": "Barlow Condensed",
+     "weight": 700,
+     "tracking": 0.02,
+     "leading": 1,
+     "top": 99,
+     "tag": "h1",
+     "kind": "heading",
+     "align": "left",
+     "position": "left"
+    },
+    "h1": {
+     "text": "Plan a route",
+     "words": 3,
+     "lines": 1,
+     "size": 34,
+     "font": "Barlow Condensed"
+    },
+    "headings": [
+     {
+      "text": "Plan a route",
+      "words": 3,
+      "chars": 12,
+      "lines": 1,
+      "size": 34,
+      "vw": 2.8,
+      "font": "Barlow Condensed",
+      "weight": 700,
+      "tracking": 0.02,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.15,
+      "top": 99,
+      "tag": "h1",
+      "kind": "heading"
+     }
+    ],
+    "headingSummary": {
+     "count": 1,
+     "maxLines": 1,
+     "over2Lines": 0,
+     "statements": 0,
+     "centered": 0,
+     "medianWords": null,
+     "mixedFontHeadings": 0
+    },
+    "type": {
+     "families": [
+      {
+       "family": "Atkinson Hyperlegible Next",
+       "share": 0.87,
+       "mono": false
+      },
+      {
+       "family": "Barlow Condensed",
+       "share": 0.13,
+       "mono": false
+      }
+     ],
+     "familyCount": 2,
+     "sizes": [
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      20,
+      22,
+      34
+     ],
+     "sizeCount": 11,
+     "notLoaded": [],
+     "body": {
+      "font": "Atkinson Hyperlegible Next",
+      "size": 13,
+      "leading": 1.54,
+      "weight": 400,
+      "tracking": 0,
+      "contrast": 7.5
+     },
+     "measureChars": 34,
+     "max": {
+      "size": 34,
+      "vw": 2.8,
+      "font": "Barlow Condensed",
+      "text": "Plan a route"
+     },
+     "monoShare": 0,
+     "monoProseShare": 0,
+     "monoFamilies": [],
+     "monoSamples": [],
+     "microLabels": 3,
+     "microLabelShare": 0.012,
+     "microSamples": [
+      "North",
+      "North",
+      "Central"
+     ],
+     "upperShare": 0.13,
+     "centerShare": 0.06,
+     "smallText": 1
+    },
+    "eyebrows": [],
+    "numbered": [],
+    "color": {
+     "bodyBg": "#e9eeee",
+     "bodyBgHsl": {
+      "h": 180,
+      "s": 0.13,
+      "l": 0.92
+     },
+     "dark": false,
+     "sectionBgs": [],
+     "textColors": [
+      {
+       "color": "#44585f",
+       "share": 0.46
+      },
+      {
+       "color": "#12262e",
+       "share": 0.4
+      },
+      {
+       "color": "#ffffff",
+       "share": 0.04
+      },
+      {
+       "color": "#0b5a8a",
+       "share": 0.04
+      },
+      {
+       "color": "#a8281c",
+       "share": 0.03
+      }
+     ],
+     "button": {
+      "bg": "#21414f",
+      "hsl": {
+       "h": 198,
+       "s": 0.41,
+       "l": 0.22
+      },
+      "fg": "#ffffff"
+     },
+     "lowContrast": []
+    },
+    "buttons": {
+     "count": 2,
+     "inHero": 2,
+     "radius": 3,
+     "height": 38,
+     "withShadow": 0,
+     "withGradient": 0,
+     "mono": 0,
+     "upper": 0,
+     "heroLabels": [
+      "Routes",
+      "Reserve 6 cores"
+     ]
+    },
+    "surfaces": {
+     "shadowStatic": 0,
+     "shadowOverlay": 0,
+     "shadowSamples": [],
+     "gradients": 0,
+     "scrims": 0,
+     "gradientSamples": [],
+     "gradientText": 0,
+     "hairlines": 1,
+     "hairlineSamples": [
+      "header.top 1016px"
+     ],
+     "outlinedBoxes": 7,
+     "dashed": 1,
+     "blurred": 0,
+     "roundedBoxes": 0,
+     "boxRadius": 0,
+     "squareMedia": 0,
+     "roundedMedia": 0,
+     "mediaRadius": 0,
+     "textShadow": 0,
+     "cardRows": [
+      {
+       "count": 3,
+       "iconTopped": false,
+       "rounded": false,
+       "top": 289
+      }
+     ]
+    },
+    "heroMedia": [],
+    "nav": {
+     "links": 3,
+     "fixed": false,
+     "height": 1058,
+     "floatingPill": false,
+     "blur": false
+    },
+    "fontsLoaded": [
+     "atkinson hyperlegible next",
+     "barlow condensed"
+    ]
+   },
+   "layout": {
+    "viewport": {
+     "w": 1200,
+     "h": 2597
+    },
+    "pageH": 2597,
+    "margins": {
+     "left": 45,
+     "right": 35
+    },
+    "sections": [
+     {
+      "sel": "section.card.plan",
+      "tag": "section",
+      "top": 80,
+      "height": 140,
+      "words": 29,
+      "media": 0,
+      "middle": 37,
+      "heading": {
+       "text": "Plan a route",
+       "size": 34,
+       "tag": "h1"
+      },
+      "left": 225,
+      "right": 41,
+      "textLeft": 225,
+      "textRight": 51,
+      "fullBleed": false,
+      "footer": false,
+      "hero": true,
+      "continues": false,
+      "pinned": false
+     },
+     {
+      "sel": "div.cols",
+      "tag": "div",
+      "top": 236,
+      "height": 782,
+      "words": 249,
+      "media": 0,
+      "middle": 46,
+      "heading": {
+       "text": "Route options",
+       "size": 16,
+       "tag": "h2"
+      },
+      "left": 219,
+      "right": 35,
+      "textLeft": 219,
+      "textRight": 41,
+      "fullBleed": false,
+      "footer": true,
+      "hero": true,
+      "continues": false,
+      "pinned": false
+     }
+    ],
+    "gaps": [],
+    "h1s": [
+     {
+      "text": "Plan a route",
+      "size": 34,
+      "top": 99,
+      "firstScreen": true
+     }
+    ],
+    "edgeText": [],
+    "edges": [
+     {
+      "x": 219,
+      "n": 2
+     },
+     {
+      "x": 459,
+      "n": 2
+     },
+     {
+      "x": 507,
+      "n": 1
+     },
+     {
+      "x": 947,
+      "n": 1
+     }
+    ],
+    "leftBlocks": 6,
+    "bodySize": 13,
+    "stage": false,
+    "explains": false,
+    "slivers": [],
+    "voidShare": 0.6,
+    "voidBox": {
+     "x": 0,
+     "y": 1039,
+     "w": 1200,
+     "h": 1558
+    }
+   },
+   "app": {
+    "viewport": {
+     "w": 1200,
+     "h": 2597
+    },
+    "dark": false,
+    "ground": "#e9eeee",
+    "sidebar": null,
+    "topbar": null,
+    "canvas": {
+     "left": 18,
+     "right": 35
+    },
+    "hero": {
+     "text": "Plan a route",
+     "words": 3,
+     "chars": 12,
+     "lines": 1,
+     "size": 34,
+     "vw": 2.8,
+     "font": "Barlow Condensed",
+     "weight": 700,
+     "tracking": 0.02,
+     "leading": 1,
+     "top": 99,
+     "tag": "h1",
+     "kind": "heading",
+     "align": "left",
+     "position": "left"
+    },
+    "charts": 0,
+    "layout": {
+     "panels": 6,
+     "firstScreen": 6,
+     "ragged": [
+      {
+       "diff": 122,
+       "top": 236
+      }
+     ],
+     "voids": []
+    },
+    "tiles": 0,
+    "panels": {
+     "count": 12,
+     "radii": [
+      [
+       3,
+       9
+      ],
+      [
+       0,
+       2
+      ],
+      [
+       2,
+       1
+      ]
+     ],
+     "heavyBorders": 4,
+     "borderSamples": [
+      "#0b5a8a on #e3f0f7 (6.36:1)",
+      "#b9c5c8 on #ffffff (1.77:1)",
+      "#b9c5c8 on #ffffff (1.77:1)"
+     ],
+     "heavyShadows": 0,
+     "softShadows": 0,
+     "shadowSamples": [],
+     "glass": 0
+    },
+    "chips": {
+     "count": 0,
+     "hues": 0,
+     "samples": []
+    },
+    "numbers": {
+     "cells": 12,
+     "leftAligned": 3,
+     "figures": 15,
+     "tabularShare": 0.67,
+     "kpiMax": 20
+    },
+    "rows": {
+     "count": 3,
+     "median": 40
+    },
+    "chartHues": 0,
+    "placeholders": [],
+    "type": {
+     "under13": 0.08,
+     "tiny": 0,
+     "tinySamples": [],
+     "sizes": [
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      20,
+      22,
+      34
+     ]
+    },
+    "title": {
+     "text": "Plan a route",
+     "size": 34,
+     "top": 99
+    },
+    "colourShare": 0.015
+   },
+   "consoleErrors": []
+  }
+ ],
+ "findings": [
+  {
+   "level": "WARN",
+   "id": "micro-label",
+   "width": 1440,
+   "message": "2 tiny uppercase letter-spaced label(s): \"North\", \"Central\"",
+   "fix": "Prefer sentence case at body size."
+  },
+  {
+   "level": "WARN",
+   "id": "heavy-borders",
+   "width": 1440,
+   "message": "3 panel borders are dark against their ground: #0b5a8a on #e3f0f7 (6.36:1) | #b9c5c8 on #ffffff (1.77:1) | #b9c5c8 on #ffffff (1.77:1)",
+   "fix": "A panel border is a whisper: about 1.1–1.3:1 against its ground on a light screen (#e5e7eb–#ededed on white), and about 1.2–1.5:1 on a dark one (#1a1a1a on #000, #2e2e2e on #111). Darker lines turn the screen into a grid of boxes; keep the stronger line for controls.",
+   "alsoAt": [
+    768,
+    390
+   ]
+  },
+  {
+   "level": "WARN",
+   "id": "ragged-row",
+   "width": 1440,
+   "message": "2 pair(s) of cards in one row end at different heights (by 89px, 120px).",
+   "fix": "Cards that share a row share a bottom edge: balance them by their content (the same number of rows, a block of similar height beside it), or stack them. In testing, ragged rows were marked down every time.",
+   "alsoAt": [
+    768
+   ]
+  },
+  {
+   "level": "FAIL",
+   "id": "micro-label",
+   "width": 768,
+   "message": "3 tiny uppercase letter-spaced labels (e.g. \"North\", \"North\", \"Central\").",
+   "fix": "Use sentence-case text at a readable size, or delete the label.",
+   "alsoAt": [
+    390
+   ]
+  },
+  {
+   "level": "FAIL",
+   "id": "overflow",
+   "width": 768,
+   "message": "Page scrolls sideways by 432px at 768px. Widest offenders: label.vh (+73px), circle (+95px), path (+97px).",
+   "fix": "Constrain the element that is wider than the viewport (max-width: 100%, or overflow: clip on its section)."
+  },
+  {
+   "level": "WARN",
+   "id": "app-title-size",
+   "width": 390,
+   "message": "The h1 is 34px (\"Plan a route\").",
+   "fix": "An app screen is not a landing page: the title is 18-32px (20-24px on a phone)."
+  }
+ ],
+ "images": [
+  {
+   "viewport": "desktop",
+   "width": 1440,
+   "fold": "/tmp/cmp/route/.taste-skill/inspect/desktop-fold.jpg",
+   "pages": [
+    "/tmp/cmp/route/.taste-skill/inspect/desktop-page-01.jpg"
+   ],
+   "film": []
+  },
+  {
+   "viewport": "tablet",
+   "width": 768,
+   "fold": "/tmp/cmp/route/.taste-skill/inspect/tablet-fold.jpg",
+   "pages": [
+    "/tmp/cmp/route/.taste-skill/inspect/tablet-page-01.jpg"
+   ],
+   "film": []
+  },
+  {
+   "viewport": "mobile",
+   "width": 390,
+   "fold": "/tmp/cmp/route/.taste-skill/inspect/mobile-fold.jpg",
+   "pages": [
+    "/tmp/cmp/route/.taste-skill/inspect/mobile-page-01.jpg"
+   ],
+   "film": []
+  }
+ ]
+}
