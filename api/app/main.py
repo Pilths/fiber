@@ -10,6 +10,7 @@ from app.auth.deps import PasswordChangeRequired
 from app.auth.router import router as auth_router
 from app.db import get_db
 from app.inventory.router import router as inventory_router
+from app.loss.router import router as loss_router
 from app.reservations.router import router as reservations_router
 
 app = FastAPI(title="Fiber Dashboard API")
@@ -17,6 +18,7 @@ app.include_router(auth_router)
 app.include_router(admin_users_router)
 app.include_router(inventory_router)
 app.include_router(reservations_router)
+app.include_router(loss_router)
 
 
 @app.get("/api/health")
