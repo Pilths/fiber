@@ -6,7 +6,7 @@ import { Dialog } from "@/components/upload-parts";
 import { EVENT_WORD, STATUS, when } from "@/lib/status";
 
 type Core = components["schemas"]["CoreDetail"];
-type Res = components["schemas"]["ReservationOut"];
+type Holder = components["schemas"]["Holder"];
 type Item = components["schemas"]["CoreHistoryItem"];
 type Me = components["schemas"]["CurrentUser"];
 
@@ -16,11 +16,10 @@ const line = (h: Item) =>
     : `${EVENT_WORD[h.type] ?? h.type} by ${h.user}`;
 
 // Core detail: right-side drawer on the native <dialog> (Esc closes, focus returns to the cell or row that opened it).
-// The span endpoint has no reservation on the core, so the holder comes from GET /api/reservations (admins see all,
-// planners only their own; for someone else's core a planner sees the customer only).
+// The holder comes from GET /api/cores/{id}: everyone sees who holds a core; actions follow holder.is_mine or admin.
 export function CoreDrawer({ core, span, me, onClose, onChanged }: { core: Core; span: string; me: Me; onClose: () => void; onChanged: () => void }) {
   const [items, setItems] = useState<Item[] | null>(null);
-  const [res, setRes] = useState<Res | null>(null);
+  const [res, setRes] = useState<Holder | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [mode, setMode] = useState<"status" | null>(null);
@@ -30,8 +29,7 @@ export function CoreDrawer({ core, span, me, onClose, onChanged }: { core: Core;
 
   const load = useCallback(() => {
     api.get("/api/cores/{cid}/history", { path: { cid: core.id } }).then(setItems).catch(() => setError("Could not load the history."));
-    // ponytail: loads every visible reservation to find the holder; a core -> reservation endpoint if this gets slow.
-    api.get("/api/reservations").then((rs) => setRes(rs.find((r) => r.cores.some((c) => c.core_id === core.id && c.held)) ?? null)).catch(() => {});
+    api.get("/api/cores/{core_id}", { path: { core_id: core.id } }).then((c) => setRes(c.holder)).catch(() => setRes(null));
   }, [core.id]);
   useEffect(load, [load, core.status]);
 
@@ -60,12 +58,16 @@ export function CoreDrawer({ core, span, me, onClose, onChanged }: { core: Core;
   };
 
   const st = STATUS[core.status];
-  const own = res?.planner_id === me.id;
-  const canKeep = res && (own || admin) && res.status === "approved" && res.awaiting !== "release";
-  const canRelease = admin && res?.awaiting === "release" && res.release_requested_cores.includes(core.id);
+  const canKeep = res && (res.is_mine || admin) && res.state === "approved";
+  const canRelease = admin && res?.state === "release_requested";
+  // The holder has no list of requested cores; admins see every reservation, so read it at click time.
+  const release = async (rid: number) => {
+    const r = (await api.get("/api/reservations")).find((x) => x.id === rid);
+    return resAction(rid, "release", { cores: r?.release_requested_cores ?? [] });
+  };
   const facts: [string, React.ReactNode][] = [
     ["Customer", core.customer ?? "-"],
-    ["Held by", res ? `${res.planner}, reservation #${res.id}` : "-"],
+    ["Held by", res ? `${res.owner.display_name}, reservation #${res.reservation_id}` : "-"],
     ["Ports", core.port_a || core.port_b ? `${core.port_a ?? "-"} to ${core.port_b ?? "-"}` : "-"],
     ["Circuit", core.circuit_id ? <span key="c" className="font-mono">{core.circuit_id}</span> : "-"],
     ["Planned date", core.planned_date ?? "-"],
@@ -78,7 +80,7 @@ export function CoreDrawer({ core, span, me, onClose, onChanged }: { core: Core;
       <div className="mt-3 flex flex-wrap items-center gap-2" data-testid="core-status">
         <span className={`inline-flex items-center gap-1.5 font-semibold ${st.tone}`}><Icon name={st.icon} />{core.status}</span>
         {res?.stale && <span className="pill h-amber"><Icon name="lo" />Stale</span>}
-        {res?.awaiting === "release" && <span className="pill h-blue"><Icon name="ex" />Release requested</span>}
+        {res?.state === "release_requested" && <span className="pill h-blue"><Icon name="ex" />Release requested</span>}
       </div>
       <dl className="mt-4 grid grid-cols-[110px_1fr] gap-x-3 gap-y-1.5 border-t pt-4 text-[13px]">
         {facts.map(([k, v]) => <div key={k} className="contents"><dt className="text-muted-foreground">{k}</dt><dd className="min-w-0 break-words">{v}</dd></div>)}
@@ -89,9 +91,9 @@ export function CoreDrawer({ core, span, me, onClose, onChanged }: { core: Core;
 
       {(canKeep || canRelease) && (
         <div className="mt-4 flex flex-wrap gap-2 border-t pt-4">
-          {canKeep && <button type="button" className="btn" disabled={busy} onClick={() => act(() => resAction(res.id, "keep"))}>Keep</button>}
-          {canKeep && <button type="button" className="btn" disabled={busy} onClick={() => act(() => resAction(res.id, "request-release", { cores: [core.id] }))}>Request release of core {core.number}</button>}
-          {canRelease && <button type="button" className="btn btn-p" disabled={busy} onClick={() => act(() => resAction(res.id, "release", { cores: res.release_requested_cores }))}>Release requested cores</button>}
+          {canKeep && <button type="button" className="btn" disabled={busy} onClick={() => act(() => resAction(res.reservation_id, "keep"))}>Keep</button>}
+          {canKeep && <button type="button" className="btn" disabled={busy} onClick={() => act(() => resAction(res.reservation_id, "request-release", { cores: [core.id] }))}>Request release of core {core.number}</button>}
+          {canRelease && <button type="button" className="btn btn-p" disabled={busy} onClick={() => act(() => release(res.reservation_id))}>Release requested cores</button>}
         </div>
       )}
 

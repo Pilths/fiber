@@ -192,6 +192,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/cores/{core_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Core */
+        get: operations["get_core_api_cores__core_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/customers": {
         parameters: {
             query?: never;
@@ -908,6 +925,15 @@ export interface components {
             port_a: string | null;
             /** Port B */
             port_b: string | null;
+            /** Reservation Id */
+            reservation_id?: number | null;
+            /**
+             * Stale
+             * @default false
+             */
+            stale: boolean;
+            /** Stale Since */
+            stale_since?: string | null;
         };
         /** CoreHistoryItem */
         CoreHistoryItem: {
@@ -932,6 +958,35 @@ export interface components {
             new_value: string | null;
             /** Cores */
             cores: components["schemas"]["CoreRef"][];
+        };
+        /** CoreHolderDetail */
+        CoreHolderDetail: {
+            /** Core Id */
+            core_id: number;
+            /** Number */
+            number: number;
+            /** Span Id */
+            span_id: number;
+            /** Span Name */
+            span_name: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "Available" | "Requested" | "Reserved" | "In use" | "Faulty";
+            /** Circuit Id */
+            circuit_id: string | null;
+            /** Port A */
+            port_a: string | null;
+            /** Port B */
+            port_b: string | null;
+            /**
+             * Hidden
+             * @default false
+             * @constant
+             */
+            hidden: false;
+            holder: components["schemas"]["Holder"] | null;
         };
         /** CoreIds */
         CoreIds: {
@@ -1106,6 +1161,27 @@ export interface components {
             /** At */
             at: unknown;
         };
+        /** Holder */
+        Holder: {
+            /** Reservation Id */
+            reservation_id: number;
+            /** Customer */
+            customer: string;
+            /** Planned Date */
+            planned_date: string | null;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "requested" | "approved" | "release_requested";
+            /** Stale */
+            stale: boolean;
+            /** Stale Since */
+            stale_since: string | null;
+            owner: components["schemas"]["Owner"];
+            /** Is Mine */
+            is_mine: boolean;
+        };
         /** LoginBody */
         LoginBody: {
             /** Username */
@@ -1152,6 +1228,15 @@ export interface components {
              * @default false
              */
             dcs: boolean;
+        };
+        /** Owner */
+        Owner: {
+            /** Id */
+            id: number;
+            /** Username */
+            username: string;
+            /** Display Name */
+            display_name: string;
         };
         /** RenameIn */
         RenameIn: {
@@ -2043,6 +2128,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SpanDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_core_api_cores__core_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-dev-user"?: string | null;
+            };
+            path: {
+                core_id: number;
+            };
+            cookie?: {
+                fiber_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoreHolderDetail"];
                 };
             };
             /** @description Validation Error */
