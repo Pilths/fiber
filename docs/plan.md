@@ -377,9 +377,9 @@ Not MVP (owner, 26 October 2026).
 - Inspector tabs Site and Services, and map layers Services and Data centres (placeholders for DC internals and bandwidth).
 - Undo or rollback of a site master upload (the MVP keeps previous uploads for comparison only).
 - Real KMZ import and KMZ route shapes on the map (the MVP uses straight lines plus one mock route with a drawn shape, TASK-084).
+- Optional Reservation workbook columns `Core status` (mark a core Faulty), `Loss (dB)` and `Tested on` (append a measurement). The parser already reads them when present, but the real sheet has none; agree the column names with the planners before relying on them.
 
 Open questions:
 
 - How an upload may "modify" a reservation. Proposal: customer and date through a 'corrected' event chosen by the admin; core differences need release and a new reservation; missing rows only warn.
 - Count-only reservations: whether real rows have blank or short core assignments. Check by running `excel_check` on the real file on the work laptop. If every real row lists its cores, a blank assignment could become Needs review instead of a count-only reservation.
-- Whether the shell and sections (TASK-073 to TASK-075) move to an earlier session (RISK-010).
