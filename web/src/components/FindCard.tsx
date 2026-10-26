@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import type { components } from "@/api/schema";
 import { Icon } from "@/components/Icon";
 import { health, LEVEL, spanName, type SpanLoss } from "@/lib/status";
@@ -14,9 +14,11 @@ export function FreeBadge({ s }: { s: Span }) {
   );
 }
 
-// Find card: "Span or site" lists every span (filters narrow it); "Route A to B" lands in the routes session (TASK-051).
-export function FindCard({ spans, selectedId, onSelect, loss }: { spans: Span[] | null; selectedId: number | null; onSelect: (id: number) => void; loss: SpanLoss[] }) {
-  const [mode, setMode] = useState<"span" | "route">("span");
+// Find card: "Span or site" lists every span (filters narrow it); "Route A to B" shows the route planner form (RoutePlanner.tsx).
+export function FindCard({ spans, selectedId, onSelect, loss, mode, onMode, route }: {
+  spans: Span[] | null; selectedId: number | null; onSelect: (id: number) => void; loss: SpanLoss[];
+  mode: "span" | "route"; onMode: (m: "span" | "route") => void; route: ReactNode;
+}) {
   const [q, setQ] = useState("");
   const [region, setRegion] = useState("");
   const [routeType, setRouteType] = useState("");
@@ -33,17 +35,12 @@ export function FindCard({ spans, selectedId, onSelect, loss }: { spans: Span[] 
       <div role="radiogroup" aria-label="Find mode" className="grid h-9 grid-cols-2 overflow-hidden rounded-md border border-line">
         {([["span", "Span or site"], ["route", "Route A to B"]] as const).map(([m, label], i) => (
           <label key={m} className={`relative flex cursor-pointer items-center justify-center px-3 font-medium whitespace-nowrap has-checked:bg-foreground has-checked:font-semibold has-checked:text-white has-focus-visible:z-10 has-focus-visible:outline-3 has-focus-visible:outline-blue ${i ? "border-l border-line" : ""}`}>
-            <input type="radio" name="find-mode" className="absolute size-px opacity-0" checked={mode === m} onChange={() => setMode(m)} />{label}
+            <input type="radio" name="find-mode" className="absolute size-px opacity-0" checked={mode === m} onChange={() => onMode(m)} />{label}
           </label>
         ))}
       </div>
 
-      {mode === "route" ? (
-        <p className="mt-3 rounded-md border border-dashed border-line px-4 py-5 text-center text-[13px] text-muted-foreground">
-          <b className="block text-sm font-semibold text-foreground">Coming in the routes session</b>
-          From, To and route options arrive with route planning.
-        </p>
-      ) : (
+      {mode === "route" ? route : (
         <>
           <div className="relative mt-3">
             <svg viewBox="0 0 16 16" aria-hidden="true" className="ni pointer-events-none absolute left-3 top-2.5 text-muted-foreground"><path d="M7 12A5 5 0 1 0 7 2a5 5 0 0 0 0 10zM14 14l-3.5-3.5" /></svg>
@@ -76,7 +73,7 @@ export function FindCard({ spans, selectedId, onSelect, loss }: { spans: Span[] 
         </>
       )}
 
-      <div className="mt-4 grid grid-cols-2 gap-x-3 gap-y-2 border-t pt-3.5">
+      {mode === "span" && <div className="mt-4 grid grid-cols-2 gap-x-3 gap-y-2 border-t pt-3.5">
         <label className="grid gap-1"><span className="lbl">Region</span>
           <select className="field" value={region} onChange={(e) => setRegion(e.target.value)}>
             <option value="">All regions</option>
@@ -90,7 +87,7 @@ export function FindCard({ spans, selectedId, onSelect, loss }: { spans: Span[] 
           </select>
         </label>
         <p className="col-span-2 text-xs text-muted-foreground" aria-live="polite"><b className="text-foreground">{shown.length} of {all.length}</b> spans shown</p>
-      </div>
+      </div>}
     </section>
   );
 }

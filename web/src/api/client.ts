@@ -68,7 +68,7 @@ async function request<P extends Path<M>, M extends Method>(
   let href: string = url;
   for (const [k, v] of Object.entries(o.path ?? {})) href = href.replace(`{${k}}`, encodeURIComponent(String(v)));
   const qs = new URLSearchParams();
-  for (const [k, v] of Object.entries(o.query ?? {})) if (v != null) qs.set(k, String(v));
+  for (const [k, v] of Object.entries(o.query ?? {})) for (const x of Array.isArray(v) ? v : [v]) if (x != null) qs.append(k, String(x)); // arrays repeat the key
   const headers: Record<string, string> = {};
   const dev = devUser();
   if (dev) headers["X-Dev-User"] = dev;

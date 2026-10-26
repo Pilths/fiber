@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { components } from "@/api/schema";
 import { Icon } from "@/components/Icon";
 import { LossPill } from "@/components/LossCard";
@@ -32,8 +33,9 @@ function heldLines(d: Detail) {
 
 type Admin = { onEditSpan: (focus?: "survey") => void; onEditSite: (end: "a" | "b") => void } | null; // null for planners
 
-export function Inspector({ detail, loading, onGoToCores, loss, onSeeLoss, admin }: {
+export function Inspector({ detail, loading, onGoToCores, loss, onSeeLoss, admin, onPlanRoute, route }: {
   detail: Detail | null; loading: boolean; onGoToCores: () => void; loss: LossDetail | null; onSeeLoss: () => void; admin: Admin;
+  onPlanRoute: (site: string) => void; route?: ReactNode; // route: the route summary, shown instead of the span in Route mode
 }) {
   const tab = "relative inline-flex h-10 items-center gap-2 border-b-2 border-transparent -mb-px px-2.5 font-semibold whitespace-nowrap focus-visible:-outline-offset-3";
   const later = (name: string) => (
@@ -50,12 +52,12 @@ export function Inspector({ detail, loading, onGoToCores, loss, onSeeLoss, admin
         {later("Services")}
       </div>
       <div role="tabpanel" aria-label="Cores" className="flex flex-1 flex-col">
-        {!detail ? (
+        {route ?? (!detail ? (
           <p className="rounded-md border border-dashed border-line px-4 py-5 text-center text-[13px] text-muted-foreground">
             <b className="mb-0.5 block text-sm font-semibold text-foreground">{loading ? "Loading span..." : "No span selected"}</b>
             {!loading && "Choose a span in Find, or search in the top bar."}
           </p>
-        ) : <Body d={detail} onGoToCores={onGoToCores} loss={loss} onSeeLoss={onSeeLoss} admin={admin} />}
+        ) : <Body d={detail} onGoToCores={onGoToCores} loss={loss} onSeeLoss={onSeeLoss} admin={admin} onPlanRoute={onPlanRoute} />)}
       </div>
     </section>
   );
@@ -63,7 +65,9 @@ export function Inspector({ detail, loading, onGoToCores, loss, onSeeLoss, admin
 
 const link = "font-[inherit] underline decoration-line decoration-1 underline-offset-4 hover:text-blue hover:decoration-blue";
 
-function Body({ d, onGoToCores, loss, onSeeLoss, admin }: { d: Detail; onGoToCores: () => void; loss: LossDetail | null; onSeeLoss: () => void; admin: Admin }) {
+function Body({ d, onGoToCores, loss, onSeeLoss, admin, onPlanRoute }: {
+  d: Detail; onGoToCores: () => void; loss: LossDetail | null; onSeeLoss: () => void; admin: Admin; onPlanRoute: (site: string) => void;
+}) {
   const h = health(d);
   const n = countBy(d);
   const surveyed = d.survey_cores != null;
@@ -144,8 +148,7 @@ function Body({ d, onGoToCores, loss, onSeeLoss, admin }: { d: Detail; onGoToCor
       )}
       <div className="-mx-5 mt-auto flex flex-wrap gap-2 border-t bg-white px-5 py-5">
         <button type="button" className="btn btn-p flex-1" onClick={onGoToCores} disabled={!surveyed}>Go to cores</button>
-        {/* Route planning UI lands in the routes session (TASK-051). */}
-        <button type="button" className="btn flex-1" aria-disabled="true" title="Coming in the routes session" onClick={(e) => e.preventDefault()}>Plan a route from here</button>
+        <button type="button" className="btn flex-1" onClick={() => onPlanRoute(d.site_a)}>Plan a route from here</button>
       </div>
     </>
   );

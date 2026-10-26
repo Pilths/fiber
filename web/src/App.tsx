@@ -12,6 +12,7 @@ import { Icon } from "@/components/Icon";
 import { LossCard } from "@/components/LossCard";
 import { Facts, Inspector } from "@/components/Inspector";
 import { PortGrid } from "@/components/PortGrid";
+import { RouteForm, RouteSection, RouteSummary, useRoutePlanner } from "@/components/RoutePlanner";
 import { Upload } from "@/components/Upload";
 import { Users } from "@/components/Users";
 import { Approvals, MyReservations, NeedsReview } from "@/components/Reservations";
@@ -24,6 +25,7 @@ type Bell = components["schemas"]["Bell"];
 
 // Selection lives in the URL hash so links can be shared: #span=<site A> - <site B>.
 // The API has no LRD codes on spans yet, so the hash uses the span name, not the AABB-BBCC form of the PRD.
+// Route mode uses #route=<from site id>-<to site id>-<cores>-<km|free_cores>-<option index> (RoutePlanner.tsx).
 const hashSpan = () => {
   const m = /^#span=(.+)$/.exec(location.hash);
   try { return m ? decodeURIComponent(m[1]) : null; } catch { return null; }
@@ -83,6 +85,16 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
   const [drawerCore, setDrawerCore] = useState<number | null>(null);
   const [editSpan, setEditSpan] = useState<{ focus?: "survey" } | null>(null);
   const [editSite, setEditSite] = useState<number | null>(null);
+  const [mode, setModeState] = useState<"span" | "route">(location.hash.startsWith("#route=") ? "route" : "span");
+  const rp = useRoutePlanner(mode === "route" && view === "map", version);
+  // Switching modes clears the other mode's selection and hash.
+  const setMode = useCallback((m: "span" | "route") => {
+    setModeState(m);
+    if (m === "route") {
+      setSpanId(null); setDetail(null); setSelected(new Set()); setDrawerCore(null);
+      if (location.hash.startsWith("#span=")) history.replaceState(null, "", location.pathname);
+    } else if (location.hash.startsWith("#route=")) history.replaceState(null, "", location.pathname);
+  }, []);
 
   const refreshBell = useCallback(() => {
     api.get("/api/bell").then(setBell).catch(() => {});
@@ -95,10 +107,13 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
     else if (location.hash === "#users") history.replaceState(null, "", location.pathname);
   }, []);
   useEffect(() => {
-    const sync = () => location.hash === "#users" && setViewState("users");
+    const sync = () => {
+      if (location.hash === "#users") setViewState("users");
+      if (location.hash.startsWith("#route=")) { setViewState("map"); setMode("route"); }
+    };
     addEventListener("hashchange", sync);
     return () => removeEventListener("hashchange", sync);
-  }, []);
+  }, [setMode]);
   useEffect(refreshBell, [refreshBell, view]);
 
   useEffect(() => {
@@ -123,6 +138,7 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
   useEffect(() => { spanRef.current = spanId; }, [spanId]);
   const open = useCallback((id: number, coreId: number | null = null) => {
     setView("map");
+    setModeState("span");
     setDetail((d) => (d?.id === id ? d : null));
     setSpanId(id);
     setFocusCoreId(coreId);
@@ -163,6 +179,13 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
       api.get("/api/admin/spans/{sid}", { path: { sid: spanId } }).then((x) => setEditSite(end === "a" ? x.site_a_id : x.site_b_id)).catch(() => setError("Could not load the span."));
     },
   } : null;
+  const goToRoute = () => {
+    const h = document.getElementById("route-h");
+    h?.scrollIntoView({ block: "start" });
+    h?.focus({ preventScroll: true });
+  };
+  const planRoute = (site: string) => { setMode("route"); rp.setFrom(site); rp.setTo(""); };
+  const routeName = rp.option && `${rp.option.spans[0].site_a} to ${rp.option.spans[rp.option.spans.length - 1].site_b}`;
   const goToLoss = () => {
     const h = document.getElementById("loss-h");
     h?.scrollIntoView({ block: "start" });
@@ -192,7 +215,7 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
           <section className={`card col-span-8 flex flex-col ${mapMin ? "self-start" : ""}`} aria-labelledby="map-h">
             <div className={`card-h ${mapMin ? "mb-0 border-b-0 pb-0" : ""}`}>
               <h2 id="map-h">Network map</h2>
-              <small className="hint">{detail ? `${spanName(detail)} selected` : "Nothing selected"}</small>
+              <small className="hint">{mode === "route" ? (routeName ? `Route ${routeName} selected` : "No route selected") : detail ? `${spanName(detail)} selected` : "Nothing selected"}</small>
             </div>
             {/* The MapLibre map is TASK-054; this card holds its place. */}
             {!mapMin && (
@@ -202,11 +225,13 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
             )}
           </section>
           <div className="col-span-4 flex min-w-0 flex-col gap-4">
-            <FindCard spans={spans} selectedId={spanId} onSelect={(id) => open(id)} loss={lossList} />
-            <Inspector detail={detail} loading={spanId != null && !detail} onGoToCores={goToCores} loss={loss?.span_id === spanId ? loss : null} onSeeLoss={goToLoss} admin={admin} />
+            <FindCard spans={spans} selectedId={spanId} onSelect={(id) => open(id)} loss={lossList} mode={mode} onMode={setMode} route={<RouteForm rp={rp} />} />
+            <Inspector detail={detail} loading={spanId != null && !detail} onGoToCores={goToCores} loss={loss?.span_id === spanId ? loss : null} onSeeLoss={goToLoss} admin={admin}
+              onPlanRoute={planRoute} route={mode === "route" ? <RouteSummary key={`${rp.idx}-${routeName}`} rp={rp} spans={spans} onGo={goToRoute} /> : undefined} />
           </div>
 
-          {detail && (
+          {mode === "route" && rp.option && <RouteSection rp={rp} spans={spans} onDone={changed} />}
+          {mode === "span" && detail && (
             <div className="col-span-12 space-y-4">
               <section className={`card ${detail.survey_cores != null ? "ccard" : ""}`} aria-labelledby="cores-h">
                 <div className="card-h items-center">

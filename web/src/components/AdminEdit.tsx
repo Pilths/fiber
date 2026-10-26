@@ -98,13 +98,16 @@ export function EditSpanDialog({ spanId, focus, onClose, onSaved }: { spanId: nu
   const survey = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    let stale = false; // a late second load (StrictMode runs effects twice) must not overwrite what the user typed
     api.get("/api/admin/spans/{sid}", { path: { sid: spanId } }).then((x) => {
+      if (stale) return;
       setS(x);
       setF({ distance: x.distance_km == null ? "" : String(Number(x.distance_km)), route: x.route_type ?? "", region: x.region ?? "",
         survey: x.survey_cores == null ? "" : String(x.survey_cores), cable: String(x.cable_size), reason: "" });
       setA({ id: x.site_a_id, name: x.site_a });
       setB({ id: x.site_b_id, name: x.site_b });
-    }).catch((e) => setError(errorText(e, "Could not load the span.")));
+    }).catch((e) => !stale && setError(errorText(e, "Could not load the span.")));
+    return () => { stale = true; };
   }, [spanId]);
   useEffect(() => { if (s && focus === "survey") survey.current?.focus(); }, [s, focus]);
 
@@ -181,10 +184,13 @@ export function EditSiteDialog({ siteId, onClose, onSaved }: { siteId: number; o
   const [tried, setTried] = useState(false);
   const [busy, setBusy] = useState(false);
   useEffect(() => {
+    let stale = false;
     api.get("/api/admin/sites/{sid}", { path: { sid: siteId } }).then((x) => {
+      if (stale) return;
       setS(x);
       setF({ name: x.name, lat: x.lat == null ? "" : String(x.lat), lon: x.lon == null ? "" : String(x.lon), region: x.region ?? "", active: x.active, reason: "" });
-    }).catch((e) => setError(errorText(e, "Could not load the site.")));
+    }).catch((e) => !stale && setError(errorText(e, "Could not load the site.")));
+    return () => { stale = true; };
   }, [siteId]);
 
   const set = (k: "name" | "lat" | "lon" | "region") => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setF((o) => ({ ...o, [k]: e.target.value }));
