@@ -252,9 +252,9 @@ h2{font-size:16px;line-height:24px;font-weight:600;white-space:nowrap}
 .filt .note b{color:var(--ink)}
 
 /* ---------- Inspector ---------- */
-.insp{flex:1 1 0;min-height:400px;display:flex;flex-direction:column;padding-top:0;overflow:auto}
-/* Inspector scrolls inside the card; tabs stick to the top and the action buttons to the bottom. */
-.tabs{position:sticky;top:0;z-index:5;background:#fff;display:flex;gap:4px;border-bottom:1px solid var(--border);margin:0 calc(var(--cp)*-1) 16px;padding:0 calc(var(--cp) - 10px)}
+.insp{flex:1 0 auto;min-height:400px;display:flex;flex-direction:column;padding-top:0}
+/* Inspector grows with its content (nothing is cut); the map card stretches to the same height. Buttons sit at the bottom. */
+.tabs{background:#fff;display:flex;gap:4px;border-bottom:1px solid var(--border);margin:0 calc(var(--cp)*-1) 16px;padding:0 calc(var(--cp) - 10px)}
 .tab{position:relative;display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 10px;border:0;border-bottom:2px solid transparent;margin-bottom:-1px;background:none;font-weight:600;cursor:pointer;white-space:nowrap}
 .tab[aria-selected=true]{border-bottom-color:var(--ink)}
 .tab[aria-disabled=true]{color:var(--muted);font-weight:500;cursor:not-allowed}
@@ -291,27 +291,13 @@ h2{font-size:16px;line-height:24px;font-weight:600;white-space:nowrap}
 .brk dd{font-weight:700;color:var(--ink);display:flex;align-items:center;gap:8px;min-width:38px;order:-1}
 .k{width:12px;height:12px;border-radius:3px;flex:none;display:inline-block}
 .k-ns{border:1px dashed var(--line)}
-.unsurv{margin-top:10px;font-size:13px;color:var(--muted)}
-.unsurv b{color:var(--ink);font-weight:600}
-.strip{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:3px;margin-top:8px}
-.mc{height:22px;border-radius:3px;border:1px solid var(--line);background:#fff;display:grid;place-items:center}
-.mc .ic{width:10px;height:10px}
-.mc.av .ic{color:var(--muted)}
-.mc.rs{background:repeating-linear-gradient(45deg,var(--res) 0 4px,#3f444c 4px 5px);border-color:var(--res);color:#fff}
-.mc.iu{background:var(--use);border-color:var(--use);color:#fff}
-.mc.rq{background:var(--amber-bg);border:1px dashed var(--amber);color:var(--amber)}
-.mc.fl{background:repeating-linear-gradient(135deg,var(--red-bg) 0 4px,var(--red-bd) 4px 5.5px);border-color:var(--red);color:var(--red)}
-.skey{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:8px;font-size:12px;color:var(--muted)}
-.skey span{display:inline-flex;align-items:center;gap:6px}
-.skey .mc{width:16px;height:16px}
-.skey .mc .ic{width:9px;height:9px}
 .held li{display:grid;grid-template-columns:118px 1fr auto;align-items:center;gap:8px;min-height:40px;border-bottom:1px solid var(--rule);font-size:13px}
 .held li:last-child{border-bottom:0}
 .st{display:inline-flex;align-items:center;gap:6px;font-weight:600;white-space:nowrap}
 .t-rs{color:var(--ink)}.t-rq{color:var(--amber)}.t-co{color:var(--use)}.t-iu{color:var(--use)}
 .held .who{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .held .meta{color:var(--muted);white-space:nowrap}
-.acts{position:sticky;bottom:calc(var(--cp)*-1);z-index:5;display:flex;flex-wrap:wrap;gap:8px;margin:auto calc(var(--cp)*-1) calc(var(--cp)*-1);padding:16px var(--cp) var(--cp);background:#fff;border-top:1px solid var(--border)}
+.acts{display:flex;flex-wrap:wrap;gap:8px;margin:auto calc(var(--cp)*-1) calc(var(--cp)*-1);padding:16px var(--cp) var(--cp);background:#fff;border-top:1px solid var(--border)}
 .acts .btn{flex:1 1 auto}
 .ikpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));margin-top:14px;border:1px solid var(--border);border-radius:var(--r)}
 .ikpis div{padding:10px 12px;border-left:1px solid var(--border);min-width:0}
@@ -419,9 +405,120 @@ tfoot td{border-bottom:0;border-top:1px solid var(--ink);font-weight:700}
 .rbox .msg{margin-top:8px;font-size:13px;font-weight:600}
 .rbox .msg:empty{display:none}
 .dempty{padding:20px;text-align:center;border:1px dashed var(--line);border-radius:var(--r);color:var(--muted)}
+.rmore{margin-top:10px}
+
+/* ---------- Dev strip role switch + admin-only nav ---------- */
+.dev .sep{margin-left:auto}
+body[data-role=planner] .admin{display:none}
+
+/* ---------- Collapsed map: map card becomes a 220px strip; the rail matches its height ---------- */
+.work.min{min-height:0}
+.work.min .mapbox{flex:none;height:220px;min-height:0}
+.work.min .stage{width:100cqw;height:90cqw}
+.work.min .mleg,.work.min .mfoot,.work.min .insp,.work.min .filt,.work.min .rlab{display:none}
+.work.min .g-rail{contain:size}
+.work.min .g-rail>.card:first-child{flex:1;min-height:0;display:flex;flex-direction:column}
+.work.min #p-span{flex:1;min-height:0;grid-template-rows:auto minmax(0,1fr)}
+.work.min #p-span>div:last-child{display:flex;flex-direction:column;min-height:0}
+.work.min .slist{flex:1;max-height:none}
+
+/* ---------- Cores section (span state). CSS, markup and behaviour from v4 "Surveyed cores" and "Held on this span". ---------- */
+.csec{display:grid;gap:var(--gut)}
+.csec .ch{align-items:center}
+.ctl{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 20px;min-width:0}
+.ctl h2{font-size:24px;line-height:30px;font-weight:700;letter-spacing:-.01em}
+.ctl h2:focus{outline:none}
+.ctl h2:focus-visible{outline:3px solid var(--blue)}
+.ctl .facts{margin-top:0}
+.mtog{gap:8px;flex:none}
+.mtog .chev{transition:transform .15s}
+.mtog[data-min=true] .chev{transform:rotate(180deg)}
+.eqs{font-size:13px;color:var(--muted);margin:-6px 0 14px}
+.eqs b{color:var(--ink);font-weight:700}
+.dot{width:8px;height:8px;border-radius:50%;background:currentColor;flex:none;display:inline-block}
+.mono{font-family:var(--mono);font-size:13px}
+.legend{display:flex;flex-wrap:wrap;gap:8px 20px;font-size:13px;color:var(--muted);margin-bottom:4px}
+.legend li{display:flex;align-items:center;gap:8px}
+.legend b{font-weight:700;color:var(--ink)}
+.legend .sw{width:22px;height:20px;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--line);border-radius:4px;padding:0}
+.tube{padding:14px 0 16px;border-bottom:1px solid var(--rule)}
+.tube-l{font-size:13px;font-weight:400;color:var(--muted);margin-bottom:8px}
+.tube-l b{font-weight:600;color:var(--ink)}
+.cells{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:4px}
+.core{position:relative;height:60px;padding:7px 8px 6px 8px;border:1px solid var(--line);border-radius:var(--r);background:#fff;display:grid;grid-template-columns:1fr auto;grid-template-rows:1fr auto;text-align:left;cursor:default}
+.core .n{font-size:14px;font-weight:600;line-height:16px;align-self:start}
+.core .ic{justify-self:end}
+.core .w{grid-column:1/-1;font-size:11px;font-weight:500;line-height:13px;white-space:nowrap;letter-spacing:-.03em;color:var(--muted)}
+.s-av{cursor:pointer}
+.s-av:hover{border-color:var(--ink)}
+.s-av .ic{color:var(--muted)}
+.s-av[aria-pressed=true]{background:var(--blue);border:2px solid #0f3a78;padding:6px 7px 5px 7px;color:#fff}
+.s-av[aria-pressed=true] .w,.s-av[aria-pressed=true] .ic{color:#fff}
+.s-av[aria-pressed=true] .ic-av,.s-av[aria-pressed=true] .w-av,.s-av[aria-pressed=false] .ic-ch,.s-av[aria-pressed=false] .w-ch{display:none}
+.s-rs{background:repeating-linear-gradient(45deg,var(--res) 0 5px,#3f444c 5px 6px);border-color:var(--res);color:#fff}
+.s-rs .w{color:#fff}
+.s-iu{background:var(--use);border-color:var(--use);color:#fff}
+.s-iu .w{color:#fff}
+.s-rq{background:repeating-linear-gradient(135deg,var(--amber-bg) 0 5px,#f3d9b8 5px 6.5px);border:1px dashed var(--amber);color:var(--amber)}
+.s-fl{background:repeating-linear-gradient(135deg,var(--red-bg) 0 5px,var(--red-bd) 5px 6.5px);border:1px solid var(--red);color:var(--red)}
+.s-rq .n,.s-rq .w{background:var(--amber-bg);color:var(--amber)}
+.s-fl .n,.s-fl .w{background:var(--red-bg);color:var(--red)}
+.s-rq .n,.s-rq .w,.s-fl .n,.s-fl .w{justify-self:start;border-radius:2px;padding:0;margin-left:0}
+.s-rq .w{letter-spacing:-.05em}
+.core:focus-visible{outline:2px solid var(--ink);outline-offset:2px;z-index:1}
+.sw.s-av,.sw.s-rq,.sw.s-rs,.sw.s-iu,.sw.s-fl,.sw.s-ch{padding:0;height:20px}
+.sw.s-ch{background:var(--blue);border:2px solid #0f3a78;color:#fff}
+.sw.s-rs,.sw.s-iu{color:#fff}
+.unsurv{margin-top:14px;font-size:13px;color:var(--muted)}
+.unsurv b{color:var(--ink);font-weight:600}
+/* Chosen bar: footer band of the cores card, sticky to the viewport bottom while the card is in view.
+   overflow:clip (not hidden) keeps the band's corners inside the card without making the card a scroll container. */
+.ccard{padding-bottom:0;overflow:clip}
+.cfoot{position:sticky;bottom:0;z-index:6;margin:16px calc(var(--cp)*-1) 0;padding:14px var(--cp) 16px;border-top:1px solid var(--border);background:#f7f8fa}
+.cfoot[data-has=true]{background:var(--blue-bg);border-top-color:var(--blue-bd)}
+.cr1{display:flex;align-items:center;gap:8px 12px;flex-wrap:wrap;min-height:30px}
+.cnow{font-size:14px;font-weight:700}
+.cnow-m{font-size:13px;color:var(--muted)}
+.cchips{display:flex;flex-wrap:wrap;gap:4px}
+.cchip{display:inline-flex;align-items:center;height:24px;padding:0 10px;border-radius:4px;background:var(--blue);color:#fff;font-size:12px;font-weight:600}
+.cr1 .btn{margin-left:auto}
+.cr2{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px;margin-top:12px}
+.cfoot .f label{font-size:12px;font-weight:500;color:var(--muted)}
+.f-c{flex:0 1 440px;min-width:240px}
+.f-d{flex:0 0 150px}
+.cfoot .btn-p{min-width:140px}
+.cnote{margin-top:10px;font-size:13px;color:var(--muted)}
+.cnote b{color:var(--ink);font-weight:700}
+.err{color:var(--red);font-weight:700}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px}
+.chip{height:32px;padding:0 12px;border:1px solid var(--line);border-radius:var(--r);background:#fff;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:8px}
+.chip b{font-weight:700}
+.chip[aria-pressed=true]{background:var(--ink);border-color:var(--ink);color:#fff}
+.chip .dot{color:var(--use)}
+.chip[data-f=rs] .dot{color:var(--res)}.chip[data-f=rq] .dot{color:var(--amber)}.chip[data-f=fl] .dot{color:var(--red)}
+.chip[aria-pressed=true] .dot{box-shadow:0 0 0 2px #fff}
+.heldt{table-layout:fixed;margin-top:0}
+.heldt th{padding:8px 16px 8px 0}
+.heldt td{height:48px;padding:0 16px 0 0}
+.heldt tbody tr:last-child td{border-bottom:0}
+.heldt th.r,.heldt td.r{text-align:right;padding-right:0}
+.heldt td.c,.heldt td.r{font-weight:600}
+.heldt td.d{white-space:normal;line-height:1.35;padding-top:8px;padding-bottom:8px}
+.heldt .st{gap:8px;vertical-align:middle}
+.t-fl{color:var(--red)}
+.tr-fl td{background:var(--red-bg)}
+.tr-fl td:first-child{box-shadow:inset 3px 0 0 var(--red);padding-left:12px}
+.tr-rq td{background:var(--amber-bg)}
+.nil{color:var(--muted);font-weight:400}
+tr.sub td{background:#fafbfc}
+tr.sub td.c{padding-left:24px}
+.exp{display:inline-flex;align-items:center;gap:6px;border:0;background:none;font-weight:600;cursor:pointer;padding:4px 0}
+.exp .chev{width:14px;height:14px;stroke-width:1.6}
+.exp[aria-expanded=true] .chev{transform:rotate(90deg)}
+.tag{display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:4px;font-size:11px;font-weight:600;white-space:nowrap;margin-right:10px;border:1px solid var(--amber-bd);background:var(--amber-bg);color:var(--amber)}
 </style>
 </head>
-<body>
+<body data-role="admin">
 <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
   <symbol id="i-av" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5" fill="none" stroke="currentColor" stroke-width="1.6"></circle></symbol>
   <symbol id="i-ch" viewBox="0 0 16 16"><path d="M3 8.5l3.2 3.2L13 4.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
@@ -443,16 +540,19 @@ tfoot td{border-bottom:0;border-top:1px solid var(--ink);font-weight:700}
   <button type="button" data-state="3">Route selected</button>
   <button type="button" data-state="4">Route with short span</button>
   <button type="button" data-state="5">Empty route</button>
+  <button type="button" data-state="6">Span, chosen bar pinned</button>
+  <span class="sep"></span><b>View as:</b>
+  <button type="button" data-role="planner" aria-pressed="false">Planner</button>
+  <button type="button" data-role="admin" aria-pressed="true">Admin</button>
 </div>
 
 <header class="top">
   <div class="brand"><svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><circle cx="15" cy="15" r="14" fill="#141414"></circle><circle cx="22.0" cy="15.0" r="2" fill="none" stroke="#fff" stroke-width="1.2"></circle><circle cx="18.5" cy="21.1" r="2" fill="#fff" stroke="#fff" stroke-width="1.2"></circle><circle cx="11.5" cy="21.1" r="2" fill="none" stroke="#fff" stroke-width="1.2"></circle><circle cx="8.0" cy="15.0" r="2" fill="none" stroke="#fff" stroke-width="1.2"></circle><circle cx="11.5" cy="8.9" r="2" fill="none" stroke="#fff" stroke-width="1.2"></circle><circle cx="18.5" cy="8.9" r="2" fill="none" stroke="#fff" stroke-width="1.2"></circle></svg><div><b>Fiber</b><span>Malaysia network</span></div></div>
   <nav aria-label="Main"><ul class="nav">
-<li><a href="../v4/index.html"><svg class="ni" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8h12M2 4h12M2 12h12"></path></svg><span>Spans</span></a></li>
-<li><a href="../route/index.html"><svg class="ni" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 13c0-6 10-2 10-8"></path></svg><span>Routes</span></a></li>
 <li><a href="#" aria-current="page"><svg class="ni" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 4l4-1.5 4 1.5 4-1.5v9.5l-4 1.5-4-1.5-4 1.5zM6 2.5v9.5M10 4v9.5"></path></svg><span>Map</span></a></li>
-<li><a href="#"><svg class="ni" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3 3 7-7"></path></svg><span>Approvals</span><span class="badge">2 waiting</span></a></li>
-<li><a href="#"><svg class="ni" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 11V3M5 6l3-3 3 3M3 13h10"></path></svg><span>Upload</span></a></li>
+<li><a href="#"><svg class="ni" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5h8v11l-4-3-4 3z"></path></svg><span>My reservations</span><span class="badge">1<span class="vh"> needs review</span></span></a></li>
+<li class="admin"><a href="#"><svg class="ni" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3 3 7-7"></path></svg><span>Approvals</span><span class="badge">2 waiting</span></a></li>
+<li class="admin"><a href="#"><svg class="ni" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 11V3M5 6l3-3 3 3M3 13h10"></path></svg><span>Upload</span></a></li>
   </ul></nav>
   <form class="search" role="search" onsubmit="return false" id="gsearch">
     <svg class="ni" viewBox="0 0 16 16" aria-hidden="true"><path d="M7 12A5 5 0 1 0 7 2a5 5 0 0 0 0 10zM14 14l-3.5-3.5"></path></svg>
@@ -461,9 +561,9 @@ tfoot td{border-bottom:0;border-top:1px solid var(--ink);font-weight:700}
     <div class="drop" id="drop" hidden></div>
   </form>
   <div class="acct" id="acct">
-    <button type="button" class="abtn" id="abtn" aria-haspopup="menu" aria-expanded="false" aria-controls="amenu"><span class="av" aria-hidden="true">P1</span><span><b>planner1</b><small>Planner</small></span><svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4"></path></svg></button>
+    <button type="button" class="abtn" id="abtn" aria-haspopup="menu" aria-expanded="false" aria-controls="amenu"><span class="av" aria-hidden="true" id="a-av">A1</span><span><b id="a-name">admin1</b><small id="a-role">Admin</small></span><svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4"></path></svg></button>
     <div class="amenu" id="amenu" role="menu" aria-labelledby="abtn" hidden>
-      <p role="presentation"><b>planner1</b>, Planner</p>
+      <p role="presentation" id="a-menu"><b>admin1</b>, Admin</p>
       <button type="button" role="menuitem" id="signout">Sign out</button>
     </div>
   </div>
@@ -472,7 +572,7 @@ tfoot td{border-bottom:0;border-top:1px solid var(--ink);font-weight:700}
 <main class="content">
 <h1 class="vh">Map</h1>
 <div class="grid">
-<div class="work">
+<div class="work" id="work">
   <!-- MAP: the picture that follows the selection -->
   <section class="card g-map" aria-labelledby="map-h">
     <div class="ch"><h2 id="map-h">Network map</h2><small id="map-sub">Dark fibre layer, 12 spans, 12 sites</small></div>
@@ -596,6 +696,9 @@ tfoot td{border-bottom:0;border-top:1px solid var(--ink);font-weight:700}
     </aside>
   </div>
 </section>
+
+<!-- CORES: only in the span state. Built by script from the selected span. -->
+<section class="g-drawer csec" id="cores" aria-labelledby="cores-h" hidden></section>
 </div>
 </main>
 <p class="vh" id="live" aria-live="polite"></p>
@@ -619,9 +722,11 @@ tfoot td{border-bottom:0;border-top:1px solid var(--ink);font-weight:700}
  var DETAIL={0:{cells:function(n){return n<=2?'rs':n===3?'rq':(n>=13&&n<=18)?'iu':n===30?'fl':'av';},co:4,
   held:[['rs','Reserved','DWDM(R)','Cores 1, 2'],['rq','Requested','[Customer A]','Core 3'],['co','Count only','[Customer B]','4 cores']]}};
  var TYPE={dc:'data centre',st:'site'};
- var W=['av','Available'],WORD={av:'Available',rs:'Reserved',rq:'Requested',iu:'In use',fl:'Faulty'},IC={av:'i-av',rs:'i-rs',rq:'i-rq',iu:'i-iu',fl:'i-fl',co:'i-co'};
+ var WORD={av:'Available',rs:'Reserved',rq:'Requested',iu:'In use',fl:'Faulty',co:'Count only'},IC={av:'i-av',rs:'i-rs',rq:'i-rq',iu:'i-iu',fl:'i-fl',co:'i-co'};
  var $=function(id){return document.getElementById(id);};
- var S={mode:'span',sel:null,q:'',region:'all',type:'all',from:'',to:'',opt:'km',need:2,paths:[],pi:0,si:0,spanView:false,err:'',empty:'',attn:false,z:1,tx:0,ty:0,layer:true,drawer:true};
+ var S={mode:'span',sel:null,q:'',region:'all',type:'all',from:'',to:'',opt:'km',need:2,paths:[],pi:0,si:0,spanView:false,err:'',empty:'',attn:false,z:1,tx:0,ty:0,layer:true,drawer:true,mapMin:false,rspAll:false};
+ var RM=matchMedia('(prefers-reduced-motion: reduce)');
+ function goTo(el){el.scrollIntoView({behavior:RM.matches?'auto':'smooth',block:'start'});}
 
  function health(e){return e.sv==null?'ns':e.free>=10?'g':e.free>=1?'a':'r';}
  var HW={g:'Healthy',a:'Low',r:'Full',ns:'Not surveyed'},HP={g:'p-green',a:'p-amber',r:'p-red',ns:'p-ns'},HI={g:'i-ch',a:'i-lo',r:'i-fl',ns:'i-ns'},HV={g:'v-green',a:'v-amber',r:'v-red'};
@@ -703,12 +808,15 @@ tfoot td{border-bottom:0;border-top:1px solid var(--ink);font-weight:700}
   if(!mapItems.some(function(b){return b.tabIndex===0&&!b.classList.contains('off');})){mapItems.forEach(function(b){b.tabIndex=-1;});(mapItems.filter(function(b){return !b.classList.contains('off');})[0]||mapItems[0]).tabIndex=0;}
   $('map-sub').textContent=c?'Route '+S.from+' to '+S.to+' highlighted':S.mode==='span'&&S.sel!=null?SPANS[S.sel].id+' highlighted':'Dark fibre layer, 12 spans, 12 sites';
  }
- function applyZoom(){var st=$('stage');st.style.transform=S.z===1?'':'translate('+(S.tx*100).toFixed(2)+'%,'+(S.ty*100).toFixed(2)+'%) scale('+S.z+')';st.style.setProperty('--iz',(1/S.z).toFixed(4));}
+ function applyZoom(){var st=$('stage');st.style.transform=S.z===1&&!S.tx&&!S.ty?'':'translate('+(S.tx*100).toFixed(2)+'%,'+(S.ty*100).toFixed(2)+'%) scale('+S.z+')';st.style.setProperty('--iz',(1/S.z).toFixed(4));}
  function zoomBy(f){var cx=(0.5-S.tx)/S.z,cy=(0.5-S.ty)/S.z;S.z=Math.max(1,Math.min(3,S.z*f));if(S.z===1){S.tx=S.ty=0;}else{S.tx=0.5-cx*S.z;S.ty=0.5-cy*S.z;}applyZoom();}
  function fit(){
   var c=cur(),ks=c?c.nodes:(S.mode==='span'&&S.sel!=null)?[SPANS[S.sel].a,SPANS[S.sel].b]:Object.keys(SITES);
   var xs=ks.map(function(k){return SITES[k].x/800;}),ys=ks.map(function(k){return SITES[k].y/720;});
   var x0=Math.min.apply(0,xs),x1=Math.max.apply(0,xs),y0=Math.min.apply(0,ys),y1=Math.max.apply(0,ys);
+  if(isMin()){ // strip: full-width map at scale 1, slid up or down so the selection sits mid-strip
+   var h=$('stage').offsetHeight,H=$('mapbox').clientHeight;S.z=1;S.tx=0;
+   S.ty=Math.max((H-h)/h,Math.min(0,(H/2-(y0+y1)/2*h)/h));applyZoom();return;}
   S.z=Math.max(1,Math.min(2.5,0.6/Math.max(x1-x0,y1-y0,0.1)));
   if(ks.length===12)S.z=1;
   S.tx=S.z===1?0:0.5-(x0+x1)/2*S.z;S.ty=S.z===1?0:0.5-(y0+y1)/2*S.z;applyZoom();
@@ -736,14 +844,23 @@ tfoot td{border-bottom:0;border-top:1px solid var(--ink);font-weight:700}
 
  // ---------- Inspector ----------
  function attention(){return SPANS.filter(function(e){var h=health(e);return h==='a'||h==='r';}).sort(function(a,b){return a.free-b.free;});}
- function cellsOf(e){var d=DETAIL[e.i],out=[];for(var n=1;n<=e.sv;n++)out.push(d?d.cells(n):(n<=e.sv-e.free?'iu':'av'));return out;}
+ // One entry per surveyed core: n, status k, and who holds it (for the cell's aria-label).
+ function cellList(e){var d=DETAIL[e.i],out=[];
+  for(var n=1;n<=e.sv;n++){var k=d?d.cells(n):(n<=e.sv-e.free?'iu':'av'),who='';
+   if(k==='iu')who='CKT-'+(d?998+n:2000+e.i*100+n);
+   if(d&&k==='rs')who='DWDM(R)';if(d&&k==='rq')who='[Customer A], waiting for approval';
+   out.push({n:n,k:k,who:who});}
+  return out;}
+ function cellsOf(e){return cellList(e).map(function(c){return c.k;});}
  function spanHTML(e,back){
   var h=health(e),d=DETAIL[e.i],x='';
   if(back)x+='<div class="back"><button type="button" class="lnk" data-act="back">Back to route summary</button></div>';
   x+='<div class="sec"><div class="ihead"><h3 class="ih">'+e.id+'</h3>'+(h==='ns'?'<span class="pill p-ns">'+ic('i-ns')+'Not surveyed</span>':'')+'</div>';
   x+='<p class="facts"><span><b>'+e.r+'</b></span><span><b>'+e.type+'</b></span><span><b>'+km(e.km)+'</b> km</span>'+(e.group?'<span><b>'+e.group+'</b></span>':'')+'</p>';
+  var acts=back?'<div class="acts"><button type="button" class="btn" data-act="drawer">Go to ribbon, table and Reserve</button></div>'
+   :'<div class="acts"><button type="button" class="btn btn-p" data-act="cores">Go to cores</button>'+(h==='ns'?'':'<button type="button" class="btn" data-act="plan" data-site="'+e.a+'">Plan a route from here</button>')+'</div>';
   if(h==='ns'){x+='<p class="ms" style="margin-top:12px">No survey count yet: this span shows no core cells, <b>cannot be booked</b> and is left out of routes. An admin enters a count, with a reason. Cable size 144 cores (info only).</p></div>';
-   return x+'<div class="acts"><a class="btn" href="../v4/index.html">Open span</a></div>';}
+   return x+acts;}
   var co=d?d.co:0,cells=cellsOf(e),cnt={av:0,rs:0,rq:0,iu:0,fl:0};cells.forEach(function(c){cnt[c]++;});
   var heldW=cnt.rs+cnt.rq+cnt.iu;
   x+='<div style="margin-top:14px"><p class="ml">Free to reserve</p><p class="mv '+HV[h]+'">'+e.free+'<span class="pill '+HP[h]+'">'+ic(HI[h])+HW[h]+'</span></p><p class="ms">'+cnt.av+' Available'+(co?' minus '+co+' held without cores':'')+', of '+e.sv+' surveyed</p></div>';
@@ -751,15 +868,10 @@ tfoot td{border-bottom:0;border-top:1px solid var(--ink);font-weight:700}
    '<span class="k-free" style="flex:'+e.free+'"></span>'+(co?'<span class="k-hold" style="flex:'+co+'"></span>':'')+(heldW?'<span class="k-cores" style="flex:'+heldW+'"></span>':'')+(cnt.fl?'<span class="k-fault" style="flex:'+cnt.fl+'"></span>':'')+'</div>';
   x+='<dl class="brk">'+[['k-free',e.free,'free'],['k-hold',co,'held without cores'],['k-cores',heldW,'held with cores'],['k-fault',cnt.fl,'faulty']].map(function(r){
    return '<div><dt>'+r[2]+'</dt><dd><i class="k '+r[0]+'"></i>'+r[1]+'</dd></div>';}).join('')+'</dl>';
-  x+='<p class="unsurv"><b>'+(144-e.sv)+' not surveyed</b> (cable 144, info only). Not drawn, cannot be booked.</p></div>';
-  x+='<div class="sec"><p class="ml">'+e.sv+' surveyed cores, overview</p><div class="strip" role="img" aria-label="Core overview: '+cnt.av+' Available, '+cnt.rq+' Requested, '+cnt.rs+' Reserved, '+cnt.iu+' In use, '+cnt.fl+' Faulty">'+
-   cells.map(function(c){return '<span class="mc '+c+'">'+ic(IC[c])+'</span>';}).join('')+'</div>'+
-   '<p class="skey" aria-hidden="true">'+['av','rq','rs','iu','fl'].filter(function(c){return cnt[c];}).map(function(c){return '<span><i class="mc '+c+'">'+ic(IC[c])+'</i>'+WORD[c]+' '+cnt[c]+'</span>';}).join('')+'</p></div>';
-  x+='<div class="sec"><p class="ml">Held on this span</p>';
+  x+='</div><div class="sec"><p class="ml">Held on this span</p>';
   if(d)x+='<ul class="held">'+d.held.map(function(r){return '<li><span class="st t-'+r[0]+'">'+ic(IC[r[0]])+r[1]+'</span><span class="who">'+r[2]+'</span><span class="meta">'+r[3]+'</span></li>';}).join('')+'</ul>';
   else x+='<p class="ms">'+heldW+' cores in use. Customers and ports are on the span page.</p>';
-  x+='</div><div class="acts"><a class="btn btn-p" href="../v4/index.html">Open span and reserve</a><button type="button" class="btn" data-act="plan" data-site="'+e.a+'">Plan a route from here</button></div>';
-  return x;
+  return x+'</div>'+acts;
  }
  function renderInsp(){
   var b=$('ibody'),c=cur(),x='';
@@ -770,8 +882,9 @@ tfoot td{border-bottom:0;border-top:1px solid var(--ink);font-weight:700}
      '<div class="ikpis"><div><p class="ml">Spans</p><p class="v">'+c.edges.length+'</p></div><div><p class="ml">Distance</p><p class="v">'+km(c.km)+'<small>km</small></p></div><div><p class="ml">Lowest free</p><p class="v '+HV[h]+'">'+c.free+'<span class="pill '+HP[h]+'">'+ic(h==='r'?'i-fl':HI[h])+(h==='r'?'Short':HW[h])+'</span></p></div></div>'+
      '<p class="ms" style="margin-top:10px">Bottleneck <b>'+bn.id+'</b>, '+bn.free+' free of '+bn.sv+' surveyed.</p>'+
      (short.length?'<p class="why">'+ic('i-fl')+'<span><b>Not enough free cores</b> on '+short.map(function(e){return e.id+' ('+e.free+' free)';}).join(', ')+'. Need '+S.need+'. Pick another option or lower the cores needed.</span></p>':'')+'</div>'+
-     '<div class="sec"><p class="ml">Spans on this route</p><ol class="rsp">'+c.edges.map(function(e,i){var sh=e.free<S.need;
+     '<div class="sec"><p class="ml">Spans on this route</p><ol class="rsp">'+c.edges.slice(0,S.rspAll||S.si>2?99:3).map(function(e,i){var sh=e.free<S.need;
       return '<li><button type="button" data-ri="'+i+'"'+(i===S.si?' aria-current="true"':'')+' aria-label="'+spanLabel(e)+(sh?', short':'')+(i===c.lo?', bottleneck':'')+'"><span class="i">'+(i+1)+'</span><span><span class="nm">'+e.id+'</span><span class="sub">'+e.type+', '+km(e.km)+' km</span></span><span class="tg">'+(sh?'<span class="stag">'+ic('i-fl')+'short</span>':i===c.lo?'<span class="btag">'+ic('i-bn')+'bottleneck</span>':'')+badge(e)+'</span></button></li>';}).join('')+'</ol>'+
+     (c.edges.length>3&&!(S.rspAll||S.si>2)?'<p class="rmore"><button type="button" class="lnk" data-act="rmore">Show '+(c.edges.length-3)+' more span'+(c.edges.length>4?'s':'')+'</button></p>':'')+
      '</div><div class="acts"><button type="button" class="btn" data-act="drawer">Go to ribbon, table and Reserve</button></div>';}
    else if(S.err){x='<div class="calm"><b>Pick two different sites</b>From and To are the same. Change one of them in Find.</div>';}
    else if(S.empty){x='<div class="calm"><b>No route connects these sites</b>'+esc(S.empty)+'</div>';}
@@ -818,7 +931,7 @@ tfoot td{border-bottom:0;border-top:1px solid var(--ink);font-weight:700}
   $('tot').innerHTML='<span><b>'+c.edges.length+'</b>spans</span><span><b>'+km(c.km)+'</b>km</span><span><b>'+c.free+'</b>lowest free</span>';
   if(S.drawer)drawDiagram(c);
   $('tb').innerHTML=c.edges.map(function(e,i){var sh=e.free<S.need;
-   return '<tr class="'+(i===S.si?'sel':'')+(sh?' short-t':'')+'" data-i="'+i+'"><td>'+(i+1)+'</td><td><a class="sn" href="../v4/index.html">'+e.id+'</a></td><td>'+e.type+'</td><td>'+c.nodes[i]+' to '+c.nodes[i+1]+'</td><td class="n">'+km(e.km)+'</td><td class="n">'+e.sv+'</td>'+
+   return '<tr class="'+(i===S.si?'sel':'')+(sh?' short-t':'')+'" data-i="'+i+'"><td>'+(i+1)+'</td><td><a class="sn" href="#span='+e.a+'-'+e.b+'">'+e.id+'</a></td><td>'+e.type+'</td><td>'+c.nodes[i]+' to '+c.nodes[i+1]+'</td><td class="n">'+km(e.km)+'</td><td class="n">'+e.sv+'</td>'+
     '<td class="n"><span class="fc">'+(sh?'<span class="stag">'+ic('i-fl')+'short</span>':'')+(i===c.lo&&!sh?'<span class="btag">'+ic('i-bn')+'bottleneck</span>':'')+'<b>'+e.free+'</b></span></td></tr>';}).join('');
   $('tf').innerHTML='<tr><td colspan="4">Total, '+c.edges.length+' spans</td><td class="n">'+km(c.km)+'</td><td class="n">'+c.edges.reduce(function(s,e){return s+e.sv;},0)+'</td><td class="n">lowest free '+c.free+'</td></tr>';
   var short=c.edges.filter(function(e){return e.free<S.need;}),tot=S.need*c.edges.length;
@@ -828,6 +941,84 @@ tfoot td{border-bottom:0;border-top:1px solid var(--ink);font-weight:700}
   $('msg').textContent='';
  }
 
+ // ---------- Cores section (span state): v4 grid, chosen bar and held table ----------
+ var CO={built:null,max:0,f:'all'};
+ function isMin(){return $('work').classList.contains('min');}
+ function coreBtn(c){
+  if(c.k==='av')return '<button type="button" class="core s-av" data-n="'+c.n+'" aria-pressed="false" tabindex="-1" aria-label="Core '+c.n+', Available"><span class="n">'+c.n+'</span>'+ic('i-av','ic-av')+ic('i-ch','ic-ch')+'<span class="w"><span class="w-av">Available</span><span class="w-ch">Chosen</span></span></button>';
+  return '<button type="button" class="core s-'+c.k+'" data-n="'+c.n+'" aria-disabled="true" tabindex="-1" aria-label="Core '+c.n+', '+WORD[c.k]+(c.who?', '+c.who:'')+'"><span class="n">'+c.n+'</span>'+ic(IC[c.k])+'<span class="w">'+WORD[c.k]+'</span></button>';}
+ function heldTable(e,cells,co){
+  var nil='<span class="nil" aria-label="none">–</span>',rows='',d=DETAIL[e.i];
+  function tr(k,cls,c,who,det,ckt,pl,age,dc){return '<tr data-k="'+k+'"'+(cls?' class="'+cls+'"':'')+(cls==='sub'?' hidden':'')+'><td class="c">'+c+'</td><td><span class="st t-'+k+'">'+ic(IC[k])+WORD[k]+'</span></td><td>'+(who||nil)+'</td><td'+(dc?' class="d"':'')+'>'+det+'</td><td'+(ckt?' class="mono"':'')+'>'+(ckt||nil)+'</td><td>'+(pl||nil)+'</td><td class="r">'+age+'</td></tr>';}
+  var iu=cells.filter(function(c){return c.k==='iu';}),age=d?412:300;
+  if(d)rows+=tr('rs','','1, 2','DWDM(R)','AABB Tray 1 P1 / P2 to BBCC MOD B P23 / P24','','2026-11-21','<span class="tag">Needs review</span>98',1)+
+   tr('rq','tr-rq','3','[Customer A]','planner2, waiting for approval','','2026-12-01','2');
+  if(iu.length>1){var a=iu[0].n,b=iu[iu.length-1].n;
+   rows+=tr('iu','grp','<button type="button" class="exp" aria-expanded="false"><svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 4l4 4-4 4"></path></svg>'+a+' to '+b+'<span class="vh"> show '+iu.length+' cores</span></button>','',iu.length+' cores, one circuit per core',iu[0].who+' to '+iu[iu.length-1].who,'',age);
+   iu.forEach(function(c){rows+=tr('iu','sub',c.n,'','One circuit',c.who,'',age);});}
+  else if(iu.length)rows+=tr('iu','',iu[0].n,'','One circuit',iu[0].who,'',age);
+  if(d)rows+=tr('fl','tr-fl','30','','Not bookable','','','75')+tr('co','','4, not assigned','[Customer B]','From Excel import, no cell, admin assigns later','','2026-09-02','54',1);
+  return rows;}
+ function buildCores(e){
+  var sec=$('cores'),h=health(e),d=DETAIL[e.i],co=d?d.co:0;CO.f='all';
+  var head='<div class="ch"><div class="ctl"><h2 id="cores-h" tabindex="-1">Cores of '+e.id+'</h2><p class="facts"><span><b>'+e.r+'</b></span><span><b>'+e.type+'</b></span><span><b>'+km(e.km)+'</b> km</span>'+(e.group?'<span><b>'+e.group+'</b></span>':'')+
+   (h==='ns'?'<span>Not surveyed, cable <b>144</b> cores (info only)</span>':'<span><b>'+e.sv+'</b> surveyed of 144</span>')+'</p></div>'+
+   '<button type="button" class="btn mtog" id="mtog" aria-controls="mapbox"><span>Collapse map</span><svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 10l4-4 4 4"></path></svg></button></div>';
+  if(h==='ns'){sec.innerHTML='<div class="card">'+head+'<p class="calm"><b>Not surveyed: no core cells to show</b>'+e.id+' has no survey count yet, so it cannot be booked and is left out of routes. An admin enters a count from the onsite survey, with a reason.</p></div>';CO.max=0;return;}
+  var cells=cellList(e),cnt={av:0,rs:0,rq:0,iu:0,fl:0};cells.forEach(function(c){cnt[c.k]++;});
+  CO.max=e.free;
+  var tubes='';for(var t=0;t*12<e.sv;t++){var part=cells.slice(t*12,t*12+12),na=part.filter(function(c){return c.k==='av';}).length;
+   tubes+='<div class="tube"><h3 class="tube-l">Tube '+(t+1)+', cores '+part[0].n+' to '+part[part.length-1].n+', <b>'+na+' available</b></h3><div class="cells">'+part.map(coreBtn).join('')+'</div></div>';}
+  var leg=[['av','Available',cnt.av],['ch','Chosen',0],['rq','Requested',cnt.rq],['rs','Reserved',cnt.rs],['iu','In use',cnt.iu],['fl','Faulty',cnt.fl]].filter(function(r){return r[0]==='av'||r[0]==='ch'||r[2];});
+  var heldW=cnt.rs+cnt.rq+cnt.iu,chips=[['all','All',heldW+cnt.fl+co],['rs','Reserved',cnt.rs],['rq','Requested',cnt.rq],['iu','In use',cnt.iu],['fl','Faulty',cnt.fl],['co','Count only',co]].filter(function(r){return r[2];});
+  sec.innerHTML='<div class="card ccard">'+head+
+   '<p class="eqs"><b>'+cnt.av+'</b> Available'+(co?' minus <b>'+co+'</b> held without cores':', nothing held without cores')+' = <b>'+e.free+'</b> free to reserve'+(d?'. [Customer B] holds 4 cores with no core numbers yet; they lower this number but mark no cell.':'')+'</p>'+
+   '<ul class="legend" aria-label="Status key">'+leg.map(function(r){return '<li><span class="sw s-'+r[0]+'">'+ic(r[0]==='ch'?'i-ch':IC[r[0]])+'</span>'+r[1]+' <b'+(r[0]==='ch'?' id="lg-ch"':'')+'>'+r[2]+'</b></li>';}).join('')+'</ul>'+
+   '<div class="grid-c" role="group" aria-labelledby="cores-h" aria-describedby="c-help"><p class="vh" id="c-help">Choose Available cores, then Reserve. Arrow keys move between cores.</p>'+tubes+'</div>'+
+   '<p class="unsurv"><b>'+(144-e.sv)+' cores not surveyed</b> (cores '+(e.sv+1)+' to 144). Not drawn, and cannot be booked until an admin enters a survey count.</p>'+
+   '<form class="cfoot" id="cfoot" data-has="false" aria-label="Reserve chosen cores" onsubmit="return false" novalidate>'+
+    '<div class="cr1"><div class="cnow" id="c-now" aria-live="polite">No cores chosen</div><div class="cchips" id="c-chips"></div><span class="cnow-m" id="c-more"></span><button type="button" class="btn" id="clear">Clear</button></div>'+
+    '<div class="cr2"><div class="f f-c"><label for="cust">Customer (required)</label><input id="cust" placeholder="e.g. [Customer A]" autocomplete="off" required aria-describedby="c-note"></div>'+
+    '<div class="f f-d"><label for="plan">Planned date</label><input id="plan" placeholder="YYYY-MM-DD" inputmode="numeric" pattern="\\d{4}-\\d{2}-\\d{2}" maxlength="10"></div>'+
+    '<button type="submit" class="btn btn-p" id="reserve" aria-describedby="c-note">Reserve</button></div>'+
+    '<p class="cnote" id="c-note"></p></form></div>'+
+   '<div class="card"><div class="ch"><h2 id="held-h">Held on this span</h2><small>'+heldW+' cores held with numbers'+(co?', '+co+' held without':'')+(cnt.fl?', '+cnt.fl+' faulty':'')+'</small></div>'+
+   (chips.length?'<div class="chips" role="group" aria-label="Filter by status">'+chips.map(function(r){return '<button type="button" class="chip" data-f="'+r[0]+'" aria-pressed="'+(r[0]==='all')+'">'+(r[0]==='all'?'':'<i class="dot"></i>')+r[1]+' <b>'+r[2]+'</b></button>';}).join('')+'</div>'+
+    '<table class="heldt"><colgroup><col style="width:130px"><col style="width:130px"><col style="width:120px"><col><col style="width:190px"><col style="width:110px"><col style="width:170px"></colgroup>'+
+    '<thead><tr><th scope="col">Cores</th><th scope="col">Status</th><th scope="col">Held by</th><th scope="col">Ports or detail</th><th scope="col">Circuit</th><th scope="col">Planned</th><th scope="col" class="r">Age (days)</th></tr></thead><tbody>'+heldTable(e,cells,co)+'</tbody></table>'
+    :'<p class="ms">Nothing is held on this span.</p>')+'</div>';
+  var first=sec.querySelector('.core.s-av')||sec.querySelector('.core');if(first)first.tabIndex=0;
+  syncCores();
+ }
+ function chosen(){return [].slice.call(document.querySelectorAll('#cores .s-av[aria-pressed=true]'));}
+ function syncCores(){
+  if(!$('cfoot'))return;
+  var c=chosen().map(function(b){return b.dataset.n;}),n=c.length,M=CO.max,btn=$('reserve');
+  $('c-now').textContent=n?n+(n>1?' cores':' core')+' chosen':'No cores chosen';
+  $('c-chips').innerHTML=c.map(function(x){return '<span class="cchip">'+x+'</span>';}).join('');$('cfoot').dataset.has=n>0;
+  $('c-more').textContent=!M?'No core can be chosen: nothing is free to reserve':n?(M-n)+' more can be chosen':'Up to '+M+' cores per request';
+  $('lg-ch').textContent=n;$('clear').disabled=!n;btn.disabled=!n;
+  btn.textContent=n?'Reserve '+n+(n>1?' cores':' core'):'Reserve';
+  $('c-note').innerHTML=n?'Goes to an admin for approval. Free to reserve after this: <b>'+(M-n)+' of '+M+'</b>.':M?'Reserve is off: choose at least one Available core in the grid.':'Reserve is off: this span is full.';
+  document.querySelectorAll('#cores .s-av').forEach(function(b){b.setAttribute('aria-label','Core '+b.dataset.n+', Available'+(b.getAttribute('aria-pressed')==='true'?', chosen':''));});
+ }
+ function toggleCore(b){var on=b.getAttribute('aria-pressed')!=='true';
+  if(on&&chosen().length>=CO.max){say('Up to '+CO.max+' cores per request on this span');return;}
+  b.setAttribute('aria-pressed',on);syncCores();}
+ function filtHeld(){var exp=document.querySelector('#cores .exp');
+  document.querySelectorAll('#cores tbody tr').forEach(function(r){var show=CO.f==='all'||r.dataset.k===CO.f;
+   if(r.classList.contains('sub'))show=show&&exp&&exp.getAttribute('aria-expanded')==='true';r.hidden=!show;});}
+ function renderCores(){
+  var on=S.mode==='span'&&S.sel!=null,min=on&&S.mapMin,sec=$('cores');sec.hidden=!on;
+  if(on&&CO.built!==S.sel){CO.built=S.sel;buildCores(SPANS[S.sel]);}
+  if(!on)CO.built=null;
+  var t=$('mtog');if(t){t.firstChild.textContent=S.mapMin?'Expand map':'Collapse map';t.dataset.min=S.mapMin;}
+  if(isMin()!==min){$('work').classList.toggle('min',min);if(min)fit();else{S.z=1;S.tx=S.ty=0;applyZoom();}}
+  else if(min)fit();
+ }
+ function syncHash(){var c=cur(),h=S.mode==='span'&&S.sel!=null?'#span='+SPANS[S.sel].a+'-'+SPANS[S.sel].b:S.mode==='route'&&S.from&&S.to?'#route='+S.from+'-'+S.to:'';
+  if(location.hash!==h)history.replaceState(null,'',h||location.pathname+location.search);}
+
  // ---------- render all ----------
  function render(){
   document.querySelector('input[name=mode][value="'+S.mode+'"]').checked=true;
@@ -835,7 +1026,7 @@ tfoot td{border-bottom:0;border-top:1px solid var(--ink);font-weight:700}
   $('from').value=S.from;$('to').value=S.to;$('need').value=S.need;
   document.querySelector('input[name=opt][value="'+S.opt+'"]').checked=true;
   $('freg').value=S.region;$('ftype').value=S.type;$('sq').value=S.q;
-  renderList();renderOpts();renderInsp();renderDrawer();drawMapState();
+  renderList();renderOpts();renderInsp();renderDrawer();renderCores();drawMapState();syncHash();
  }
  function pickSpan(i,src){
   var c=cur();
@@ -843,7 +1034,7 @@ tfoot td{border-bottom:0;border-top:1px solid var(--ink);font-weight:700}
   else{S.mode='span';S.sel=i;S.attn=false;S.spanView=false;}
   render();say('Selected span '+SPANS[i].id+', '+(SPANS[i].sv==null?'not surveyed':SPANS[i].free+' free cores'));
  }
- function routeSet(from,to){S.mode='route';S.from=from;S.to=to;S.pi=0;S.spanView=false;S.sel=null;plan();render();
+ function routeSet(from,to){S.mode='route';S.from=from;S.to=to;S.pi=0;S.spanView=false;S.sel=null;S.rspAll=false;plan();render();
   var c=cur();say(c?'Route '+S.from+' to '+S.to+': '+c.edges.length+' spans, '+km(c.km)+' km, lowest free '+c.free:S.err||(S.empty?'No route connects these sites':''));}
  function clearAll(){S.mode='span';S.sel=null;S.q='';S.attn=false;S.from='';S.to='';S.paths=[];S.err='';S.empty='';S.spanView=false;render();say('Selection cleared');}
 
@@ -883,7 +1074,10 @@ tfoot td{border-bottom:0;border-top:1px solid var(--ink);font-weight:700}
   if(b.dataset.act==='plan'){S.mode='route';S.from=b.dataset.site;S.to='';S.sel=null;plan();render();$('to').focus();return;}
   if(b.dataset.act==='attn'){S.attn=!S.attn;renderInsp();drawMapState();document.querySelector('[data-act=attn]').focus();return;}
   if(b.dataset.act==='back'){S.spanView=false;render();return;}
-  if(b.dataset.act==='drawer'){S.drawer=true;renderDrawer();$('drawer').scrollIntoView({behavior:'smooth',block:'start'});$('dtog').focus({preventScroll:true});return;}
+  if(b.dataset.act==='drawer'){S.drawer=true;renderDrawer();goTo($('drawer'));$('dtog').focus({preventScroll:true});return;}
+  if(b.dataset.act==='cores'){var t=document.querySelector('#cores .core.s-av')||$('cores-h');goTo($('cores'));
+   if(t.classList.contains('core'))document.querySelectorAll('#cores .core').forEach(function(x){x.tabIndex=x===t?0:-1;});t.focus({preventScroll:true});return;}
+  if(b.dataset.act==='rmore'){S.rspAll=true;renderInsp();var r=document.querySelector('.rsp li:nth-child(4) button');if(r)r.focus();return;}
   if(b.dataset.ri!=null){S.si=+b.dataset.ri;S.spanView=true;render();return;}
   if(b.dataset.i!=null)pickSpan(+b.dataset.i);
  });
@@ -941,17 +1135,51 @@ tfoot td{border-bottom:0;border-top:1px solid var(--ink);font-weight:700}
   if(!amenu.hidden){acct(false,true);return;}
   if(!drop.hidden){closeDrop();q.focus();return;}
   if(!$('lpop').hidden){$('lpop').hidden=true;$('lbtn').setAttribute('aria-expanded','false');$('lbtn').focus();return;}
-  if(e.target.tagName==='SELECT')return;
+  if(e.target.tagName==='SELECT'||e.target.closest('#cfoot'))return;
   clearAll();});
 
+ // cores section events (content is rebuilt per span, so events are delegated)
+ var cs=$('cores');
+ cs.addEventListener('click',function(e){var b=e.target.closest('button');if(!b)return;
+  if(b.classList.contains('s-av')){toggleCore(b);return;}
+  if(b.id==='clear'){chosen().forEach(function(x){x.setAttribute('aria-pressed','false');});syncCores();return;}
+  if(b.id==='reserve'){var cu=$('cust');
+   if(!cu.value.trim()){cu.setAttribute('aria-invalid','true');$('c-note').innerHTML='<span class="err">Customer is required.</span> Enter the customer, then Reserve.';cu.focus();}
+   else $('c-note').innerHTML='Mock: the request for <b>'+chosen().length+'</b> cores would go to an admin for approval.';return;}
+  if(b.id==='mtog'){S.mapMin=!S.mapMin;renderCores();$('mtog').focus();say(S.mapMin?'Map collapsed to a strip':'Map expanded');return;}
+  if(b.classList.contains('chip')){CO.f=b.dataset.f;cs.querySelectorAll('.chip').forEach(function(x){x.setAttribute('aria-pressed',x===b);});filtHeld();return;}
+  if(b.classList.contains('exp')){b.setAttribute('aria-expanded',b.getAttribute('aria-expanded')!=='true');filtHeld();}
+ });
+ cs.addEventListener('input',function(e){if(e.target.id==='cust')e.target.removeAttribute('aria-invalid');});
+ // Roving tabindex: arrows move, Up/Down jump a tube, Home/End go to row ends.
+ cs.addEventListener('keydown',function(e){var cores=[].slice.call(cs.querySelectorAll('.core')),i=cores.indexOf(e.target);if(i<0)return;
+  var j={ArrowRight:i+1,ArrowLeft:i-1,ArrowDown:i+12,ArrowUp:i-12,Home:i-i%12,End:Math.min(cores.length-1,i-i%12+11)}[e.key];
+  if(j===undefined||j<0||j>=cores.length)return;e.preventDefault();cores[i].tabIndex=-1;cores[j].tabIndex=0;cores[j].focus();});
+ cs.addEventListener('focusin',function(e){if(!e.target.classList.contains('core'))return;cs.querySelectorAll('.core').forEach(function(x){x.tabIndex=x===e.target?0:-1;});});
+
+ // role (dev strip): Approvals and Upload are admin-only
+ function setRole(r){document.body.dataset.role=r;var a=r==='admin';
+  $('a-av').textContent=a?'A1':'P1';$('a-name').textContent=a?'admin1':'planner1';$('a-role').textContent=a?'Admin':'Planner';
+  $('a-menu').innerHTML=a?'<b>admin1</b>, Admin':'<b>planner1</b>, Planner';
+  document.querySelectorAll('.dev [data-role]').forEach(function(x){x.setAttribute('aria-pressed',x.dataset.role===r);});}
+
  // dev strip
- var STATES={1:clearAll,2:function(){S.mode='span';S.q='';S.attn=false;S.sel=0;S.spanView=false;render();},
-  3:function(){$('need').value=2;S.opt='km';routeSet('AABB','DDEE');},4:function(){$('need').value=4;S.opt='km';routeSet('AABB','DDEE');},5:function(){$('need').value=2;routeSet('KKLL','AABB');}};
+ function pinned(){STATES[2]();[7,8,9].forEach(function(n){toggleCore(document.querySelector('#cores .core[data-n="'+n+'"]'));});
+  (document.fonts?document.fonts.ready:Promise.resolve()).then(function(){var r=document.querySelector('.ccard').getBoundingClientRect();window.scrollTo(0,scrollY+r.bottom-innerHeight-190);});}
+ var STATES={1:clearAll,2:function(){S.mode='span';S.q='';S.attn=false;S.sel=0;S.spanView=false;CO.built=null;render();},
+  3:function(){$('need').value=2;S.opt='km';routeSet('AABB','DDEE');},4:function(){$('need').value=4;S.opt='km';routeSet('AABB','DDEE');},5:function(){$('need').value=2;routeSet('KKLL','AABB');},6:pinned};
  document.querySelector('.dev').addEventListener('click',function(e){var b=e.target.closest('button');if(!b)return;
-  document.querySelectorAll('.dev button').forEach(function(x){x.setAttribute('aria-pressed',x===b);});STATES[b.dataset.state]();});
- var m=location.hash.match(/state=(\d)/);
+  if(b.dataset.role){setRole(b.dataset.role);return;}
+  document.querySelectorAll('.dev [data-state]').forEach(function(x){x.setAttribute('aria-pressed',x===b);});window.scrollTo(0,0);STATES[b.dataset.state]();});
+ // URL hash: #span=AABB-BBCC, #route=AABB-DDEE, #state=N (dev)
+ function applyHash(){var h=location.hash,m;
+  if((m=h.match(/state=(\d)/))&&STATES[m[1]]){STATES[m[1]]();return true;}
+  if((m=h.match(/span=([A-Z]{4})-([A-Z]{4})/))){var e=SPANS.filter(function(s){return (s.a===m[1]&&s.b===m[2])||(s.a===m[2]&&s.b===m[1]);})[0];if(e){pickSpan(e.i);return true;}}
+  if((m=h.match(/route=([A-Z]{4})-([A-Z]{4})/))&&SITES[m[1]]&&SITES[m[2]]){routeSet(m[1],m[2]);return true;}
+  return false;}
+ window.addEventListener('hashchange',function(){if(applyHash())window.scrollTo(0,0);});
  mapItems[0].tabIndex=0;
- (STATES[m?m[1]:1])();
+ if(!applyHash())clearAll();
 })();
 </script>
 </body>
