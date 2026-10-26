@@ -7,7 +7,7 @@ from app.auth.deps import CurrentUser, get_current_user
 from app.db import get_db
 from app.inventory import service
 from app.inventory.schemas import (
-    Customer, CustomerCreate, CustomerResult, SearchResult, SpanDetail, SpanSummary,
+    CoreHolderDetail, Customer, CustomerCreate, CustomerResult, SearchResult, SpanDetail, SpanSummary,
 )
 
 router = APIRouter(prefix="/api", dependencies=[Depends(get_current_user)])
@@ -31,6 +31,14 @@ def get_span(db: DB, span_id: int) -> SpanDetail:
     if span is None:
         raise HTTPException(404, "Span not found")
     return span
+
+
+@router.get("/cores/{core_id}")
+def get_core(db: DB, user: Annotated[CurrentUser, Depends(get_current_user)], core_id: int) -> CoreHolderDetail:
+    core = service.get_core(db, core_id, user.id)
+    if core is None:
+        raise HTTPException(404, "Core not found")
+    return core
 
 
 @router.get("/customers")

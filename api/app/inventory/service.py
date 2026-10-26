@@ -4,7 +4,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.inventory.schemas import (
-    CoreDetail, Customer, SearchResult, SpanDetail, SpanSummary,
+    CoreDetail, CoreHolderDetail, Customer, Holder, Owner, SearchResult, SpanDetail, SpanSummary,
 )
 
 PER_TYPE = 20
@@ -35,13 +35,15 @@ ORDER BY s.id
 # (A correction may set only one of the two fields.)
 CORE_SQL = """
 SELECT c.id, c.number, v.status, c.circuit_id, pa.port_id AS port_a, pb.port_id AS port_b,
-       COALESCE(cust.name, hc.name) AS customer, COALESCE(corr_date.planned_date, r.planned_date) AS planned_date
+       COALESCE(cust.name, hc.name) AS customer, COALESCE(corr_date.planned_date, r.planned_date) AS planned_date,
+       r.id AS reservation_id, COALESCE(st.is_stale, false) AS stale, st.stale_since
 FROM cores c
 JOIN core_status_v v ON v.core_id = c.id
 LEFT JOIN ports pa ON pa.id = c.port_a_id
 LEFT JOIN ports pb ON pb.id = c.port_b_id
 LEFT JOIN core_holds h ON h.core_id = c.id
 LEFT JOIN reservations r ON r.id = h.reservation_id
+LEFT JOIN reservation_state_v st ON st.reservation_id = r.id
 LEFT JOIN customers hc ON hc.id = r.customer_id
 LEFT JOIN LATERAL (
   SELECT e.customer_id FROM reservation_events e
@@ -57,6 +59,14 @@ LEFT JOIN customers cust ON cust.id = corr_cust.customer_id
 JOIN spans sp ON sp.id = c.span_id
 WHERE c.span_id = :id AND (sp.survey_cores IS NULL OR c.number <= sp.survey_cores)
 ORDER BY c.number
+"""
+
+# One core with its holder. Hidden cores (above survey_cores) are not found. Stale comes from reservation_state_v.
+CORE_ONE_SQL = CORE_SQL.replace("SELECT c.id, c.number,", "SELECT c.span_id, a.name || ' - ' || b.name AS span_name, c.id, c.number,", 1) \
+    .replace("JOIN spans sp ON sp.id = c.span_id\n", "JOIN spans sp ON sp.id = c.span_id\nJOIN sites a ON a.id = sp.site_a_id JOIN sites b ON b.id = sp.site_b_id\n") \
+    .replace("WHERE c.span_id = :id AND", "WHERE c.id = :id AND").replace("ORDER BY c.number", "")
+HOLDER_SQL = """
+SELECT r.planner_id AS id, u.username, u.display_name FROM reservations r JOIN users u ON u.id = r.planner_id WHERE r.id = :rid
 """
 
 
@@ -81,6 +91,26 @@ def get_span(db: Session, span_id: int) -> SpanDetail | None:
         return None
     cores = db.execute(text(CORE_SQL), {"id": span_id}).mappings()
     return SpanDetail(**spans[0], cores=[CoreDetail(**c) for c in cores])
+
+
+def get_core(db: Session, core_id: int, user_id: int) -> CoreHolderDetail | None:
+    row = db.execute(text(CORE_ONE_SQL), {"id": core_id}).mappings().first()
+    if row is None:
+        return None
+    holder = None
+    if row["reservation_id"] is not None:
+        # state: pending = requested; approved with a release waiting = release_requested
+        last = db.execute(text("SELECT status, last_event FROM reservation_state_v WHERE reservation_id = :r"),
+                          {"r": row["reservation_id"]}).one()
+        state = ("requested" if last.status == "pending" else
+                 "release_requested" if last.last_event == "release_requested" else "approved")
+        owner = db.execute(text(HOLDER_SQL), {"rid": row["reservation_id"]}).mappings().one()
+        holder = Holder(reservation_id=row["reservation_id"], customer=row["customer"], planned_date=row["planned_date"],
+                        state=state, stale=row["stale"], stale_since=row["stale_since"],
+                        owner=Owner(**owner), is_mine=owner["id"] == user_id)
+    return CoreHolderDetail(core_id=row["id"], number=row["number"], span_id=row["span_id"], span_name=row["span_name"],
+                            status=row["status"], circuit_id=row["circuit_id"], port_a=row["port_a"], port_b=row["port_b"],
+                            holder=holder)
 
 
 def list_span_summaries(db: Session, region: str | None, route_type: str | None,

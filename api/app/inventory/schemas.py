@@ -39,6 +39,39 @@ class CoreDetail(BaseModel):
     planned_date: date | None
     port_a: str | None
     port_b: str | None
+    reservation_id: int | None = None  # holder, when the core is held
+    stale: bool = False
+    stale_since: date | None = None  # date the 3-month stale clock started (latest keep, else approval)
+
+
+class Owner(BaseModel):
+    id: int
+    username: str
+    display_name: str
+
+
+class Holder(BaseModel):
+    reservation_id: int
+    customer: str
+    planned_date: date | None
+    state: Literal["requested", "approved", "release_requested"]
+    stale: bool
+    stale_since: date | None
+    owner: Owner
+    is_mine: bool
+
+
+class CoreHolderDetail(BaseModel):
+    core_id: int
+    number: int
+    span_id: int
+    span_name: str
+    status: CoreStatus
+    circuit_id: str | None
+    port_a: str | None
+    port_b: str | None
+    hidden: Literal[False] = False
+    holder: Holder | None
 
 
 class SpanDetail(SpanSummary):

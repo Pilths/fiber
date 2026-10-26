@@ -383,3 +383,34 @@ def test_count_only_reservation_in_lists(client, w, db):
     r = next(x for x in client.get("/api/reservations", params={"mine": True}, headers=H("planner1")).json() if x["id"] == rid)
     assert (r["status"], r["cores"], r["remaining_unassigned"]) == ("approved", [], 3)
     assert r["unassigned_span"] == "B - C"
+
+
+# ---------- core holder endpoint and stale flags on span detail ----------
+
+def test_core_holder_endpoint_and_span_stale(client, w, db):
+    free, held, old = w["c1"][1], w["c1"][2], w["c1"][3]
+    r = client.get(f"/api/cores/{free}", headers=H("planner2"))
+    assert r.status_code == 200 and r.json()["holder"] is None and r.json()["hidden"] is False
+    assert r.json()["span_id"] == w["s1"] and r.json()["number"] == 1 and r.json()["span_name"] == "A - B"
+    rid = book(client, w, [held]).json()["id"]
+    mine = client.get(f"/api/cores/{held}", headers=H("planner1")).json()["holder"]
+    assert mine["is_mine"] is True and mine["state"] == "requested" and mine["customer"] == "Acme" and mine["stale"] is False
+    other = client.get(f"/api/cores/{held}", headers=H("planner2")).json()["holder"]
+    assert other["is_mine"] is False and other["customer"] == "Acme" and other["reservation_id"] == rid
+    assert other["owner"]["username"] == "planner1"
+    act(client, rid, "approve")
+    assert client.get(f"/api/cores/{held}", headers=H("planner2")).json()["holder"]["state"] == "approved"
+    # a 4-month-old approved reservation holding core 3
+    orid = old_reservation(db, w, 4)
+    db.execute(text("INSERT INTO reservation_cores (reservation_id, core_id) VALUES (:r,:c)"), {"r": orid, "c": old})
+    db.execute(text("INSERT INTO core_holds (core_id, reservation_id) VALUES (:c,:r)"), {"r": orid, "c": old})
+    h = client.get(f"/api/cores/{old}", headers=H("planner2")).json()["holder"]
+    assert h["stale"] is True and h["stale_since"] is not None
+    rows = {c["id"]: c for c in span(client, w["s1"])["cores"]}
+    assert rows[old]["stale"] is True and rows[old]["reservation_id"] == orid and rows[old]["stale_since"] == h["stale_since"]
+    assert rows[held]["stale"] is False and rows[held]["reservation_id"] == rid
+    assert rows[free]["reservation_id"] is None and rows[free]["stale"] is False
+    # hidden core (above survey_cores) and unknown core
+    hidden = one(db, "INSERT INTO cores (span_id, number) VALUES (:s, 7) RETURNING id", s=w["s1"])
+    assert client.get(f"/api/cores/{hidden}", headers=H("planner1")).status_code == 404
+    assert client.get("/api/cores/999999", headers=H("planner1")).status_code == 404
