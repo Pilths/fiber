@@ -673,6 +673,130 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get History */
+        get: operations["get_history_api_admin_history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/cores/{cid}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Set Core Status */
+        post: operations["set_core_status_api_admin_cores__cid__status_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/spans/{sid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Span */
+        get: operations["get_span_api_admin_spans__sid__get"];
+        put?: never;
+        /** Edit Span */
+        post: operations["edit_span_api_admin_spans__sid__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/sites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Find Sites
+         * @description Site picker for the span form: id and name, 20 best matches.
+         */
+        get: operations["find_sites_api_admin_sites_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/sites/{sid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Site */
+        get: operations["get_site_api_admin_sites__sid__get"];
+        put?: never;
+        /** Edit Site */
+        post: operations["edit_site_api_admin_sites__sid__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/reservations/{rid}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Reservation History */
+        get: operations["reservation_history_api_reservations__rid__history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/cores/{cid}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Core History */
+        get: operations["core_history_api_cores__cid__history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -785,10 +909,53 @@ export interface components {
             /** Port B */
             port_b: string | null;
         };
+        /** CoreHistoryItem */
+        CoreHistoryItem: {
+            /**
+             * At
+             * Format: date-time
+             */
+            at: string;
+            /** Kind */
+            kind: string;
+            /** Type */
+            type: string;
+            /** User */
+            user: string;
+            /** Reason */
+            reason: string | null;
+            /** Reservation Id */
+            reservation_id: number | null;
+            /** Old Value */
+            old_value: string | null;
+            /** New Value */
+            new_value: string | null;
+            /** Cores */
+            cores: components["schemas"]["CoreRef"][];
+        };
         /** CoreIds */
         CoreIds: {
             /** Cores */
             cores?: number[];
+        };
+        /** CoreRef */
+        CoreRef: {
+            /** Core Id */
+            core_id: number;
+            /** Number */
+            number: number;
+            /** Span Id */
+            span_id: number;
+        };
+        /** CoreStatusBody */
+        CoreStatusBody: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "Faulty" | "Available";
+            /** Reason */
+            reason: string;
         };
         /** CorrectBody */
         CorrectBody: {
@@ -880,10 +1047,64 @@ export interface components {
             /** Similar */
             similar: components["schemas"]["Customer"][];
         };
+        /** Edited */
+        Edited: {
+            /** Id */
+            id: number;
+            /** Changed */
+            changed: string[];
+            /** History */
+            history: components["schemas"]["HistoryRow"][];
+        };
+        /** EventOut */
+        EventOut: {
+            /** Id */
+            id: number;
+            /** Reservation Id */
+            reservation_id: number;
+            /** Type */
+            type: string;
+            /** User Id */
+            user_id: number;
+            /** User */
+            user: string;
+            /**
+             * At
+             * Format: date-time
+             */
+            at: string;
+            /** Reason */
+            reason: string | null;
+            /** Customer */
+            customer: string | null;
+            /** Planned Date */
+            planned_date: string | null;
+            /** Cores */
+            cores: components["schemas"]["CoreRef"][];
+            /** Unassigned Change */
+            unassigned_change: number | null;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** HistoryRow */
+        HistoryRow: {
+            /** Field */
+            field: string;
+            /** Old Value */
+            old_value: string | null;
+            /** New Value */
+            new_value: string | null;
+            /** Reason */
+            reason: string;
+            /** User Id */
+            user_id: number;
+            /** User */
+            user: string;
+            /** At */
+            at: unknown;
         };
         /** LoginBody */
         LoginBody: {
@@ -1082,6 +1303,59 @@ export interface components {
             /** Needs Override */
             needs_override: boolean;
         };
+        /** SiteBody */
+        SiteBody: {
+            /** Reason */
+            reason: string;
+            /** Name */
+            name?: string | null;
+            /** Lat */
+            lat?: number | null;
+            /** Lon */
+            lon?: number | null;
+            /** Region */
+            region?: string | null;
+            /** Active */
+            active?: boolean | null;
+        };
+        /** SiteEdit */
+        SiteEdit: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Kind */
+            kind: string;
+            /** Lat */
+            lat: number | null;
+            /** Lon */
+            lon: number | null;
+            /** Region */
+            region: string | null;
+            /** Active */
+            active: boolean;
+            /** History */
+            history: components["schemas"]["HistoryRow"][];
+        };
+        /** SpanBody */
+        SpanBody: {
+            /** Reason */
+            reason: string;
+            /** Distance Km */
+            distance_km?: number | string | null;
+            /** Route Type */
+            route_type?: ("Bespoke" | "Trunk" | "Metro") | null;
+            /** Region */
+            region?: string | null;
+            /** Site A Id */
+            site_a_id?: number | null;
+            /** Site B Id */
+            site_b_id?: number | null;
+            /** Survey Cores */
+            survey_cores?: number | null;
+            /** Cable Size */
+            cable_size?: number | null;
+        };
         /** SpanDetail */
         SpanDetail: {
             /** Id */
@@ -1114,6 +1388,31 @@ export interface components {
             free_to_reserve: number;
             /** Cores */
             cores: components["schemas"]["CoreDetail"][];
+        };
+        /** SpanEdit */
+        SpanEdit: {
+            /** Id */
+            id: number;
+            /** Site A Id */
+            site_a_id: number;
+            /** Site B Id */
+            site_b_id: number;
+            /** Site A */
+            site_a: string;
+            /** Site B */
+            site_b: string;
+            /** Route Type */
+            route_type: string | null;
+            /** Region */
+            region: string | null;
+            /** Distance Km */
+            distance_km: string | null;
+            /** Survey Cores */
+            survey_cores: number | null;
+            /** Cable Size */
+            cable_size: number;
+            /** History */
+            history: components["schemas"]["HistoryRow"][];
         };
         /** SpanLoss */
         SpanLoss: {
@@ -2851,6 +3150,338 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_history_api_admin_history_get: {
+        parameters: {
+            query: {
+                entity: "core" | "span" | "site";
+                id: number;
+            };
+            header?: {
+                "x-dev-user"?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                fiber_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HistoryRow"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_core_status_api_admin_cores__cid__status_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-dev-user"?: string | null;
+            };
+            path: {
+                cid: number;
+            };
+            cookie?: {
+                fiber_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CoreStatusBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_span_api_admin_spans__sid__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-dev-user"?: string | null;
+            };
+            path: {
+                sid: number;
+            };
+            cookie?: {
+                fiber_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SpanEdit"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    edit_span_api_admin_spans__sid__post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-dev-user"?: string | null;
+            };
+            path: {
+                sid: number;
+            };
+            cookie?: {
+                fiber_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SpanBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Edited"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    find_sites_api_admin_sites_get: {
+        parameters: {
+            query: {
+                q: string;
+            };
+            header?: {
+                "x-dev-user"?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                fiber_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_site_api_admin_sites__sid__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-dev-user"?: string | null;
+            };
+            path: {
+                sid: number;
+            };
+            cookie?: {
+                fiber_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SiteEdit"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    edit_site_api_admin_sites__sid__post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-dev-user"?: string | null;
+            };
+            path: {
+                sid: number;
+            };
+            cookie?: {
+                fiber_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SiteBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Edited"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reservation_history_api_reservations__rid__history_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-dev-user"?: string | null;
+            };
+            path: {
+                rid: number;
+            };
+            cookie?: {
+                fiber_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    core_history_api_cores__cid__history_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-dev-user"?: string | null;
+            };
+            path: {
+                cid: number;
+            };
+            cookie?: {
+                fiber_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoreHistoryItem"][];
                 };
             };
             /** @description Validation Error */

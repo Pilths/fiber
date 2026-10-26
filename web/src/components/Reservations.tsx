@@ -1,13 +1,45 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { api, errorText } from "@/api/client";
+import { api, errorText, resAction, type Action } from "@/api/client";
 import type { components } from "@/api/schema";
 import { Button } from "@/components/ui/button";
-import { inputCls } from "@/lib/status";
+import { EVENT_WORD, inputCls, when } from "@/lib/status";
 
 type Res = components["schemas"]["ReservationOut"];
 type Item = components["schemas"]["NeedsReviewItem"];
 type Me = components["schemas"]["CurrentUser"];
-type Action = "approve" | "reject" | "withdraw" | "keep" | "request-release" | "release" | "decline-release";
+type Event = components["schemas"]["EventOut"];
+
+
+// "History" disclosure: the reservation's events in order, loaded on first open.
+export function ResHistory({ rid }: { rid: number }) {
+  const [events, setEvents] = useState<Event[] | null>(null);
+  const [error, setError] = useState(false);
+  const load = (e: React.SyntheticEvent<HTMLDetailsElement>) => {
+    if (!e.currentTarget.open) return;
+    api.get("/api/reservations/{rid}/history", { path: { rid } }).then((r) => { setEvents(r); setError(false); }).catch(() => setError(true));
+  };
+  return (
+    <details className="text-sm" onToggle={load} data-testid="res-history">
+      <summary className="w-fit cursor-pointer font-semibold text-blue underline underline-offset-2">History</summary>
+      {error ? <p role="alert" className="mt-2 text-red">Could not load the history.</p>
+        : !events ? <p className="mt-2 text-muted-foreground">Loading…</p>
+        : (
+          <ol className="mt-2 border-l-2 border-rule pl-3">
+            {events.map((ev) => (
+              <li key={ev.id} className="py-1">
+                <span className="font-semibold">{EVENT_WORD[ev.type] ?? ev.type}</span> by {ev.user}
+                <span className="text-muted-foreground">, {when(ev.at)}</span>
+                {ev.cores.length > 0 && <span>; cores {ev.cores.map((c) => c.number).join(", ")}</span>}
+                {ev.unassigned_change != null && <span>; {ev.unassigned_change > 0 ? `${ev.unassigned_change} cores by count` : `${-ev.unassigned_change} assigned`}</span>}
+                {(ev.customer || ev.planned_date) && <span>; now {[ev.customer, ev.planned_date && `planned ${ev.planned_date}`].filter(Boolean).join(", ")}</span>}
+                {ev.reason && <span className="block text-muted-foreground">Reason: {ev.reason}</span>}
+              </li>
+            ))}
+          </ol>
+        )}
+    </details>
+  );
+}
 
 // Status is always text (and a symbol), never colour alone.
 const STATUS_LABEL: Record<Res["status"], string> = {
@@ -34,8 +66,7 @@ function Card({ r, me, onChanged }: { r: Res; me: Me; onChanged: () => void }) {
     setBusy(true);
     setMsg(null);
     try {
-      // The generated client types each body; one cast keeps this a single call site for seven actions.
-      await (api.post as unknown as (u: string, o: { path: { rid: number }; body?: unknown }) => Promise<unknown>)(`/api/reservations/{rid}/${action}`, { path: { rid: r.id }, body });
+      await resAction(r.id, action, body);
       setMode(null);
       setReason("");
       setPick(new Set());
@@ -89,6 +120,7 @@ function Card({ r, me, onChanged }: { r: Res; me: Me; onChanged: () => void }) {
         </label>
       )}
       {msg && <p role="alert" className="text-sm font-medium text-destructive">{msg}</p>}
+      <ResHistory key={r.last_event_at ?? ""} rid={r.id} />
 
       <div className="flex flex-wrap gap-2">
         {mode ? (

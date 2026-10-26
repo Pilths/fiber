@@ -205,8 +205,7 @@ Completion: TEST-009, TEST-010 and TEST-019 pass.
 |------|-------------|-----------|------|
 | TASK-046 | `POST /api/admin/cores/{id}/status` with `{status: Faulty|Available, reason}` writing a `data_edits` row. A Faulty core with a hold appears in the Action needed list through the derived query. | ✅ | 2026-10-26 |
 | TASK-047 | `POST /api/admin/spans/{id}` (distance, route type, region, site A, site B, survey count, cable size) and `POST /api/admin/sites/{id}` (name, coordinates), each field change written to `data_edits` with the reason. Third cut: this task moves to v1.1 if Phase 13's checkpoint says so. | ✅ | 2026-10-26 |
-| TASK-048 | UI: edit forms in the admin area, reason required, history list per item. | | |
-
+| TASK-048 | UI: edit forms in the admin area, reason required, history list per item. | ✅ | 2026-10-26 |
 Completion: TEST-011 passes.
 
 ### Implementation Phase 10 (Session 9, 28 October): Routing

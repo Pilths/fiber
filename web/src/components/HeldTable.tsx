@@ -9,7 +9,7 @@ const DOT: Record<string, string> = { Reserved: "text-[#272a30]", Requested: "te
 
 // One row per held core from GET /api/spans/{id}, plus one count-only row. Age and the reservation's planner
 // are not on the span endpoint (history is TASK-077), so those columns are left out.
-export function HeldTable({ d }: { d: Detail }) {
+export function HeldTable({ d, onOpen }: { d: Detail; onOpen: (c: Detail["cores"][number]) => void }) {
   const [filter, setFilter] = useState<Filter>("All");
   const held = d.cores.filter((c) => c.status !== "Available");
   const count = (f: Filter) => (f === "All" ? held.length + (d.unassigned_reserved ? 1 : 0) : f === "Count only" ? (d.unassigned_reserved ? 1 : 0) : held.filter((c) => c.status === f).length);
@@ -42,8 +42,10 @@ export function HeldTable({ d }: { d: Detail }) {
             </tr></thead>
             <tbody>
               {rows.map((c) => (
-                <tr key={c.id} className={c.status === "Faulty" ? "bg-red-bg" : c.status === "Requested" ? "bg-amber-bg" : ""}>
-                  <th scope="row" className={`text-left font-semibold text-foreground ${c.status === "Faulty" ? "pl-3 shadow-[inset_3px_0_0_var(--red)]" : ""}`}>{c.number}</th>
+                <tr key={c.id} onClick={() => onOpen(c)} className={`cursor-pointer hover:bg-raised ${c.status === "Faulty" ? "bg-red-bg" : c.status === "Requested" ? "bg-amber-bg" : ""}`}>
+                  <th scope="row" className={`text-left font-semibold text-foreground ${c.status === "Faulty" ? "pl-3 shadow-[inset_3px_0_0_var(--red)]" : ""}`}>
+                    <button type="button" className="text-blue underline underline-offset-2 hover:no-underline" aria-label={`Core ${c.number} details`} onClick={(e) => { e.stopPropagation(); onOpen(c); }}>{c.number}</button>
+                  </th>
                   <td><span className={`inline-flex items-center gap-2 font-semibold whitespace-nowrap ${STATUS[c.status].tone}`}><Icon name={STATUS[c.status].icon} />{c.status}</span></td>
                   <td className="truncate">{c.customer ?? "-"}</td>
                   <td className="py-2 leading-snug">{c.status === "Faulty" ? "Not bookable" : c.port_a || c.port_b ? `${c.port_a ?? "-"} to ${c.port_b ?? "-"}` : "-"}</td>

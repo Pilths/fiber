@@ -2,7 +2,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api, ApiError, authEvents, setDevUser } from "@/api/client";
 import { ChangePassword, Login } from "@/components/Auth";
 import type { components } from "@/api/schema";
+import { EditSiteDialog, EditSpanDialog } from "@/components/AdminEdit";
 import { ChosenBar } from "@/components/ChosenBar";
+import { CoreDrawer } from "@/components/CoreDrawer";
 import { FindCard } from "@/components/FindCard";
 import { Header, type View } from "@/components/Header";
 import { HeldTable } from "@/components/HeldTable";
@@ -77,7 +79,10 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
   const [loss, setLoss] = useState<LossDetail | null>(null);
   const [lossList, setLossList] = useState<SpanLoss[]>([]);
   const [coverage, setCoverage] = useState<{ measured: number; total: number } | null>(null);
-  const [version, setVersion] = useState(0); // bumped after a booking so the span list and grid reload
+  const [version, setVersion] = useState(0); // bumped after a booking or edit so the span list and grid reload
+  const [drawerCore, setDrawerCore] = useState<number | null>(null);
+  const [editSpan, setEditSpan] = useState<{ focus?: "survey" } | null>(null);
+  const [editSite, setEditSite] = useState<number | null>(null);
 
   const refreshBell = useCallback(() => {
     api.get("/api/bell").then(setBell).catch(() => {});
@@ -104,7 +109,7 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
     if (view !== "map") return;
     api.get("/api/loss/spans").then(setLossList).catch(() => {});
     api.get("/api/loss/coverage").then(setCoverage).catch(() => {});
-  }, [view]);
+  }, [view, version]);
 
   useEffect(() => {
     if (spanId == null) return;
@@ -122,6 +127,7 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
     setSpanId(id);
     setFocusCoreId(coreId);
     setSelected((s) => (s.size ? new Set() : s));
+    setDrawerCore(null);
   }, [setView]);
 
   // Hash -> selection, on load and when the hash changes (back button, pasted link).
@@ -149,6 +155,14 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
     cell?.scrollIntoView({ block: "center" });
     cell?.focus({ preventScroll: true });
   };
+  const changed = () => { setVersion((v) => v + 1); refreshBell(); };
+  const drawn = detail?.cores.find((c) => c.id === drawerCore);
+  const admin = me.role === "admin" && spanId != null ? {
+    onEditSpan: (focus?: "survey") => setEditSpan({ focus }),
+    onEditSite: (end: "a" | "b") => {
+      api.get("/api/admin/spans/{sid}", { path: { sid: spanId } }).then((x) => setEditSite(end === "a" ? x.site_a_id : x.site_b_id)).catch(() => setError("Could not load the span."));
+    },
+  } : null;
   const goToLoss = () => {
     const h = document.getElementById("loss-h");
     h?.scrollIntoView({ block: "start" });
@@ -189,7 +203,7 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
           </section>
           <div className="col-span-4 flex min-w-0 flex-col gap-4">
             <FindCard spans={spans} selectedId={spanId} onSelect={(id) => open(id)} loss={lossList} />
-            <Inspector detail={detail} loading={spanId != null && !detail} onGoToCores={goToCores} loss={loss?.span_id === spanId ? loss : null} onSeeLoss={goToLoss} />
+            <Inspector detail={detail} loading={spanId != null && !detail} onGoToCores={goToCores} loss={loss?.span_id === spanId ? loss : null} onSeeLoss={goToLoss} admin={admin} />
           </div>
 
           {detail && (
@@ -209,23 +223,32 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
                   </button>
                 </div>
                 {detail.survey_cores == null
-                  ? <p role="status" data-testid="capacity" className="text-[13px]">Not surveyed yet: this span has no cores to show and cannot be booked until an admin enters a survey count. Cable size {detail.cable_size}.</p>
-                  : <Cores d={detail} selected={selected} chosen={chosen} toggle={toggle} focusCoreId={focusCoreId}
+                  ? (
+                    <div role="status" data-testid="capacity" className="flex items-center gap-3 text-[13px]">
+                      <p>{admin ? "Not surveyed: enter a survey count to make it bookable." : "Not surveyed, cannot be booked."} No cores to show. Cable size {detail.cable_size}.</p>
+                      {admin && <button type="button" className="btn h-8! px-3!" onClick={() => admin.onEditSpan("survey")}>Enter survey count</button>}
+                    </div>
+                  )
+                  : <Cores d={detail} selected={selected} chosen={chosen} toggle={toggle} focusCoreId={focusCoreId} onOpen={(c) => setDrawerCore(c.id)}
                       onClear={() => setSelected(new Set())}
                       onDone={() => { setSelected(new Set()); setVersion((v) => v + 1); refreshBell(); }} />}
               </section>
-              <HeldTable d={detail} />
+              <HeldTable d={detail} onOpen={(c) => setDrawerCore(c.id)} />
               <LossCard key={detail.id} loss={loss?.span_id === detail.id ? loss : null} coverage={coverage} />
             </div>
           )}
+          {detail && drawn && <CoreDrawer key={drawn.id} core={drawn} span={spanName(detail)} me={me} onClose={() => setDrawerCore(null)} onChanged={changed} />}
+          {editSpan && spanId != null && <EditSpanDialog spanId={spanId} focus={editSpan.focus} onClose={() => setEditSpan(null)} onSaved={changed} />}
+          {editSite != null && <EditSiteDialog siteId={editSite} onClose={() => setEditSite(null)} onSaved={changed} />}
         </main>
       )}
     </div>
   );
 }
 
-function Cores({ d, selected, chosen, toggle, focusCoreId, onClear, onDone }: {
-  d: Detail; selected: Set<number>; chosen: Detail["cores"]; toggle: (id: number) => void; focusCoreId: number | null; onClear: () => void; onDone: () => void;
+function Cores({ d, selected, chosen, toggle, focusCoreId, onOpen, onClear, onDone }: {
+  d: Detail; selected: Set<number>; chosen: Detail["cores"]; toggle: (id: number) => void; focusCoreId: number | null;
+  onOpen: (c: Detail["cores"][number]) => void; onClear: () => void; onDone: () => void;
 }) {
   const n = countBy(d);
   const notSurveyed = d.not_surveyed ?? 0;
@@ -246,7 +269,7 @@ function Cores({ d, selected, chosen, toggle, focusCoreId, onClear, onDone }: {
           );
         })}
       </ul>
-      <PortGrid cores={d.cores} selected={selected} onToggle={toggle} focusCoreId={focusCoreId} />
+      <PortGrid cores={d.cores} selected={selected} onToggle={toggle} onOpen={onOpen} focusCoreId={focusCoreId} />
       {notSurveyed > 0 && (
         <p className="mt-3.5 text-[13px] text-muted-foreground">
           <b className="font-semibold text-foreground">{notSurveyed} cores not surveyed</b> (cores {(d.survey_cores ?? 0) + 1} to {d.cable_size}). Not drawn, and cannot be booked until an admin enters a survey count.

@@ -1,0 +1,164 @@
+import { expect, test, type Page } from "@playwright/test";
+import { signIn } from "./helpers";
+
+// Session 8: core detail drawer, admin edits (TEST-011) and reservation history (TEST-021).
+// Every edit here is reversed in the same test; nothing is deleted, so the history rows stay.
+const KLCJ = /^DEV Kuala Lumpur DC - DEV Cyberjaya DC/; // core 1 Reserved by planner1 (approved)
+const KLBJ = /^DEV Kuala Lumpur DC - DEV Bukit Jalil TOC/; // core 20 is free: marked Faulty and back
+const CJBJ = /^DEV Cyberjaya DC - DEV Bukit Jalil TOC/; // distance 18.2 km, changed and reverted
+
+test.use({ viewport: { width: 1440, height: 900 } });
+
+const pick = async (page: Page, name: RegExp) => {
+  await page.getByRole("list", { name: "Spans" }).getByRole("button", { name }).click();
+  await expect(page.getByRole("grid", { name: "Cores" })).toBeVisible();
+};
+const cell = (page: Page, n: number) => page.getByRole("gridcell", { name: new RegExp(`^Core ${n}:`) });
+const drawer = (page: Page) => page.getByRole("dialog", { name: /^Core \d+ on / });
+
+test("core drawer: opens from a taken core with history, Keep for the owner, Esc returns focus", async ({ page }) => {
+  await signIn(page, "planner1");
+  await pick(page, KLCJ);
+  await cell(page, 1).focus();
+  await page.keyboard.press("Enter");
+  const d = drawer(page);
+  await expect(d).toBeVisible();
+  await expect(d.getByRole("heading", { level: 2 })).toHaveText("Core 1 on DEV Kuala Lumpur DC - DEV Cyberjaya DC");
+  await expect(d.getByTestId("core-status")).toContainText("Reserved");
+  await expect(d).toContainText("DEV Telco Alpha");
+  const hist = d.getByRole("list", { name: "Core history, newest first" });
+  await expect(hist).toContainText("Requested by DEV planner1");
+  await expect(hist).toContainText("Approved by DEV admin1");
+  await expect(hist.getByRole("listitem").last()).toContainText("Requested by");
+  await expect(d.getByRole("button", { name: "Request release of core 1" })).toBeVisible();
+  await expect(d.getByRole("button", { name: /^Mark / })).toHaveCount(0); // planners cannot edit status
+  await d.getByRole("button", { name: "Keep" }).click();
+  await expect(hist.getByRole("listitem").first()).toContainText("Kept by DEV planner1");
+  await page.screenshot({ path: "e2e/screenshots/core-drawer.png" });
+  await page.keyboard.press("Escape");
+  await expect(d).toBeHidden();
+  await expect(cell(page, 1)).toBeFocused();
+
+  // the held table opens the same drawer
+  await page.getByRole("table", { name: "Held cores on this span" }).getByRole("button", { name: "Core 2 details" }).click();
+  await expect(drawer(page).getByRole("heading", { level: 2 })).toHaveText(/^Core 2 on/);
+});
+
+test("planner sees no Keep on others' cores and no edit buttons", async ({ page }) => {
+  await signIn(page, "planner2");
+  await pick(page, KLCJ);
+  await cell(page, 1).click({ force: true }); // taken cells are aria-disabled (not selectable), which Playwright treats as disabled
+  const d = drawer(page);
+  await expect(d).toContainText("DEV Telco Alpha");
+  await expect(d).toContainText("No events on this core that you can see"); // another planner's reservation
+  await expect(d.getByRole("button", { name: "Keep" })).toHaveCount(0);
+  await expect(d.getByRole("button", { name: /Request release/ })).toHaveCount(0);
+  await d.getByRole("button", { name: "Close core detail" }).click();
+  const inspector = page.getByRole("region", { name: "Inspector" });
+  await expect(inspector.getByRole("button", { name: "Edit span" })).toHaveCount(0);
+  await expect(inspector.getByRole("button", { name: /^Edit site/ })).toHaveCount(0);
+});
+
+test("admin marks a free core Faulty with a reason, then Available again", async ({ page }) => {
+  await signIn(page, "admin1");
+  await pick(page, KLBJ);
+  await cell(page, 20).focus();
+  await page.getByRole("button", { name: "Core 20 details" }).click();
+  const d = drawer(page);
+  await expect(d.getByTestId("core-status")).toContainText("Available");
+  await d.getByRole("button", { name: "Mark Faulty" }).click();
+  const form = d.getByRole("form", { name: "Mark core 20 Faulty" });
+  await form.getByRole("button", { name: "Mark Faulty" }).click();
+  await expect(form.getByRole("alert")).toContainText("Enter a reason");
+  await expect(cell(page, 20)).toHaveAttribute("data-status", "Available");
+  await form.getByLabel("Reason (required)").fill("E2E: OTDR test failed");
+  await form.getByRole("button", { name: "Mark Faulty" }).click();
+  await expect(d.getByTestId("core-status")).toContainText("Faulty");
+  await expect(cell(page, 20)).toHaveAttribute("data-status", "Faulty");
+  const first = d.getByRole("list", { name: "Core history, newest first" }).getByRole("listitem").first();
+  await expect(first).toContainText("Marked Faulty by DEV admin1");
+  await expect(first).toContainText("Reason: E2E: OTDR test failed");
+
+  await d.getByRole("button", { name: "Mark Available" }).click();
+  await d.getByLabel("Reason (required)").fill("E2E: repaired");
+  await d.getByRole("form", { name: "Mark core 20 Available" }).getByRole("button", { name: "Mark Available" }).click();
+  await expect(cell(page, 20)).toHaveAttribute("data-status", "Available");
+  await expect(first).toContainText("Marked Available by DEV admin1");
+});
+
+test("admin edits span distance with a reason; calculated loss follows; then reverts", async ({ page }) => {
+  await signIn(page, "admin1");
+  await pick(page, CJBJ);
+  const loss = page.getByTestId("loss-card");
+  await expect(loss).toContainText("18.2 km × 0.3 dB/km");
+  await expect(loss).toContainText("5.46 dB");
+
+  const edit = async (km: string, reason: string) => {
+    await page.getByRole("region", { name: "Inspector" }).getByRole("button", { name: "Edit span" }).click();
+    const dlg = page.getByRole("dialog", { name: /^Edit span/ });
+    await dlg.getByLabel("Distance (km)").fill(km);
+    await dlg.getByRole("button", { name: "Save" }).click();
+    await expect(dlg.getByRole("alert")).toContainText("Enter a reason"); // reason empty: blocked before sending
+    await dlg.getByLabel("Reason (required)").fill(reason);
+    return dlg;
+  };
+  let dlg = await edit("18.3", "E2E: re-measured route");
+  await dlg.getByText(/^History/).click();
+  await page.screenshot({ path: "e2e/screenshots/edit-span.png" });
+  await dlg.getByRole("button", { name: "Save" }).click();
+  await expect(dlg).toBeHidden();
+  await expect(loss).toContainText("18.3 km × 0.3 dB/km");
+  await expect(loss).toContainText("5.49 dB");
+
+  dlg = await edit("18.2", "E2E: revert");
+  await dlg.getByRole("button", { name: "Save" }).click();
+  await expect(dlg).toBeHidden();
+  await expect(loss).toContainText("5.46 dB");
+  await page.getByRole("region", { name: "Inspector" }).getByRole("button", { name: "Edit span" }).click();
+  await page.getByText(/^History/).click();
+  await expect(page.getByTestId("edit-history").getByRole("listitem").first()).toContainText("Reason: E2E: revert");
+});
+
+test("lowering the survey count below held cores is refused in plain words", async ({ page }) => {
+  await signIn(page, "admin1");
+  await pick(page, KLCJ);
+  await page.getByRole("region", { name: "Inspector" }).getByRole("button", { name: "Edit span" }).click();
+  const dlg = page.getByRole("dialog", { name: /^Edit span/ });
+  await dlg.getByLabel("Survey count").fill("1");
+  await dlg.getByLabel("Reason (required)").fill("E2E: should be refused");
+  await dlg.getByRole("button", { name: "Save" }).click();
+  await expect(dlg.getByRole("alert")).toContainText(/^Cores 2, .* are in use or have history and cannot be removed/);
+  await dlg.getByRole("button", { name: "Cancel" }).click();
+  await expect(page.getByRole("region", { name: /^Cores of/ })).toContainText("24 surveyed of 144");
+});
+
+test("admin opens a site from the Inspector: fields, reason required, history", async ({ page }) => {
+  await signIn(page, "admin1");
+  await pick(page, KLCJ);
+  await page.getByRole("button", { name: "Edit site DEV Cyberjaya DC" }).click();
+  const dlg = page.getByRole("dialog", { name: "Edit site DEV Cyberjaya DC" });
+  await expect(dlg.getByLabel("Name")).toHaveValue("DEV Cyberjaya DC");
+  await expect(dlg.getByLabel("Latitude")).toHaveValue("2.9213");
+  await dlg.getByLabel("Active").uncheck();
+  await expect(dlg).toContainText("A site used by a span cannot be deactivated");
+  await dlg.getByRole("button", { name: "Save" }).click();
+  await expect(dlg.getByRole("alert")).toContainText("Enter a reason");
+  await dlg.getByLabel("Reason (required)").fill("E2E: try to deactivate");
+  await dlg.getByRole("button", { name: "Save" }).click();
+  await expect(dlg.getByRole("alert").first()).toContainText("used by a span");
+  await dlg.getByText(/^History/).click();
+  await page.screenshot({ path: "e2e/screenshots/edit-site.png" });
+  await page.keyboard.press("Escape");
+  await expect(dlg).toBeHidden();
+  await expect(page.getByRole("button", { name: "Edit site DEV Cyberjaya DC" })).toBeFocused();
+});
+
+test("reservation History disclosure lists events in order", async ({ page }) => {
+  await signIn(page, "planner1");
+  await page.getByRole("button", { name: /My reservations/ }).click();
+  const card = page.getByRole("region", { name: "My reservations" }).getByTestId("reservation").filter({ hasText: "DEV Telco Alpha" }).filter({ hasText: "Approved" }).first();
+  await card.getByText("History", { exact: true }).click();
+  const items = card.getByTestId("res-history").getByRole("listitem");
+  await expect(items.first()).toContainText("Requested by DEV planner1");
+  await expect(items.nth(1)).toContainText("Approved by DEV admin1");
+});

@@ -71,7 +71,7 @@ export function Pager({ total, page, onPage }: { total: number; page: number; on
 }
 
 // Modal dialog on the native <dialog>: focus moves in on open, Escape closes, focus returns on close.
-export function Dialog({ title, children, onClose, wide }: { title: string; children: React.ReactNode; onClose: () => void; wide?: boolean }) {
+export function Dialog({ title, children, onClose, wide, cls }: { title: React.ReactNode; children: React.ReactNode; onClose: () => void; wide?: boolean; cls?: string }) {
   const ref = useRef<HTMLDialogElement>(null);
   const id = useId();
   const back = useRef<Element | null>(null);
@@ -81,7 +81,7 @@ export function Dialog({ title, children, onClose, wide }: { title: string; chil
     return () => (back.current as HTMLElement | null)?.focus?.();
   }, []);
   return (
-    <dialog ref={ref} aria-labelledby={id} onClose={onClose} className={`m-auto rounded-lg border bg-white p-6 backdrop:bg-black/30 ${wide ? "w-[560px]" : "w-[460px]"}`}>
+    <dialog ref={ref} aria-labelledby={id} onClose={onClose} className={`rounded-lg border bg-white p-6 backdrop:bg-black/30 ${cls ?? `m-auto ${wide ? "w-[560px]" : "w-[460px]"}`}`}>
       <h2 id={id} className="text-base font-semibold">{title}</h2>
       {children}
     </dialog>

@@ -30,8 +30,10 @@ function heldLines(d: Detail) {
   return lines;
 }
 
-export function Inspector({ detail, loading, onGoToCores, loss, onSeeLoss }: {
-  detail: Detail | null; loading: boolean; onGoToCores: () => void; loss: LossDetail | null; onSeeLoss: () => void;
+type Admin = { onEditSpan: (focus?: "survey") => void; onEditSite: (end: "a" | "b") => void } | null; // null for planners
+
+export function Inspector({ detail, loading, onGoToCores, loss, onSeeLoss, admin }: {
+  detail: Detail | null; loading: boolean; onGoToCores: () => void; loss: LossDetail | null; onSeeLoss: () => void; admin: Admin;
 }) {
   const tab = "relative inline-flex h-10 items-center gap-2 border-b-2 border-transparent -mb-px px-2.5 font-semibold whitespace-nowrap focus-visible:-outline-offset-3";
   const later = (name: string) => (
@@ -53,13 +55,15 @@ export function Inspector({ detail, loading, onGoToCores, loss, onSeeLoss }: {
             <b className="mb-0.5 block text-sm font-semibold text-foreground">{loading ? "Loading span..." : "No span selected"}</b>
             {!loading && "Choose a span in Find, or search in the top bar."}
           </p>
-        ) : <Body d={detail} onGoToCores={onGoToCores} loss={loss} onSeeLoss={onSeeLoss} />}
+        ) : <Body d={detail} onGoToCores={onGoToCores} loss={loss} onSeeLoss={onSeeLoss} admin={admin} />}
       </div>
     </section>
   );
 }
 
-function Body({ d, onGoToCores, loss, onSeeLoss }: { d: Detail; onGoToCores: () => void; loss: LossDetail | null; onSeeLoss: () => void }) {
+const link = "font-[inherit] underline decoration-line decoration-1 underline-offset-4 hover:text-blue hover:decoration-blue";
+
+function Body({ d, onGoToCores, loss, onSeeLoss, admin }: { d: Detail; onGoToCores: () => void; loss: LossDetail | null; onSeeLoss: () => void; admin: Admin }) {
   const h = health(d);
   const n = countBy(d);
   const surveyed = d.survey_cores != null;
@@ -73,8 +77,19 @@ function Body({ d, onGoToCores, loss, onSeeLoss }: { d: Detail; onGoToCores: () 
   const lines = heldLines(d).slice(0, 3);
   return (
     <>
-      <h3 className="text-2xl leading-[30px] font-bold tracking-tight">{spanName(d)}</h3>
-      <p className="mt-1.5 flex flex-wrap gap-x-4 gap-y-0.5 text-[13px] text-muted-foreground"><Facts d={d} /></p>
+      <h3 className="text-2xl leading-[30px] font-bold tracking-tight">
+        {admin ? (
+          <>
+            <button type="button" className={link} aria-label={`Edit site ${d.site_a}`} onClick={() => admin.onEditSite("a")}>{d.site_a}</button>
+            {" - "}
+            <button type="button" className={link} aria-label={`Edit site ${d.site_b}`} onClick={() => admin.onEditSite("b")}>{d.site_b}</button>
+          </>
+        ) : spanName(d)}
+      </h3>
+      <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-0.5 text-[13px] text-muted-foreground">
+        <Facts d={d} />
+        {admin && <button type="button" className="btn ml-auto h-8! px-3!" onClick={() => admin.onEditSpan()}>Edit span</button>}
+      </div>
       <div className="mt-5 border-t pt-4">
         <div className="lbl">Free to reserve</div>
         <div className={`mt-0.5 flex items-center gap-2.5 text-[40px] leading-[46px] font-bold tracking-tight ${surveyed ? h.cls.replace("h-", "v-") : "text-muted-foreground"}`}>
@@ -96,7 +111,12 @@ function Body({ d, onGoToCores, loss, onSeeLoss }: { d: Detail; onGoToCores: () 
               ))}
             </dl>
           </>
-        ) : <p className="mt-1 text-[13px] text-muted-foreground">No survey count yet: no cores to show and it cannot be booked until an admin enters one. Cable size {d.cable_size}.</p>}
+        ) : admin ? (
+          <div className="mt-1 text-[13px]">
+            <p className="text-muted-foreground">Not surveyed: enter a survey count to make it bookable. Cable size {d.cable_size}.</p>
+            <button type="button" className="btn mt-2 h-8! px-3!" onClick={() => admin.onEditSpan("survey")}>Enter survey count</button>
+          </div>
+        ) : <p className="mt-1 text-[13px] text-muted-foreground">Not surveyed, cannot be booked. Cable size {d.cable_size}.</p>}
       </div>
       <div className="mt-5 flex items-center gap-2 border-t pt-4 text-[13px]" data-testid="inspector-loss">
         <span className="lbl">Loss</span>

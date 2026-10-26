@@ -50,3 +50,13 @@ const sign = (n: number) => (n > 0 ? "+" : n < 0 ? "−" : "");
 export const db = (n: number) => `${n.toFixed(2)} dB`;
 export const signedDb = (n: number) => `${sign(n)}${Math.abs(n).toFixed(2)} dB`;
 export const pct = (n: number) => `${sign(n)}${Math.abs(n).toFixed(1)}%`;
+
+// Date and time in Asia/Kuala_Lumpur, e.g. "26 Oct 2026, 14:05".
+export const when = (iso: string) =>
+  new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Kuala_Lumpur", day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(iso));
+
+// Reservation event types in plain words ("Approved by DEV admin1").
+export const EVENT_WORD: Record<string, string> = {
+  requested: "Requested", approved: "Approved", rejected: "Rejected", withdrawn: "Withdrawn", kept: "Kept",
+  release_requested: "Release requested", released: "Released", release_declined: "Release declined", corrected: "Corrected", assigned: "Cores assigned",
+};
