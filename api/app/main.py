@@ -15,6 +15,7 @@ from app.ingest.reservation_upload_router import router as reservation_upload_ro
 from app.ingest.site_master_router import router as site_master_router
 from app.inventory.router import router as inventory_router
 from app.loss.router import router as loss_router
+from app.map.router import router as map_router
 from app.reservations.router import router as reservations_router
 from app.routing.router import router as routing_router
 
@@ -29,6 +30,7 @@ app.include_router(reservation_upload_router)
 app.include_router(admin_edits_router)
 app.include_router(history_router)
 app.include_router(routing_router)
+app.include_router(map_router)
 
 
 @app.get("/api/health")
