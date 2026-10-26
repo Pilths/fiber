@@ -72,11 +72,12 @@ async function request<P extends Path<M>, M extends Method>(
   const headers: Record<string, string> = {};
   const dev = devUser();
   if (dev) headers["X-Dev-User"] = dev;
-  if (o.body !== undefined) headers["Content-Type"] = "application/json";
+  const form = o.body instanceof FormData; // multipart: the browser sets the boundary header
+  if (o.body !== undefined && !form) headers["Content-Type"] = "application/json";
   const res = await fetch(qs.size ? `${href}?${qs}` : href, {
     method: method.toUpperCase(),
     headers,
-    body: o.body === undefined ? undefined : JSON.stringify(o.body),
+    body: o.body === undefined ? undefined : form ? (o.body as FormData) : JSON.stringify(o.body),
   });
   if (!res.ok) {
     const detail = await res.json().catch(() => null);
@@ -91,4 +92,10 @@ export const api = {
   get: <P extends Path<"get">>(url: P, opts?: Options<Op<P, "get">, "get">) => request("get", url, opts),
   post: <P extends Path<"post">>(url: P, ...[opts]: {} extends Options<Op<P, "post">, "post"> ? [opts?: Options<Op<P, "post">, "post">] : [opts: Options<Op<P, "post">, "post">]) =>
     request("post", url, opts),
+  // Multipart upload of one file as field "file". The generated types have no multipart body, so this is untyped.
+  postFile: <P extends Path<"post">>(url: P, file: File) => {
+    const body = new FormData();
+    body.append("file", file);
+    return request("post", url, { body } as never);
+  },
 };

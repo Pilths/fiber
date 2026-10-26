@@ -10,6 +10,7 @@ import { Icon } from "@/components/Icon";
 import { LossCard } from "@/components/LossCard";
 import { Facts, Inspector } from "@/components/Inspector";
 import { PortGrid } from "@/components/PortGrid";
+import { Upload } from "@/components/Upload";
 import { Users } from "@/components/Users";
 import { Approvals, MyReservations, NeedsReview } from "@/components/Reservations";
 import { countBy, spanName, STATUS, STATUS_ORDER, type LossDetail, type SpanLoss } from "@/lib/status";
@@ -168,7 +169,7 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
             </>
           )}
           {view === "approvals" && <Approvals me={me} onChanged={refreshBell} />}
-          {view === "upload" && <Placeholder title="Upload" text="Excel upload and the validation report arrive in the upload session." />}
+          {view === "upload" && me.role === "admin" && <Upload />}
           {view === "users" && <Users me={me} />}
         </main>
       )}
@@ -253,14 +254,5 @@ function Cores({ d, selected, chosen, toggle, focusCoreId, onClear, onDone }: {
       )}
       <ChosenBar key={d.id} cores={chosen.map((c) => ({ id: c.id, number: c.number }))} free={d.free_to_reserve} onClear={onClear} onDone={onDone} />
     </>
-  );
-}
-
-function Placeholder({ title, text }: { title: string; text: string }) {
-  return (
-    <section className="card mx-auto max-w-3xl" aria-labelledby="ph-h">
-      <div className="card-h"><h2 id="ph-h">{title}</h2></div>
-      <p className="text-[13px] text-muted-foreground">{text}</p>
-    </section>
   );
 }
