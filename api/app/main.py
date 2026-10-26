@@ -16,6 +16,7 @@ from app.ingest.site_master_router import router as site_master_router
 from app.inventory.router import router as inventory_router
 from app.loss.router import router as loss_router
 from app.reservations.router import router as reservations_router
+from app.routing.router import router as routing_router
 
 app = FastAPI(title="Fiber Dashboard API")
 app.include_router(auth_router)
@@ -27,6 +28,7 @@ app.include_router(site_master_router)
 app.include_router(reservation_upload_router)
 app.include_router(admin_edits_router)
 app.include_router(history_router)
+app.include_router(routing_router)
 
 
 @app.get("/api/health")

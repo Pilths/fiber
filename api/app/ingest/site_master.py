@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 from app.ingest import checks
 from app.ingest.checks import blank, norm
 from app.ingest.excel import _json
+from app.routing.graph import invalidate as invalidate_routes
 
 BLANKS = {"", "tba", "n/a", "na", "-", "tbc"}
 HEADER_SCAN_ROWS = 10
@@ -584,4 +585,5 @@ def apply_upload(db: Session, admin_id: int, upload_id: int, override: dict[str,
         db.execute(text("UPDATE uploads SET status = 'confirmed', confirmed_at = now(), summary = CAST(:s AS jsonb) WHERE id = :i"),
                    {"s": json.dumps(s), "i": upload_id})
     db.commit()
+    invalidate_routes()
     return {"upload_id": upload_id, "sheets": sheets, "warnings": warnings}

@@ -19,6 +19,7 @@ from app.ingest import checks
 from app.ingest.reservation_import import add_cores
 from app.reservations.schemas import Reason
 from app.reservations.service import conflict
+from app.routing.graph import invalidate as invalidate_routes
 
 router = APIRouter(prefix="/api/admin", dependencies=[Depends(require_admin)])
 DB = Annotated[Session, Depends(get_db)]
@@ -196,6 +197,7 @@ def edit_span(db: DB, admin: Admin, sid: int, body: SpanBody) -> Edited:
                    {"a": changes.get("site_a_id", old["site_a_id"]), "b": changes.get("site_b_id", old["site_b_id"]), "i": sid})
     done = _log(db, admin, "span", sid, [(f, old[f], v) for f, v in changes.items()], body.reason)
     db.commit()
+    invalidate_routes()  # distance or site change alters the routing graph
     return Edited(id=sid, changed=done, history=history(db, "span", sid, 10))
 
 

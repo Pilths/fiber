@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 from app.ingest.excel import RowResult, _json
 from app.ingest.reservation_import import Skip, add_cores, ensure_span, find_span, place_reservation, port_pairs
 from app.inventory import service as inventory
+from app.routing.graph import invalidate as invalidate_routes
 
 REASON = "reservation upload"
 SPAN_FIELDS = ("region", "distance_km", "survey_cores")
@@ -478,5 +479,6 @@ def confirm(db: Session, admin_id: int, upload_id: int, excel_wins: list[dict[st
         db.execute(text("UPDATE uploads SET status = 'confirmed', confirmed_at = now(), summary = CAST(:s AS jsonb) WHERE id = :i"),
                    {"s": json.dumps(summary), "i": upload_id})
     db.commit()
+    invalidate_routes()  # new spans or distances
     return {"upload_id": upload_id, "counts": counts, "skipped": skipped, "warnings": ev.warnings,
             "ignored_reservation_rows": ev.counts()["ignored"]}
