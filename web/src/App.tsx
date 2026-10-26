@@ -11,12 +11,13 @@ import { HeldTable } from "@/components/HeldTable";
 import { Icon } from "@/components/Icon";
 import { LossCard } from "@/components/LossCard";
 import { Facts, Inspector } from "@/components/Inspector";
+import { NetworkMap } from "@/components/NetworkMap";
 import { PortGrid } from "@/components/PortGrid";
 import { RouteForm, RouteSection, RouteSummary, useRoutePlanner } from "@/components/RoutePlanner";
 import { Upload } from "@/components/Upload";
 import { Users } from "@/components/Users";
 import { Approvals, MyReservations, NeedsReview } from "@/components/Reservations";
-import { countBy, spanName, STATUS, STATUS_ORDER, type LossDetail, type SpanLoss } from "@/lib/status";
+import { countBy, inFilter, NO_FILTER, spanName, STATUS, STATUS_ORDER, type LossDetail, type SpanFilter, type SpanLoss } from "@/lib/status";
 
 type Span = components["schemas"]["SpanSummary"];
 type Detail = components["schemas"]["SpanDetail"];
@@ -85,6 +86,7 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
   const [drawerCore, setDrawerCore] = useState<number | null>(null);
   const [editSpan, setEditSpan] = useState<{ focus?: "survey" } | null>(null);
   const [editSite, setEditSite] = useState<number | null>(null);
+  const [filter, setFilter] = useState<SpanFilter>(NO_FILTER);
   const [mode, setModeState] = useState<"span" | "route">(location.hash.startsWith("#route=") ? "route" : "span");
   const rp = useRoutePlanner(mode === "route" && view === "map", version);
   // Switching modes clears the other mode's selection and hash.
@@ -185,6 +187,17 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
     h?.focus({ preventScroll: true });
   };
   const planRoute = (site: string) => { setMode("route"); rp.setFrom(site); rp.setTo(""); };
+  // Map: a site click lists its spans in Find (span mode) or fills From, then To (route mode); Esc clears the selection.
+  const mapSite = (name: string) => {
+    if (mode === "span") setFilter((f) => ({ ...f, q: name }));
+    else if (!rp.from || rp.to) { rp.setFrom(name); rp.setTo(""); }
+    else rp.setTo(name);
+  };
+  const clearSelection = () => {
+    if (mode === "route") { rp.clear(); return; }
+    setSpanId(null); setDetail(null); setSelected(new Set()); setDrawerCore(null);
+    if (location.hash.startsWith("#span=")) history.replaceState(null, "", location.pathname);
+  };
   const routeName = rp.option && `${rp.option.spans[0].site_a} to ${rp.option.spans[rp.option.spans.length - 1].site_b}`;
   const goToLoss = () => {
     const h = document.getElementById("loss-h");
@@ -212,20 +225,19 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
       )}
       {view === "map" && (
         <main className="grid grid-cols-12 gap-4 px-6 pt-6 pb-10">
-          <section className={`card col-span-8 flex flex-col ${mapMin ? "self-start" : ""}`} aria-labelledby="map-h">
+          <section className="card col-span-8 flex flex-col self-start" aria-labelledby="map-h">
             <div className={`card-h ${mapMin ? "mb-0 border-b-0 pb-0" : ""}`}>
               <h2 id="map-h">Network map</h2>
               <small className="hint">{mode === "route" ? (routeName ? `Route ${routeName} selected` : "No route selected") : detail ? `${spanName(detail)} selected` : "Nothing selected"}</small>
             </div>
-            {/* The MapLibre map is TASK-054; this card holds its place. */}
             {!mapMin && (
-              <div className="grid flex-1 place-items-center rounded-md border border-dashed border-line bg-[#f4f6f8] p-8 text-center text-[13px] text-muted-foreground">
-                <p><b className="mb-1 block text-sm font-semibold text-foreground">Map arrives in the map session</b>Search and the list work without it.</p>
-              </div>
+              <NetworkMap version={version} onSelectSpan={(id) => open(id)} onSite={mapSite} onClear={clearSelection}
+                selectedIds={mode === "route" ? rp.option?.spans.map((s) => s.span_id) ?? [] : spanId != null ? [spanId] : []}
+                routeKey={mode === "route" && rp.option ? `${rp.idx}-${routeName}` : null} visible={(p) => inFilter(p, filter)} />
             )}
           </section>
           <div className="col-span-4 flex min-w-0 flex-col gap-4">
-            <FindCard spans={spans} selectedId={spanId} onSelect={(id) => open(id)} loss={lossList} mode={mode} onMode={setMode} route={<RouteForm rp={rp} />} />
+            <FindCard spans={spans} selectedId={spanId} onSelect={(id) => open(id)} loss={lossList} mode={mode} onMode={setMode} route={<RouteForm rp={rp} />} filter={filter} onFilter={setFilter} />
             <Inspector detail={detail} loading={spanId != null && !detail} onGoToCores={goToCores} loss={loss?.span_id === spanId ? loss : null} onSeeLoss={goToLoss} admin={admin}
               onPlanRoute={planRoute} route={mode === "route" ? <RouteSummary key={`${rp.idx}-${routeName}`} rp={rp} onGo={goToRoute} /> : undefined} />
           </div>

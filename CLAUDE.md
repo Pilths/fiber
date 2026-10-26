@@ -10,7 +10,7 @@ Read before working: `docs/PRD.md` (requirements), `docs/architecture.md` (desig
 - Python dependencies: edit `api/requirements.in`, then regenerate `api/requirements.lock` with `pip freeze` inside a `python:3.14.8-slim` container. npm dependencies: `npm install --save-exact` inside the web container so `web/package-lock.json` updates.
 - Host venv for the editor and pyright only (the app runs in Docker): `python3 -m venv --without-pip api/.venv && python3 -m pip --python api/.venv/bin/python install -r api/requirements.lock`.
 - UI tests: `docker compose exec web npx playwright install --with-deps chromium` once after each web image rebuild, then `docker compose exec web npm run test:e2e`.
-- Map basemap: `./scripts/get-tiles.sh` once per machine with internet (downloads `web/public/map/malaysia.pmtiles`, git-ignored, never shipped by git or email).
+- Map basemap: `./scripts/get-tiles.sh` once per machine with internet (downloads `web/public/map/malaysia.pmtiles` and the label fonts into `web/public/map/fonts/`, git-ignored, never shipped by git or email; `FORCE=1` downloads again). Without them the map falls back to a plain overlay with a note.
 - Ship to another machine: `git archive --format=zip -o fiber.zip HEAD` (source only; images are built on each machine).
 
 ## Domain rules

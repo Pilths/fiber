@@ -114,6 +114,7 @@ export function useRoutePlanner(active: boolean, version: number) {
 
   const reset = () => { setIdx(null); setSpanIdx(0); };
   return {
+    clear: reset,
     eps, fromText, toText, cores, sort, need, from, to, res, errs, loading, option, idx, spanIdx, setSpanIdx,
     setFrom: (t: string) => { setFromText(t); reset(); },
     setTo: (t: string) => { setToText(t); reset(); },

@@ -29,6 +29,13 @@ export const countBy = (d: { cores: { status: CoreStatus }[] }) => {
   return n;
 };
 
+// Find filters live in the Dashboard so the map dims the same spans the list hides.
+export type SpanFilter = { q: string; region: string; routeType: string };
+export const NO_FILTER: SpanFilter = { q: "", region: "", routeType: "" };
+// Region and route type only; the text search narrows the list, not the map.
+export const inFilter = (s: { region: string | null; route_type: string | null }, f: SpanFilter) =>
+  (!f.region || s.region === f.region) && (!f.routeType || s.route_type === f.routeType);
+
 export const spanName = (s: { site_a: string; site_b: string }) => `${s.site_a} - ${s.site_b}`;
 
 export const inputCls =

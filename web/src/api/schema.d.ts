@@ -868,6 +868,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/map/spans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Spans */
+        get: operations["spans_api_map_spans_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/map/sites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Sites */
+        get: operations["sites_api_map_sites_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -3750,6 +3784,76 @@ export interface operations {
                 span_ids: number[];
                 cores_needed: number;
             };
+            header?: {
+                "x-dev-user"?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                fiber_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    spans_api_map_spans_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-dev-user"?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                fiber_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sites_api_map_sites_get: {
+        parameters: {
+            query?: never;
             header?: {
                 "x-dev-user"?: string | null;
             };

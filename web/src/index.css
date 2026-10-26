@@ -177,3 +177,35 @@
 .rb-sh { display: block; flex: none; }
 .rb-sh.dc { width: 14px; height: 14px; background: var(--ink); }
 .rb-sh.st { width: 12px; height: 12px; transform: rotate(45deg); background: #fff; border: 2px solid var(--ink); }
+
+/* Network map overlay (NetworkMap.tsx), from the map mock: chips and site markers are DOM buttons over the lines. */
+.mbtn { display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 12px; border: 1px solid var(--line); border-radius: 6px; background: #fff; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.mbtn:hover { background: var(--raised); }
+.lrow { display: flex; align-items: center; gap: 10px; min-height: 34px; font-size: 14px; }
+.lrow input { width: 16px; height: 16px; accent-color: var(--blue); flex: none; }
+.lrow input[aria-disabled="true"] { cursor: not-allowed; }
+.mchip { position: absolute; z-index: 5; transform: translate(-50%, -50%); display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 9px; border-radius: 999px; border: 1px solid; font-size: 12px; line-height: 1; font-weight: 700; white-space: nowrap; cursor: pointer; }
+.mchip .ic { width: 11px; height: 11px; }
+.mchip.h-green { border-color: var(--green); } .mchip.h-amber { border-color: var(--amber); } .mchip.h-red { border-color: var(--red); }
+.mchip.h-ns { font-weight: 500; }
+.mchip.on { border-width: 2px; padding: 0 8px; z-index: 6; }
+.mchip:focus-visible, .msite:focus-visible { outline-offset: 3px; z-index: 7; }
+.mname { position: absolute; left: 50%; bottom: calc(100% + 5px); transform: translateX(-50%); padding: 0 8px; border-radius: 3px; background: #fff; color: var(--blue); font-size: 12px; line-height: 18px; font-weight: 700; white-space: nowrap; pointer-events: none; }
+.msite { position: absolute; z-index: 4; transform: translate(-50%, -50%); width: 26px; height: 26px; display: grid; place-items: center; border: 0; border-radius: 50%; background: none; cursor: pointer; padding: 0; }
+.msite .shape { display: block; }
+.msite .shape.dc { width: 14px; height: 14px; background: var(--ink); border: 1.5px solid #fff; outline: 1px solid var(--ink); }
+.msite .shape.st { width: 12px; height: 12px; transform: rotate(45deg); background: #fff; border: 2px solid var(--ink); }
+.msite .code { position: absolute; top: 24px; left: 50%; transform: translateX(-50%); padding: 0 6px; border-radius: 3px; background: rgb(255 255 255 / .9); font-size: 12px; line-height: 18px; font-weight: 700; white-space: nowrap; }
+.msite.end::before { content: ""; position: absolute; inset: -1px; border: 2.5px solid var(--blue); border-radius: 50%; }
+.msite.end .code { color: var(--blue); }
+.msite.end .shape.dc { background: var(--blue); outline-color: var(--blue); }
+.msite.end .shape.st { border-color: var(--blue); }
+.mleg { position: absolute; z-index: 10; left: 12px; bottom: 12px; display: grid; grid-template-columns: auto auto; gap: 6px 18px; padding: 10px 12px; background: #fff; border: 1px solid var(--border); border-radius: 6px; font-size: 12px; line-height: 16px; color: var(--muted-ink); }
+.mleg li { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+.mleg .lc { display: inline-flex; align-items: center; gap: 3px; height: 18px; padding: 0 8px; border-radius: 999px; border: 1px solid; font-weight: 700; font-size: 11px; }
+.mleg .lc .ic { width: 10px; height: 10px; }
+.mleg .lc.h-green { border-color: var(--green); } .mleg .lc.h-amber { border-color: var(--amber); } .mleg .lc.h-red { border-color: var(--red); }
+.ll { width: 26px; height: 0; border-top: 6px solid var(--ink); flex: none; }
+.ll.m { border-top-width: 3px; } .ll.b { border-top: 3px dashed var(--ink); } .ll.s { border-top: 4px solid var(--blue); }
+/* MapLibre's attribution sits bottom right, clear of the key. */
+.maplibregl-ctrl-attrib { font-size: 11px; }

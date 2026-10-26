@@ -1,7 +1,7 @@
-import { useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import type { components } from "@/api/schema";
 import { Icon } from "@/components/Icon";
-import { health, LEVEL, spanName, type SpanLoss } from "@/lib/status";
+import { health, inFilter, LEVEL, spanName, type SpanFilter, type SpanLoss } from "@/lib/status";
 
 type Span = components["schemas"]["SpanSummary"];
 
@@ -15,19 +15,21 @@ export function FreeBadge({ s }: { s: Span }) {
 }
 
 // Find card: "Span or site" lists every span (filters narrow it); "Route A to B" shows the route planner form (RoutePlanner.tsx).
-export function FindCard({ spans, selectedId, onSelect, loss, mode, onMode, route }: {
+export function FindCard({ spans, selectedId, onSelect, loss, mode, onMode, route, filter, onFilter }: {
   spans: Span[] | null; selectedId: number | null; onSelect: (id: number) => void; loss: SpanLoss[];
   mode: "span" | "route"; onMode: (m: "span" | "route") => void; route: ReactNode;
+  filter: SpanFilter; onFilter: (f: SpanFilter) => void;
 }) {
-  const [q, setQ] = useState("");
-  const [region, setRegion] = useState("");
-  const [routeType, setRouteType] = useState("");
+  const { q, region, routeType } = filter;
+  const setQ = (v: string) => onFilter({ ...filter, q: v });
+  const setRegion = (v: string) => onFilter({ ...filter, region: v });
+  const setRouteType = (v: string) => onFilter({ ...filter, routeType: v });
   const all = spans ?? [];
   // Loss marker only for amber or worse, so the list stays quiet.
   const warn = new Map(loss.filter((l) => l.level && l.level !== "green").map((l) => [l.span_id, LEVEL[l.level!]]));
   const opts = (k: "region" | "route_type") => [...new Set(all.map((s) => s[k]).filter((v): v is string => !!v))].sort();
   const t = q.trim().toLowerCase();
-  const shown = all.filter((s) => (!region || s.region === region) && (!routeType || s.route_type === routeType) && (!t || spanName(s).toLowerCase().includes(t)));
+  const shown = all.filter((s) => inFilter(s, filter) && (!t || spanName(s).toLowerCase().includes(t)));
 
   return (
     <section className="card" aria-labelledby="find-h">
