@@ -10,7 +10,6 @@ const PATHS = {
   co: <rect x="2.8" y="2.8" width="10.4" height="10.4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeDasharray="2.6 1.8" />,
   lo: <><path d="M8 2.2l6.4 11.3H1.6z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" /><path d="M8 6.6v3M8 11.5v.1" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></>,
   ex: <><circle cx="8" cy="8" r="5.8" fill="none" stroke="currentColor" strokeWidth="1.8" /><path d="M8 4.8v3.6M8 11v.1" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></>,
-  bn: <path d="M8 2.5l6 10.5H2z" fill="currentColor" />, // bottleneck: fewest free on a route
   ns: <path d="M3 8h10" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />,
 };
 export type IconName = keyof typeof PATHS;

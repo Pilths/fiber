@@ -1,10 +1,9 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
+import { Fragment, useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import { api, ApiError, errorText } from "@/api/client";
 import type { components } from "@/api/schema";
 import { useCustomerPicker } from "@/components/ChosenBar";
 import { Icon } from "@/components/Icon";
-import { LossPill } from "@/components/LossCard";
-import { db, health } from "@/lib/status";
+import { db } from "@/lib/status";
 
 // Route planner (TASK-051, TASK-076, route loss line of TASK-040). The routes API returns plain dicts, so the shapes live here.
 type Span = components["schemas"]["SpanSummary"];
@@ -16,8 +15,8 @@ export type RouteSpan = {
   surveyed: boolean; segment_label: string | null; measured: boolean;
 };
 export type RouteOption = {
-  spans: RouteSpan[]; total_km: number; distance_incomplete: boolean; estimated_db: number | null; fewest_free: number;
-  bottleneck_span_id: number; measured_spans: number; total_spans: number; insufficient: boolean; best_match: boolean;
+  spans: RouteSpan[]; total_km: number; distance_incomplete: boolean; estimated_db: number | null;
+  measured_spans: number; total_spans: number; insufficient: boolean; best_match: boolean;
 };
 type Result = { options: RouteOption[]; message: string | null };
 type Errs = Partial<Record<"from" | "to" | "cores_needed" | "form", string>>;
@@ -47,6 +46,9 @@ function fieldErrors(e: unknown): Errs {
 }
 
 const isShort = (s: RouteSpan, need: number) => !s.surveyed || s.free_to_reserve < need;
+const shortText = (s: RouteSpan, need: number) =>
+  s.surveyed ? `Not enough free cores on ${s.name}: ${s.free_to_reserve} free, ${need} needed` : `${s.name} is not surveyed`;
+const totalKm = (op: RouteOption) => `${km(op.total_km)}${op.distance_incomplete ? "+" : ""}`;
 
 export function useRoutePlanner(active: boolean, version: number) {
   const [eps, setEps] = useState<Endpoint[]>([]);
@@ -118,7 +120,7 @@ export function useRoutePlanner(active: boolean, version: number) {
     select: (i: number) => {
       const o = res?.options[i];
       setIdx(i);
-      setSpanIdx(Math.max(0, o ? o.spans.findIndex((s) => s.span_id === o.bottleneck_span_id) : 0));
+      setSpanIdx(Math.max(0, o ? o.spans.findIndex((s) => isShort(s, need ?? 0)) : 0)); // the short span, if any
     },
   };
 }
@@ -199,34 +201,30 @@ export function RouteForm({ rp }: { rp: RoutePlanner }) {
 }
 
 function OptionCard({ op, i, need, pressed, onClick }: { op: RouteOption; i: number; need: number; pressed: boolean; onClick: () => void }) {
-  const bn = op.spans.find((s) => s.span_id === op.bottleneck_span_id)!;
   const short = op.spans.find((s) => isShort(s, need));
   return (
     <button type="button" aria-pressed={pressed} onClick={onClick} data-testid="route-option"
       className="block w-full rounded-md border border-l-3 border-border border-l-transparent px-3.5 py-2.5 text-left text-[13px] hover:bg-ground focus-visible:-outline-offset-3 aria-pressed:border-l-blue aria-pressed:bg-blue-bg">
-      <span className="flex items-start justify-between gap-2">
-        <span className="text-sm"><b className="font-semibold">Option {i + 1}</b>, <b>{op.total_spans}</b> {op.total_spans === 1 ? "span" : "spans"}, <b>{km(op.total_km)}</b> km</span>
+      <span className="mb-0.5 flex items-start justify-between gap-2">
+        <b className="text-sm font-semibold">Option {i + 1}</b>
         {op.best_match && <span className="pill h-blue">Best match</span>}
       </span>
-      {op.distance_incomplete && <span className="block text-muted-foreground">Some spans have no distance</span>}
       <span className="block text-muted-foreground">
-        {op.estimated_db == null ? "No dB estimate" : <>Estimated <b className="text-foreground">{db(op.estimated_db)}</b></>}, measured <b className="text-foreground">{op.measured_spans} of {op.total_spans}</b>
+        <b className="text-foreground">{op.total_spans}</b> {op.total_spans === 1 ? "span" : "spans"}, <b className="text-foreground">{totalKm(op)}</b> km,{" "}
+        {op.estimated_db == null ? "no dB estimate" : <><b className="text-foreground">{db(op.estimated_db)}</b> estimated</>}
       </span>
-      {op.insufficient && short ? (
-        <span className="mt-0.5 flex items-start gap-1.5 font-semibold text-red">
-          <Icon name="fl" className="ic mt-[3px]" />
-          <span>{short.surveyed ? <>Lowest free <b>{short.free_to_reserve}</b> on {short.name}, short for {need}</> : <>{short.name} not surveyed, short for {need}</>}</span>
+      <span className="block text-muted-foreground">{op.measured_spans} of {op.total_spans} spans measured</span>
+      {op.insufficient && short && (
+        <span className="mt-0.5 flex items-start gap-1.5 font-semibold text-red" data-testid="route-short">
+          <Icon name="fl" className="ic mt-[3px]" /><span>{shortText(short, need)}</span>
         </span>
-      ) : (
-        <span className="mt-0.5 block">Lowest free <b>{op.fewest_free}</b>, bottleneck <Icon name="bn" className="ic inline align-[-1px]" /> <b className="font-semibold">{bn.name}</b></span>
       )}
     </button>
   );
 }
 
 // ---------- Inspector, route state ----------
-export function RouteSummary({ rp, spans, onGo }: { rp: RoutePlanner; spans: Span[] | null; onGo: () => void }) {
-  const [all, setAll] = useState(false);
+export function RouteSummary({ rp, onGo }: { rp: RoutePlanner; onGo: () => void }) {
   const op = rp.option;
   if (!op) {
     return (
@@ -237,12 +235,7 @@ export function RouteSummary({ rp, spans, onGo }: { rp: RoutePlanner; spans: Spa
     );
   }
   const need = rp.need ?? 0;
-  const info = (id: number) => spans?.find((s) => s.id === id);
-  const bi = op.spans.findIndex((s) => s.span_id === op.bottleneck_span_id);
-  const bn = op.spans[bi];
-  const h = op.insufficient ? { cls: "h-red", icon: "fl" as const, word: "Short" } : health({ survey_cores: 0, free_to_reserve: op.fewest_free });
-  const shorts = op.spans.filter((s) => isShort(s, need));
-  const shown = all || rp.spanIdx > 2 ? op.spans : op.spans.slice(0, 3);
+  const short = op.insufficient ? op.spans.find((s) => isShort(s, need)) : undefined;
   return (
     <div className="flex flex-1 flex-col" data-testid="route-summary">
       <p className="lbl">Route, option {(rp.idx ?? 0) + 1}</p>
@@ -250,63 +243,22 @@ export function RouteSummary({ rp, spans, onGo }: { rp: RoutePlanner; spans: Spa
       <p className="mt-1 text-[13px] text-muted-foreground"><b className="text-foreground">{need}</b> {need === 1 ? "core" : "cores"} needed per span</p>
       <dl className="mt-4 grid grid-cols-3 rounded-md border">
         <div className="p-3"><dt className="lbl">Spans</dt><dd className="text-2xl font-bold">{op.total_spans}</dd></div>
-        <div className="border-l p-3"><dt className="lbl">Distance</dt><dd className="text-2xl font-bold">{km(op.total_km)}<small className="ml-1 text-xs font-normal text-muted-foreground">km</small></dd></div>
-        <div className="border-l p-3"><dt className="lbl">Lowest free</dt>
-          <dd className={`flex flex-wrap items-center gap-x-2 text-2xl font-bold ${h.cls.replace("h-", "v-")}`}>{op.fewest_free}<span className={`pill tracking-normal ${h.cls}`}><Icon name={h.icon} />{h.word}</span></dd>
+        <div className="border-l p-3"><dt className="lbl">Distance</dt><dd className="text-2xl font-bold">{totalKm(op)}<small className="ml-1 text-xs font-normal text-muted-foreground">km</small></dd></div>
+        <div className="border-l p-3"><dt className="lbl">dB estimate</dt>
+          <dd className="text-2xl font-bold">{op.estimated_db == null ? "–" : op.estimated_db.toFixed(2)}{op.estimated_db != null && <small className="ml-1 text-xs font-normal text-muted-foreground">dB</small>}</dd>
         </div>
       </dl>
-      <p className="mt-2.5 text-[13px] text-muted-foreground">
-        Bottleneck <b className="text-foreground">{bn.name}</b>, {bn.free_to_reserve} free{info(bn.span_id)?.survey_cores != null && ` of ${info(bn.span_id)!.survey_cores} surveyed`}.
-        {" "}{op.estimated_db == null ? "No loss estimate: a span has no distance." : <>Estimated loss <b className="text-foreground">{db(op.estimated_db)}</b>, {op.measured_spans} of {op.total_spans} spans measured.</>}
-        {op.distance_incomplete && op.estimated_db != null && " Some spans have no distance."}
-      </p>
-      {shorts.length > 0 && (
+      {short && (
         <p className="mt-3 flex gap-2 rounded-md border border-l-3 border-red-bd border-l-red bg-red-bg px-3 py-2.5 text-[13px] font-medium text-red">
-          <Icon name="fl" className="ic mt-[3px]" />
-          <span><b>Not enough free cores</b> on {shorts.map((s) => s.surveyed ? `${s.name} (${s.free_to_reserve} free)` : `${s.name} (not surveyed)`).join(", ")}. Need {need}. Pick another option or lower the cores needed.</span>
+          <Icon name="fl" className="ic mt-[3px]" /><span>{shortText(short, need)}. Pick another option or lower the cores needed.</span>
         </p>
       )}
-      <div className="mt-4 border-t pt-3">
-        <div className="lbl">Spans on this route</div>
-        <ol>
-          {shown.map((s, i) => {
-            const sh = isShort(s, need), sp = info(s.span_id);
-            return (
-              <li key={s.span_id}>
-                <button type="button" aria-current={i === rp.spanIdx ? "true" : undefined} onClick={() => rp.setSpanIdx(i)}
-                  className="grid min-h-11 w-full grid-cols-[20px_1fr_auto] items-center gap-2 border-b border-l-3 border-b-rule border-l-transparent py-1 pl-2 text-left text-[13px] hover:bg-ground focus-visible:-outline-offset-3 aria-[current]:border-l-blue aria-[current]:bg-blue-bg">
-                  <span className="text-muted-foreground">{i + 1}</span>
-                  <span className="min-w-0">
-                    <span className="block truncate font-semibold">{s.name}</span>
-                    <span className="block text-xs text-muted-foreground">{[sp?.route_type, s.km == null ? "no distance" : `${km(s.km)} km`].filter(Boolean).join(", ")}</span>
-                  </span>
-                  <span className="flex items-center gap-1.5 pr-1">
-                    {sh ? <span className="pill h-red"><Icon name="fl" />{s.surveyed ? "short" : "not surveyed"}</span>
-                      : s.span_id === op.bottleneck_span_id && <span className="inline-flex items-center gap-1 text-xs font-semibold"><Icon name="bn" />bottleneck</span>}
-                    {s.surveyed && <FreePill n={s.free_to_reserve} />}
-                  </span>
-                </button>
-              </li>
-            );
-          })}
-        </ol>
-        {op.spans.length > shown.length && (
-          <button type="button" className="mt-2 font-semibold text-blue underline underline-offset-2 hover:no-underline" onClick={() => setAll(true)}>
-            Show {op.spans.length - shown.length} more
-          </button>
-        )}
-      </div>
       <div className="-mx-5 mt-auto border-t px-5 pt-5">
-        <button type="button" className="btn w-full" onClick={onGo}>Go to ribbon, table and Reserve</button>
+        <button type="button" className="btn w-full" onClick={onGo}>Go to route table and Reserve</button>
       </div>
     </div>
   );
 }
-
-const FreePill = ({ n }: { n: number }) => {
-  const h = health({ survey_cores: 0, free_to_reserve: n });
-  return <span className={`pill min-w-11 justify-center gap-[5px] ${h.cls}`}><Icon name={h.icon} className="size-2.5" />{h.value}<span className="sr-only"> free, {h.word}</span></span>;
-};
 
 // ---------- Bottom section, route state ----------
 export function RouteSection({ rp, spans, onDone }: { rp: RoutePlanner; spans: Span[] | null; onDone: () => void }) {
@@ -320,121 +272,70 @@ export function RouteSection({ rp, spans, onDone }: { rp: RoutePlanner; spans: S
     api.get("/api/loss/route", { query: { span_ids: ids } }).then((r) => !stale && setLoss(r)).catch(() => !stale && setLoss(null));
     return () => { stale = true; };
   }, [ids, freeSum]);
-  const info = (id: number) => spans?.find((s) => s.id === id);
-  const surveyedSum = op.spans.reduce((n, s) => n + (info(s.span_id)?.survey_cores ?? 0), 0);
+  const type = (id: number) => spans?.find((s) => s.id === id)?.route_type ?? "–";
   const first = op.spans[0].site_a, last = op.spans[op.spans.length - 1].site_b;
   return (
     <section className="card col-span-12" aria-labelledby="route-h" data-testid="route-section">
-      <div className="card-h items-center">
-        <div className="flex min-w-0 flex-wrap items-baseline gap-x-5 gap-y-1">
-          <h2 id="route-h" tabIndex={-1} className="outline-offset-4">Route <span className="font-normal text-muted-foreground">option {(rp.idx ?? 0) + 1}, {first} to {last}</span></h2>
-          <p className="flex gap-4 text-[13px] text-muted-foreground">
-            <span><b className="mr-1 text-base text-foreground">{op.total_spans}</b>spans</span>
-            <span><b className="mr-1 text-base text-foreground">{km(op.total_km)}</b>km{op.distance_incomplete && " (some spans have no distance)"}</span>
-            <span><b className="mr-1 text-base text-foreground">{op.fewest_free}</b>lowest free</span>
-          </p>
-        </div>
+      <div className="card-h items-center! justify-start! gap-4!">
+        <h2 id="route-h" tabIndex={-1} className="outline-offset-4">
+          <span className="sr-only">Route option {(rp.idx ?? 0) + 1}, {first} to {last}: </span>
+          {op.total_spans} {op.total_spans === 1 ? "span" : "spans"}, {totalKm(op)} km, {op.estimated_db == null ? "No dB estimate" : `${db(op.estimated_db)} est.`}
+        </h2>
+        <Strip rp={rp} op={op} need={need} />
       </div>
       <div className="grid grid-cols-[minmax(0,1fr)_320px] items-start gap-6">
-        <div className="min-w-0">
-          <Ribbon rp={rp} op={op} need={need} spans={spans} />
-          <ul className="mt-3.5 flex flex-wrap gap-x-[18px] gap-y-1.5 text-xs text-muted-foreground" aria-label="Ribbon key">
-            <li className="flex items-center gap-1.5"><span className="rb-sh dc" aria-hidden />Data centre</li>
-            <li className="flex items-center gap-1.5"><span className="rb-sh st scale-75" aria-hidden />Other site</li>
-            <li className="flex items-center gap-1.5"><span className="rb-ll" aria-hidden />Trunk</li>
-            <li className="flex items-center gap-1.5"><span className="rb-ll m" aria-hidden />Metro</li>
-            <li className="flex items-center gap-1.5"><span className="rb-ll b" aria-hidden />Bespoke</li>
-            <li className="flex items-center gap-1.5"><span className="rb-sw" aria-hidden><Icon name="bn" /></span>Bottleneck: fewest free on route</li>
-            <li className="flex items-center gap-1.5"><span className="rb-sw x hatch-red" aria-hidden><Icon name="fl" /></span>Short: fewer free than needed, or not surveyed</li>
-          </ul>
-        </div>
+        <table className="tbl [&_tbody_th]:h-11 [&_td]:h-11" data-testid="route-table">
+          <caption className="sr-only">Spans on this route, in travel order, with loss and free cores</caption>
+          <thead><tr>
+            <th scope="col" className="pl-2">#</th><th scope="col">Span</th><th scope="col">Type</th><th scope="col">From → to</th>
+            <th scope="col" className="text-right!">km</th><th scope="col" className="text-right!">Est. loss (dB)</th>
+            <th scope="col" className="text-right!">Measured</th><th scope="col" className="pr-2! text-right!">Free cores</th>
+          </tr></thead>
+          <tbody>
+            {op.spans.map((s, i) => {
+              const sh = isShort(s, need), l = loss?.spans[i], sel = i === rp.spanIdx;
+              return (
+                <tr key={s.span_id} aria-selected={sel} className={sel ? "bg-blue-bg [&>td:first-child]:shadow-[inset_3px_0_0_var(--blue)]" : ""}>
+                  <td className="pl-2 text-muted-foreground">{i + 1}</td>
+                  <th scope="row" className="py-1.5 text-left">
+                    <button type="button" className="text-left font-semibold underline decoration-line underline-offset-4 hover:text-blue" onClick={() => rp.setSpanIdx(i)}>{s.name}</button>
+                  </th>
+                  <td>{type(s.span_id)}</td>
+                  <td>{s.site_a} → {s.site_b}</td>
+                  <td className="text-right whitespace-nowrap">{s.km == null ? "–" : km(s.km)}</td>
+                  <td className="text-right whitespace-nowrap">{l?.calculated_db == null ? "–" : l.calculated_db.toFixed(2)}</td>
+                  <td className="text-right whitespace-nowrap">{!l ? "–" : l.measured_db == null ? <span className="text-muted-foreground">Not measured</span> : db(l.measured_db)}</td>
+                  <td className="pr-2! text-right whitespace-nowrap">
+                    {sh ? <span className="inline-flex items-center gap-1 font-semibold text-red"><Icon name="fl" className="size-3" />{s.surveyed ? s.free_to_reserve : "Not surveyed"}<span className="sr-only"> short</span></span>
+                      : s.free_to_reserve}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+          <tfoot className="font-bold [&_td]:border-t [&_td]:border-b-0 [&_td]:border-t-foreground [&_td]:pr-4 [&_td]:whitespace-nowrap">
+            <tr>
+              <td colSpan={2} className="pl-2">Total, {op.total_spans} {op.total_spans === 1 ? "span" : "spans"}</td>
+              <td /><td />
+              <td className="text-right">{totalKm(op)}{op.distance_incomplete && <span className="sr-only"> (some spans have no distance)</span>}</td>
+              <td className="text-right">{op.estimated_db == null ? "–" : op.estimated_db.toFixed(2)}</td>
+              <td className="text-right">{op.measured_spans} of {op.total_spans} measured</td>
+              <td className="pr-2!" />
+            </tr>
+          </tfoot>
+        </table>
         <ReserveBox key={ids} op={op} need={need} onDone={onDone} />
       </div>
-
-      <div data-testid="route-loss" className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-2 rounded-md border px-4 py-3 text-[13px]">
-        <span className="lbl">Route loss</span>
-        {!loss ? <span className="text-muted-foreground">Loading loss...</span> : (
-          <>
-            <span>Total calculated <b>{loss.total_calculated_db == null ? "Not every span has a distance" : db(loss.total_calculated_db)}</b></span>
-            <span>Total measured <b>{loss.total_measured_db == null ? "Not all spans measured" : db(loss.total_measured_db)}</b></span>
-            <span className="flex items-center gap-2">Overall level {loss.level ? <LossPill l={{ level: loss.level, deviation_pct: null }} /> : <b>-</b>}</span>
-            <span className="text-muted-foreground">Worst span sets the level. {op.measured_spans} of {op.total_spans} spans measured.</span>
-          </>
-        )}
-      </div>
-
-      <table className="tbl mt-4" data-testid="route-table">
-        <caption className="sr-only">Spans on this route, in travel order, with free cores and loss</caption>
-        <thead><tr>
-          <th scope="col">#</th><th scope="col">Span</th><th scope="col">From to</th><th scope="col" className="text-right!">km</th>
-          <th scope="col" className="text-right!">Surveyed</th><th scope="col" className="text-right!">Free</th>
-          <th scope="col" className="text-right!">Calculated</th><th scope="col" className="text-right!">Measured</th><th scope="col" className="pr-0!">Loss level</th>
-        </tr></thead>
-        <tbody>
-          {op.spans.map((s, i) => {
-            const sh = isShort(s, need), l = loss?.spans[i], sel = i === rp.spanIdx;
-            return (
-              <tr key={s.span_id} aria-selected={sel} className={sel ? "bg-blue-bg [&>td:first-child]:shadow-[inset_3px_0_0_var(--blue)]" : ""}>
-                <td className="pl-2">{i + 1}</td>
-                <th scope="row" className="text-left">
-                  <button type="button" className="text-left font-semibold underline decoration-line underline-offset-4 hover:text-blue" onClick={() => rp.setSpanIdx(i)}>{s.name}</button>
-                  {s.segment_label && <span className="block text-xs font-normal text-muted-foreground">Segment {s.segment_label}</span>}
-                </th>
-                <td>{s.site_a} to {s.site_b}</td>
-                <td className="text-right font-semibold whitespace-nowrap">{s.km == null ? "No distance" : km(s.km)}</td>
-                <td className="text-right">{info(s.span_id)?.survey_cores ?? "Not surveyed"}</td>
-                <td className="text-right whitespace-nowrap">
-                  <span className="inline-flex items-center gap-2">
-                    {sh ? <span className="pill h-red"><Icon name="fl" />{s.surveyed ? "short" : "not surveyed"}</span>
-                      : s.span_id === op.bottleneck_span_id && <span className="inline-flex items-center gap-1 text-xs font-semibold"><Icon name="bn" />bottleneck</span>}
-                    <b className={sh ? "text-red" : ""}>{s.surveyed ? s.free_to_reserve : "-"}</b>
-                  </span>
-                </td>
-                <td className="text-right whitespace-nowrap">{!l ? "-" : l.calculated_db == null ? "No distance" : db(l.calculated_db)}</td>
-                <td className="text-right whitespace-nowrap">{!l ? "-" : l.measured_db == null ? <span className="text-muted-foreground">Not measured</span> : db(l.measured_db)}</td>
-                <td className="pr-0">{l?.level ? <LossPill l={l} /> : <span className="text-muted-foreground">-</span>}</td>
-              </tr>
-            );
-          })}
-        </tbody>
-        <tfoot className="font-bold [&_td]:h-12 [&_td]:border-t [&_td]:border-foreground [&_td]:pr-4">
-          <tr>
-            <td colSpan={3}>Total, {op.total_spans} {op.total_spans === 1 ? "span" : "spans"}</td>
-            <td className="text-right">{km(op.total_km)}{op.distance_incomplete && "+"}</td>
-            <td className="text-right">{surveyedSum}</td>
-            <td className="text-right whitespace-nowrap">lowest free {op.fewest_free}</td>
-            <td className="text-right whitespace-nowrap">{loss?.total_calculated_db == null ? "Not every span has a distance" : db(loss.total_calculated_db)}</td>
-            <td className="text-right">{loss?.total_measured_db == null ? "Not all spans measured" : db(loss.total_measured_db)}</td>
-            <td className="pr-0!">{loss?.level ? <LossPill l={{ level: loss.level, deviation_pct: null }} /> : "-"}</td>
-          </tr>
-        </tfoot>
-      </table>
     </section>
   );
 }
 
-// Sites as nodes left to right, spans as links. Wraps to more rows by width; the first node of a later row says "cont.".
-const NODE = 88, MIN_LINK = 150;
-function Ribbon({ rp, op, need, spans }: { rp: RoutePlanner; op: RouteOption; need: number; spans: Span[] | null }) {
+// v6 drawer strip: Site — [span] — Site, one row, scrolls inside itself. One tab stop; arrow keys move between span chips.
+function Strip({ rp, op, need }: { rp: RoutePlanner; op: RouteOption; need: number }) {
   const ref = useRef<HTMLDivElement>(null);
-  const [w, setW] = useState(0);
-  useLayoutEffect(() => {
-    const el = ref.current!;
-    const ro = new ResizeObserver(() => setW(el.clientWidth));
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
   const n = op.spans.length;
-  const k = Math.min(n, Math.max(1, Math.floor(((w || 800) - NODE) / (NODE + MIN_LINK))));
-  const info = (id: number) => spans?.find((s) => s.id === id);
   const kind = (name: string) => rp.eps.find((e) => e.name === name)?.kind;
   const sites = [op.spans[0].site_a, ...op.spans.map((s) => s.site_b)];
-  const label = (s: RouteSpan) => {
-    const sp = info(s.span_id);
-    return [`Span ${s.name}`, sp?.route_type, s.km == null ? "no distance" : `${km(s.km)} km`,
-      s.surveyed ? `${s.free_to_reserve}${sp?.survey_cores != null ? ` of ${sp.survey_cores}` : ""} cores free` : "not surveyed",
-      s.span_id === op.bottleneck_span_id && "bottleneck", isShort(s, need) && `short, need ${need}`].filter(Boolean).join(", ");
-  };
   const move = (e: KeyboardEvent) => {
     const to = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
     const i = e.key === "Home" ? 0 : e.key === "End" ? n - 1 : to != null ? Math.min(n - 1, Math.max(0, rp.spanIdx + to)) : null;
@@ -443,67 +344,37 @@ function Ribbon({ rp, op, need, spans }: { rp: RoutePlanner; op: RouteOption; ne
     rp.setSpanIdx(i);
     ref.current?.querySelector<HTMLElement>(`[data-i="${i}"]`)?.focus();
   };
-  const rows: [number, number][] = [];
-  for (let i = 0; i < n; i += k) rows.push([i, Math.min(n, i + k)]);
+  const text = (s: RouteSpan) => [`span ${s.name}`, s.km == null ? "no distance" : `${km(s.km)} km`,
+    s.surveyed ? `${s.free_to_reserve} cores free` : "not surveyed", isShort(s, need) && `short, need ${need}`].filter(Boolean).join(", ");
   return (
-    <div ref={ref}>
-      <div className="grid gap-3.5" role="group" aria-label="Route ribbon. Arrow keys move between spans." onKeyDown={move} data-testid="ribbon">
-        {rows.map(([a, b], ri) => {
-          const cnt = b - a;
-          // Region bands behind the links: consecutive spans with the same region share one band.
-          const zones: { reg: string; s: number; e: number }[] = [];
-          for (let t = 0; t < cnt; t++) {
-            const reg = info(op.spans[a + t].span_id)?.region ?? "";
-            if (zones.length && zones[zones.length - 1].reg === reg) zones[zones.length - 1].e = t;
-            else zones.push({ reg, s: t, e: t });
-          }
-          return (
-            <div key={ri} className="rb-row" style={{ gridTemplateColumns: `var(--n) repeat(${k}, minmax(0,1fr) minmax(0,1fr) var(--n))` }}>
-              {zones.filter((z) => z.reg).map((z, zi) => (
-                <div key={zi} aria-hidden className={`rb-zone ${zi % 2 ? "z1" : ""}`}
-                  style={{ gridColumn: `${z.s === 0 ? 1 : 2 + 3 * z.s} / ${z.e === cnt - 1 ? 3 * cnt + 2 : 3 * z.e + 4}` }}>
-                  <span>{z.reg}</span>
-                </div>
-              ))}
-              {Array.from({ length: cnt + 1 }, (_, t) => {
-                const gi = a + t, name = sites[gi];
-                const fl = gi === 0 ? "From" : gi === n ? "To" : t === 0 ? "cont." : "";
-                return (
-                  <div key={`n${t}`} aria-hidden className={`rb-node ${gi === 0 || gi === n ? "end" : ""} ${t === 0 && ri > 0 ? "again" : ""}`} style={{ gridColumn: 1 + 3 * t }}>
-                    <span className="fl">{fl}</span><Shape kind={kind(name)} /><span className="cd">{name}</span>
-                  </div>
-                );
-              })}
-              {Array.from({ length: cnt }, (_, t) => {
-                const gi = a + t, s = op.spans[gi], sp = info(s.span_id), sh = isShort(s, need);
-                const h = health({ survey_cores: s.surveyed ? 0 : null, free_to_reserve: s.free_to_reserve });
-                const of = sp?.survey_cores;
-                return (
-                  <button key={`l${t}`} type="button" data-i={gi} aria-pressed={gi === rp.spanIdx} tabIndex={gi === rp.spanIdx ? 0 : -1} aria-label={label(s)}
-                    className={`rb-lk ${sp?.route_type ?? ""} ${sh ? "short" : ""}`} style={{ gridColumn: `${2 + 3 * t} / span 2` }} onClick={() => rp.setSpanIdx(gi)}>
-                    <span className="flag">{s.span_id === op.bottleneck_span_id && <><Icon name="bn" className="size-[11px]" />Bottleneck</>}</span>
-                    <span className="lab" title={s.name}>{s.name}</span>
-                    <span className="ln" />
-                    <span className="km">{s.km == null ? "no distance" : `${km(s.km)} km`}</span>
-                    <span className={`rb-fb ${sh ? "hatch-red" : ""}`} data-h={h.cls}>
-                      <span className="v">{!sh && <Icon name={h.icon} className={`size-[11px] ${h.cls.replace("h-", "v-")}`} />}<b>{s.surveyed ? s.free_to_reserve : "-"}</b>free</span>
-                      {sh ? <span className="w"><Icon name="fl" className="size-[11px]" />{s.surveyed ? "short" : "not surveyed"}</span>
-                        : <span>{of != null ? `of ${of}` : "free to reserve"}</span>}
-                      <span className="mini"><i style={{ width: `${of ? Math.min(100, (100 * s.free_to_reserve) / of) : sh ? 0 : 100}%` }} /></span>
-                    </span>
+    <>
+      <div ref={ref} className="rs-strip" role="group" aria-label="Route strip. Arrow keys move between spans." onKeyDown={move} data-testid="route-strip">
+        {sites.map((name, i) => (
+          <Fragment key={i}>
+            <span aria-hidden className={`sn ${i === 0 || i === n ? "end" : ""}`}>{name}</span>
+            {i < n && (() => {
+              const s = op.spans[i], sh = isShort(s, need), dist = s.km == null ? "no distance" : `${km(s.km)} km`;
+              const label = [`Span ${s.name}`, dist, s.surveyed ? `${s.free_to_reserve} free` : "not surveyed", sh && "short"].filter(Boolean).join(", ");
+              return (
+                <>
+                  <span aria-hidden className="ln" />
+                  <button type="button" data-i={i} aria-pressed={i === rp.spanIdx} tabIndex={i === rp.spanIdx ? 0 : -1}
+                    aria-label={label} title={label} className={`rs-ss ${sh ? "short" : ""}`} onClick={() => rp.setSpanIdx(i)}>
+                    {sh && <Icon name="fl" className="size-3" />}{dist}
                   </button>
-                );
-              })}
-            </div>
-          );
-        })}
+                  <span aria-hidden className="ln" />
+                </>
+              );
+            })()}
+          </Fragment>
+        ))}
       </div>
       <ol className="sr-only" aria-label="Route as text">
         {sites.map((name, i) => (
-          <li key={i}>Site {name}, {kindWord(kind(name))}{i < n && `; then ${label(op.spans[i])}`}</li>
+          <li key={i}>Site {name}, {kindWord(kind(name))}{i < n && `; then ${text(op.spans[i])}`}</li>
         ))}
       </ol>
-    </div>
+    </>
   );
 }
 

@@ -227,7 +227,7 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
           <div className="col-span-4 flex min-w-0 flex-col gap-4">
             <FindCard spans={spans} selectedId={spanId} onSelect={(id) => open(id)} loss={lossList} mode={mode} onMode={setMode} route={<RouteForm rp={rp} />} />
             <Inspector detail={detail} loading={spanId != null && !detail} onGoToCores={goToCores} loss={loss?.span_id === spanId ? loss : null} onSeeLoss={goToLoss} admin={admin}
-              onPlanRoute={planRoute} route={mode === "route" ? <RouteSummary key={`${rp.idx}-${routeName}`} rp={rp} spans={spans} onGo={goToRoute} /> : undefined} />
+              onPlanRoute={planRoute} route={mode === "route" ? <RouteSummary key={`${rp.idx}-${routeName}`} rp={rp} onGo={goToRoute} /> : undefined} />
           </div>
 
           {mode === "route" && rp.option && <RouteSection rp={rp} spans={spans} onDone={changed} />}
