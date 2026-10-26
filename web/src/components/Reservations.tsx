@@ -174,10 +174,10 @@ export function NeedsReview({ me, onChanged }: { me: Me; onChanged: () => void }
   const { data, error, reload } = useLoad(() => api.get("/api/needs-review"));
   return (
     <section aria-labelledby="nr-h" className="card mx-auto w-full max-w-4xl space-y-3">
-      <h2 id="nr-h" className="text-base leading-6 font-semibold">Needs review{data ? ` (${data.length})` : ""}</h2>
+      <h2 id="nr-h" className="text-base leading-6 font-semibold">Action needed{data ? ` (${data.length})` : ""}</h2>
       <p className="text-sm text-muted-foreground">Stale reservations, release requests and held cores that went faulty.</p>
       {error && <p role="alert">Could not load the list.</p>}
-      {data && data.length === 0 && <p>Nothing needs review.</p>}
+      {data && data.length === 0 && <p>Nothing needs action.</p>}
       <div className="space-y-3">
         {data?.map((i: Item, n) => (
           <div key={`${i.kind}-${i.reservation.id}-${n}`} className="space-y-1">

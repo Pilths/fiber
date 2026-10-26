@@ -40,7 +40,7 @@ flowchart TB
     RES["Reservations<br/>request, approve, reject, withdraw<br/>keep, release, correct"]
     LOSS["Loss<br/>calculated vs measured<br/>warning levels"]
     ROUTE["Routing<br/>NetworkX graph of spans, up to 3 options"]
-    REVIEW["Needs review + waiting counts<br/>stale, upload conflicts, faulty cores"]
+    REVIEW["Action needed list + waiting counts<br/>stale, upload conflicts, faulty cores"]
     JOB["APScheduler daily job<br/>stale check, digest<br/>records last run"]
     NOTIFY["Notifications<br/>in-app + email"]
   end
@@ -92,7 +92,7 @@ Solid lines are synchronous request paths. Dotted lines are asynchronous or sche
 | --- | --- | --- | --- |
 | F1 | Search, cores grid | 1 | One search endpoint over customer, span, circuit ID and core, used by the global search in the top bar. Core status is derived (see E3). Filters for region and route type ("n of N spans"). The cores grid is 12 per row; the held table shows the ports at both ends from the Excel's paired ports. |
 | F2 | Reserve cores and approval flow | 2, 3 | Reservation events are append-only. Route reservations are one request across many spans. A request holds cores; approval reserves them; rejection or withdrawal frees them. A release can cover only some cores of a route reservation; it frees their locks and keeps all records. Corrections touch only customer and planned date. A route reservation takes N cores per span, assigned from the first free cores on each span by default. A reservation history endpoint (TASK-077) feeds the core detail (history, Keep, Release). |
-| F3 | Needs review and waiting counts | 2, 3 | Shown as the Approvals tab count (amber, admin) and the review count badge on My reservations. A query, not a stored flag: stale reservations, release requests, upload conflicts, faulty cores, pending approvals. |
+| F3 | Action needed list and waiting counts | 2, 3 | Shown as the Approvals tab count (amber, admin) and the Action needed count badge on My reservations. A query, not a stored flag: stale reservations, release requests, upload conflicts, faulty cores, pending approvals. |
 | F4 | Login and roles | 7 | Local accounts, planner and admin, forced password change, deactivation only. Built right after F2. Admins reach the users screen from a "Users" item in the account menu (admin only). |
 | F5 | Link loss | 4 | Calculated loss in one backend function (distance × 0.3 dB/km). Measurements kept as history; the latest is shown. Coverage is spans with a reading out of all spans. Shown in the bottom section of the map page: a loss line under the route ribbon (per span and route total), and a "Loss" block below the held table for a single span. No link loss tab. |
 | F6 | Admin upload | 8 | Upload, Preview, Confirm. The site master (its own workbook, separate from the Reservation workbook: sites sheet and DC sheet) uses a replace-file model with Added, Changed, Missing and Problem groups (see E6b). Preview groups New, Changed, Conflicts, Not in this file, Needs review, Rejected. Every row is kept raw in staging with sheet name, row number, status (Ready, Needs review, Rejected) and reason. Upload never touches reservations. See E6a for the sample workbook rules. |
@@ -212,7 +212,7 @@ Latest stable at the time of pinning, per the data owner's "latest" rule. Source
 
 | Decision | Affects | Default until confirmed |
 | --- | --- | --- |
-| SMTP relay access | F10, E9 | Later, per data owner. In-app Needs review and counts ship first |
+| SMTP relay access | F10, E9 | Later, per data owner. In-app Action needed list and counts ship first |
 | KMZ name matching when segments share end sites (real KMZ import, Later) | E11 | Ambiguous names go to the validation report; check against the mock files |
 | Production web serving | E1 | Static build served by a small web server container; confirm with IT along with the host |
 

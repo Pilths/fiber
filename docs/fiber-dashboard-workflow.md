@@ -57,7 +57,7 @@ The order builds the last-to-be-cut items first.
 - Session 1: Schema and Alembic. Reservations are insert-only events. Internal span ID is the key. Circuit ID is an optional field on the core. Measurements per span. `user_id` on every write. Edit history with reasons. Seed from the mock Excel.
 - Session 2: Search, span and core endpoints. Generate the TypeScript client. A dev-only header stands in for the acting user.
 - Session 3: Span list, port grid and the Reserve side panel. UI session, runs Step 7. Done; the page structure is reworked into the one-page map layout by TASK-073 to TASK-079 (Session 10).
-- Session 4: Approval flow: request, approve, reject, withdraw, release request. Needs review list and waiting counts. Also migration 0004 (cable size, count-only reservations, `assign` action) and the free to reserve limit.
+- Session 4: Approval flow: request, approve, reject, withdraw, release request. Action needed list and waiting counts. Also migration 0004 (cable size, count-only reservations, `assign` action) and the free to reserve limit.
 - Session 5: Minimal login: local accounts, planner and admin roles, forced password change, deactivate. Replaces the dev header. Admins reach the users screen from "Users" in the account menu.
 - Session 6: Loss warning levels per span (green 0 to 3%, amber 3 to 7%, red 7 to 10%). The form is open: chart, small scrollable list, or both. A segment shows x of y spans measured. No distance shown instead of 0 dB. Shown in the bottom section of the map page (route loss line under the ribbon; single-span Loss block after the held table), not in an Inspector tab. UI session.
 - Session 7: Admin upload in three steps: Upload, Preview, Confirm. Protected edits, first import of reservations, upload log. Also the site master replace-file upload (its own workbook, separate from the Reservation workbook; sites and DC sheets found by headers; Added, Changed, Missing, Problem; current file).
@@ -114,7 +114,7 @@ Do not create a separate agent per phase. Make an agent only when it needs a dif
 - Whether two sites can have more than one span of the same route type (to confirm with the data owners).
 - KMZ route name format, until real files are seen (real KMZ import is Later).
 - SMTP relay access.
-- Whether the UI rework (TASK-073 to TASK-075) moves earlier than Phase 11 (RISK-010); whether the 90-day "Needs review" tag replaces the 3-month stale rule; whether real rows have blank core assignments (run `excel_check` on the real file); how an upload may "modify" a reservation. Full list: `docs/plan.md`, section 9.
+- Whether the UI rework (TASK-073 to TASK-075) moves earlier than Phase 11 (RISK-010); whether real rows have blank core assignments (run `excel_check` on the real file); how an upload may "modify" a reservation. Full list: `docs/plan.md`, section 9.
 
 ## Install notes
 
