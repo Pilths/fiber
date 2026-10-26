@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { components } from "@/api/schema";
-import { STATUS, STATUS_ORDER } from "@/lib/status";
+import { Icon } from "@/components/Icon";
+import { STATUS } from "@/lib/status";
 
 type Core = components["schemas"]["CoreDetail"];
 const COLS = 12; // one fibre tube per row
@@ -20,7 +21,7 @@ export function PortGrid({ cores, selected, onToggle, focusCoreId }: {
     if (i >= 0) {
       setIdx(i);
       cells.current[i]?.focus();
-      cells.current[i]?.scrollIntoView({ block: "nearest" });
+      cells.current[i]?.scrollIntoView({ block: "center" });
     }
   }, [focusCoreId, cores]);
 
@@ -36,57 +37,56 @@ export function PortGrid({ cores, selected, onToggle, focusCoreId }: {
     else if (e.key === "End") { e.preventDefault(); move(cores.length - 1); }
     else if (e.key === " " || e.key === "Enter") { e.preventDefault(); if (c.status === "Available") onToggle(c.id); }
   };
-  const label = (c: Core) => `Core ${c.number}: ${c.status}${c.customer ? `, ${c.customer}` : ""}`;
+  const label = (c: Core) => `Core ${c.number}: ${selected.has(c.id) ? "Chosen" : c.status}${c.customer ? `, ${c.customer}` : ""}`;
   const rows = Array.from({ length: Math.ceil(cores.length / COLS) }, (_, r) => cores.slice(r * COLS, r * COLS + COLS));
 
   return (
     <div>
-      <ul aria-label="Status key" className="mb-3 flex flex-wrap gap-x-4 gap-y-1 text-sm">
-        {STATUS_ORDER.map((s) => (
-          <li key={s} className="flex items-center gap-1.5">
-            <span aria-hidden className={`core ${STATUS[s].cls} inline-block size-5 rounded text-center text-xs leading-4`}>{STATUS[s].symbol}</span>
-            {s}
-          </li>
-        ))}
-      </ul>
-      <div role="grid" aria-label="Cores" aria-multiselectable="true" className="flex max-w-full flex-col gap-1 overflow-x-auto">
-        {rows.map((row, r) => (
-          <div role="row" key={r} aria-label={`Tube ${r + 1}`} className="flex gap-1">
-            {row.map((c, j) => {
-              const i = r * COLS + j;
-              const avail = c.status === "Available";
-              return (
-                <div
-                  key={c.id}
-                  ref={(el) => { cells.current[i] = el; }}
-                  role="gridcell"
-                  tabIndex={i === idx ? 0 : -1}
-                  aria-label={label(c)}
-                  aria-selected={selected.has(c.id)}
-                  aria-disabled={!avail}
-                  title={label(c)}
-                  data-status={c.status}
-                  className={`core ${STATUS[c.status].cls} flex h-12 w-16 shrink-0 cursor-pointer select-none flex-col items-center justify-center rounded-md text-[11px] leading-tight`}
-                  onClick={() => { setIdx(i); if (avail) onToggle(c.id); }}
-                  onFocus={() => { setIdx(i); setCaption(c); }}
-                  onMouseEnter={() => setCaption(c)}
-                  onMouseLeave={() => setCaption(null)}
-                  onKeyDown={(e) => onKey(e, i, c)}
-                >
-                  <span className="text-xs font-semibold">
-                    <span aria-hidden>{selected.has(c.id) ? "✓" : STATUS[c.status].symbol}</span> {c.number}
-                  </span>
-                  <span>{c.status}</span>
-                </div>
-              );
-            })}
-          </div>
-        ))}
+      <div role="grid" aria-label="Cores" aria-multiselectable="true">
+        {rows.map((row, r) => {
+          const free = row.filter((c) => c.status === "Available").length;
+          const tube = `Tube ${r + 1}, cores ${row[0].number} to ${row[row.length - 1].number}`;
+          return (
+            <div key={r} className="border-b border-rule pt-3.5 pb-4">
+              <p aria-hidden className="mb-2 text-[13px] text-muted-foreground">{tube}, <b className="font-semibold text-foreground">{free} available</b></p>
+              <div role="row" aria-label={`${tube}, ${free} available`} className="grid grid-cols-12 gap-1">
+                {row.map((c, j) => {
+                  const i = r * COLS + j;
+                  const avail = c.status === "Available";
+                  const chosen = selected.has(c.id);
+                  return (
+                    <div
+                      key={c.id}
+                      ref={(el) => { cells.current[i] = el; }}
+                      role="gridcell"
+                      tabIndex={i === idx ? 0 : -1}
+                      aria-label={label(c)}
+                      aria-selected={chosen}
+                      aria-disabled={!avail}
+                      title={label(c)}
+                      data-status={c.status}
+                      className={`core ${STATUS[c.status].cls}`}
+                      onClick={() => { setIdx(i); if (avail) onToggle(c.id); }}
+                      onFocus={() => { setIdx(i); setCaption(c); }}
+                      onMouseEnter={() => setCaption(c)}
+                      onMouseLeave={() => setCaption(null)}
+                      onKeyDown={(e) => onKey(e, i, c)}
+                    >
+                      <span className="n">{c.number}</span>
+                      <Icon name={chosen ? "ch" : STATUS[c.status].icon} />
+                      <span className="w">{chosen ? "Chosen" : c.status}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
       </div>
-      <p className="mt-2 min-h-5 text-sm" data-testid="grid-caption">
+      <p className="mt-2 min-h-5 text-[13px] text-muted-foreground" data-testid="grid-caption">
         {caption
           ? `${label(caption)}${caption.circuit_id ? `, circuit ${caption.circuit_id}` : ""}${caption.status !== "Available" ? " (not selectable)" : ""}`
-          : "Hover or focus a core for details. Space or Enter selects an Available core."}
+          : "Hover or focus a core for details. Space or Enter chooses an Available core."}
       </p>
     </div>
   );

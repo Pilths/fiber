@@ -2,10 +2,12 @@ import { expect, test, type Page } from "@playwright/test";
 
 const SPAN = "DEV Kuala Lumpur DC - DEV Cyberjaya DC"; // dev seed: has Available, Reserved and In use cores
 
-async function openSpan(page: Page, theme: "light" | "dark" = "light") {
-  await page.addInitScript((t) => localStorage.setItem("theme", t), theme);
+const pickSpan = (page: Page, name: string | RegExp) =>
+  page.getByRole("list", { name: "Spans" }).getByRole("button", { name: typeof name === "string" ? new RegExp(name) : name }).click();
+
+async function openSpan(page: Page) {
   await page.goto("/");
-  await page.getByRole("button", { name: new RegExp(SPAN) }).click();
+  await pickSpan(page, SPAN);
   await expect(page.getByRole("grid", { name: "Cores" })).toBeVisible();
 }
 
@@ -13,8 +15,8 @@ test("keyboard: roving tabindex, arrows, Space/Enter select only Available", asy
   await openSpan(page);
   const cells = page.getByRole("gridcell");
   expect(await cells.count()).toBe(24);
-  await expect(page.getByTestId("capacity")).toContainText("Surveyed 24 of cable 144");
-  await expect(page.getByTestId("capacity")).toContainText("Free to reserve 18");
+  await expect(page.getByRole("region", { name: /^Cores of/ })).toContainText("24 surveyed of 144");
+  await expect(page.getByTestId("capacity")).toContainText("18 Available minus 0 held without cores = 18 free to reserve");
   // 12 cores per row, and the whole row fits the panel at 1280px (no horizontal scroll)
   const tops = await cells.evaluateAll((els) => els.slice(0, 13).map((e) => Math.round(e.getBoundingClientRect().top)));
   expect(new Set(tops.slice(0, 12)).size).toBe(1);
@@ -47,33 +49,34 @@ test("keyboard: roving tabindex, arrows, Space/Enter select only Available", asy
   await expect(page.getByTestId("grid-caption")).toContainText("not selectable");
 });
 
-test("reserve panel: blocks without customer, traps focus, Escape returns focus", async ({ page }) => {
+test("chosen bar: counts chosen cores, blocks without customer, Clear resets", async ({ page }) => {
   await openSpan(page);
-  await page.locator('[role=gridcell][data-status="Available"]').first().click();
-  const opener = page.getByRole("button", { name: /Reserve cores/ });
-  await opener.focus();
-  await page.keyboard.press("Enter");
-  const dialog = page.getByRole("dialog");
-  await expect(dialog).toBeVisible();
-  await expect(page.getByTestId("counter")).toContainText("1 of 1");
-  await dialog.getByRole("button", { name: "Submit request" }).click();
-  await expect(dialog.getByRole("alert")).toContainText("Choose a customer");
-  for (let i = 0; i < 12; i++) {
-    await page.keyboard.press("Tab");
-    expect(await dialog.evaluate((d) => d.contains(document.activeElement))).toBe(true);
-  }
-  await page.keyboard.press("Escape");
-  await expect(dialog).toBeHidden();
-  await expect(opener).toBeFocused();
+  const bar = page.getByTestId("chosen-bar");
+  await expect(bar).toContainText("No cores chosen");
+  await expect(bar.getByRole("button", { name: "Reserve" })).toBeDisabled();
+  const avail = page.locator('[role=gridcell][data-status="Available"]');
+  for (let i = 0; i < 3; i++) await avail.nth(i).click();
+  await expect(bar).toContainText("3 cores chosen");
+  await expect(bar).toContainText("15 more can be chosen");
+  await expect(bar.locator(".cchip")).toHaveCount(3);
+  await expect(avail.first()).toContainText("Chosen");
+  // sticky: the bar sits at the viewport bottom while the grid is in view
+  await page.getByRole("grid", { name: "Cores" }).scrollIntoViewIfNeeded();
+  expect(await bar.evaluate((el) => getComputedStyle(el).position)).toBe("sticky");
+  await bar.getByRole("button", { name: "Reserve 3 cores" }).click();
+  await expect(bar.getByRole("alert")).toContainText("Choose a customer");
+  await bar.getByRole("button", { name: "Clear" }).click();
+  await expect(bar).toContainText("No cores chosen");
+  await expect(page.locator('[role=gridcell][aria-selected="true"]')).toHaveCount(0);
 });
 
 test("each status has a distinct symbol and text, not colour alone", async ({ page }) => {
   await openSpan(page);
   const key = page.getByRole("list", { name: "Status key" });
   const items = await key.getByRole("listitem").allInnerTexts();
-  const symbols = items.map((t) => t.trim().split(/\s+/)[0]);
-  expect(new Set(symbols).size).toBe(5);
-  for (const s of ["Available", "Requested", "Reserved", "In use", "Faulty"]) expect(items.join("|")).toContain(s);
+  const icons = await key.locator("svg[data-icon]").evaluateAll((els) => els.map((e) => e.getAttribute("data-icon")));
+  expect(new Set(icons).size).toBe(6); // 5 statuses + Chosen, each its own symbol
+  for (const s of ["Available", "Chosen", "Requested", "Reserved", "In use", "Faulty"]) expect(items.join("|")).toContain(s);
 
   // Cell patterns differ without any colour: compare border style/width and background-image.
   const looks = await page.evaluate(() => {
@@ -92,10 +95,9 @@ test("each status has a distinct symbol and text, not colour alone", async ({ pa
   expect(Object.keys(looks).length).toBeGreaterThanOrEqual(3);
 });
 
-for (const theme of ["light", "dark"] as const) {
-  test(`contrast >= 4.5 in ${theme} theme`, async ({ page }) => {
-    await openSpan(page, theme);
-    await expect(page.locator("html")).toHaveClass(theme === "dark" ? /dark/ : /^(?!.*dark)/);
+{ // light theme only (PRD: dark theme is parked)
+  test("contrast >= 4.5", async ({ page }) => {
+    await openSpan(page);
     const ratios = await page.evaluate(() => {
       const ctx = document.createElement("canvas").getContext("2d", { willReadFrequently: true })!;
       const rgba = (c: string) => {
@@ -126,12 +128,15 @@ for (const theme of ["light", "dark"] as const) {
         body: "body",
         header: "header h1",
         search: "header input",
-        spanMuted: "main section ul li button span.text-muted-foreground",
+        spanMuted: "[aria-label=Spans] button span.text-muted-foreground",
         captionHint: "[data-testid=grid-caption]",
         tableHead: "thead th",
         tableCell: "tbody td",
-        button: "main button.bg-primary",
+        button: "main button.btn-p",
         navCurrent: "nav button[aria-current]",
+        equation: "[data-testid=capacity]",
+        later: ".later",
+        badge: "[aria-label=Spans] .pill",
       };
       for (const [k, s] of Object.entries(sel)) {
         const el = document.querySelector(s);
@@ -149,12 +154,12 @@ for (const theme of ["light", "dark"] as const) {
 }
 
 test("count-only reservation shows on the span and in My reservations; admin sees Approvals", async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem("theme", "light"));
   await page.goto("/");
-  await page.getByRole("button", { name: /Cyberjaya DC - DEV Bukit Jalil/ }).click();
-  await expect(page.getByTestId("capacity")).toContainText("+3 reserved, not assigned");
-  await expect(page.getByTestId("capacity")).toContainText("Free to reserve 17");
-  await page.getByRole("button", { name: "My reservations" }).click();
+  await pickSpan(page, /^DEV Cyberjaya DC - DEV Bukit Jalil/);
+  await expect(page.getByTestId("capacity")).toContainText("3 reserved, not assigned");
+  await expect(page.getByTestId("capacity")).toContainText("= 17 free to reserve");
+  await expect(page.getByRole("table")).toContainText("Count only");
+  await page.getByRole("button", { name: /My reservations/ }).click();
   await expect(page.getByTestId("reservation").filter({ hasText: "3 not assigned yet" })).toBeVisible();
   await page.getByRole("button", { name: "Rejected" }).click();
   await expect(page.getByText("No reservations that are rejected.")).toBeVisible();
@@ -164,15 +169,14 @@ test("planner books and withdraws a core request, admin sees Approvals", async (
   const planner = await (await browser.newContext({ viewport: { width: 1280, height: 900 } })).newPage();
   await planner.addInitScript(() => localStorage.setItem("devUser", "planner2"));
   await planner.goto("/");
-  await planner.getByRole("button", { name: /DEV Bukit Jalil TOC - DEV Kuantan Hut/ }).click();
+  await pickSpan(planner, /DEV Bukit Jalil TOC - DEV Kuantan Hut/);
   await planner.locator('[role=gridcell][data-status="Available"]').first().click();
-  await planner.getByRole("button", { name: /Reserve cores/ }).click();
-  const dlg = planner.getByRole("dialog");
-  await dlg.getByLabel("Search customers").fill("DEV Telco Alpha");
-  await dlg.getByRole("button", { name: "DEV Telco Alpha" }).click();
-  await dlg.getByRole("button", { name: "Submit request" }).click();
-  await expect(dlg.getByRole("status")).toContainText("sent (pending)");
-  await planner.keyboard.press("Escape");
+  const bar = planner.getByTestId("chosen-bar");
+  await bar.getByLabel("Search customers").fill("DEV Telco Alpha");
+  await bar.getByRole("button", { name: "DEV Telco Alpha", exact: true }).click();
+  await bar.getByRole("button", { name: "Reserve 1 core" }).click();
+  await expect(bar.getByRole("status")).toContainText("sent (pending)");
+  await expect(bar).toContainText("No cores chosen");
   await planner.getByRole("button", { name: /My reservations/ }).click();
   await expect(planner.getByTestId("reservation").first()).toContainText("Pending approval");
   await planner.getByRole("button", { name: "Withdraw" }).first().click(); // leave the dev data as found

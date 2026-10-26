@@ -1,18 +1,27 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "@/api/client";
 import type { components } from "@/api/schema";
-import { CoreTable } from "@/components/CoreTable";
+import { ChosenBar } from "@/components/ChosenBar";
+import { FindCard } from "@/components/FindCard";
 import { Header, type View } from "@/components/Header";
-import { Approvals, MyReservations, NeedsReview } from "@/components/Reservations";
+import { HeldTable } from "@/components/HeldTable";
+import { Icon } from "@/components/Icon";
+import { Facts, Inspector } from "@/components/Inspector";
 import { PortGrid } from "@/components/PortGrid";
-import { ReservePanel } from "@/components/ReservePanel";
-import { SpanList } from "@/components/SpanList";
-import { Button } from "@/components/ui/button";
+import { Approvals, MyReservations, NeedsReview } from "@/components/Reservations";
+import { countBy, spanName, STATUS, STATUS_ORDER } from "@/lib/status";
 
 type Span = components["schemas"]["SpanSummary"];
 type Detail = components["schemas"]["SpanDetail"];
 type Me = components["schemas"]["CurrentUser"];
 type Bell = components["schemas"]["Bell"];
+
+// Selection lives in the URL hash so links can be shared: #span=<site A> - <site B>.
+// The API has no LRD codes on spans yet, so the hash uses the span name, not the AABB-BBCC form of the PRD.
+const hashSpan = () => {
+  const m = /^#span=(.+)$/.exec(location.hash);
+  try { return m ? decodeURIComponent(m[1]) : null; } catch { return null; }
+};
 
 export default function App() {
   const [spans, setSpans] = useState<Span[] | null>(null);
@@ -21,14 +30,16 @@ export default function App() {
   const [detail, setDetail] = useState<Detail | null>(null);
   const [focusCoreId, setFocusCoreId] = useState<number | null>(null);
   const [selected, setSelected] = useState<Set<number>>(new Set());
-  const [reserving, setReserving] = useState(false);
-  const [view, setView] = useState<View>("spans");
+  const [view, setView] = useState<View>("map");
   const [me, setMe] = useState<Me | null>(null);
   const [bell, setBell] = useState<Bell | null>(null);
+  const [stale, setStale] = useState(0);
+  const [mapMin, setMapMin] = useState(false);
   const [version, setVersion] = useState(0); // bumped after a booking so the span list and grid reload
 
   const refreshBell = useCallback(() => {
     api.get("/api/bell").then(setBell).catch(() => {});
+    api.get("/api/reservations", { query: { mine: true } }).then((r) => setStale(r.filter((x) => x.stale).length)).catch(() => {});
   }, []);
   useEffect(() => {
     api.get("/api/me").then(setMe).catch(() => setError("Could not sign in."));
@@ -44,69 +55,150 @@ export default function App() {
     let stale = false;
     api.get("/api/spans/{span_id}", { path: { span_id: spanId } }).then((d) => !stale && setDetail(d)).catch(() => !stale && setError("Could not load the span."));
     return () => { stale = true; };
-  }, [spanId, version, view]);
+  }, [spanId, version]);
 
+  const spanRef = useRef(spanId);
+  useEffect(() => { spanRef.current = spanId; }, [spanId]);
   const open = useCallback((id: number, coreId: number | null = null) => {
-    setView("spans");
+    setView("map");
     setDetail((d) => (d?.id === id ? d : null));
     setSpanId(id);
     setFocusCoreId(coreId);
-    setSelected(new Set());
+    setSelected((s) => (s.size ? new Set() : s));
   }, []);
+
+  // Hash -> selection, on load and when the hash changes (back button, pasted link).
+  useEffect(() => {
+    if (!spans) return;
+    const sync = () => {
+      const name = hashSpan();
+      const s = name && spans.find((x) => spanName(x) === name);
+      if (s && spanRef.current !== s.id) open(s.id);
+    };
+    sync();
+    addEventListener("hashchange", sync);
+    return () => removeEventListener("hashchange", sync);
+  }, [spans, open]);
+  // Selection -> hash.
+  useEffect(() => {
+    const s = spans?.find((x) => x.id === spanId);
+    if (s && hashSpan() !== spanName(s)) history.replaceState(null, "", `#span=${encodeURIComponent(spanName(s))}`);
+  }, [spanId, spans]);
+
   const toggle = (id: number) => setSelected((s) => { const n = new Set(s); if (!n.delete(id)) n.add(id); return n; });
   const chosen = detail?.cores.filter((c) => selected.has(c.id)) ?? [];
-
-  const surveyed = detail?.survey_cores != null;
+  const goToCores = () => {
+    const cell = document.querySelector<HTMLElement>('[role=gridcell][data-status="Available"]') ?? document.querySelector<HTMLElement>("[role=gridcell]");
+    cell?.scrollIntoView({ block: "center" });
+    cell?.focus({ preventScroll: true });
+  };
 
   return (
     <div className="min-h-screen">
-      <Header onPick={(r) => r.span_id != null && open(r.span_id, r.core_id ?? null)} view={view} onView={setView} me={me} bell={bell} />
-      {error && <p role="alert" className="p-4">{error}</p>}
-      {view !== "spans" && me && (
-        <main className="p-4">
-          {view === "mine" && <MyReservations me={me} onChanged={refreshBell} />}
-          {view === "approvals" && <Approvals me={me} onChanged={refreshBell} />}
-          {view === "review" && <NeedsReview me={me} onChanged={refreshBell} />}
-        </main>
-      )}
-      {view === "spans" && (
-      <main className="grid gap-6 p-4 lg:grid-cols-[22rem_1fr]">
-        {spans ? <SpanList spans={spans} selectedId={spanId} onSelect={(id) => open(id)} /> : <p>Loading spans...</p>}
-        <section aria-labelledby="detail-h" className="min-w-0 space-y-4">
-          {spanId == null && <p id="detail-h" className="text-muted-foreground">Pick a span, or search above, to see its port grid.</p>}
-          {spanId != null && !detail && <p id="detail-h">Loading span...</p>}
-          {detail && (
+      <Header onPick={(r) => r.span_id != null && open(r.span_id, r.core_id ?? null)} view={view} onView={setView} me={me}
+        approvals={me?.role === "admin" ? bell?.approvals ?? null : null} stale={stale} />
+      {error && <p role="alert" className="mx-6 mt-4 rounded-md border border-red bg-red-bg px-4 py-2 font-semibold text-red">{error}</p>}
+      {view !== "map" && me && (
+        <main className="space-y-4 px-6 pt-6 pb-10">
+          {view === "mine" && (
             <>
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <h2 id="detail-h" className="text-lg font-semibold">{detail.site_a} - {detail.site_b}</h2>
-                <Button onClick={() => setReserving(true)} disabled={!surveyed}>Reserve cores ({chosen.length} selected)</Button>
-              </div>
-              <p className="flex flex-wrap gap-x-4 gap-y-1 text-sm" data-testid="capacity">
-                {surveyed ? (
-                  <>
-                    <span>Surveyed {detail.survey_cores} of cable {detail.cable_size}</span>
-                    {detail.unassigned_reserved > 0 && <span>+{detail.unassigned_reserved} reserved, not assigned</span>}
-                    <strong>Free to reserve {detail.free_to_reserve}</strong>
-                  </>
-                ) : (
-                  <span role="status">Not surveyed yet: this span has no cores to show and cannot be booked. Cable size {detail.cable_size}.</span>
-                )}
-              </p>
-              {surveyed && <PortGrid cores={detail.cores} selected={selected} onToggle={toggle} focusCoreId={focusCoreId} />}
-              {surveyed && <CoreTable cores={detail.cores} />}
+              <MyReservations me={me} onChanged={refreshBell} />
+              <NeedsReview me={me} onChanged={refreshBell} />
             </>
           )}
-        </section>
-      </main>
+          {view === "approvals" && <Approvals me={me} onChanged={refreshBell} />}
+          {view === "upload" && <Placeholder title="Upload" text="Excel upload and the validation report arrive in the upload session." />}
+          {view === "users" && <Placeholder title="Users" text="Account management arrives with real sign-in." />}
+        </main>
       )}
-      {reserving && detail && (
-        <ReservePanel
-          spanLabel={`${detail.site_a} - ${detail.site_b}`}
-          cores={chosen.map((c) => ({ id: c.id, number: c.number }))}
-          onClose={() => setReserving(false)}
-          onDone={() => { setSelected(new Set()); setVersion((v) => v + 1); refreshBell(); }}
-        />
+      {view === "map" && (
+        <main className="grid grid-cols-12 gap-4 px-6 pt-6 pb-10">
+          <section className={`card col-span-8 flex flex-col ${mapMin ? "self-start" : ""}`} aria-labelledby="map-h">
+            <div className={`card-h ${mapMin ? "mb-0 border-b-0 pb-0" : ""}`}>
+              <h2 id="map-h">Network map</h2>
+              <small className="hint">{detail ? `${spanName(detail)} selected` : "Nothing selected"}</small>
+            </div>
+            {/* The MapLibre map is TASK-054; this card holds its place. */}
+            {!mapMin && (
+              <div className="grid flex-1 place-items-center rounded-md border border-dashed border-line bg-[#f4f6f8] p-8 text-center text-[13px] text-muted-foreground">
+                <p><b className="mb-1 block text-sm font-semibold text-foreground">Map arrives in the map session</b>Search and the list work without it.</p>
+              </div>
+            )}
+          </section>
+          <div className="col-span-4 flex min-w-0 flex-col gap-4">
+            <FindCard spans={spans} selectedId={spanId} onSelect={(id) => open(id)} />
+            <Inspector detail={detail} loading={spanId != null && !detail} onGoToCores={goToCores} />
+          </div>
+
+          {detail && (
+            <div className="col-span-12 space-y-4">
+              <section className={`card ${detail.survey_cores != null ? "ccard" : ""}`} aria-labelledby="cores-h">
+                <div className="card-h items-center">
+                  <div className="flex min-w-0 flex-wrap items-baseline gap-x-5 gap-y-1">
+                    <h2 id="cores-h" className="text-2xl! leading-8! font-bold! tracking-tight">Cores of {spanName(detail)}</h2>
+                    <span className="flex flex-wrap gap-x-4 text-[13px] text-muted-foreground">
+                      <Facts d={detail} />
+                      {detail.survey_cores != null && <span><b className="font-semibold text-foreground">{detail.survey_cores}</b> surveyed of {detail.cable_size}</span>}
+                    </span>
+                  </div>
+                  <button type="button" className="btn flex-none" aria-pressed={mapMin} onClick={() => setMapMin((m) => !m)}>
+                    {mapMin ? "Expand map" : "Collapse map"}
+                    <svg viewBox="0 0 16 16" aria-hidden="true" className={`ni ${mapMin ? "rotate-180" : ""}`}><path d="M4 10l4-4 4 4" /></svg>
+                  </button>
+                </div>
+                {detail.survey_cores == null
+                  ? <p role="status" data-testid="capacity" className="text-[13px]">Not surveyed yet: this span has no cores to show and cannot be booked until an admin enters a survey count. Cable size {detail.cable_size}.</p>
+                  : <Cores d={detail} selected={selected} chosen={chosen} toggle={toggle} focusCoreId={focusCoreId}
+                      onClear={() => setSelected(new Set())}
+                      onDone={() => { setSelected(new Set()); setVersion((v) => v + 1); refreshBell(); }} />}
+              </section>
+              <HeldTable d={detail} />
+            </div>
+          )}
+        </main>
       )}
     </div>
+  );
+}
+
+function Cores({ d, selected, chosen, toggle, focusCoreId, onClear, onDone }: {
+  d: Detail; selected: Set<number>; chosen: Detail["cores"]; toggle: (id: number) => void; focusCoreId: number | null; onClear: () => void; onDone: () => void;
+}) {
+  const n = countBy(d);
+  const notSurveyed = d.not_surveyed ?? 0;
+  return (
+    <>
+      <p className="-mt-1.5 mb-3.5 text-[13px] text-muted-foreground" data-testid="capacity">
+        <b className="font-bold text-foreground">{n.Available}</b> Available minus <b className="font-bold text-foreground">{d.unassigned_reserved}</b> held without cores = <b className="font-bold text-foreground">{d.free_to_reserve}</b> free to reserve.
+        {d.unassigned_reserved > 0 && ` ${d.unassigned_reserved} reserved, not assigned: cores held by count with no core numbers yet; they lower this number but mark no cell.`}
+      </p>
+      <ul aria-label="Status key" className="mb-1 flex flex-wrap gap-x-5 gap-y-2 text-[13px] text-muted-foreground">
+        {(["Available", "Chosen", ...STATUS_ORDER.slice(1)] as const).map((s) => {
+          const st = s === "Chosen" ? STATUS.Available : STATUS[s];
+          return (
+            <li key={s} className="flex items-center gap-2" data-key={s}>
+              <span aria-hidden className={`core sw ${st.cls} ${s === "Chosen" ? "sw-chosen" : ""}`}><Icon name={s === "Chosen" ? "ch" : st.icon} /></span>
+              {s} <b className="font-bold text-foreground">{s === "Chosen" ? chosen.length : n[s]}</b>
+            </li>
+          );
+        })}
+      </ul>
+      <PortGrid cores={d.cores} selected={selected} onToggle={toggle} focusCoreId={focusCoreId} />
+      {notSurveyed > 0 && (
+        <p className="mt-3.5 text-[13px] text-muted-foreground">
+          <b className="font-semibold text-foreground">{notSurveyed} cores not surveyed</b> (cores {(d.survey_cores ?? 0) + 1} to {d.cable_size}). Not drawn, and cannot be booked until an admin enters a survey count.
+        </p>
+      )}
+      <ChosenBar key={d.id} cores={chosen.map((c) => ({ id: c.id, number: c.number }))} free={d.free_to_reserve} onClear={onClear} onDone={onDone} />
+    </>
+  );
+}
+
+function Placeholder({ title, text }: { title: string; text: string }) {
+  return (
+    <section className="card mx-auto max-w-3xl" aria-labelledby="ph-h">
+      <div className="card-h"><h2 id="ph-h">{title}</h2></div>
+      <p className="text-[13px] text-muted-foreground">{text}</p>
+    </section>
   );
 }

@@ -50,9 +50,9 @@ function Card({ r, me, onChanged }: { r: Res; me: Me; onChanged: () => void }) {
   const toggle = (id: number) => setPick((s) => { const n = new Set(s); if (!n.delete(id)) n.add(id); return n; });
 
   return (
-    <li className="space-y-2 rounded-lg border bg-card p-3" data-testid="reservation">
+    <li className="space-y-2 rounded-xl border border-border bg-white p-4" data-testid="reservation">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h3 className="font-medium">#{r.id} {r.customer}{r.is_new_customer && " (new customer)"}</h3>
+        <h3 className="font-semibold">#{r.id} {r.customer}{r.is_new_customer && " (new customer)"}</h3>
         <span className="text-sm font-medium">{STATUS_LABEL[r.status]}</span>
       </div>
       <p className="text-sm text-muted-foreground">
@@ -142,8 +142,8 @@ export function MyReservations({ me, onChanged }: { me: Me; onChanged: () => voi
   const [status, setStatus] = useState<Res["status"] | undefined>();
   const { data, error, reload } = useLoad(() => api.get("/api/reservations", { query: { mine: true, status } }), [status]);
   return (
-    <section aria-labelledby="mine-h" className="mx-auto w-full max-w-3xl space-y-3">
-      <h2 id="mine-h" className="text-lg font-semibold">My reservations</h2>
+    <section aria-labelledby="mine-h" className="card mx-auto w-full max-w-4xl space-y-3">
+      <h2 id="mine-h" className="text-base leading-6 font-semibold">My reservations</h2>
       <div role="group" aria-label="Filter by status" className="flex gap-2">
         {FILTERS.map(([label, v]) => (
           <Button key={label} size="sm" variant={status === v ? "secondary" : "outline"} aria-pressed={status === v} onClick={() => setStatus(v)}>{label}</Button>
@@ -159,8 +159,8 @@ export function MyReservations({ me, onChanged }: { me: Me; onChanged: () => voi
 export function Approvals({ me, onChanged }: { me: Me; onChanged: () => void }) {
   const { data, error, reload } = useLoad(() => api.get("/api/approvals"));
   return (
-    <section aria-labelledby="appr-h" className="mx-auto w-full max-w-3xl space-y-3">
-      <h2 id="appr-h" className="text-lg font-semibold">Approvals{data ? ` (${data.length})` : ""}</h2>
+    <section aria-labelledby="appr-h" className="card mx-auto w-full max-w-4xl space-y-3">
+      <h2 id="appr-h" className="text-base leading-6 font-semibold">Approvals{data ? ` (${data.length})` : ""}</h2>
       <p className="text-sm text-muted-foreground">New requests and release requests, oldest first.</p>
       {me.role !== "admin" && <p role="alert">Admins only.</p>}
       {error && me.role === "admin" && <p role="alert">Could not load approvals.</p>}
@@ -173,8 +173,8 @@ export function Approvals({ me, onChanged }: { me: Me; onChanged: () => void }) 
 export function NeedsReview({ me, onChanged }: { me: Me; onChanged: () => void }) {
   const { data, error, reload } = useLoad(() => api.get("/api/needs-review"));
   return (
-    <section aria-labelledby="nr-h" className="mx-auto w-full max-w-3xl space-y-3">
-      <h2 id="nr-h" className="text-lg font-semibold">Needs review{data ? ` (${data.length})` : ""}</h2>
+    <section aria-labelledby="nr-h" className="card mx-auto w-full max-w-4xl space-y-3">
+      <h2 id="nr-h" className="text-base leading-6 font-semibold">Needs review{data ? ` (${data.length})` : ""}</h2>
       <p className="text-sm text-muted-foreground">Stale reservations, release requests and held cores that went faulty.</p>
       {error && <p role="alert">Could not load the list.</p>}
       {data && data.length === 0 && <p>Nothing needs review.</p>}

@@ -33,3 +33,6 @@ web/public/map/
 Thumbs.db
 *.log
 *.zip
+
+# Local UI screenshots from Playwright runs
+web/e2e/screenshots/

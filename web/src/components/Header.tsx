@@ -1,41 +1,14 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { Bell as BellIcon, Moon, Search, Sun } from "lucide-react";
 import { api, DEV_USERS } from "@/api/client";
 import type { components } from "@/api/schema";
-import { Button } from "@/components/ui/button";
-import { inputCls } from "@/lib/status";
+import { NavIcon } from "@/components/Icon";
 
 type Result = components["schemas"]["SearchResult"];
-type Theme = "system" | "light" | "dark";
+type Me = components["schemas"]["CurrentUser"];
 const GROUPS: Result["type"][] = ["customer", "span", "circuit", "core"];
 const GROUP_LABEL = { customer: "Customers", span: "Spans", circuit: "Circuits", core: "Cores" };
 
-function useTheme() {
-  const [theme, setTheme] = useState<Theme>(() => {
-    try {
-      const t = localStorage.getItem("theme");
-      return t === "light" || t === "dark" ? t : "system";
-    } catch {
-      return "system";
-    }
-  });
-  useEffect(() => {
-    const mq = matchMedia("(prefers-color-scheme: dark)");
-    const apply = () =>
-      document.documentElement.classList.toggle("dark", theme === "dark" || (theme === "system" && mq.matches));
-    apply();
-    mq.addEventListener("change", apply);
-    try {
-      if (theme === "system") localStorage.removeItem("theme");
-      else localStorage.setItem("theme", theme);
-    } catch {
-      /* storage unavailable: theme just won't persist */
-    }
-    return () => mq.removeEventListener("change", apply);
-  }, [theme]);
-  return [theme, () => setTheme((t) => (t === "system" ? "light" : t === "light" ? "dark" : "system"))] as const;
-}
-
+// Global search: GET /api/search already exists, so results come from the server (TASK-079 will add sites and polish).
 function GlobalSearch({ onPick }: { onPick: (r: Result) => void }) {
   const id = useId();
   const [q, setQ] = useState("");
@@ -93,18 +66,19 @@ function GlobalSearch({ onPick }: { onPick: (r: Result) => void }) {
   };
 
   const showList = open && q.trim() !== "";
+  const label = "Find a span, site, customer, circuit or core";
   return (
-    <div ref={box} className="relative w-full max-w-md">
-      <Search aria-hidden className="pointer-events-none absolute left-2.5 top-2 size-4 text-muted-foreground" />
+    <div ref={box} className="relative ml-auto min-w-[260px] flex-[0_1_420px]">
+      <svg viewBox="0 0 16 16" aria-hidden="true" className="ni pointer-events-none absolute left-3 top-2.5 text-muted-foreground"><path d="M7 12A5 5 0 1 0 7 2a5 5 0 0 0 0 10zM14 14l-3.5-3.5" /></svg>
       <input
         role="combobox"
-        aria-label="Search customer, circuit, core or span"
+        aria-label={label}
         aria-expanded={showList}
         aria-controls={`${id}-list`}
         aria-activedescendant={showList && results[active] ? `${id}-${active}` : undefined}
         aria-autocomplete="list"
-        placeholder="Search customer, circuit, core or span"
-        className={`${inputCls} w-full pl-8`}
+        placeholder={label}
+        className="field pl-9"
         value={q}
         onChange={(e) => {
           setQ(e.target.value);
@@ -114,15 +88,15 @@ function GlobalSearch({ onPick }: { onPick: (r: Result) => void }) {
         onKeyDown={onKey}
       />
       {showList && (
-        <div id={`${id}-list`} role="listbox" aria-label="Search results" className="absolute z-30 mt-1 max-h-96 w-full overflow-auto rounded-lg border bg-popover p-1 text-popover-foreground shadow-lg">
-          {error && <p className="p-2 text-sm">Search failed. Try again.</p>}
-          {!error && results.length === 0 && <p className="p-2 text-sm">No matches.</p>}
+        <div id={`${id}-list`} role="listbox" aria-label="Search results" className="absolute inset-x-0 top-[42px] z-30 max-h-[440px] overflow-auto rounded-xl border border-line bg-white py-2">
+          {error && <p className="px-4 py-2 text-[13px] text-muted-foreground">Search failed. Try again.</p>}
+          {!error && results.length === 0 && <p className="px-4 py-2 text-[13px] text-muted-foreground">No matches.</p>}
           {GROUPS.map((g) => {
             const items = results.map((r, i) => ({ r, i })).filter((x) => x.r.type === g);
             if (!items.length) return null;
             return (
               <div key={g} role="group" aria-label={GROUP_LABEL[g]}>
-                <div className="px-2 pt-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{GROUP_LABEL[g]}</div>
+                <div className="lbl px-4 pt-2">{GROUP_LABEL[g]}</div>
                 {items.map(({ r, i }) => (
                   <div
                     key={i}
@@ -132,10 +106,10 @@ function GlobalSearch({ onPick }: { onPick: (r: Result) => void }) {
                     aria-disabled={r.span_id == null}
                     onMouseEnter={() => setActive(i)}
                     onClick={() => pick(r)}
-                    className={`cursor-pointer rounded-md px-2 py-1.5 text-sm aria-disabled:cursor-not-allowed ${i === active ? "bg-accent text-accent-foreground" : ""}`}
+                    className={`flex min-h-10 cursor-pointer items-center px-4 py-1.5 aria-disabled:cursor-not-allowed ${i === active ? "bg-blue-bg" : ""}`}
                   >
-                    {r.label}
-                    {r.span_id == null && <span className="text-muted-foreground"> (no span yet)</span>}
+                    <span className="font-semibold">{r.label}</span>
+                    {r.span_id == null && <span className="ml-2 text-[13px] text-muted-foreground">(no span yet)</span>}
                   </div>
                 ))}
               </div>
@@ -147,53 +121,105 @@ function GlobalSearch({ onPick }: { onPick: (r: Result) => void }) {
   );
 }
 
-export type View = "spans" | "mine" | "approvals" | "review";
-type Me = components["schemas"]["CurrentUser"];
-type Bell = components["schemas"]["Bell"];
+export type View = "map" | "mine" | "approvals" | "upload" | "users";
 
-export function Header({ onPick, view, onView, me, bell }: {
-  onPick: (r: Result) => void;
-  view: View;
-  onView: (v: View) => void;
-  me: Me | null;
-  bell: Bell | null;
-}) {
-  const [theme, cycle] = useTheme();
-  const Icon = theme === "dark" ? Moon : Sun;
-  const nav: [View, string][] = [["spans", "Spans"], ["mine", "My reservations"], ...(me?.role === "admin" ? [["approvals", "Approvals"] as [View, string]] : []), ["review", "Needs review"]];
-  const total = bell?.total ?? 0;
+const LOGO = (
+  <svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true">
+    <circle cx="15" cy="15" r="14" fill="#141414" />
+    {[[22, 15, 0], [18.5, 21.1, 1], [11.5, 21.1, 0], [8, 15, 0], [11.5, 8.9, 0], [18.5, 8.9, 0]].map(([x, y, f]) => (
+      <circle key={`${x}-${y}`} cx={x} cy={y} r="2" fill={f ? "#fff" : "none"} stroke="#fff" strokeWidth="1.2" />
+    ))}
+  </svg>
+);
+
+function Account({ me, onView }: { me: Me; onView: (v: View) => void }) {
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+  const menu = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    menu.current?.querySelector<HTMLElement>("button, select")?.focus();
+    const close = (e: MouseEvent) => !box.current?.contains(e.target as Node) && setOpen(false);
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [open]);
+  const role = me.role === "admin" ? "Admin" : "Planner";
+  const initials = (me.display_name.match(/\b\w/g)?.join("") ?? me.username).slice(0, 2).toUpperCase();
   const switchUser = (u: string) => {
     try { localStorage.setItem("devUser", u); } catch { /* storage unavailable */ }
     location.reload();
   };
+  const item = "block min-h-9 w-full px-3 text-left font-medium hover:bg-raised focus-visible:-outline-offset-3";
   return (
-    <header className="sticky top-0 z-20 flex flex-wrap items-center gap-3 border-b bg-background px-4 py-2">
-      <h1 className="text-base font-semibold">Fiber Dashboard</h1>
-      <nav aria-label="Main" className="flex flex-wrap gap-1">
-        {nav.map(([v, label]) => (
-          <Button key={v} variant={view === v ? "secondary" : "ghost"} size="sm" aria-current={view === v ? "page" : undefined} onClick={() => onView(v)}>
-            {label}
-            {v === "approvals" && bell ? ` (${bell.approvals})` : ""}
-            {v === "review" && bell ? ` (${bell.needs_review})` : ""}
-          </Button>
-        ))}
-      </nav>
-      <div className="order-last w-full md:order-none md:flex-1 md:w-auto md:flex md:justify-center">
-        <GlobalSearch onPick={onPick} />
-      </div>
-      <Button variant="outline" size="sm" aria-label={`Notifications: ${total} waiting`} onClick={() => onView(me?.role === "admin" && bell?.approvals ? "approvals" : "review")}>
-        <BellIcon aria-hidden /> <span>{total}</span>
-      </Button>
-      {import.meta.env.DEV && me && (
-        <label className="text-sm">Dev user{" "}
-          <select className={inputCls} value={me.username} onChange={(e) => switchUser(e.target.value)}>
-            {DEV_USERS.map((u) => <option key={u}>{u}</option>)}
-          </select>
-        </label>
+    <div ref={box} className="relative flex-none" onKeyDown={(e) => { if (e.key === "Escape") { setOpen(false); box.current?.querySelector("button")?.focus(); } }}>
+      <button type="button" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((o) => !o)}
+        className="flex h-11 items-center gap-2.5 rounded-md pl-1.5 pr-2.5 text-left hover:bg-raised aria-expanded:bg-raised">
+        <span aria-hidden className="grid size-[30px] place-items-center rounded-full bg-[#272a30] text-xs font-semibold text-white">{initials}</span>
+        <span>
+          <b className="block text-[13px] leading-[17px] font-semibold">{me.display_name}</b>
+          <small className="block text-xs leading-4 text-muted-foreground">{role}</small>
+        </span>
+        <svg viewBox="0 0 16 16" aria-hidden="true" className="ni"><path d="M4 6l4 4 4-4" /></svg>
+      </button>
+      {open && (
+        <div ref={menu} role="menu" aria-label="Account" className="absolute right-0 top-[50px] z-30 min-w-[220px] rounded-xl border border-line bg-white py-1.5">
+          <p className="mb-1.5 border-b px-3 pb-2.5 pt-2 text-[13px] whitespace-nowrap text-muted-foreground"><b className="font-semibold text-foreground">{me.display_name}</b> · {role}</p>
+          {me.role === "admin" && <button type="button" role="menuitem" className={item} onClick={() => { setOpen(false); onView("users"); }}>Users</button>}
+          {/* Sign out is a stub until real sign-in lands (TASK-034). */}
+          <button type="button" role="menuitem" className={item} onClick={() => setOpen(false)}>Sign out</button>
+          {import.meta.env.DEV && (
+            <label className="mt-1.5 block border-t px-3 pt-2 pb-1 text-xs font-medium text-muted-foreground">Dev user (development only)
+              <select aria-label="Dev user" className="field mt-1 h-8 text-sm text-foreground" value={me.username} onChange={(e) => switchUser(e.target.value)}>
+                {DEV_USERS.map((u) => <option key={u}>{u}</option>)}
+              </select>
+            </label>
+          )}
+        </div>
       )}
-      <Button variant="outline" size="sm" onClick={cycle} aria-label={`Theme: ${theme}. Click to change`}>
-        <Icon aria-hidden /> Theme: {theme}
-      </Button>
+    </div>
+  );
+}
+
+export function Header({ onPick, view, onView, me, approvals, stale }: {
+  onPick: (r: Result) => void;
+  view: View;
+  onView: (v: View) => void;
+  me: Me | null;
+  approvals: number | null;
+  stale: number;
+}) {
+  const admin = me?.role === "admin";
+  const tabs: [View, string, string, React.ReactNode][] = [
+    ["map", "Map", "M2 4l4-1.5 4 1.5 4-1.5v9.5l-4 1.5-4-1.5-4 1.5zM6 2.5v9.5M10 4v9.5", null],
+    ["mine", "My reservations", "M4 2.5h8v11l-4-3-4 3z", stale > 0 && <span key="b" className="badge">{stale}<span className="sr-only"> stale</span></span>],
+  ];
+  if (admin) {
+    tabs.push(["approvals", "Approvals", "M3 8.5l3 3 7-7", approvals ? <span key="b" className="badge">{approvals} waiting</span> : null]);
+    tabs.push(["upload", "Upload", "M8 11V3M5 6l3-3 3 3M3 13h10", null]);
+  }
+  return (
+    <header className="sticky top-0 z-20 flex h-[60px] items-center gap-5 border-b bg-white px-6">
+      <div className="flex flex-none items-center gap-2.5">
+        {LOGO}
+        <div>
+          <h1 className="text-base leading-5 font-semibold">Fiber</h1>
+          <span className="block text-xs leading-4 whitespace-nowrap text-muted-foreground">Malaysia network</span>
+        </div>
+      </div>
+      <nav aria-label="Main">
+        <ul className="flex items-center gap-0.5">
+          {tabs.map(([v, label, d, extra]) => (
+            <li key={v}>
+              <button type="button" aria-current={view === v ? "page" : undefined} onClick={() => onView(v)}
+                className="flex h-9 items-center gap-2 rounded-md px-2.5 whitespace-nowrap text-[#3d4046] hover:bg-raised aria-[current=page]:bg-[#e4e7ec] aria-[current=page]:font-semibold aria-[current=page]:text-foreground">
+                <NavIcon d={d} /><span>{label}</span>{extra}
+              </button>
+            </li>
+          ))}
+        </ul>
+      </nav>
+      <GlobalSearch onPick={onPick} />
+      {me && <Account me={me} onView={onView} />}
     </header>
   );
 }

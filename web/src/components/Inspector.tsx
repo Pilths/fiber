@@ -1,0 +1,119 @@
+import type { components } from "@/api/schema";
+import { Icon } from "@/components/Icon";
+import { countBy, health, spanName, STATUS, type CoreStatus } from "@/lib/status";
+
+type Detail = components["schemas"]["SpanDetail"];
+
+export const Facts = ({ d }: { d: Detail }) => (
+  <>
+    {d.region && <b className="font-semibold text-foreground">{d.region}</b>}
+    {d.route_type && <b className="font-semibold text-foreground">{d.route_type}</b>}
+    {d.distance_km && <span><b className="font-semibold text-foreground">{Number(d.distance_km)}</b> km</span>}
+  </>
+);
+
+const numbers = (ns: number[]) => (ns.length === 1 ? `Core ${ns[0]}` : ns.length <= 4 ? `Cores ${ns.join(", ")}` : `${ns.length} cores`);
+
+// Short held list: one line per status and customer, most urgent first.
+function heldLines(d: Detail) {
+  const groups = new Map<string, { status: CoreStatus; who: string; ns: number[] }>();
+  for (const s of ["Requested", "Reserved", "In use"] as CoreStatus[])
+    for (const c of d.cores.filter((c) => c.status === s)) {
+      const k = `${s}|${c.customer ?? ""}`;
+      if (!groups.has(k)) groups.set(k, { status: s, who: c.customer ?? "-", ns: [] });
+      groups.get(k)!.ns.push(c.number);
+    }
+  const lines = [...groups.values()].map((g) => ({ key: g.status + g.who, icon: STATUS[g.status].icon, tone: STATUS[g.status].tone, word: g.status as string, who: g.who, meta: numbers(g.ns) }));
+  if (d.unassigned_reserved > 0)
+    lines.splice(Math.min(2, lines.length), 0, { key: "count", icon: "co", tone: "text-[#50555d]", word: "Count only", who: "-", meta: `${d.unassigned_reserved} cores` });
+  return lines;
+}
+
+export function Inspector({ detail, loading, onGoToCores }: { detail: Detail | null; loading: boolean; onGoToCores: () => void }) {
+  const tab = "relative inline-flex h-10 items-center gap-2 border-b-2 border-transparent -mb-px px-2.5 font-semibold whitespace-nowrap focus-visible:-outline-offset-3";
+  const later = (name: string) => (
+    <button type="button" role="tab" aria-selected="false" aria-disabled="true" title={`${name}: later`} className={`${tab} cursor-not-allowed font-medium text-muted-foreground`}
+      onClick={(e) => e.preventDefault()}>
+      {name}<span className="later">Later</span>
+    </button>
+  );
+  return (
+    <section className="card flex min-h-[400px] flex-[1_0_auto] flex-col pt-0" aria-label="Inspector">
+      <div role="tablist" aria-label="Inspector" className="-mx-5 mb-4 flex gap-1 border-b px-2.5">
+        <button type="button" role="tab" aria-selected="true" className={`${tab} border-b-foreground`}>Cores</button>
+        {later("Site")}
+        {later("Services")}
+      </div>
+      <div role="tabpanel" aria-label="Cores" className="flex flex-1 flex-col">
+        {!detail ? (
+          <p className="rounded-md border border-dashed border-line px-4 py-5 text-center text-[13px] text-muted-foreground">
+            <b className="mb-0.5 block text-sm font-semibold text-foreground">{loading ? "Loading span..." : "No span selected"}</b>
+            {!loading && "Choose a span in Find, or search in the top bar."}
+          </p>
+        ) : <Body d={detail} onGoToCores={onGoToCores} />}
+      </div>
+    </section>
+  );
+}
+
+function Body({ d, onGoToCores }: { d: Detail; onGoToCores: () => void }) {
+  const h = health(d);
+  const n = countBy(d);
+  const surveyed = d.survey_cores != null;
+  const withCores = n.Reserved + n.Requested + n["In use"];
+  const parts = [
+    { k: "k-free", v: d.free_to_reserve, label: "free" },
+    { k: "k-hold", v: d.unassigned_reserved, label: "held without cores" },
+    { k: "k-cores", v: withCores, label: "held with cores" },
+    { k: "k-fault", v: n.Faulty, label: "faulty" },
+  ];
+  const lines = heldLines(d).slice(0, 3);
+  return (
+    <>
+      <h3 className="text-2xl leading-[30px] font-bold tracking-tight">{spanName(d)}</h3>
+      <p className="mt-1.5 flex flex-wrap gap-x-4 gap-y-0.5 text-[13px] text-muted-foreground"><Facts d={d} /></p>
+      <div className="mt-5 border-t pt-4">
+        <div className="lbl">Free to reserve</div>
+        <div className={`mt-0.5 flex items-center gap-2.5 text-[40px] leading-[46px] font-bold tracking-tight ${surveyed ? h.cls.replace("h-", "v-") : "text-muted-foreground"}`}>
+          {surveyed ? d.free_to_reserve : "-"}
+          <span className={`pill tracking-normal ${h.cls}`}><Icon name={h.icon} />{h.word}</span>
+        </div>
+        {surveyed ? (
+          <>
+            <p className="mt-1 text-[13px] text-muted-foreground">{n.Available} Available minus {d.unassigned_reserved} held without cores, of {d.survey_cores} surveyed</p>
+            <div className="mt-3.5 flex h-2 gap-0.5" aria-hidden>
+              {parts.filter((p) => p.v > 0).map((p) => <span key={p.k} className={`k ${p.k} h-full rounded`} style={{ flex: p.v }} />)}
+            </div>
+            <dl className="mt-2.5 grid grid-cols-2 gap-x-4 gap-y-1 text-[13px] text-muted-foreground">
+              {parts.map((p) => (
+                <div key={p.k} className="flex items-center gap-2">
+                  <dt className="order-1">{p.label}</dt>
+                  <dd className="flex min-w-[38px] items-center gap-2 font-bold text-foreground"><span className={`k ${p.k}`} />{p.v}</dd>
+                </div>
+              ))}
+            </dl>
+          </>
+        ) : <p className="mt-1 text-[13px] text-muted-foreground">No survey count yet: no cores to show and it cannot be booked until an admin enters one. Cable size {d.cable_size}.</p>}
+      </div>
+      {lines.length > 0 && (
+        <div className="mt-5 border-t pt-4">
+          <div className="lbl">Held on this span</div>
+          <ul className="mt-1">
+            {lines.map((l) => (
+              <li key={l.key} className="grid min-h-10 grid-cols-[118px_1fr_auto] items-center gap-2 border-b border-rule text-[13px] last:border-b-0">
+                <span className={`inline-flex items-center gap-1.5 font-semibold whitespace-nowrap ${l.tone}`}><Icon name={l.icon} />{l.word}</span>
+                <span className="truncate">{l.who}</span>
+                <span className="whitespace-nowrap text-muted-foreground">{l.meta}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      <div className="-mx-5 mt-auto flex flex-wrap gap-2 border-t bg-white px-5 py-5">
+        <button type="button" className="btn btn-p flex-1" onClick={onGoToCores} disabled={!surveyed}>Go to cores</button>
+        {/* Route planning UI lands in the routes session (TASK-051). */}
+        <button type="button" className="btn flex-1" aria-disabled="true" title="Coming in the routes session" onClick={(e) => e.preventDefault()}>Plan a route from here</button>
+      </div>
+    </>
+  );
+}
