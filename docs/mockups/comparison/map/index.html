@@ -20,7 +20,7 @@
   --ns:#6b7079;             /* not surveyed line/border: 4.2:1 on land, 4.6:1 on sea */
   --sea:#f4f6f8; --land:#e9ecf0; --coast:#d3d8de; --rlab:#4a4f57;
   --r:6px; --font:"Geist",Inter,system-ui,sans-serif; --mono:"Geist Mono",ui-monospace,monospace;
-  --pad:clamp(24px,1.8vw,40px); --gut:16px; --cp:20px; --dev:34px; --top:72px;
+  --pad:24px; --gut:16px; --cp:20px; --dev:34px; --top:60px;
 }
 /*
  TYPE SCALE (v4, Geist, tabular-nums everywhere)
@@ -50,25 +50,31 @@ svg{display:block}
 .dev button[aria-pressed=true]{background:#fff;color:#0a0a0a}
 .dev :focus-visible{outline-color:#fff}
 
-/* Shell (v4) */
-.shell{display:grid;grid-template-columns:clamp(200px,15vw,232px) minmax(0,1fr);min-height:calc(100vh - var(--dev))}
-.side{position:sticky;top:0;height:calc(100vh - var(--dev));display:flex;flex-direction:column;gap:24px;padding:16px 12px 20px}
-.brand{display:flex;align-items:center;gap:10px;padding:0 8px;height:40px}
+/* Shell: one full-width page. Top bar = logo, main nav, search, account. No sidebar. */
+.top{display:flex;align-items:center;gap:20px;height:var(--top);padding:0 var(--pad);background:var(--card);border-bottom:1px solid var(--border)}
+.brand{display:flex;align-items:center;gap:10px;flex:none}
 .brand b{font-weight:600;font-size:16px;line-height:20px;display:block}
-.brand span{font-size:12px;line-height:16px;color:var(--muted);display:block}
-.nav a{display:flex;align-items:center;gap:10px;height:32px;margin-bottom:2px;padding:0 10px;border-radius:var(--r);color:#3d4046;text-decoration:none}
+.brand span{font-size:12px;line-height:16px;color:var(--muted);display:block;white-space:nowrap}
+.nav{display:flex;align-items:center;gap:2px;flex:none}
+.nav a{display:flex;align-items:center;gap:8px;height:36px;padding:0 10px;border-radius:var(--r);color:#3d4046;text-decoration:none;white-space:nowrap}
 .nav a:hover{background:var(--raised)}
 .nav a[aria-current=page]{background:#e4e7ec;color:var(--ink);font-weight:600}
 .ni{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
-.badge{margin-left:auto;font-size:12px;font-weight:600;line-height:18px;padding:0 8px;border-radius:4px;background:var(--amber-bg);color:var(--amber);border:1px solid var(--amber-bd);white-space:nowrap}
-.user{margin-top:auto;padding:8px;font-size:13px;line-height:18px}
-.user b{font-weight:600;display:block}
-.user span{color:var(--muted)}
-.content{min-width:0;padding:0 var(--pad) 40px 0}
-.top{display:flex;align-items:center;gap:24px;height:var(--top)}
-.crumb{display:flex;gap:8px;font-size:13px;color:var(--muted)}
-.crumb [aria-current]{color:var(--ink);font-weight:700;font-size:16px}
-.search{margin-left:auto;position:relative;width:min(460px,44%)}
+.badge{font-size:12px;font-weight:600;line-height:18px;padding:0 8px;border-radius:4px;background:var(--amber-bg);color:var(--amber);border:1px solid var(--amber-bd);white-space:nowrap}
+.acct{position:relative;flex:none}
+.abtn{display:flex;align-items:center;gap:10px;height:44px;padding:0 10px 0 6px;border:1px solid transparent;border-radius:var(--r);background:none;cursor:pointer;text-align:left}
+.abtn:hover,.abtn[aria-expanded=true]{background:var(--raised)}
+.av{width:30px;height:30px;border-radius:50%;background:var(--res);color:#fff;display:grid;place-items:center;font-size:12px;font-weight:600;flex:none}
+.abtn b{display:block;font-size:13px;line-height:17px;font-weight:600}
+.abtn small{display:block;font-size:12px;line-height:16px;color:var(--muted)}
+.amenu{position:absolute;z-index:30;right:0;top:50px;min-width:200px;padding:6px 0;background:#fff;border:1px solid var(--line);border-radius:8px}
+.amenu p{padding:8px 12px 10px;font-size:13px;color:var(--muted);border-bottom:1px solid var(--border);margin-bottom:6px;white-space:nowrap}
+.amenu p b{color:var(--ink);font-weight:600}
+.amenu button{display:block;width:100%;min-height:36px;padding:0 12px;border:0;background:none;text-align:left;font-weight:500;cursor:pointer}
+.amenu button:hover,.amenu button:focus-visible{background:var(--raised)}
+.amenu button:focus-visible{outline-offset:-3px}
+.content{min-width:0;padding:var(--pad) var(--pad) 40px}
+.search{margin-left:auto;position:relative;flex:0 1 420px;min-width:260px}
 .search .ni{position:absolute;left:12px;top:10px;color:var(--muted)}
 .search input{width:100%;height:36px;padding:0 12px 0 36px;border:1px solid var(--line);border-radius:var(--r);background:#fff}
 input::placeholder{color:var(--muted);opacity:1}
@@ -84,7 +90,7 @@ input::placeholder{color:var(--muted);opacity:1}
 /* Grid: ONE 12-col grid, 16px gutters. Map = cols 1-8, rail = cols 9-12; both stretch to the same height and
    fill at least the viewport under the top bar. Every card: 1px #e2e5ea border, 8px radius, 20px padding, header = title row + hairline. */
 .grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:var(--gut);align-items:stretch}
-.work{grid-column:1/-1;display:grid;grid-template-columns:subgrid;min-height:calc(100vh - var(--dev) - var(--top) - 24px)}
+.work{grid-column:1/-1;display:grid;grid-template-columns:subgrid;min-height:calc(100vh - var(--dev) - var(--top) - 2*var(--pad))}
 .g-map{grid-column:1/9;min-width:0}
 .g-rail{grid-column:9/13;display:flex;flex-direction:column;gap:var(--gut);min-width:0}
 .g-drawer{grid-column:1/-1}
@@ -439,8 +445,7 @@ tfoot td{border-bottom:0;border-top:1px solid var(--ink);font-weight:700}
   <button type="button" data-state="5">Empty route</button>
 </div>
 
-<div class="shell">
-<aside class="side">
+<header class="top">
   <div class="brand"><svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><circle cx="15" cy="15" r="14" fill="#141414"></circle><circle cx="22.0" cy="15.0" r="2" fill="none" stroke="#fff" stroke-width="1.2"></circle><circle cx="18.5" cy="21.1" r="2" fill="#fff" stroke="#fff" stroke-width="1.2"></circle><circle cx="11.5" cy="21.1" r="2" fill="none" stroke="#fff" stroke-width="1.2"></circle><circle cx="8.0" cy="15.0" r="2" fill="none" stroke="#fff" stroke-width="1.2"></circle><circle cx="11.5" cy="8.9" r="2" fill="none" stroke="#fff" stroke-width="1.2"></circle><circle cx="18.5" cy="8.9" r="2" fill="none" stroke="#fff" stroke-width="1.2"></circle></svg><div><b>Fiber</b><span>Malaysia network</span></div></div>
   <nav aria-label="Main"><ul class="nav">
 <li><a href="../v4/index.html"><svg class="ni" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8h12M2 4h12M2 12h12"></path></svg><span>Spans</span></a></li>
@@ -449,21 +454,23 @@ tfoot td{border-bottom:0;border-top:1px solid var(--ink);font-weight:700}
 <li><a href="#"><svg class="ni" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3 3 7-7"></path></svg><span>Approvals</span><span class="badge">2 waiting</span></a></li>
 <li><a href="#"><svg class="ni" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 11V3M5 6l3-3 3 3M3 13h10"></path></svg><span>Upload</span></a></li>
   </ul></nav>
-  <div class="user"><b>planner1</b><span>Planner</span></div>
-</aside>
-
-<div class="content">
-<header class="top">
-  <h1 class="vh">Map</h1>
-  <nav aria-label="Breadcrumb"><ol class="crumb"><li aria-current="page">Map</li></ol></nav>
   <form class="search" role="search" onsubmit="return false" id="gsearch">
     <svg class="ni" viewBox="0 0 16 16" aria-hidden="true"><path d="M7 12A5 5 0 1 0 7 2a5 5 0 0 0 0 10zM14 14l-3.5-3.5"></path></svg>
     <label class="vh" for="q">Find a span, site, customer, circuit or core</label>
     <input id="q" type="search" placeholder="Find a span, site, customer, circuit or core" autocomplete="off" spellcheck="false" role="combobox" aria-expanded="false" aria-controls="drop" aria-autocomplete="list">
     <div class="drop" id="drop" hidden></div>
   </form>
+  <div class="acct" id="acct">
+    <button type="button" class="abtn" id="abtn" aria-haspopup="menu" aria-expanded="false" aria-controls="amenu"><span class="av" aria-hidden="true">P1</span><span><b>planner1</b><small>Planner</small></span><svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4"></path></svg></button>
+    <div class="amenu" id="amenu" role="menu" aria-labelledby="abtn" hidden>
+      <p role="presentation"><b>planner1</b>, Planner</p>
+      <button type="button" role="menuitem" id="signout">Sign out</button>
+    </div>
+  </div>
 </header>
 
+<main class="content">
+<h1 class="vh">Map</h1>
 <div class="grid">
 <div class="work">
   <!-- MAP: the picture that follows the selection -->
@@ -590,8 +597,7 @@ tfoot td{border-bottom:0;border-top:1px solid var(--ink);font-weight:700}
   </div>
 </section>
 </div>
-</div>
-</div>
+</main>
 <p class="vh" id="live" aria-live="polite"></p>
 
 <script>
@@ -923,7 +929,16 @@ tfoot td{border-bottom:0;border-top:1px solid var(--ink);font-weight:700}
   if(b.dataset.a==='span')pickSpan(+b.dataset.v);else routeSet(b.dataset.v,'');});
  $('gsearch').addEventListener('focusout',function(e){if(!$('gsearch').contains(e.relatedTarget))closeDrop();});
 
+ // account menu stub
+ var abtn=$('abtn'),amenu=$('amenu');
+ function acct(open,focus){amenu.hidden=!open;abtn.setAttribute('aria-expanded',open);if(open)$('signout').focus();else if(focus)abtn.focus();}
+ abtn.addEventListener('click',function(){acct(amenu.hidden);});
+ abtn.addEventListener('keydown',function(e){if(e.key==='ArrowDown'){e.preventDefault();acct(true);}});
+ $('acct').addEventListener('focusout',function(e){if(!$('acct').contains(e.relatedTarget))acct(false);});
+ $('signout').addEventListener('click',function(){acct(false,true);$('live').textContent='Sign out is not part of this mock.';});
+
  document.addEventListener('keydown',function(e){if(e.key!=='Escape')return;
+  if(!amenu.hidden){acct(false,true);return;}
   if(!drop.hidden){closeDrop();q.focus();return;}
   if(!$('lpop').hidden){$('lpop').hidden=true;$('lbtn').setAttribute('aria-expanded','false');$('lbtn').focus();return;}
   if(e.target.tagName==='SELECT')return;

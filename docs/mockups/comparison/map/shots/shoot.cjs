@@ -66,12 +66,23 @@ const check = p => p.evaluate(() => {
   await p.click('#lbtn');
   await p.click('#zin'); await p.click('#fit'); await p.waitForTimeout(300);
   await p.screenshot({ path: D + 'shots/1440-fit.png' });
+  // account menu: keyboard open, Esc closes and returns focus
+  await p.focus('#abtn'); await p.keyboard.press('Enter'); await p.waitForTimeout(100);
+  console.log('acct open ->', await p.evaluate(() => document.activeElement.textContent + ' expanded=' + document.getElementById('abtn').getAttribute('aria-expanded')));
+  await p.screenshot({ path: D + 'shots/1440-account.png' });
+  await p.keyboard.press('Escape');
+  console.log('acct esc ->', await p.evaluate(() => document.activeElement.id + ' hidden=' + document.getElementById('amenu').hidden));
   await p.close();
   for (const w of [1280, 1920]) {
     const q = await b.newPage({ viewport: { width: w, height: w === 1920 ? 1080 : 800 } });
     q.on('pageerror', e => console.log('ERR', e.message));
     await q.goto('file://' + D + 'index.html#state=3'); await q.waitForTimeout(1200);
     console.log(w, 'route', JSON.stringify(await check(q)));
+    console.log(w, 'topbar', JSON.stringify(await q.evaluate(() => {
+      const t = document.querySelector('.top'), r = e => { const b = document.querySelector(e).getBoundingClientRect(); return [Math.round(b.left), Math.round(b.right), Math.round(b.top), Math.round(b.bottom)]; };
+      const i = document.getElementById('q'), c = document.createElement('canvas').getContext('2d'); c.font = getComputedStyle(i).font;
+      return { h: t.offsetHeight, brand: r('.brand'), nav: r('.nav'), search: r('.search'), acct: r('.acct'), phFits: c.measureText(i.placeholder).width <= i.clientWidth - 48 };
+    })));
     await q.screenshot({ path: D + `shots/${w}-3-route.png`, fullPage: true });
     await q.close();
   }
