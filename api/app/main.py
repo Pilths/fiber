@@ -9,6 +9,7 @@ from app.auth.admin import router as admin_users_router
 from app.auth.deps import PasswordChangeRequired
 from app.auth.router import router as auth_router
 from app.db import get_db
+from app.ingest.reservation_upload_router import router as reservation_upload_router
 from app.ingest.site_master_router import router as site_master_router
 from app.inventory.router import router as inventory_router
 from app.loss.router import router as loss_router
@@ -21,6 +22,7 @@ app.include_router(inventory_router)
 app.include_router(reservations_router)
 app.include_router(loss_router)
 app.include_router(site_master_router)
+app.include_router(reservation_upload_router)
 
 
 @app.get("/api/health")
