@@ -309,6 +309,7 @@ All five MVP items are planned for 31 October 2026, about 11 days from this draf
 8. **Inspector tabs Site and Services, map layers Services and Data centres** (shown disabled with a "Later" tag; placeholders for DC internals and bandwidth).
 9. **Undo of a site master upload** (rollback to a previous upload). The MVP keeps previous uploads for comparison only.
 10. **Real KMZ import** and KMZ route shapes on the map in place of straight lines. The MVP proves the path with one mock route.
+11. **Optional Reservation workbook columns** Core status (mark a core Faulty), Loss (dB) and Tested on (append a measurement). The parser reads them when present, but the real sheet has none; agree the names with the planners first.
 
 **Technical Risks**
 
