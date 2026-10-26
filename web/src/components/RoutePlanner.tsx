@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import { api, ApiError, errorText } from "@/api/client";
 import type { components } from "@/api/schema";
 import { useCustomerPicker } from "@/components/ChosenBar";
@@ -48,6 +48,8 @@ function fieldErrors(e: unknown): Errs {
 const isShort = (s: RouteSpan, need: number) => !s.surveyed || s.free_to_reserve < need;
 const shortText = (s: RouteSpan, need: number) =>
   s.surveyed ? `Not enough free cores on ${s.name}: ${s.free_to_reserve} free, ${need} needed` : `${s.name} is not surveyed`;
+// Match loss rows by span id, never by position: while a new option's fetch is in flight, `loss` still holds the previous option's rows.
+const lossOf = (loss: RouteLoss | null, id: number) => loss?.spans.find((x) => x.span_id === id);
 const totalKm = (op: RouteOption) => `${km(op.total_km)}${op.distance_incomplete ? "+" : ""}`;
 
 export function useRoutePlanner(active: boolean, version: number) {
@@ -260,7 +262,7 @@ export function RouteSummary({ rp, onGo }: { rp: RoutePlanner; onGo: () => void 
   );
 }
 
-// ---------- Bottom section, route state ----------
+// ---------- Bottom section, route state: v4 "End-to-end span diagram" card, then the "Spans on this path" card ----------
 export function RouteSection({ rp, spans, onDone }: { rp: RoutePlanner; spans: Span[] | null; onDone: () => void }) {
   const op = rp.option!;
   const need = rp.need ?? 0;
@@ -275,105 +277,155 @@ export function RouteSection({ rp, spans, onDone }: { rp: RoutePlanner; spans: S
   const type = (id: number) => spans?.find((s) => s.id === id)?.route_type ?? "–";
   const first = op.spans[0].site_a, last = op.spans[op.spans.length - 1].site_b;
   return (
-    <section className="card col-span-12" aria-labelledby="route-h" data-testid="route-section">
-      <div className="card-h items-center! justify-start! gap-4!">
-        <h2 id="route-h" tabIndex={-1} className="outline-offset-4">
-          <span className="sr-only">Route option {(rp.idx ?? 0) + 1}, {first} to {last}: </span>
-          {op.total_spans} {op.total_spans === 1 ? "span" : "spans"}, {totalKm(op)} km, {op.estimated_db == null ? "No dB estimate" : `${db(op.estimated_db)} est.`}
-        </h2>
-        <Strip rp={rp} op={op} need={need} />
-      </div>
-      <div className="grid grid-cols-[minmax(0,1fr)_320px] items-start gap-6">
-        <table className="tbl [&_tbody_th]:h-11 [&_td]:h-11" data-testid="route-table">
-          <caption className="sr-only">Spans on this route, in travel order, with loss and free cores</caption>
-          <thead><tr>
-            <th scope="col" className="pl-2">#</th><th scope="col">Span</th><th scope="col">Type</th><th scope="col">From → to</th>
-            <th scope="col" className="text-right!">km</th><th scope="col" className="text-right!">Est. loss (dB)</th>
-            <th scope="col" className="text-right!">Measured</th><th scope="col" className="pr-2! text-right!">Free cores</th>
-          </tr></thead>
-          <tbody>
-            {op.spans.map((s, i) => {
-              const sh = isShort(s, need), l = loss?.spans[i], sel = i === rp.spanIdx;
-              return (
-                <tr key={s.span_id} aria-selected={sel} className={sel ? "bg-blue-bg [&>td:first-child]:shadow-[inset_3px_0_0_var(--blue)]" : ""}>
-                  <td className="pl-2 text-muted-foreground">{i + 1}</td>
-                  <th scope="row" className="py-1.5 text-left">
-                    <button type="button" className="text-left font-semibold underline decoration-line underline-offset-4 hover:text-blue" onClick={() => rp.setSpanIdx(i)}>{s.name}</button>
-                  </th>
-                  <td>{type(s.span_id)}</td>
-                  <td>{s.site_a} → {s.site_b}</td>
-                  <td className="text-right whitespace-nowrap">{s.km == null ? "–" : km(s.km)}</td>
-                  <td className="text-right whitespace-nowrap">{l?.calculated_db == null ? "–" : l.calculated_db.toFixed(2)}</td>
-                  <td className="text-right whitespace-nowrap">{!l ? "–" : l.measured_db == null ? <span className="text-muted-foreground">Not measured</span> : db(l.measured_db)}</td>
-                  <td className="pr-2! text-right whitespace-nowrap">
-                    {sh ? <span className="inline-flex items-center gap-1 font-semibold text-red"><Icon name="fl" className="size-3" />{s.surveyed ? s.free_to_reserve : "Not surveyed"}<span className="sr-only"> short</span></span>
-                      : s.free_to_reserve}
-                  </td>
+    <div className="col-span-12 min-w-0 space-y-4" data-testid="route-section">
+      <section className="card" aria-labelledby="route-h">
+        <div className="card-h">
+          <h2 id="route-h" tabIndex={-1} className="outline-offset-4">
+            End-to-end span diagram<span className="sr-only">, route option {(rp.idx ?? 0) + 1}, {first} to {last}</span>
+          </h2>
+        </div>
+        <Diagram rp={rp} op={op} need={need} type={type} loss={loss} />
+      </section>
+      <section className="card" aria-labelledby="route-t">
+        <div className="card-h"><h2 id="route-t">Spans on this path</h2></div>
+        <div className="grid grid-cols-[minmax(0,1fr)_320px] items-start gap-6">
+          <div className="overflow-hidden rounded-md border">
+            <table className="tbl [&_tbody_th]:h-10 [&_td]:h-10 [&_td]:px-3! [&_th]:px-3!" data-testid="route-table">
+              <caption className="sr-only">Spans on this route, in travel order, with loss and free cores</caption>
+              <thead className="[&_th]:bg-[#f7f8fa]"><tr>
+                <th scope="col">#</th><th scope="col">Span</th><th scope="col">Type</th><th scope="col">From → to</th>
+                <th scope="col" className="text-right!">km</th><th scope="col" className="text-right!">Est. loss (dB)</th>
+                <th scope="col" className="text-right!">Measured</th><th scope="col" className="text-right!">Free cores</th>
+              </tr></thead>
+              <tbody>
+                {op.spans.map((s, i) => {
+                  const sh = isShort(s, need), l = lossOf(loss, s.span_id), sel = i === rp.spanIdx;
+                  return (
+                    <tr key={s.span_id} aria-selected={sel} className={sel ? "bg-blue-bg [&>td:first-child]:shadow-[inset_3px_0_0_var(--blue)]" : ""}>
+                      <td className="text-muted-foreground">{i + 1}</td>
+                      <th scope="row" className="text-left">
+                        <button type="button" className="text-left font-semibold underline decoration-line underline-offset-4 hover:text-blue" onClick={() => rp.setSpanIdx(i)}>{s.name}</button>
+                      </th>
+                      <td>{type(s.span_id)}</td>
+                      <td>{s.site_a} → {s.site_b}</td>
+                      <td className="text-right whitespace-nowrap">{s.km == null ? "–" : km(s.km)}</td>
+                      <td className="text-right whitespace-nowrap">{l?.calculated_db == null ? "–" : l.calculated_db.toFixed(2)}</td>
+                      <td className="text-right whitespace-nowrap">{!l ? "–" : l.measured_db == null ? <span className="text-muted-foreground">Not measured</span> : db(l.measured_db)}</td>
+                      <td className="text-right whitespace-nowrap">
+                        {sh ? <span className="inline-flex items-center gap-1 font-semibold text-red" data-testid="route-cell-short"><Icon name="fl" className="size-3" />{s.surveyed ? s.free_to_reserve : "Not surveyed"} short</span>
+                          : s.free_to_reserve}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              <tfoot className="font-semibold [&_td]:border-t [&_td]:border-b-0 [&_td]:whitespace-nowrap">
+                <tr>
+                  <td colSpan={4}>Total, {op.total_spans} {op.total_spans === 1 ? "span" : "spans"}</td>
+                  <td className="text-right">{totalKm(op)}{op.distance_incomplete && <span className="sr-only"> (some spans have no distance)</span>}</td>
+                  <td className="text-right">{op.estimated_db == null ? "–" : op.estimated_db.toFixed(2)}</td>
+                  <td className="text-right">{op.measured_spans} of {op.total_spans} measured</td>
+                  <td />
                 </tr>
-              );
-            })}
-          </tbody>
-          <tfoot className="font-bold [&_td]:border-t [&_td]:border-b-0 [&_td]:border-t-foreground [&_td]:pr-4 [&_td]:whitespace-nowrap">
-            <tr>
-              <td colSpan={2} className="pl-2">Total, {op.total_spans} {op.total_spans === 1 ? "span" : "spans"}</td>
-              <td /><td />
-              <td className="text-right">{totalKm(op)}{op.distance_incomplete && <span className="sr-only"> (some spans have no distance)</span>}</td>
-              <td className="text-right">{op.estimated_db == null ? "–" : op.estimated_db.toFixed(2)}</td>
-              <td className="text-right">{op.measured_spans} of {op.total_spans} measured</td>
-              <td className="pr-2!" />
-            </tr>
-          </tfoot>
-        </table>
-        <ReserveBox key={ids} op={op} need={need} onDone={onDone} />
-      </div>
-    </section>
+              </tfoot>
+            </table>
+          </div>
+          <ReserveBox key={ids} op={op} need={need} onDone={onDone} />
+        </div>
+      </section>
+    </div>
   );
 }
 
-// v6 drawer strip: Site — [span] — Site, one row, scrolls inside itself. One tab stop; arrow keys move between span chips.
-function Strip({ rp, op, need }: { rp: RoutePlanner; op: RouteOption; need: number }) {
-  const ref = useRef<HTMLDivElement>(null);
+// Cut a label to fit `px` at about `cw` px per character; the full text stays in <title> and aria-label.
+const fit = (s: string, px: number, cw: number) => (s.length * cw <= px ? s : `${s.slice(0, Math.max(1, Math.floor(px / cw) - 1))}…`);
+
+// Port of v4 lineSVG(): one straight line, sites evenly spaced, one focusable group per span.
+// One tab stop (roving tabindex); arrows/Home/End move focus, Enter/Space or click selects the span's table row.
+function Diagram({ rp, op, need, type, loss }: { rp: RoutePlanner; op: RouteOption; need: number; type: (id: number) => string; loss: RouteLoss | null }) {
+  const box = useRef<HTMLDivElement>(null);
+  const [boxW, setBoxW] = useState(0);
+  useEffect(() => {
+    const el = box.current!;
+    const ro = new ResizeObserver(() => setBoxW(Math.floor(el.clientWidth)));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const [cur, setCur] = useState(rp.spanIdx);
+  const [seen, setSeen] = useState(rp.spanIdx);
+  if (seen !== rp.spanIdx) { setSeen(rp.spanIdx); setCur(rp.spanIdx); } // follow selections made in the table
   const n = op.spans.length;
-  const kind = (name: string) => rp.eps.find((e) => e.name === name)?.kind;
+  // v4 width rule, widened to the card so text draws at 1:1 instead of scaling up
+  const W = Math.max(640, 120 + n * 170, boxW), H = 140, y = 68, x0 = 60, x1 = W - 60;
+  const X = (k: number) => x0 + (k * (x1 - x0)) / n, step = (x1 - x0) / n;
   const sites = [op.spans[0].site_a, ...op.spans.map((s) => s.site_b)];
-  const move = (e: KeyboardEvent) => {
+  const kind = (name: string) => rp.eps.find((e) => e.name === name)?.kind;
+  const go = (i: number) => { setCur(i); box.current?.querySelector<SVGGElement>(`[data-i="${i}"]`)?.focus(); };
+  const key = (e: KeyboardEvent) => {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); rp.setSpanIdx(cur); return; }
     const to = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
-    const i = e.key === "Home" ? 0 : e.key === "End" ? n - 1 : to != null ? Math.min(n - 1, Math.max(0, rp.spanIdx + to)) : null;
+    const i = e.key === "Home" ? 0 : e.key === "End" ? n - 1 : to != null ? Math.min(n - 1, Math.max(0, cur + to)) : null;
     if (i == null) return;
     e.preventDefault();
-    rp.setSpanIdx(i);
-    ref.current?.querySelector<HTMLElement>(`[data-i="${i}"]`)?.focus();
+    go(i);
   };
+  const dist = (s: RouteSpan, d: number | null | undefined) => (s.km == null ? "no distance" : `${km(s.km)} km${d == null ? "" : ` · ${d.toFixed(2)} dB`}`);
+  const end = `End · ${totalKm(op)} km · ${op.estimated_db == null ? "No dB estimate" : `${op.estimated_db.toFixed(2)} dB total`}`;
   const text = (s: RouteSpan) => [`span ${s.name}`, s.km == null ? "no distance" : `${km(s.km)} km`,
     s.surveyed ? `${s.free_to_reserve} cores free` : "not surveyed", isShort(s, need) && `short, need ${need}`].filter(Boolean).join(", ");
   return (
     <>
-      <div ref={ref} className="rs-strip" role="group" aria-label="Route strip. Arrow keys move between spans." onKeyDown={move} data-testid="route-strip">
-        {sites.map((name, i) => (
-          <Fragment key={i}>
-            <span aria-hidden className={`sn ${i === 0 || i === n ? "end" : ""}`}>{name}</span>
-            {i < n && (() => {
-              const s = op.spans[i], sh = isShort(s, need), dist = s.km == null ? "no distance" : `${km(s.km)} km`;
-              const label = [`Span ${s.name}`, dist, s.surveyed ? `${s.free_to_reserve} free` : "not surveyed", sh && "short"].filter(Boolean).join(", ");
-              return (
-                <>
-                  <span aria-hidden className="ln" />
-                  <button type="button" data-i={i} aria-pressed={i === rp.spanIdx} tabIndex={i === rp.spanIdx ? 0 : -1}
-                    aria-label={label} title={label} className={`rs-ss ${sh ? "short" : ""}`} onClick={() => rp.setSpanIdx(i)}>
-                    {sh && <Icon name="fl" className="size-3" />}{dist}
-                  </button>
-                  <span aria-hidden className="ln" />
-                </>
-              );
-            })()}
-          </Fragment>
-        ))}
+      <div ref={box} tabIndex={0} role="region" aria-label="Span diagram, scrolls sideways" className="overflow-x-auto rounded-md" data-testid="route-diagram">
+        <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} role="group" aria-label="Route drawn as a straight line from start to end. Arrow keys move between spans, Enter selects."
+          className="block font-sans" onKeyDown={key}>
+          <text x={x0} y={14} className="fill-current text-[11px] text-muted-foreground">Start</text>
+          <text x={x1} y={14} textAnchor="end" className="fill-current text-[11px] text-muted-foreground">{end}</text>
+          {op.spans.map((s, i) => {
+            const a = X(i), b = X(i + 1), m = (a + b) / 2, sh = isShort(s, need), t = type(s.span_id), d = lossOf(loss, s.span_id)?.calculated_db;
+            const tt = t.toLowerCase(), sel = i === rp.spanIdx;
+            const label = [`Span ${s.name}`, t, s.km == null ? "no distance" : `${km(s.km)} km`, d == null ? "no dB estimate" : `${d.toFixed(2)} dB`,
+              s.surveyed ? `${s.free_to_reserve} free cores` : "not surveyed", sh && "short"].filter(Boolean).join(", ");
+            return (
+              <g key={s.span_id} data-i={i} role="button" tabIndex={i === cur ? 0 : -1} aria-label={label} aria-pressed={sel}
+                className="rd-g cursor-pointer" onClick={() => { setCur(i); rp.setSpanIdx(i); }} onFocus={() => setCur(i)}>
+                <title>{s.name}</title>
+                <rect className="hit" x={a + 4} y={y - 46} width={b - a - 8} height={92} rx={4} fill={sel ? "var(--blue-bg)" : "transparent"} />
+                <line x1={a} y1={y} x2={b} y2={y} stroke="var(--blue)" strokeWidth={tt === "trunk" ? 5 : 3} strokeDasharray={tt === "bespoke" ? "7 5" : undefined} />
+                <text x={m} y={y - 30} textAnchor="middle" className="fill-current text-[11px] text-muted-foreground">{t}</text>
+                <text x={m} y={y - 13} textAnchor="middle" className="fill-current text-xs font-semibold text-foreground">{fit(s.name, step - 24, 6.6)}</text>
+                <text x={m} y={y + 23} textAnchor="middle" className="fill-current text-xs text-foreground">{dist(s, d)}</text>
+                <text x={m} y={y + 39} textAnchor="middle" data-testid={sh ? "route-diagram-short" : undefined}
+                  className={`fill-current text-xs ${sh ? "font-semibold text-red" : "text-muted-foreground"}`}>
+                  {sh && <tspan data-icon="fl" aria-hidden="true">✕ </tspan>}
+                  {s.surveyed ? `${s.free_to_reserve} free cores` : "not surveyed"}{sh && " · short"}
+                </text>
+              </g>
+            );
+          })}
+          {sites.map((name, i) => {
+            const x = X(i);
+            return (
+              <g key={i} aria-hidden="true">
+                {kind(name) === "data_center"
+                  ? <rect x={x - 8} y={y - 8} width={16} height={16} rx={2} fill="var(--ink)" stroke="#fff" strokeWidth={1.5} />
+                  : <polygon points={`${x},${y - 10} ${x + 10},${y} ${x},${y + 10} ${x - 10},${y}`} fill="#fff" stroke="var(--ink)" strokeWidth={2} />}
+                <text x={x} y={y + 64} textAnchor={i === 0 ? "start" : i === n ? "end" : "middle"} dx={i === 0 ? -8 : i === n ? 8 : 0}
+                  className="fill-current text-xs font-bold text-foreground">{fit(name, i === 0 || i === n ? step / 2 + 40 : step - 12, 7)}</text>
+              </g>
+            );
+          })}
+        </svg>
       </div>
       <ol className="sr-only" aria-label="Route as text">
         {sites.map((name, i) => (
           <li key={i}>Site {name}, {kindWord(kind(name))}{i < n && `; then ${text(op.spans[i])}`}</li>
         ))}
       </ol>
+      <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+        <span className="inline-flex items-center gap-1.5"><Shape kind="data_center" className="scale-75" />Data centre</span>
+        <span className="inline-flex items-center gap-1.5"><Shape kind="site" className="scale-75" />Site</span>
+        <span>Above the line: span and route type. Below: distance, estimated loss, free cores.</span>
+      </p>
     </>
   );
 }

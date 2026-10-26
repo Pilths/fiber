@@ -9,7 +9,8 @@ async function routeHash(page: Page, cores = 2, sort = "km", idx = 0) {
   return `#route=${id(FROM)}-${id(TO)}-${cores}-${sort}-${idx}`;
 }
 const options = (page: Page) => page.getByRole("list", { name: "Route options" }).getByTestId("route-option");
-const strip = (page: Page) => page.getByTestId("route-strip");
+const diagram = (page: Page) => page.getByTestId("route-diagram");
+const groups = (page: Page) => diagram(page).locator("g[role=button]");
 // Route UI regions that must never say "Bottleneck" or "lowest free".
 const noOldWords = async (page: Page) => {
   for (const id of ["route-form", "route-summary", "route-section"]) await expect(page.getByTestId(id)).not.toContainText(/bottleneck|lowest free/i);
@@ -49,14 +50,55 @@ test("route options: up to 3, a Best match, every field shown", async ({ page })
   await expect(table.locator("thead th")).toHaveText(["#", "Span", "Type", "From → to", "km", "Est. loss (dB)", "Measured", "Free cores"]);
   await expect(table.locator("tfoot")).toContainText(/Total, \d+ spans/);
   await expect(table.locator("tfoot")).toContainText(/\d+ of \d+ measured/);
-  await expect(page.getByTestId("route-section").getByRole("heading", { level: 2 })).toContainText(/\d+ spans, [\d.]+\+? km, ([\d.]+ dB est\.|No dB estimate)/);
+  const section = page.getByTestId("route-section");
+  await expect(section.getByRole("heading", { level: 2 })).toHaveText([/^End-to-end span diagram/, "Spans on this path"]);
+  // diagram: a node per site, a span group per span, End total
+  const rows = await table.locator("tbody tr").count();
+  await expect(groups(page)).toHaveCount(rows);
+  await expect(diagram(page).locator("g[aria-hidden=true]")).toHaveCount(rows + 1);
+  await expect(diagram(page)).toContainText(/End · [\d.]+\+? km · ([\d.]+ dB total|No dB estimate)/);
+  await expect(groups(page).first()).toHaveAttribute("aria-label", /^Span DEV .+ - DEV .+, (Trunk|Metro|Bespoke|–), ([\d.]+ km|no distance), ([\d.]+ dB|no dB estimate), (\d+ free cores|not surveyed)$/);
+  await expect(section).toContainText("Above the line: span and route type. Below: distance, estimated loss, free cores.");
   await expect(page.getByRole("list", { name: "Route as text" })).toContainText(`Site ${FROM}`);
   await noOldWords(page);
   // screenshot a 3-span option when the dev data has one
   const three = (await options(page).allTextContents()).findIndex((t) => /\b3 spans/.test(t));
-  if (three >= 0) await options(page).nth(three).click();
+  // Dev seed: calculated loss is km x 0.3. Hold the new option's loss fetch: while it is in flight the previous option's
+  // rows must never show on this option's spans (they were once matched by position), only "–" or the span's own value.
+  const rowsAll = table.locator("tbody tr");
+  const calc = (kmText: string) => (Number(kmText) * 0.3).toFixed(2);
+  if (three >= 0) {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    await page.route("**/api/loss/route*", async (r) => { await gate; await r.continue(); });
+    await options(page).nth(three).click();
+    await expect(groups(page)).toHaveCount(3);
+    for (let i = 0; i < 3; i++) {
+      const cells = rowsAll.nth(i).locator("td");
+      const kmText = (await cells.nth(3).textContent())!;
+      expect(["–", kmText === "–" ? "–" : calc(kmText)], `row ${i + 1} while loading`).toContain(await cells.nth(4).textContent());
+      expect(["–", "Not measured"].includes((await cells.nth(5).textContent())!) || /dB$/.test((await cells.nth(5).textContent())!)).toBeTruthy();
+    }
+    const lossRes = page.waitForResponse((r) => r.url().includes("/api/loss/route"));
+    release();
+    await lossRes;
+    await page.unroute("**/api/loss/route*");
+  }
+  // Every span with a distance shows its calculated dB in the table and the diagram; Measured is a dB or "Not measured".
+  for (let i = 0; i < (await rowsAll.count()); i++) {
+    const cells = rowsAll.nth(i).locator("td");
+    const kmText = (await cells.nth(3).textContent())!;
+    if (kmText !== "–") {
+      await expect(cells.nth(4), `row ${i + 1} calculated dB`).toHaveText(calc(kmText));
+      const dbText = calc(kmText);
+      await expect(groups(page).nth(i)).toContainText(`${kmText} km · ${dbText} dB`);
+      await expect(groups(page).nth(i)).toHaveAttribute("aria-label", new RegExp(`, ${kmText} km, ${dbText} dB, `));
+    }
+    await expect(cells.nth(5), `row ${i + 1} measured`).toHaveText(/^(\d+\.\d\d dB|Not measured)$/);
+  }
   await toSection(page);
-  await page.screenshot({ path: "e2e/screenshots/route-v6-strip.png" });
+  await expect(groups(page)).toHaveCount(three >= 0 ? 3 : await table.locator("tbody tr").count());
+  await page.screenshot({ path: "e2e/screenshots/route-v4-diagram.png" });
   await page.screenshot({ path: "test-results/route-full.png", fullPage: true });
 });
 
@@ -77,27 +119,32 @@ test("Most free cores sends sort=free_cores and re-ranks", async ({ page }) => {
   for (let i = 1; i < fewest.length; i++) expect(fewest[i - 1]).toBeGreaterThanOrEqual(fewest[i]);
 });
 
-test("too many cores: options short, strip chip short, Reserve off naming the span", async ({ page }) => {
+test("too many cores: options short, diagram span short, Reserve off naming the span", async ({ page }) => {
   await signIn(page);
   await plan(page, "200");
   await expect(options(page).first().getByTestId("route-short")).toContainText(/Not enough free cores on DEV .+: \d+ free, 200 needed/);
   await expect(options(page).first()).not.toContainText("Best match");
   await options(page).first().click();
-  const chip = strip(page).locator(".rs-ss.short").first();
-  await expect(chip.locator('svg[data-icon="fl"]')).toHaveCount(1);
-  await expect(chip).toHaveAttribute("aria-label", /^Span DEV .+ - DEV .+, ([\d.]+ km|no distance), (\d+ free|not surveyed), short$/);
-  await expect(chip).toHaveAttribute("title", (await chip.getAttribute("aria-label"))!);
+  const g = groups(page).first();
+  await expect(g).toHaveAttribute("aria-label", /^Span DEV .+ - DEV .+, .+, ([\d.]+ km|no distance), ([\d.]+ dB|no dB estimate), (\d+ free cores|not surveyed), short$/);
+  const shortText = g.getByTestId("route-diagram-short");
+  await expect(shortText).toHaveText(/^✕ (\d+ free cores|not surveyed) · short$/);
+  await expect(shortText.locator('[data-icon="fl"]')).toHaveCount(1);
+  const cell = page.getByTestId("route-cell-short").first();
+  await expect(cell).toHaveText(/^(\d+|Not surveyed) short$/);
+  await expect(cell.locator('svg[data-icon="fl"]')).toHaveCount(1);
   const box = page.getByTestId("route-reserve");
   await expect(box.getByRole("button", { name: "Reserve on this route" })).toBeDisabled();
   await expect(box).toContainText(/Reserve is off: DEV .+ has \d+ free, fewer than the 200 needed/);
   await expect(page.getByTestId("route-summary")).toContainText("Not enough free cores");
   await noOldWords(page);
   // red text keeps 4.5:1
-  const r = await contrast(page, { option: '[data-testid="route-short"]', chip: ".rs-ss.short" });
+  const r = await contrast(page, { option: '[data-testid="route-short"]', diagram: '[data-testid="route-diagram-short"]', cell: '[data-testid="route-cell-short"]' });
   expect(r.option).toBeGreaterThanOrEqual(4.5);
-  expect(r.chip).toBeGreaterThanOrEqual(4.5);
-  await page.evaluate(() => scrollTo(0, 0)); // full page: option cards and the route section
-  await page.screenshot({ path: "e2e/screenshots/route-v6-short.png", fullPage: true });
+  expect(r.diagram).toBeGreaterThanOrEqual(4.5);
+  expect(r.cell).toBeGreaterThanOrEqual(4.5);
+  await toSection(page);
+  await page.screenshot({ path: "e2e/screenshots/route-v4-short.png" });
 });
 
 test("from equal to to shows the inline error", async ({ page }) => {
@@ -109,28 +156,37 @@ test("from equal to to shows the inline error", async ({ page }) => {
   await expect(page.getByLabel("To", { exact: true })).toHaveAttribute("aria-invalid", "true");
 });
 
-test("#route= restores the selection; arrow keys move along the strip", async ({ page }) => {
+test("#route= restores the selection; arrow keys move between diagram spans, Enter selects", async ({ page }) => {
   await signIn(page);
   const h = await routeHash(page);
   await page.goto(`/${h}`);
   await expect(page.getByLabel("From", { exact: true })).toHaveValue(FROM);
   await expect(options(page).first()).toHaveAttribute("aria-pressed", "true");
-  const links = strip(page).getByRole("button");
+  const links = groups(page);
   await expect(links.first()).toBeVisible();
-  // chips show only km; the full span name is in the accessible name
-  await expect(links.first()).toHaveText(/^([\d.]+ km|no distance)$/);
-  await expect(links.first()).toHaveAttribute("aria-label", /^Span DEV .+ - DEV .+, ([\d.]+ km|no distance), (\d+ free|not surveyed)/);
-  // one tab stop; Home goes to the first, arrows move one at a time
-  await expect(strip(page).locator('[tabindex="0"]')).toHaveCount(1);
-  await strip(page).locator('[aria-pressed="true"]').focus();
+  const n = await links.count();
+  const row = (i: number) => page.getByRole("table", { name: /Spans on this route/ }).locator("tbody tr").nth(i);
+  // one tab stop; Home/End jump, arrows move one at a time; moving does not select, Enter/Space does
+  await expect(diagram(page).locator('g[tabindex="0"]')).toHaveCount(1);
+  await diagram(page).locator('g[tabindex="0"]').focus();
+  await page.keyboard.press("End");
+  await expect(links.nth(n - 1)).toBeFocused();
   await page.keyboard.press("Home");
   await expect(links.nth(0)).toBeFocused();
   await page.keyboard.press("ArrowRight");
   await expect(links.nth(1)).toBeFocused();
+  await expect(links.nth(1)).toHaveAttribute("tabindex", "0");
+  await expect(row(1)).toHaveAttribute("aria-selected", "false");
+  await page.keyboard.press("Enter");
+  await expect(row(1)).toHaveAttribute("aria-selected", "true");
   await expect(links.nth(1)).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByRole("table", { name: /Spans on this route/ }).locator("tbody tr").nth(1)).toHaveAttribute("aria-selected", "true");
   await page.keyboard.press("ArrowLeft");
   await expect(links.nth(0)).toBeFocused();
+  await page.keyboard.press(" ");
+  await expect(row(0)).toHaveAttribute("aria-selected", "true");
+  // click selects too
+  await links.nth(1).click();
+  await expect(row(1)).toHaveAttribute("aria-selected", "true");
   // #span= still works and switches back to span mode
   await page.goto("/");
   await page.getByRole("list", { name: "Spans" }).getByRole("button").first().click();
@@ -166,10 +222,10 @@ test("Plan a route from here prefills From with site A", async ({ page }) => {
 test("route state has no horizontal scroll at 1200, 1280, 1440, 1920", async ({ page }) => {
   await signIn(page);
   await page.goto(`/${await routeHash(page)}`);
-  await expect(strip(page)).toBeVisible();
+  await expect(diagram(page)).toBeVisible();
   for (const idx of [0, 1]) {
     await page.goto(`/${await routeHash(page, 2, "km", idx)}`);
-    await expect(strip(page)).toBeVisible();
+    await expect(diagram(page)).toBeVisible();
     for (const width of [1200, 1280, 1440, 1920]) {
       await page.setViewportSize({ width, height: 900 });
       await page.waitForTimeout(100);
@@ -177,9 +233,26 @@ test("route state has no horizontal scroll at 1200, 1280, 1440, 1920", async ({ 
       expect(over, `option ${idx + 1}, width ${width}`).toBeLessThanOrEqual(0);
     }
   }
-  // At 1200 the strip stays one row and scrolls inside its own box.
+  // A long route (3+ spans) at 1200: the diagram is at least v4's width and any overflow scrolls inside its own focusable box.
+  const opts = await options(page).allTextContents();
+  const long = opts.findIndex((t) => /\b([3-9]|\d\d) spans/.test(t));
+  expect(long, "dev data has a 3+ span option").toBeGreaterThanOrEqual(0);
+  await page.goto(`/${await routeHash(page, 2, "km", long)}`);
   await page.setViewportSize({ width: 1200, height: 900 });
-  const box = await strip(page).evaluate((el) => ({ h: el.clientHeight, overflow: getComputedStyle(el).overflowX }));
+  await expect(groups(page).nth(2)).toBeVisible();
+  const n = await groups(page).count();
+  const box = await diagram(page).evaluate((el) => ({ overflow: getComputedStyle(el).overflowX, tab: el.tabIndex, sw: el.scrollWidth, cw: el.clientWidth,
+    svg: el.querySelector("svg")!.getBoundingClientRect().width }));
   expect(box.overflow).toBe("auto");
-  expect(box.h).toBeLessThan(60);
+  expect(box.tab).toBe(0);
+  expect(box.svg).toBeGreaterThanOrEqual(Math.max(640, 120 + n * 170));
+  expect(box.sw).toBeGreaterThanOrEqual(box.cw);
+  // force a narrow box to prove it scrolls inside itself, never the page
+  await diagram(page).evaluate((el) => { el.style.width = "500px"; });
+  const sc = await diagram(page).evaluate((el) => { el.scrollLeft = 100; return { sw: el.scrollWidth, cw: el.clientWidth, left: el.scrollLeft }; });
+  expect(sc.sw).toBeGreaterThan(sc.cw);
+  expect(sc.left).toBeGreaterThan(0);
+  const over = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(over).toBeLessThanOrEqual(0);
+  await noOldWords(page);
 });
