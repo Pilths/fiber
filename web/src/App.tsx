@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { api } from "@/api/client";
+import { api, ApiError, authEvents, setDevUser } from "@/api/client";
+import { ChangePassword, Login } from "@/components/Auth";
 import type { components } from "@/api/schema";
 import { ChosenBar } from "@/components/ChosenBar";
 import { FindCard } from "@/components/FindCard";
@@ -8,6 +9,7 @@ import { HeldTable } from "@/components/HeldTable";
 import { Icon } from "@/components/Icon";
 import { Facts, Inspector } from "@/components/Inspector";
 import { PortGrid } from "@/components/PortGrid";
+import { Users } from "@/components/Users";
 import { Approvals, MyReservations, NeedsReview } from "@/components/Reservations";
 import { countBy, spanName, STATUS, STATUS_ORDER } from "@/lib/status";
 
@@ -23,15 +25,50 @@ const hashSpan = () => {
   try { return m ? decodeURIComponent(m[1]) : null; } catch { return null; }
 };
 
+// Auth gate: GET /api/me decides. 401 -> Login, must_change_password -> Change password, else the dashboard.
+// The api client reports a 401 or a 403 password_change_required from any call, so a mid-session change routes too.
 export default function App() {
+  const [me, setMe] = useState<Me | null>(null);
+  const [page, setPage] = useState<"loading" | "login" | "change" | "app" | "error">("loading");
+  const [voluntary, setVoluntary] = useState(false);
+
+  const loadMe = useCallback(() => {
+    api.get("/api/me")
+      .then((u) => { setMe(u); setPage(u.must_change_password ? "change" : "app"); })
+      .catch((e) => setPage(e instanceof ApiError && e.status === 401 ? "login" : "error"));
+  }, []);
+  useEffect(() => {
+    loadMe();
+    const out = () => { setMe(null); setPage("login"); };
+    const change = () => loadMe();
+    authEvents.addEventListener("signed-out", out);
+    authEvents.addEventListener("password-change", change);
+    return () => { authEvents.removeEventListener("signed-out", out); authEvents.removeEventListener("password-change", change); };
+  }, [loadMe]);
+
+  const signOut = () => {
+    setDevUser(null);
+    api.post("/api/auth/logout").catch(() => {}).finally(() => { setMe(null); setPage("login"); });
+  };
+
+  if (page === "loading") return null;
+  if (page === "error") return <p role="alert" className="m-6 rounded-md border border-red bg-red-bg px-4 py-2 font-semibold text-red">Could not reach the server. Reload to try again.</p>;
+  if (page === "login" || !me) return <Login onSignedIn={(u) => { setDevUser(null); setMe(u); setVoluntary(false); setPage(u.must_change_password ? "change" : "app"); }} />;
+  if (page === "change" || voluntary) {
+    return <ChangePassword me={me} forced={page === "change"} onSignOut={signOut} onCancel={() => setVoluntary(false)}
+      onDone={() => { setVoluntary(false); setPage("loading"); loadMe(); }} />;
+  }
+  return <Dashboard me={me} onSignOut={signOut} onChangePassword={() => setVoluntary(true)} />;
+}
+
+function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () => void; onChangePassword: () => void }) {
   const [spans, setSpans] = useState<Span[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [spanId, setSpanId] = useState<number | null>(null);
   const [detail, setDetail] = useState<Detail | null>(null);
   const [focusCoreId, setFocusCoreId] = useState<number | null>(null);
   const [selected, setSelected] = useState<Set<number>>(new Set());
-  const [view, setView] = useState<View>("map");
-  const [me, setMe] = useState<Me | null>(null);
+  const [view, setViewState] = useState<View>(location.hash === "#users" ? "users" : "map");
   const [bell, setBell] = useState<Bell | null>(null);
   const [stale, setStale] = useState(0);
   const [mapMin, setMapMin] = useState(false);
@@ -41,8 +78,16 @@ export default function App() {
     api.get("/api/bell").then(setBell).catch(() => {});
     api.get("/api/reservations", { query: { mine: true } }).then((r) => setStale(r.filter((x) => x.stale).length)).catch(() => {});
   }, []);
+  // Users has its own URL (#users) so it can be visited directly; other views keep the #span= hash.
+  const setView = useCallback((v: View) => {
+    setViewState(v);
+    if (v === "users") history.replaceState(null, "", "#users");
+    else if (location.hash === "#users") history.replaceState(null, "", location.pathname);
+  }, []);
   useEffect(() => {
-    api.get("/api/me").then(setMe).catch(() => setError("Could not sign in."));
+    const sync = () => location.hash === "#users" && setViewState("users");
+    addEventListener("hashchange", sync);
+    return () => removeEventListener("hashchange", sync);
   }, []);
   useEffect(refreshBell, [refreshBell, view]);
 
@@ -65,7 +110,7 @@ export default function App() {
     setSpanId(id);
     setFocusCoreId(coreId);
     setSelected((s) => (s.size ? new Set() : s));
-  }, []);
+  }, [setView]);
 
   // Hash -> selection, on load and when the hash changes (back button, pasted link).
   useEffect(() => {
@@ -96,9 +141,9 @@ export default function App() {
   return (
     <div className="min-h-screen">
       <Header onPick={(r) => r.span_id != null && open(r.span_id, r.core_id ?? null)} view={view} onView={setView} me={me}
-        approvals={me?.role === "admin" ? bell?.approvals ?? null : null} stale={stale} />
+        approvals={me.role === "admin" ? bell?.approvals ?? null : null} stale={stale} onSignOut={onSignOut} onChangePassword={onChangePassword} />
       {error && <p role="alert" className="mx-6 mt-4 rounded-md border border-red bg-red-bg px-4 py-2 font-semibold text-red">{error}</p>}
-      {view !== "map" && me && (
+      {view !== "map" && (
         <main className="space-y-4 px-6 pt-6 pb-10">
           {view === "mine" && (
             <>
@@ -108,7 +153,7 @@ export default function App() {
           )}
           {view === "approvals" && <Approvals me={me} onChanged={refreshBell} />}
           {view === "upload" && <Placeholder title="Upload" text="Excel upload and the validation report arrive in the upload session." />}
-          {view === "users" && <Placeholder title="Users" text="Account management arrives with real sign-in." />}
+          {view === "users" && <Users me={me} />}
         </main>
       )}
       {view === "map" && (

@@ -4,6 +4,143 @@
  */
 
 export interface paths {
+    "/api/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Login */
+        post: operations["login_api_auth_login_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Logout */
+        post: operations["logout_api_auth_logout_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/change-password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Change Password */
+        post: operations["change_password_api_auth_change_password_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Me */
+        get: operations["me_api_me_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Users */
+        get: operations["list_users_api_admin_users_get"];
+        put?: never;
+        /** Create User */
+        post: operations["create_user_api_admin_users_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/users/{user_id}/reset-password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reset Password */
+        post: operations["reset_password_api_admin_users__user_id__reset_password_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/users/{user_id}/deactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Deactivate */
+        post: operations["deactivate_api_admin_users__user_id__deactivate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/users/{user_id}/activate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Activate */
+        post: operations["activate_api_admin_users__user_id__activate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/search": {
         parameters: {
             query?: never;
@@ -70,23 +207,6 @@ export interface paths {
          * @description Existing name (any case): returned as is. Similar names (>= 0.4) need confirm_new=true before a new one is created.
          */
         post: operations["create_customer_api_customers_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/me": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Me */
-        get: operations["me_api_me_get"];
-        put?: never;
-        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -345,6 +465,13 @@ export interface components {
             /** Total */
             total: number;
         };
+        /** ChangePasswordBody */
+        ChangePasswordBody: {
+            /** Current Password */
+            current_password: string;
+            /** New Password */
+            new_password: string;
+        };
         /** CoreDetail */
         CoreDetail: {
             /** Id */
@@ -393,6 +520,11 @@ export interface components {
             display_name: string;
             /** Role */
             role: string;
+            /**
+             * Must Change Password
+             * @default false
+             */
+            must_change_password: boolean;
         };
         /** Customer */
         Customer: {
@@ -427,6 +559,13 @@ export interface components {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
         };
+        /** LoginBody */
+        LoginBody: {
+            /** Username */
+            username: string;
+            /** Password */
+            password: string;
+        };
         /** NeedsReviewItem */
         NeedsReviewItem: {
             /**
@@ -437,11 +576,6 @@ export interface components {
             /** Detail */
             detail: string;
             reservation: components["schemas"]["ReservationOut"];
-        };
-        /** ReasonBody */
-        ReasonBody: {
-            /** Reason */
-            reason: string;
         };
         /** ResCore */
         ResCore: {
@@ -591,6 +725,65 @@ export interface components {
             /** Free To Reserve */
             free_to_reserve: number;
         };
+        /** UserCreate */
+        UserCreate: {
+            /** Username */
+            username: string;
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "planner" | "admin";
+            /** Display Name */
+            display_name?: string | null;
+            /**
+             * Reason
+             * @default admin action
+             */
+            reason: string;
+        };
+        /** UserOut */
+        UserOut: {
+            /** Id */
+            id: number;
+            /** Username */
+            username: string;
+            /** Display Name */
+            display_name: string;
+            /** Role */
+            role: string;
+            /** Active */
+            active: boolean;
+            /** Must Change Password */
+            must_change_password: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** UserWithPassword */
+        UserWithPassword: {
+            /** Id */
+            id: number;
+            /** Username */
+            username: string;
+            /** Display Name */
+            display_name: string;
+            /** Role */
+            role: string;
+            /** Active */
+            active: boolean;
+            /** Must Change Password */
+            must_change_password: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Temporary Password */
+            temporary_password: string;
+        };
         /** ValidationError */
         ValidationError: {
             /** Location */
@@ -604,6 +797,19 @@ export interface components {
             /** Context */
             ctx?: Record<string, never>;
         };
+        /** ReasonBody */
+        app__auth__admin__ReasonBody: {
+            /**
+             * Reason
+             * @default admin action
+             */
+            reason: string;
+        };
+        /** ReasonBody */
+        app__reservations__schemas__ReasonBody: {
+            /** Reason */
+            reason: string;
+        };
     };
     responses: never;
     parameters: never;
@@ -613,6 +819,323 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    login_api_auth_login_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoginBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CurrentUser"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    logout_api_auth_logout_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                fiber_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    change_password_api_auth_change_password_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-dev-user"?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                fiber_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangePasswordBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    me_api_me_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-dev-user"?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                fiber_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CurrentUser"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_users_api_admin_users_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-dev-user"?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                fiber_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_user_api_admin_users_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-dev-user"?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                fiber_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserWithPassword"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reset_password_api_admin_users__user_id__reset_password_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-dev-user"?: string | null;
+            };
+            path: {
+                user_id: number;
+            };
+            cookie?: {
+                fiber_session?: string | null;
+            };
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["app__auth__admin__ReasonBody"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserWithPassword"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    deactivate_api_admin_users__user_id__deactivate_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-dev-user"?: string | null;
+            };
+            path: {
+                user_id: number;
+            };
+            cookie?: {
+                fiber_session?: string | null;
+            };
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["app__auth__admin__ReasonBody"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    activate_api_admin_users__user_id__activate_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-dev-user"?: string | null;
+            };
+            path: {
+                user_id: number;
+            };
+            cookie?: {
+                fiber_session?: string | null;
+            };
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["app__auth__admin__ReasonBody"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     search_api_search_get: {
         parameters: {
             query: {
@@ -622,7 +1145,9 @@ export interface operations {
                 "x-dev-user"?: string | null;
             };
             path?: never;
-            cookie?: never;
+            cookie?: {
+                fiber_session?: string | null;
+            };
         };
         requestBody?: never;
         responses: {
@@ -657,7 +1182,9 @@ export interface operations {
                 "x-dev-user"?: string | null;
             };
             path?: never;
-            cookie?: never;
+            cookie?: {
+                fiber_session?: string | null;
+            };
         };
         requestBody?: never;
         responses: {
@@ -690,7 +1217,9 @@ export interface operations {
             path: {
                 span_id: number;
             };
-            cookie?: never;
+            cookie?: {
+                fiber_session?: string | null;
+            };
         };
         requestBody?: never;
         responses: {
@@ -723,7 +1252,9 @@ export interface operations {
                 "x-dev-user"?: string | null;
             };
             path?: never;
-            cookie?: never;
+            cookie?: {
+                fiber_session?: string | null;
+            };
         };
         requestBody?: never;
         responses: {
@@ -754,7 +1285,9 @@ export interface operations {
                 "x-dev-user"?: string | null;
             };
             path?: never;
-            cookie?: never;
+            cookie?: {
+                fiber_session?: string | null;
+            };
         };
         requestBody: {
             content: {
@@ -782,37 +1315,6 @@ export interface operations {
             };
         };
     };
-    me_api_me_get: {
-        parameters: {
-            query?: never;
-            header?: {
-                "x-dev-user"?: string | null;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CurrentUser"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     list_reservations_api_reservations_get: {
         parameters: {
             query?: {
@@ -823,7 +1325,9 @@ export interface operations {
                 "x-dev-user"?: string | null;
             };
             path?: never;
-            cookie?: never;
+            cookie?: {
+                fiber_session?: string | null;
+            };
         };
         requestBody?: never;
         responses: {
@@ -854,7 +1358,9 @@ export interface operations {
                 "x-dev-user"?: string | null;
             };
             path?: never;
-            cookie?: never;
+            cookie?: {
+                fiber_session?: string | null;
+            };
         };
         requestBody: {
             content: {
@@ -889,7 +1395,9 @@ export interface operations {
                 "x-dev-user"?: string | null;
             };
             path?: never;
-            cookie?: never;
+            cookie?: {
+                fiber_session?: string | null;
+            };
         };
         requestBody?: never;
         responses: {
@@ -920,7 +1428,9 @@ export interface operations {
                 "x-dev-user"?: string | null;
             };
             path?: never;
-            cookie?: never;
+            cookie?: {
+                fiber_session?: string | null;
+            };
         };
         requestBody?: never;
         responses: {
@@ -951,7 +1461,9 @@ export interface operations {
                 "x-dev-user"?: string | null;
             };
             path?: never;
-            cookie?: never;
+            cookie?: {
+                fiber_session?: string | null;
+            };
         };
         requestBody?: never;
         responses: {
@@ -984,7 +1496,9 @@ export interface operations {
             path: {
                 rid: number;
             };
-            cookie?: never;
+            cookie?: {
+                fiber_session?: string | null;
+            };
         };
         requestBody?: never;
         responses: {
@@ -1017,7 +1531,9 @@ export interface operations {
             path: {
                 rid: number;
             };
-            cookie?: never;
+            cookie?: {
+                fiber_session?: string | null;
+            };
         };
         requestBody?: never;
         responses: {
@@ -1050,7 +1566,9 @@ export interface operations {
             path: {
                 rid: number;
             };
-            cookie?: never;
+            cookie?: {
+                fiber_session?: string | null;
+            };
         };
         requestBody: {
             content: {
@@ -1087,7 +1605,9 @@ export interface operations {
             path: {
                 rid: number;
             };
-            cookie?: never;
+            cookie?: {
+                fiber_session?: string | null;
+            };
         };
         requestBody?: never;
         responses: {
@@ -1120,11 +1640,13 @@ export interface operations {
             path: {
                 rid: number;
             };
-            cookie?: never;
+            cookie?: {
+                fiber_session?: string | null;
+            };
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ReasonBody"];
+                "application/json": components["schemas"]["app__reservations__schemas__ReasonBody"];
             };
         };
         responses: {
@@ -1157,7 +1679,9 @@ export interface operations {
             path: {
                 rid: number;
             };
-            cookie?: never;
+            cookie?: {
+                fiber_session?: string | null;
+            };
         };
         requestBody: {
             content: {
@@ -1194,11 +1718,13 @@ export interface operations {
             path: {
                 rid: number;
             };
-            cookie?: never;
+            cookie?: {
+                fiber_session?: string | null;
+            };
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ReasonBody"];
+                "application/json": components["schemas"]["app__reservations__schemas__ReasonBody"];
             };
         };
         responses: {
@@ -1231,7 +1757,9 @@ export interface operations {
             path: {
                 rid: number;
             };
-            cookie?: never;
+            cookie?: {
+                fiber_session?: string | null;
+            };
         };
         requestBody: {
             content: {
@@ -1268,7 +1796,9 @@ export interface operations {
             path: {
                 rid: number;
             };
-            cookie?: never;
+            cookie?: {
+                fiber_session?: string | null;
+            };
         };
         requestBody: {
             content: {

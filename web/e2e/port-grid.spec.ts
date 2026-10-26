@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { signIn } from "./helpers";
 
 const SPAN = "DEV Kuala Lumpur DC - DEV Cyberjaya DC"; // dev seed: has Available, Reserved and In use cores
 
@@ -6,7 +7,7 @@ const pickSpan = (page: Page, name: string | RegExp) =>
   page.getByRole("list", { name: "Spans" }).getByRole("button", { name: typeof name === "string" ? new RegExp(name) : name }).click();
 
 async function openSpan(page: Page) {
-  await page.goto("/");
+  await signIn(page);
   await pickSpan(page, SPAN);
   await expect(page.getByRole("grid", { name: "Cores" })).toBeVisible();
 }
@@ -154,7 +155,7 @@ test("each status has a distinct symbol and text, not colour alone", async ({ pa
 }
 
 test("count-only reservation shows on the span and in My reservations; admin sees Approvals", async ({ page }) => {
-  await page.goto("/");
+  await signIn(page);
   await pickSpan(page, /^DEV Cyberjaya DC - DEV Bukit Jalil/);
   await expect(page.getByTestId("capacity")).toContainText("3 reserved, not assigned");
   await expect(page.getByTestId("capacity")).toContainText("= 17 free to reserve");
@@ -167,8 +168,7 @@ test("count-only reservation shows on the span and in My reservations; admin see
 
 test("planner books and withdraws a core request, admin sees Approvals", async ({ browser }) => {
   const planner = await (await browser.newContext({ viewport: { width: 1280, height: 900 } })).newPage();
-  await planner.addInitScript(() => localStorage.setItem("devUser", "planner2"));
-  await planner.goto("/");
+  await signIn(planner, "planner2");
   await pickSpan(planner, /DEV Bukit Jalil TOC - DEV Kuantan Hut/);
   await planner.locator('[role=gridcell][data-status="Available"]').first().click();
   const bar = planner.getByTestId("chosen-bar");
@@ -183,8 +183,7 @@ test("planner books and withdraws a core request, admin sees Approvals", async (
   await expect(planner.getByText("Withdrawn").first()).toBeVisible();
 
   const admin = await (await browser.newContext()).newPage();
-  await admin.addInitScript(() => localStorage.setItem("devUser", "admin1"));
-  await admin.goto("/");
+  await signIn(admin, "admin1");
   await admin.getByRole("button", { name: /^Approvals/ }).click();
   await expect(admin.getByRole("heading", { name: /^Approvals/ })).toBeVisible();
   await expect(admin.getByRole("button", { name: "Approve" }).first()).toBeVisible();

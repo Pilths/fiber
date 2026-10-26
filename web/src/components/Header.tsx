@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { api, DEV_USERS } from "@/api/client";
+import { api, DEV_USERS, setDevUser } from "@/api/client";
 import type { components } from "@/api/schema";
 import { NavIcon } from "@/components/Icon";
 
@@ -123,7 +123,7 @@ function GlobalSearch({ onPick }: { onPick: (r: Result) => void }) {
 
 export type View = "map" | "mine" | "approvals" | "upload" | "users";
 
-const LOGO = (
+export const LOGO = (
   <svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true">
     <circle cx="15" cy="15" r="14" fill="#141414" />
     {[[22, 15, 0], [18.5, 21.1, 1], [11.5, 21.1, 0], [8, 15, 0], [11.5, 8.9, 0], [18.5, 8.9, 0]].map(([x, y, f]) => (
@@ -132,7 +132,9 @@ const LOGO = (
   </svg>
 );
 
-function Account({ me, onView }: { me: Me; onView: (v: View) => void }) {
+type AccountActions = { onSignOut: () => void; onChangePassword: () => void };
+
+function Account({ me, onView, onSignOut, onChangePassword }: { me: Me; onView: (v: View) => void } & AccountActions) {
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
   const menu = useRef<HTMLDivElement>(null);
@@ -146,7 +148,7 @@ function Account({ me, onView }: { me: Me; onView: (v: View) => void }) {
   const role = me.role === "admin" ? "Admin" : "Planner";
   const initials = (me.display_name.match(/\b\w/g)?.join("") ?? me.username).slice(0, 2).toUpperCase();
   const switchUser = (u: string) => {
-    try { localStorage.setItem("devUser", u); } catch { /* storage unavailable */ }
+    setDevUser(u);
     location.reload();
   };
   const item = "block min-h-9 w-full px-3 text-left font-medium hover:bg-raised focus-visible:-outline-offset-3";
@@ -165,8 +167,8 @@ function Account({ me, onView }: { me: Me; onView: (v: View) => void }) {
         <div ref={menu} role="menu" aria-label="Account" className="absolute right-0 top-[50px] z-30 min-w-[220px] rounded-xl border border-line bg-white py-1.5">
           <p className="mb-1.5 border-b px-3 pb-2.5 pt-2 text-[13px] whitespace-nowrap text-muted-foreground"><b className="font-semibold text-foreground">{me.display_name}</b> · {role}</p>
           {me.role === "admin" && <button type="button" role="menuitem" className={item} onClick={() => { setOpen(false); onView("users"); }}>Users</button>}
-          {/* Sign out is a stub until real sign-in lands (TASK-034). */}
-          <button type="button" role="menuitem" className={item} onClick={() => setOpen(false)}>Sign out</button>
+          <button type="button" role="menuitem" className={item} onClick={() => { setOpen(false); onChangePassword(); }}>Change password</button>
+          <button type="button" role="menuitem" className={item} onClick={() => { setOpen(false); onSignOut(); }}>Sign out</button>
           {import.meta.env.DEV && (
             <label className="mt-1.5 block border-t px-3 pt-2 pb-1 text-xs font-medium text-muted-foreground">Dev user (development only)
               <select aria-label="Dev user" className="field mt-1 h-8 text-sm text-foreground" value={me.username} onChange={(e) => switchUser(e.target.value)}>
@@ -180,7 +182,7 @@ function Account({ me, onView }: { me: Me; onView: (v: View) => void }) {
   );
 }
 
-export function Header({ onPick, view, onView, me, approvals, stale }: {
+export function Header({ onPick, view, onView, me, approvals, stale, onSignOut, onChangePassword }: AccountActions & {
   onPick: (r: Result) => void;
   view: View;
   onView: (v: View) => void;
@@ -219,7 +221,7 @@ export function Header({ onPick, view, onView, me, approvals, stale }: {
         </ul>
       </nav>
       <GlobalSearch onPick={onPick} />
-      {me && <Account me={me} onView={onView} />}
+      {me && <Account me={me} onView={onView} onSignOut={onSignOut} onChangePassword={onChangePassword} />}
     </header>
   );
 }

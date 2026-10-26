@@ -6,16 +6,19 @@ type Path<M extends Method> = {
 }[keyof paths];
 type Op<P extends keyof paths, M extends Method> = paths[P] extends Record<M, infer O> ? O : never;
 type Part<O, K extends string> = O extends { [k in K]?: infer V } ? NonNullable<V> : never;
-type Json<O> = O extends { responses: { 200: { content: { "application/json": infer R } } } } ? R : never;
-type Body<O> = O extends { requestBody: { content: { "application/json": infer B } } } ? B : never;
+type Json<O> = O extends { responses: { 200: { content: { "application/json": infer R } } } } ? R
+  : O extends { responses: { 201: { content: { "application/json": infer R } } } } ? R : void; // 204: no body
+type BodyOpt<O> = O extends { requestBody: { content: { "application/json": infer B } } } ? { body: B }
+  : O extends { requestBody?: { content: { "application/json": infer B } } } ? { body?: B } : { body?: undefined };
 
 type Options<O, M extends Method> = {
   path?: Part<Part<O, "parameters">, "path">;
   query?: Part<Part<O, "parameters">, "query">;
-} & (M extends "post" ? ([Body<O>] extends [never] ? { body?: undefined } : { body: Body<O> }) : unknown);
+} & (M extends "post" ? BodyOpt<O> : unknown);
 
-// Only sent in development; the real sign-in replaces it (TASK-034).
-// The header switcher stores another dev user in localStorage.
+// Dev user switcher: sends X-Dev-User only in a Vite dev build (import.meta.env.DEV is false in a production
+// build, so this is compiled out) and only after someone picks a user in the switcher. The API also ignores the
+// header unless APP_ENV=development. Signing in or out with a password clears it, so the cookie decides.
 export const DEV_USERS = ["planner1", "planner2", "admin1", "admin2"];
 export const devUser = (): string | undefined => {
   if (!import.meta.env.DEV) return undefined;
@@ -25,8 +28,19 @@ export const devUser = (): string | undefined => {
   } catch {
     /* storage unavailable */
   }
-  return import.meta.env.VITE_DEV_USER ?? "planner1";
+  return undefined;
 };
+export const setDevUser = (u: string | null) => {
+  try {
+    if (u) localStorage.setItem("devUser", u);
+    else localStorage.removeItem("devUser");
+  } catch {
+    /* storage unavailable */
+  }
+};
+
+// The app listens here: "signed-out" on any 401, "password-change" on 403 password_change_required.
+export const authEvents = new EventTarget();
 
 export const errorText = (e: unknown, fallback: string): string => {
   const d = e instanceof ApiError ? (e.detail as { detail?: unknown } | null)?.detail : null;
@@ -64,8 +78,13 @@ async function request<P extends Path<M>, M extends Method>(
     headers,
     body: o.body === undefined ? undefined : JSON.stringify(o.body),
   });
-  if (!res.ok) throw new ApiError(res.status, await res.json().catch(() => null));
-  return res.json();
+  if (!res.ok) {
+    const detail = await res.json().catch(() => null);
+    if (res.status === 401 && url !== "/api/auth/login") authEvents.dispatchEvent(new Event("signed-out"));
+    if (res.status === 403 && (detail as { code?: string } | null)?.code === "password_change_required") authEvents.dispatchEvent(new Event("password-change"));
+    throw new ApiError(res.status, detail);
+  }
+  return res.status === 204 ? (undefined as Json<Op<P, M>>) : res.json();
 }
 
 export const api = {
