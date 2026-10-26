@@ -33,3 +33,20 @@ export const spanName = (s: { site_a: string; site_b: string }) => `${s.site_a} 
 
 export const inputCls =
   "h-9 rounded-md border border-line bg-white px-3 text-sm outline-none focus-visible:outline-3 focus-visible:outline-blue";
+
+export type SpanLoss = components["schemas"]["SpanLoss"];
+export type LossDetail = components["schemas"]["SpanLossDetail"];
+type Level = NonNullable<SpanLoss["level"]>;
+
+// Symbol + word per band, never colour alone. Bands come from the API (deviation from calculated).
+export const LEVEL: Record<Level, { icon: IconName; cls: string; word: string }> = {
+  green: { icon: "ch", cls: "h-green", word: "Within 3%" },
+  amber: { icon: "lo", cls: "h-amber", word: "Over 3%" },
+  red: { icon: "fl", cls: "h-red", word: "Over 7%" },
+  off_scale: { icon: "ex", cls: "h-off", word: "Off scale (over 10%)" },
+};
+
+const sign = (n: number) => (n > 0 ? "+" : n < 0 ? "−" : "");
+export const db = (n: number) => `${n.toFixed(2)} dB`;
+export const signedDb = (n: number) => `${sign(n)}${Math.abs(n).toFixed(2)} dB`;
+export const pct = (n: number) => `${sign(n)}${Math.abs(n).toFixed(1)}%`;

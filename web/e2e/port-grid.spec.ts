@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { signIn } from "./helpers";
+import { contrast, signIn } from "./helpers";
 
 const SPAN = "DEV Kuala Lumpur DC - DEV Cyberjaya DC"; // dev seed: has Available, Reserved and In use cores
 
@@ -99,55 +99,20 @@ test("each status has a distinct symbol and text, not colour alone", async ({ pa
 { // light theme only (PRD: dark theme is parked)
   test("contrast >= 4.5", async ({ page }) => {
     await openSpan(page);
-    const ratios = await page.evaluate(() => {
-      const ctx = document.createElement("canvas").getContext("2d", { willReadFrequently: true })!;
-      const rgba = (c: string) => {
-        ctx.clearRect(0, 0, 1, 1);
-        ctx.fillStyle = "#000";
-        ctx.fillStyle = c;
-        ctx.fillRect(0, 0, 1, 1);
-        return Array.from(ctx.getImageData(0, 0, 1, 1).data);
-      };
-      const lum = ([r, g, b]: number[]) => {
-        const f = (v: number) => ((v /= 255) <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
-        return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
-      };
-      const bgOf = (el: Element) => {
-        for (let e: Element | null = el; e; e = e.parentElement) {
-          const c = rgba(getComputedStyle(e).backgroundColor);
-          if (c[3] === 255) return c;
-        }
-        return rgba("#fff");
-      };
-      const ratio = (el: Element) => {
-        const a = lum(rgba(getComputedStyle(el).color));
-        const b = lum(bgOf(el));
-        return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
-      };
-      const out: Record<string, number> = {};
-      const sel: Record<string, string> = {
-        body: "body",
-        header: "header h1",
-        search: "header input",
-        spanMuted: "[aria-label=Spans] button span.text-muted-foreground",
-        captionHint: "[data-testid=grid-caption]",
-        tableHead: "thead th",
-        tableCell: "tbody td",
-        button: "main button.btn-p",
-        navCurrent: "nav button[aria-current]",
-        equation: "[data-testid=capacity]",
-        later: ".later",
-        badge: "[aria-label=Spans] .pill",
-      };
-      for (const [k, s] of Object.entries(sel)) {
-        const el = document.querySelector(s);
-        if (el) out[k] = ratio(el);
-      }
-      for (const st of ["Available", "Requested", "Reserved", "In use", "Faulty"]) {
-        const el = document.querySelector(`[role=gridcell][data-status="${st}"]`);
-        if (el) out[`cell ${st}`] = ratio(el);
-      }
-      return out;
+    const ratios = await contrast(page, {
+      body: "body",
+      header: "header h1",
+      search: "header input",
+      spanMuted: "[aria-label=Spans] button span.text-muted-foreground",
+      captionHint: "[data-testid=grid-caption]",
+      tableHead: "thead th",
+      tableCell: "tbody td",
+      button: "main button.btn-p",
+      navCurrent: "nav button[aria-current]",
+      equation: "[data-testid=capacity]",
+      later: ".later",
+      badge: "[aria-label=Spans] .pill",
+      ...Object.fromEntries(["Available", "Requested", "Reserved", "In use", "Faulty"].map((st) => [`cell ${st}`, `[role=gridcell][data-status="${st}"]`])),
     });
     expect(Object.keys(ratios).length).toBeGreaterThan(8);
     for (const [k, v] of Object.entries(ratios)) expect(v, `${k} ${v.toFixed(2)}`).toBeGreaterThanOrEqual(4.5);
@@ -159,7 +124,7 @@ test("count-only reservation shows on the span and in My reservations; admin see
   await pickSpan(page, /^DEV Cyberjaya DC - DEV Bukit Jalil/);
   await expect(page.getByTestId("capacity")).toContainText("3 reserved, not assigned");
   await expect(page.getByTestId("capacity")).toContainText("= 17 free to reserve");
-  await expect(page.getByRole("table")).toContainText("Count only");
+  await expect(page.getByRole("table", { name: "Held cores on this span" })).toContainText("Count only");
   await page.getByRole("button", { name: /My reservations/ }).click();
   await expect(page.getByTestId("reservation").filter({ hasText: "3 not assigned yet" })).toBeVisible();
   await page.getByRole("button", { name: "Rejected" }).click();

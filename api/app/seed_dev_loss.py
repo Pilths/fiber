@@ -19,11 +19,11 @@ def main() -> None:
         if db.execute(text("SELECT 1 FROM measurements WHERE field_team = :t LIMIT 1"), {"t": TAG}).first():
             print("already seeded; nothing to do")
             return
-        # newest measurement wins, so these override the older random ones from seed_dev
+        # newest test date wins; today (KL) beats every seed_dev date, so these override the older random ones from seed_dev
         spans = db.execute(text("SELECT id, distance_km FROM spans WHERE distance_km IS NOT NULL ORDER BY id")).all()
         for (sid, km), (label, f) in zip(spans, FACTORS):
             db.execute(text("INSERT INTO measurements (span_id, loss_db, tested_on, test_method, field_team) "
-                            "VALUES (:s, :l, current_date - 7, 'OTDR', :t)"),
+                            "VALUES (:s, :l, (now() AT TIME ZONE 'Asia/Kuala_Lumpur')::date, 'OTDR', :t)"),
                        {"s": sid, "l": round(float(km) * 0.3 * f, 3), "t": TAG})
             print(f"span {sid}: {label}")
         db.commit()

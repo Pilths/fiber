@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { components } from "@/api/schema";
 import { Icon } from "@/components/Icon";
-import { health, spanName } from "@/lib/status";
+import { health, LEVEL, spanName, type SpanLoss } from "@/lib/status";
 
 type Span = components["schemas"]["SpanSummary"];
 
@@ -15,12 +15,14 @@ export function FreeBadge({ s }: { s: Span }) {
 }
 
 // Find card: "Span or site" lists every span (filters narrow it); "Route A to B" lands in the routes session (TASK-051).
-export function FindCard({ spans, selectedId, onSelect }: { spans: Span[] | null; selectedId: number | null; onSelect: (id: number) => void }) {
+export function FindCard({ spans, selectedId, onSelect, loss }: { spans: Span[] | null; selectedId: number | null; onSelect: (id: number) => void; loss: SpanLoss[] }) {
   const [mode, setMode] = useState<"span" | "route">("span");
   const [q, setQ] = useState("");
   const [region, setRegion] = useState("");
   const [routeType, setRouteType] = useState("");
   const all = spans ?? [];
+  // Loss marker only for amber or worse, so the list stays quiet.
+  const warn = new Map(loss.filter((l) => l.level && l.level !== "green").map((l) => [l.span_id, LEVEL[l.level!]]));
   const opts = (k: "region" | "route_type") => [...new Set(all.map((s) => s[k]).filter((v): v is string => !!v))].sort();
   const t = q.trim().toLowerCase();
   const shown = all.filter((s) => (!region || s.region === region) && (!routeType || s.route_type === routeType) && (!t || spanName(s).toLowerCase().includes(t)));
@@ -56,7 +58,14 @@ export function FindCard({ spans, selectedId, onSelect }: { spans: Span[] | null
                   className="flex min-h-11 w-full items-center justify-between gap-2 border-b border-l-3 border-b-rule border-l-transparent py-1 pl-2.5 pr-1 text-left hover:bg-ground focus-visible:-outline-offset-3 aria-pressed:border-l-blue aria-pressed:bg-blue-bg">
                   <span className="min-w-0">
                     <span className="block truncate font-semibold">{spanName(s)}</span>
-                    <span className="block text-xs text-muted-foreground">{[s.region, s.route_type, s.distance_km && `${Number(s.distance_km)} km`].filter(Boolean).join(", ")}</span>
+                    <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      {[s.region, s.route_type, s.distance_km && `${Number(s.distance_km)} km`].filter(Boolean).join(", ")}
+                      {warn.has(s.id) && (
+                        <span className={`inline-flex items-center gap-1 font-semibold ${warn.get(s.id)!.cls.replace("h-", "v-")}`} title={`Loss ${warn.get(s.id)!.word}`} data-testid="loss-marker">
+                          <Icon name={warn.get(s.id)!.icon} /><span className="sr-only">Loss {warn.get(s.id)!.word}</span>
+                        </span>
+                      )}
+                    </span>
                   </span>
                   <FreeBadge s={s} />
                 </button>

@@ -78,6 +78,17 @@ def test_latest_measurement_wins_and_statuses(client, db, spans):
     assert [r["span_id"] for r in client.get("/api/loss/spans?region=South", headers=H()).json()] == [c]
 
 
+def test_latest_is_newest_test_date_not_recorded_time(client, db, spans):
+    from sqlalchemy import text
+    a = spans[0]
+    for loss, day, rec in ((3.3, "2026-10-24", "now() - interval '2 days'"), (3.0, "2026-10-19", "now()")):
+        db.execute(text(f"INSERT INTO measurements (span_id, loss_db, tested_on, created_at, test_method, field_team) "
+                        f"VALUES (:s,:l,:d,{rec},'OTDR','T1')"), {"s": a, "l": loss, "d": day})
+    rows = {r["span_id"]: r for r in client.get("/api/loss/spans", headers=H()).json()}
+    assert rows[a]["measured_db"] == 3.3 and str(rows[a]["last_test_date"]) == "2026-10-24"
+    assert [h["loss_db"] for h in client.get(f"/api/loss/spans/{a}", headers=H()).json()["history"]] == [3.3, 3.0]
+
+
 def test_coverage_counts(client, db, spans):
     measure(db, spans[0], 3.0)
     cov = client.get("/api/loss/coverage", headers=H()).json()

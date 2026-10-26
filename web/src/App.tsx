@@ -7,11 +7,12 @@ import { FindCard } from "@/components/FindCard";
 import { Header, type View } from "@/components/Header";
 import { HeldTable } from "@/components/HeldTable";
 import { Icon } from "@/components/Icon";
+import { LossCard } from "@/components/LossCard";
 import { Facts, Inspector } from "@/components/Inspector";
 import { PortGrid } from "@/components/PortGrid";
 import { Users } from "@/components/Users";
 import { Approvals, MyReservations, NeedsReview } from "@/components/Reservations";
-import { countBy, spanName, STATUS, STATUS_ORDER } from "@/lib/status";
+import { countBy, spanName, STATUS, STATUS_ORDER, type LossDetail, type SpanLoss } from "@/lib/status";
 
 type Span = components["schemas"]["SpanSummary"];
 type Detail = components["schemas"]["SpanDetail"];
@@ -72,6 +73,9 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
   const [bell, setBell] = useState<Bell | null>(null);
   const [stale, setStale] = useState(0);
   const [mapMin, setMapMin] = useState(false);
+  const [loss, setLoss] = useState<LossDetail | null>(null);
+  const [lossList, setLossList] = useState<SpanLoss[]>([]);
+  const [coverage, setCoverage] = useState<{ measured: number; total: number } | null>(null);
   const [version, setVersion] = useState(0); // bumped after a booking so the span list and grid reload
 
   const refreshBell = useCallback(() => {
@@ -94,11 +98,18 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
   useEffect(() => {
     api.get("/api/spans").then(setSpans).catch(() => setError("Could not load spans."));
   }, [version, view]);
+  // Loss is read-only here; one load per visit to the map is enough.
+  useEffect(() => {
+    if (view !== "map") return;
+    api.get("/api/loss/spans").then(setLossList).catch(() => {});
+    api.get("/api/loss/coverage").then(setCoverage).catch(() => {});
+  }, [view]);
 
   useEffect(() => {
     if (spanId == null) return;
     let stale = false;
     api.get("/api/spans/{span_id}", { path: { span_id: spanId } }).then((d) => !stale && setDetail(d)).catch(() => !stale && setError("Could not load the span."));
+    api.get("/api/loss/spans/{span_id}", { path: { span_id: spanId } }).then((l) => !stale && setLoss(l)).catch(() => {});
     return () => { stale = true; };
   }, [spanId, version]);
 
@@ -137,6 +148,11 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
     cell?.scrollIntoView({ block: "center" });
     cell?.focus({ preventScroll: true });
   };
+  const goToLoss = () => {
+    const h = document.getElementById("loss-h");
+    h?.scrollIntoView({ block: "start" });
+    h?.focus({ preventScroll: true });
+  };
 
   return (
     <div className="min-h-screen">
@@ -171,8 +187,8 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
             )}
           </section>
           <div className="col-span-4 flex min-w-0 flex-col gap-4">
-            <FindCard spans={spans} selectedId={spanId} onSelect={(id) => open(id)} />
-            <Inspector detail={detail} loading={spanId != null && !detail} onGoToCores={goToCores} />
+            <FindCard spans={spans} selectedId={spanId} onSelect={(id) => open(id)} loss={lossList} />
+            <Inspector detail={detail} loading={spanId != null && !detail} onGoToCores={goToCores} loss={loss?.span_id === spanId ? loss : null} onSeeLoss={goToLoss} />
           </div>
 
           {detail && (
@@ -198,6 +214,7 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
                       onDone={() => { setSelected(new Set()); setVersion((v) => v + 1); refreshBell(); }} />}
               </section>
               <HeldTable d={detail} />
+              <LossCard key={detail.id} loss={loss?.span_id === detail.id ? loss : null} coverage={coverage} />
             </div>
           )}
         </main>

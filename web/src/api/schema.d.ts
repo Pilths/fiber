@@ -435,6 +435,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/loss/spans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Spans */
+        get: operations["spans_api_loss_spans_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/loss/spans/{span_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Span */
+        get: operations["span_api_loss_spans__span_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/loss/coverage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Coverage */
+        get: operations["coverage_api_loss_coverage_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/loss/route": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Route */
+        get: operations["route_api_loss_route_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -510,6 +578,26 @@ export interface components {
             /** Cores */
             cores?: number[] | null;
         };
+        /** Count */
+        Count: {
+            /** Measured */
+            measured: number;
+            /** Total */
+            total: number;
+        };
+        /** Coverage */
+        Coverage: {
+            /** Measured */
+            measured: number;
+            /** Total */
+            total: number;
+            /** By Region */
+            by_region: {
+                [key: string]: components["schemas"]["Count"];
+            };
+            /** Segments */
+            segments: components["schemas"]["SegmentCount"][];
+        };
         /** CurrentUser */
         CurrentUser: {
             /** Id */
@@ -565,6 +653,22 @@ export interface components {
             username: string;
             /** Password */
             password: string;
+        };
+        /** MeasurementOut */
+        MeasurementOut: {
+            /** Loss Db */
+            loss_db: number;
+            /** Tested On */
+            tested_on: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Test Method */
+            test_method: string | null;
+            /** Field Team */
+            field_team: string | null;
         };
         /** NeedsReviewItem */
         NeedsReviewItem: {
@@ -647,6 +751,17 @@ export interface components {
             /** Release Requested Cores */
             release_requested_cores: number[];
         };
+        /** RouteLoss */
+        RouteLoss: {
+            /** Spans */
+            spans: components["schemas"]["SpanLoss"][];
+            /** Total Calculated Db */
+            total_calculated_db: number | null;
+            /** Total Measured Db */
+            total_measured_db: number | null;
+            /** Level */
+            level: ("green" | "amber" | "red" | "off_scale") | null;
+        };
         /** SearchResult */
         SearchResult: {
             /**
@@ -660,6 +775,17 @@ export interface components {
             span_id?: number | null;
             /** Core Id */
             core_id?: number | null;
+        };
+        /** SegmentCount */
+        SegmentCount: {
+            /** Measured */
+            measured: number;
+            /** Total */
+            total: number;
+            /** Segment Id */
+            segment_id: number;
+            /** Name */
+            name: string;
         };
         /** SpanDetail */
         SpanDetail: {
@@ -693,6 +819,76 @@ export interface components {
             free_to_reserve: number;
             /** Cores */
             cores: components["schemas"]["CoreDetail"][];
+        };
+        /** SpanLoss */
+        SpanLoss: {
+            /** Span Id */
+            span_id: number;
+            /** Span Name */
+            span_name: string;
+            /** Region */
+            region: string | null;
+            /** Route Type */
+            route_type: string | null;
+            /** Distance Km */
+            distance_km: string | null;
+            /** Calculated Db */
+            calculated_db: number | null;
+            /** Measured Db */
+            measured_db: number | null;
+            /** Difference Db */
+            difference_db: number | null;
+            /** Deviation Pct */
+            deviation_pct: number | null;
+            /** Level */
+            level: ("green" | "amber" | "red" | "off_scale") | null;
+            /** Last Test Date */
+            last_test_date: string | null;
+            /** Test Method */
+            test_method: string | null;
+            /** Field Team */
+            field_team: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "measured" | "calculated_only" | "no_distance";
+        };
+        /** SpanLossDetail */
+        SpanLossDetail: {
+            /** Span Id */
+            span_id: number;
+            /** Span Name */
+            span_name: string;
+            /** Region */
+            region: string | null;
+            /** Route Type */
+            route_type: string | null;
+            /** Distance Km */
+            distance_km: string | null;
+            /** Calculated Db */
+            calculated_db: number | null;
+            /** Measured Db */
+            measured_db: number | null;
+            /** Difference Db */
+            difference_db: number | null;
+            /** Deviation Pct */
+            deviation_pct: number | null;
+            /** Level */
+            level: ("green" | "amber" | "red" | "off_scale") | null;
+            /** Last Test Date */
+            last_test_date: string | null;
+            /** Test Method */
+            test_method: string | null;
+            /** Field Team */
+            field_team: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "measured" | "calculated_only" | "no_distance";
+            /** History */
+            history: components["schemas"]["MeasurementOut"][];
         };
         /** SpanSummary */
         SpanSummary: {
@@ -1813,6 +2009,147 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReservationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    spans_api_loss_spans_get: {
+        parameters: {
+            query?: {
+                span_id?: number | null;
+                region?: string | null;
+                route_type?: string | null;
+            };
+            header?: {
+                "x-dev-user"?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                fiber_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SpanLoss"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    span_api_loss_spans__span_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-dev-user"?: string | null;
+            };
+            path: {
+                span_id: number;
+            };
+            cookie?: {
+                fiber_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SpanLossDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    coverage_api_loss_coverage_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-dev-user"?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                fiber_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Coverage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    route_api_loss_route_get: {
+        parameters: {
+            query: {
+                /** @description Comma-separated span ids, in route order */
+                span_ids: string;
+            };
+            header?: {
+                "x-dev-user"?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                fiber_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RouteLoss"];
                 };
             };
             /** @description Validation Error */

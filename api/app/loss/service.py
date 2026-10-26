@@ -40,7 +40,7 @@ SELECT s.id AS span_id, a.name || ' - ' || b.name AS span_name, s.region, s.rout
        m.loss_db AS measured_db, m.test_method, m.field_team,
        coalesce(m.tested_on, (m.created_at AT TIME ZONE 'Asia/Kuala_Lumpur')::date) AS last_test_date
 FROM spans s JOIN sites a ON a.id = s.site_a_id JOIN sites b ON b.id = s.site_b_id
-LEFT JOIN LATERAL (SELECT * FROM measurements WHERE span_id = s.id ORDER BY created_at DESC, id DESC LIMIT 1) m ON true
+LEFT JOIN LATERAL (SELECT * FROM measurements WHERE span_id = s.id ORDER BY coalesce(tested_on, (created_at AT TIME ZONE 'Asia/Kuala_Lumpur')::date) DESC, created_at DESC, id DESC LIMIT 1) m ON true
 WHERE (CAST(:span_id AS bigint) IS NULL OR s.id = :span_id)
   AND (CAST(:region AS text) IS NULL OR s.region = :region)
   AND (CAST(:route_type AS text) IS NULL OR s.route_type = :route_type)
@@ -65,7 +65,7 @@ def span_rows(db: Session, span_id: int | None = None, region: str | None = None
 def history(db: Session, span_id: int) -> list[dict]:
     rs = db.execute(text(
         "SELECT loss_db, tested_on, created_at, test_method, field_team FROM measurements "
-        "WHERE span_id = :s ORDER BY created_at DESC, id DESC"), {"s": span_id})
+        "WHERE span_id = :s ORDER BY coalesce(tested_on, (created_at AT TIME ZONE 'Asia/Kuala_Lumpur')::date) DESC, created_at DESC, id DESC"), {"s": span_id})
     return [dict(r) for r in rs.mappings()]
 
 

@@ -1,6 +1,7 @@
 import type { components } from "@/api/schema";
 import { Icon } from "@/components/Icon";
-import { countBy, health, spanName, STATUS, type CoreStatus } from "@/lib/status";
+import { LossPill } from "@/components/LossCard";
+import { countBy, db, health, pct, spanName, STATUS, type CoreStatus, type LossDetail } from "@/lib/status";
 
 type Detail = components["schemas"]["SpanDetail"];
 
@@ -29,7 +30,9 @@ function heldLines(d: Detail) {
   return lines;
 }
 
-export function Inspector({ detail, loading, onGoToCores }: { detail: Detail | null; loading: boolean; onGoToCores: () => void }) {
+export function Inspector({ detail, loading, onGoToCores, loss, onSeeLoss }: {
+  detail: Detail | null; loading: boolean; onGoToCores: () => void; loss: LossDetail | null; onSeeLoss: () => void;
+}) {
   const tab = "relative inline-flex h-10 items-center gap-2 border-b-2 border-transparent -mb-px px-2.5 font-semibold whitespace-nowrap focus-visible:-outline-offset-3";
   const later = (name: string) => (
     <button type="button" role="tab" aria-selected="false" aria-disabled="true" title={`${name}: later`} className={`${tab} cursor-not-allowed font-medium text-muted-foreground`}
@@ -50,13 +53,13 @@ export function Inspector({ detail, loading, onGoToCores }: { detail: Detail | n
             <b className="mb-0.5 block text-sm font-semibold text-foreground">{loading ? "Loading span..." : "No span selected"}</b>
             {!loading && "Choose a span in Find, or search in the top bar."}
           </p>
-        ) : <Body d={detail} onGoToCores={onGoToCores} />}
+        ) : <Body d={detail} onGoToCores={onGoToCores} loss={loss} onSeeLoss={onSeeLoss} />}
       </div>
     </section>
   );
 }
 
-function Body({ d, onGoToCores }: { d: Detail; onGoToCores: () => void }) {
+function Body({ d, onGoToCores, loss, onSeeLoss }: { d: Detail; onGoToCores: () => void; loss: LossDetail | null; onSeeLoss: () => void }) {
   const h = health(d);
   const n = countBy(d);
   const surveyed = d.survey_cores != null;
@@ -94,6 +97,16 @@ function Body({ d, onGoToCores }: { d: Detail; onGoToCores: () => void }) {
             </dl>
           </>
         ) : <p className="mt-1 text-[13px] text-muted-foreground">No survey count yet: no cores to show and it cannot be booked until an admin enters one. Cable size {d.cable_size}.</p>}
+      </div>
+      <div className="mt-5 flex items-center gap-2 border-t pt-4 text-[13px]" data-testid="inspector-loss">
+        <span className="lbl">Loss</span>
+        <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
+          {!loss ? <span className="text-muted-foreground">Loading...</span>
+            : loss.measured_db != null ? (
+              <><span><b className="font-semibold">{db(loss.measured_db)}</b> measured{loss.deviation_pct != null && `, ${pct(loss.deviation_pct)}`}</span><LossPill l={loss} /></>
+            ) : <span className="text-muted-foreground">{loss.status === "no_distance" ? "Not measured, no distance" : "Not measured"}</span>}
+        </span>
+        <button type="button" className="flex-none font-semibold text-blue underline underline-offset-2 hover:no-underline" onClick={onSeeLoss}>See loss</button>
       </div>
       {lines.length > 0 && (
         <div className="mt-5 border-t pt-4">
