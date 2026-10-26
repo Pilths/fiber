@@ -153,7 +153,7 @@ def _span_items(db: Session, rows: list[Row], sites: dict[str, int], wins: set[t
         if sid is None:
             sp.group, sp.survey = "new", sp.vals.get("survey_cores")
             continue
-        old = db.execute(text("SELECT region, distance_km, survey_cores, (SELECT count(*) FROM cores WHERE span_id = :i) AS n_cores "
+        old = db.execute(text("SELECT region, distance_km, survey_cores, (SELECT count(*) FROM cores c WHERE c.span_id = :i AND (spans.survey_cores IS NULL OR c.number <= spans.survey_cores)) AS n_cores "
                               "FROM spans WHERE id = :i"), {"i": sid[0]}).mappings().one()
         sp.db_survey = sp.survey = old["survey_cores"]
         sp.db_free = inventory.list_spans(db, None, None, None, sid[0])[0]["free_to_reserve"]

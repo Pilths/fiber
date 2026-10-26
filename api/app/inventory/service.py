@@ -20,7 +20,8 @@ JOIN sites b ON b.id = s.site_b_id
 LEFT JOIN LATERAL (
   SELECT jsonb_object_agg(status, n) AS m FROM (
     SELECT v.status, count(*) AS n FROM cores c
-    JOIN core_status_v v ON v.core_id = c.id WHERE c.span_id = s.id GROUP BY v.status
+    JOIN core_status_v v ON v.core_id = c.id WHERE c.span_id = s.id
+      AND (s.survey_cores IS NULL OR c.number <= s.survey_cores) GROUP BY v.status
   ) t
 ) mix ON true
 WHERE (CAST(:region AS text) IS NULL OR s.region = :region)
@@ -53,7 +54,8 @@ LEFT JOIN LATERAL (
   ORDER BY e.created_at DESC, e.id DESC LIMIT 1
 ) corr_date ON true
 LEFT JOIN customers cust ON cust.id = corr_cust.customer_id
-WHERE c.span_id = :id
+JOIN spans sp ON sp.id = c.span_id
+WHERE c.span_id = :id AND (sp.survey_cores IS NULL OR c.number <= sp.survey_cores)
 ORDER BY c.number
 """
 
@@ -136,12 +138,12 @@ def search(db: Session, q: str) -> list[SearchResult]:
         WHERE a.name ILIKE :like ESCAPE '\\' OR b.name ILIKE :like ESCAPE '\\'
         ORDER BY s.id LIMIT :n""")
     add("circuit", """
-        SELECT c.circuit_id, c.span_id, c.id FROM cores c
-        WHERE c.circuit_id ILIKE :like ESCAPE '\\' ORDER BY c.circuit_id, c.id LIMIT :n""")
+        SELECT c.circuit_id, c.span_id, c.id FROM cores c JOIN spans s ON s.id = c.span_id
+        WHERE (s.survey_cores IS NULL OR c.number <= s.survey_cores) AND c.circuit_id ILIKE :like ESCAPE '\\' ORDER BY c.circuit_id, c.id LIMIT :n""")
     if p["num"] is not None:
         add("core", """
             SELECT 'Core ' || c.number || ' on ' || a.name || ' - ' || b.name, c.span_id, c.id FROM cores c
-            JOIN spans s ON s.id = c.span_id
+            JOIN spans s ON s.id = c.span_id AND (s.survey_cores IS NULL OR c.number <= s.survey_cores)
             JOIN sites a ON a.id = s.site_a_id JOIN sites b ON b.id = s.site_b_id
             WHERE c.number = :num ORDER BY c.span_id LIMIT :n""")
     return out

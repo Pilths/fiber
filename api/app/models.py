@@ -209,6 +209,12 @@ class ReleaseCore(Base):
     core_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("cores.id"), primary_key=True)
 
 
+class AssignCore(Base):
+    __tablename__ = "assign_cores"
+    event_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("reservation_events.id"), primary_key=True)
+    core_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("cores.id"), primary_key=True)
+
+
 class CoreHold(Base):
     __tablename__ = "core_holds"
     core_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("cores.id"), primary_key=True)

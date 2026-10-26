@@ -170,7 +170,8 @@ def _lock_spans(db: Session, span_ids: set[int]) -> None:
 
 def _core_rows(db: Session, core_ids: list[int]) -> list[dict[str, Any]]:
     return [dict(r) for r in db.execute(text(
-        "SELECT c.id, c.span_id, v.status FROM cores c JOIN core_status_v v ON v.core_id = c.id "
+        "SELECT c.id, c.span_id, v.status, (s.survey_cores IS NOT NULL AND c.number > s.survey_cores) AS hidden "
+        "FROM cores c JOIN core_status_v v ON v.core_id = c.id JOIN spans s ON s.id = c.span_id "
         "WHERE c.id = ANY(CAST(:ids AS bigint[]))"), {"ids": core_ids}).mappings()]
 
 
@@ -194,9 +195,9 @@ def _check_book(db: Session, core_ids: list[int]) -> list[dict[str, Any]]:
     spans = {r["span_id"] for r in rows}
     _lock_spans(db, spans)
     rows = _core_rows(db, core_ids)  # statuses as of now, after the lock
-    taken = sorted(r["id"] for r in rows if r["status"] != "Available")
+    taken = sorted(r["id"] for r in rows if r["status"] != "Available" or r["hidden"])
     if taken:
-        raise conflict("Some cores are not Available.", taken_core_ids=taken)
+        raise conflict("Some cores are not Available (or are beyond the surveyed count).", taken_core_ids=taken)
     for sid in sorted(spans):
         span = inventory.get_span(db, sid)
         assert span is not None
@@ -360,10 +361,12 @@ def assign(db: Session, user: CurrentUser, rid: int, core_ids: list[int]) -> Res
     if len(cores) != len(core_ids) or any(c["span_id"] != row["unassigned_span_id"] for c in cores):
         raise HTTPException(422, "Cores must belong to the reservation's span")
     _lock_spans(db, {row["unassigned_span_id"]})
-    taken = sorted(c["id"] for c in _core_rows(db, core_ids) if c["status"] != "Available")
+    taken = sorted(c["id"] for c in _core_rows(db, core_ids) if c["status"] != "Available" or c["hidden"])
     if taken:
         raise conflict("Some cores are not Available.", taken_core_ids=taken)
     _hold(db, rid, core_ids)
-    _event(db, rid, "assigned", user)
+    ev = _event(db, rid, "assigned", user)
+    for c in core_ids:
+        db.execute(text("INSERT INTO assign_cores (event_id, core_id) VALUES (:e, :c)"), {"e": ev, "c": c})
     db.commit()
     return get(db, rid)

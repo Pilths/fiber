@@ -71,6 +71,7 @@ def place_reservation(db: Any, counts: dict[str, int], p: dict[str, Any], site_i
         core = one(db, "SELECT id FROM cores WHERE span_id = :s AND port_a_id = :a AND port_b_id = :b", s=span_id, a=pa, b=pb)
         if core is None:  # next portless surveyed core in number order, else a new one
             core = one(db, "SELECT id FROM cores WHERE span_id = :s AND port_a_id IS NULL AND port_b_id IS NULL "
+                           "AND number <= coalesce((SELECT survey_cores FROM spans WHERE id = :s), number) "
                            "ORDER BY number LIMIT 1", s=span_id)
             if core is None:
                 core = one(db, "INSERT INTO cores (span_id, number, port_a_id, port_b_id) VALUES "
