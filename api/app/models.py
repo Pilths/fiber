@@ -72,6 +72,7 @@ class Site(Base):
     geom: Mapped[Any] = mapped_column(Geometry("Point"), nullable=True)
     details: Mapped[Any] = mapped_column(JSONB, nullable=True)
     lrd_site_id: Mapped[int | None] = _fk("sites", True)
+    active: Mapped[bool] = mapped_column(Boolean, server_default=text("true"))
     created_at: Mapped[datetime] = _created()
 
 
@@ -217,7 +218,7 @@ class CoreHold(Base):
 class Upload(Base):
     __tablename__ = "uploads"
     __table_args__ = (
-        _in("kind", ("excel", "kmz"), "uploads_kind_ck"),
+        _in("kind", ("excel", "kmz", "site_master"), "uploads_kind_ck"),
         _in("status", ("staged", "confirmed", "discarded"), "uploads_status_ck"),
     )
     id: Mapped[int] = _id()
@@ -233,7 +234,7 @@ class Upload(Base):
 class UploadRow(Base):
     __tablename__ = "upload_rows"
     __table_args__ = (
-        _in("row_group", ("new", "changed", "conflict", "missing", "rejected", "needs_review"), "upload_rows_group_ck"),
+        _in("row_group", ("new", "changed", "conflict", "missing", "rejected", "needs_review", "unchanged"), "upload_rows_group_ck"),
         _in("status", ("ready", "needs_review", "rejected"), "upload_rows_status_ck"),
     )
     id: Mapped[int] = _id()
