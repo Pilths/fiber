@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api, errorText, resAction, type Action } from "@/api/client";
 import type { components } from "@/api/schema";
 import { Button } from "@/components/ui/button";
+import { Icon } from "@/components/Icon";
 import { EVENT_WORD, inputCls, when } from "@/lib/status";
 
 type Res = components["schemas"]["ReservationOut"];
@@ -52,21 +53,20 @@ function groupCores(r: Res) {
   return [...by.entries()];
 }
 
-function Card({ r, me, onChanged }: { r: Res; me: Me; onChanged: () => void }) {
-  const [mode, setMode] = useState<"reject" | "decline-release" | "request-release" | null>(null);
+type Mode = "reject" | "decline-release" | "request-release" | null;
+
+// One reservation's actions: run an action, then reset the open form and tell the parent to reload.
+function useResAction(rid: number, onChanged: () => void) {
+  const [mode, setMode] = useState<Mode>(null);
   const [reason, setReason] = useState("");
   const [pick, setPick] = useState<Set<number>>(new Set());
   const [msg, setMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const admin = me.role === "admin";
-  const own = r.planner_id === me.id;
-  const held = r.cores.filter((c) => c.held);
-
   const run = async (action: Action, body?: { reason?: string; cores?: number[] }) => {
     setBusy(true);
     setMsg(null);
     try {
-      await resAction(r.id, action, body);
+      await resAction(rid, action, body);
       setMode(null);
       setReason("");
       setPick(new Set());
@@ -77,6 +77,14 @@ function Card({ r, me, onChanged }: { r: Res; me: Me; onChanged: () => void }) {
       setBusy(false);
     }
   };
+  return { mode, setMode, reason, setReason, pick, setPick, msg, setMsg, busy, run };
+}
+
+function Card({ r, me, onChanged }: { r: Res; me: Me; onChanged: () => void }) {
+  const { mode, setMode, reason, setReason, pick, setPick, msg, setMsg, busy, run } = useResAction(r.id, onChanged);
+  const admin = me.role === "admin";
+  const own = r.planner_id === me.id;
+  const held = r.cores.filter((c) => c.held);
   const needsReason = mode === "reject" || mode === "decline-release";
   const toggle = (id: number) => setPick((s) => { const n = new Set(s); if (!n.delete(id)) n.add(id); return n; });
 
@@ -188,17 +196,114 @@ export function MyReservations({ me, onChanged }: { me: Me; onChanged: () => voi
   );
 }
 
+const day = (iso: string | null) => iso ? new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Kuala_Lumpur", day: "numeric", month: "short", year: "numeric" }).format(new Date(iso)) : "—";
+
+// Span or route of a request: one span name, or the first span and how many more (all of them in the details row).
+function spanText(r: Res) {
+  const spans = groupCores(r).map(([s]) => s);
+  if (!spans.length) return r.unassigned_span ?? "—";
+  return spans.length === 1 ? spans[0] : `${spans[0]} +${spans.length - 1} more`;
+}
+
+// Approvals (admin): one table of waiting requests, oldest first. Approve / Reject (or Release / Decline for a release
+// request) sit at the right of each row; Reject and Decline open the row to ask for a reason. The chevron opens the
+// row for its cores, notes and history.
 export function Approvals({ me, onChanged }: { me: Me; onChanged: () => void }) {
   const { data, error, reload } = useLoad(() => api.get("/api/approvals"));
   return (
-    <section aria-labelledby="appr-h" className="card mx-auto w-full max-w-4xl space-y-3">
-      <h2 id="appr-h" className="text-base leading-6 font-semibold">Approvals{data ? ` (${data.length})` : ""}</h2>
-      <p className="text-sm text-muted-foreground">New requests and release requests, oldest first.</p>
+    <section aria-labelledby="appr-h" className="card mx-auto w-full max-w-6xl">
+      <div className="card-h">
+        <h2 id="appr-h">Approvals{data ? ` (${data.length})` : ""}</h2>
+        <small className="hint">New requests and release requests, oldest first.</small>
+      </div>
       {me.role !== "admin" && <p role="alert">Admins only.</p>}
       {error && me.role === "admin" && <p role="alert">Could not load approvals.</p>}
-      {data && data.length === 0 && <p>Nothing is waiting.</p>}
-      <ul className="space-y-3">{data?.map((r) => <Card key={r.id} r={r} me={me} onChanged={() => { reload(); onChanged(); }} />)}</ul>
+      {data && data.length === 0 && <p className="text-[13px] text-muted-foreground">Nothing is waiting.</p>}
+      {data && data.length > 0 && (
+        <div className="tbox">
+          <table className="tbl band" data-testid="approvals-table">
+            <caption className="sr-only">Requests waiting for an admin, oldest first</caption>
+            <thead><tr>
+              <th scope="col" className="w-px"><span className="sr-only">Details</span></th>
+              <th scope="col" className="w-px">Requested</th><th scope="col" className="w-px">Type</th><th scope="col">Planner</th><th scope="col">Customer</th>
+              <th scope="col">Span or route</th><th scope="col" className="num w-px">Cores</th><th scope="col" className="w-px">Planned</th>
+              <th scope="col" className="w-px text-right!"><span className="sr-only">Actions</span></th>
+            </tr></thead>
+            {data.map((r) => <ApprovalRow key={r.id} r={r} onChanged={() => { reload(); onChanged(); }} />)}
+          </table>
+        </div>
+      )}
     </section>
+  );
+}
+
+function ApprovalRow({ r, onChanged }: { r: Res; onChanged: () => void }) {
+  const { mode, setMode, reason, setReason, msg, setMsg, busy, run } = useResAction(r.id, onChanged);
+  const [open, setOpen] = useState(false);
+  const release = r.awaiting === "release";
+  const cores = release ? r.release_requested_cores.length : r.cores.length + r.unassigned_cores;
+  const detailId = `appr-d-${r.id}`;
+  const ask = (m: Mode) => { setMode(m); setReason(""); setMsg(null); setOpen(true); };
+  return (
+    <tbody data-testid="approval" className="border-b border-rule last:border-b-0 [&>tr>*]:border-b-0!">
+      <tr className={open ? "bg-[#f7f8fa]" : ""}>
+        <td className="pr-0!">
+          <button type="button" className="grid size-7 place-items-center rounded-md hover:bg-rule" aria-expanded={open} aria-controls={detailId}
+            aria-label={`Details of request #${r.id}`} onClick={() => setOpen((o) => !o)}>
+            <svg viewBox="0 0 16 16" aria-hidden="true" className={`ni size-3.5! transition-transform ${open ? "rotate-90" : ""}`}><path d="M6 4l4 4-4 4" /></svg>
+          </button>
+        </td>
+        <td>{day(r.last_event_at)} <span className="text-muted-foreground">· {r.age_days} d</span></td>
+        <td>{release ? "Release" : "New"}</td>
+        <td>{r.planner}</td>
+        <th scope="row" className="text-left font-semibold">
+          {r.customer}
+          {r.is_new_customer && <span className="ml-2 inline-flex items-center gap-1 text-xs font-semibold text-amber"><Icon name="lo" />New customer</span>}
+        </th>
+        <td className="max-w-[320px] truncate" title={groupCores(r).map(([s]) => s).join(", ") || undefined}>{spanText(r)}</td>
+        <td className="num">{cores}{!release && r.unassigned_cores > 0 && <span className="text-muted-foreground"> by count</span>}</td>
+        <td>{r.planned_date ?? "—"}</td>
+        <td className="text-right">
+          <span className="inline-flex gap-2">
+            {release ? (
+              <>
+                <button type="button" className="btn h-8! px-3!" disabled={busy} onClick={() => run("release", { cores: r.release_requested_cores })}>Release</button>
+                <button type="button" className="btn h-8! px-3!" onClick={() => ask("decline-release")}>Decline</button>
+              </>
+            ) : (
+              <>
+                <button type="button" className="btn btn-p h-8! px-3!" disabled={busy} onClick={() => run("approve")}>Approve</button>
+                <button type="button" className="btn h-8! px-3!" onClick={() => ask("reject")}>Reject</button>
+              </>
+            )}
+          </span>
+        </td>
+      </tr>
+      <tr id={detailId} hidden={!open} className="bg-[#f7f8fa]">
+        <td />
+        <td colSpan={8} className="h-auto! py-3! whitespace-normal!">
+          <div className="space-y-1.5 text-[13px]">
+            <p className="text-muted-foreground">Request #{r.id}{r.imported && ", imported"}. Last event: {r.last_event ?? "none"}, {r.age_days} days ago.{r.stale && " Stale: no approval or keep for over 3 months."}</p>
+            {r.unassigned_cores > 0 && <p>{r.unassigned_cores} cores reserved by count on {r.unassigned_span}; {r.remaining_unassigned} not assigned yet.</p>}
+            {groupCores(r).map(([span, cs]) => <p key={span}>{span}: cores {cs.map((c) => c.held ? c.number : `${c.number} (released)`).join(", ")}</p>)}
+            {release && <p>Release requested for cores {r.cores.filter((c) => r.release_requested_cores.includes(c.core_id)).map((c) => c.number).join(", ") || "held by count"}.</p>}
+            {r.last_reason && <p role="note">{r.status === "rejected" ? "Rejection reason" : "Release declined"}: {r.last_reason}</p>}
+            {mode && (
+              <form className="flex items-end gap-2 pt-1" onSubmit={(e) => { e.preventDefault(); if (reason.trim()) run(mode, { reason: reason.trim() }); }}>
+                <label className="w-[420px] font-medium">Reason (required)
+                  <input className="field mt-1 bg-white" value={reason} onChange={(e) => setReason(e.target.value)} autoFocus />
+                </label>
+                <button type="submit" className="btn btn-p" disabled={busy || !reason.trim()}>Confirm {mode === "reject" ? "rejection" : "decline"}</button>
+                <button type="button" className="btn" onClick={() => { setMode(null); setMsg(null); }}>Cancel</button>
+              </form>
+            )}
+            {msg && <p role="alert" className="font-medium text-destructive">{msg}</p>}
+            <ResHistory key={r.last_event_at ?? ""} rid={r.id} />
+          </div>
+        </td>
+      </tr>
+      {msg && !open && <tr><td colSpan={9}><p role="alert" className="font-medium text-destructive">{msg}</p></td></tr>}
+    </tbody>
   );
 }
 

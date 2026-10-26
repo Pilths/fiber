@@ -45,7 +45,7 @@ export function Inspector({ detail, loading, onGoToCores, loss, onSeeLoss, admin
     </button>
   );
   return (
-    <section className="card flex min-h-[400px] flex-[1_0_auto] flex-col pt-0" aria-label="Inspector">
+    <section className="card flex flex-[1_0_auto] flex-col pt-0" aria-label="Inspector">
       <div role="tablist" aria-label="Inspector" className="-mx-5 mb-4 flex gap-1 border-b px-2.5">
         <button type="button" role="tab" aria-selected="true" className={`${tab} border-b-foreground`}>Cores</button>
         {later("Site")}

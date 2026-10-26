@@ -111,6 +111,7 @@ export function NetworkMap({ selectedIds, routeKey, visible, onSelectSpan, onSit
       const v = viewRef.current!;
       const m = bm.createBasemap(glBox.current!, [v.lng, v.lat], v.zoom, has.glyphs);
       map.current = m;
+      (window as { fiberMap?: unknown }).fiberMap = m; // read by the e2e tests (layer checks); harmless otherwise
       m.on("move", () => { const c = m.getCenter(); setView({ lng: c.lng, lat: c.lat, zoom: m.getZoom() }); });
       m.on("error", (e) => { if ((e as { sourceId?: string }).sourceId === "pm" || /pmtiles/i.test(String(e.error?.message))) setBase("failed"); });
       setBase("gl");
@@ -186,10 +187,12 @@ export function NetworkMap({ selectedIds, routeKey, visible, onSelectSpan, onSit
   }).map((d) => d.p.span_id));
   const nameShown = siteXY.map(([x, y], i) => fits(x, y + 33, 7.2 * sites!.features[i].properties.name.length + 12, 18));
 
+  // The stage is the growing child: it fills the card when the right column makes the row taller (no blank band
+  // under the map). MapLibre follows container size changes itself (ResizeObserver), the overlay via `box` above.
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-1 flex-col">
       <div ref={box} role="region" aria-label="Network map" aria-describedby="map-instr" data-testid="network-map" data-mode={base === "gl" ? "gl" : base === "loading" ? "loading" : "svg"}
-        className="relative h-[calc(100vh-210px)] max-h-[860px] min-h-[520px] overflow-hidden rounded-md border border-border bg-[#eef1f5] select-none"
+        className="relative min-h-[clamp(520px,calc(100vh-210px),860px)] flex-1 overflow-hidden rounded-md border border-border bg-[#eef1f5] select-none"
         onKeyDown={(e) => { if (e.key === "Escape") { setLayersOpen(false); onClear(); } }}
         onPointerDown={onDown} onPointerMove={onMove} onPointerUp={() => { drag.current = null; }}>
         <div ref={glBox} style={{ position: "absolute", inset: 0 }} aria-hidden="true" />{/* inline: MapLibre's CSS sets position: relative */}
@@ -256,7 +259,7 @@ export function NetworkMap({ selectedIds, routeKey, visible, onSelectSpan, onSit
             </div>
           </div>
           <div className="flex" role="group" aria-label="Zoom">
-            <button type="button" className="mbtn w-[34px] justify-center rounded-r-none! px-0! text-base" aria-label="Zoom in" onClick={() => view && go({ ...view, zoom: Math.min(16, view.zoom + 1) })}>+</button>
+            <button type="button" className="mbtn w-[34px] justify-center rounded-r-none! px-0! text-base" aria-label="Zoom in" onClick={() => view && go({ ...view, zoom: Math.min(18, view.zoom + 1) })}>+</button>
             <button type="button" className="mbtn -ml-px w-[34px] justify-center rounded-l-none! px-0! text-base" aria-label="Zoom out" onClick={() => view && go({ ...view, zoom: Math.max(4, view.zoom - 1) })}>&minus;</button>
           </div>
           <button type="button" className="mbtn" onClick={() => fitTo(selectedIds.length ? selectedIds : null)}>Fit selection</button>

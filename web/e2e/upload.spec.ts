@@ -70,6 +70,7 @@ test("site master preview: counts per sheet, 10% drop override, blocked DC sheet
   await sites.getByRole("button", { name: "Added 1" }).click();
   await page.evaluate(() => scrollTo(0, 0));
   await page.screenshot({ path: "e2e/screenshots/upload-site-master-preview.png", fullPage: true });
+  await page.screenshot({ path: "e2e/screenshots/upload-clean-site-master.png", fullPage: true });
   await preview.getByRole("button", { name: "Discard preview" }).click(); // never applied: would deactivate nothing, but keep the dev data as seeded
 });
 
@@ -145,6 +146,7 @@ test("reservation workbook: preview, confirm, re-upload shows Already imported",
   await expect(groups.getByRole("table")).toContainText("blank requestor");
   await page.evaluate(() => scrollTo(0, 0));
   await page.screenshot({ path: "e2e/screenshots/upload-reservations-preview.png", fullPage: true });
+  await page.screenshot({ path: "e2e/screenshots/upload-clean-reservations.png", fullPage: true });
 
   await preview.getByRole("button", { name: "Confirm import…" }).click();
   const dialog = page.getByRole("dialog", { name: "Confirm this upload?" });

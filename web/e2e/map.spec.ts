@@ -38,7 +38,7 @@ test("map loads with no request leaving the app origin; chips, sites, layers and
   const m = await mode(page);
   test.info().annotations.push({ type: "map path", description: m ?? "" });
   await expect(chips(page)).toHaveCount(5); // in the DOM; chips that would overlap are hidden until zoomed in
-  expect(await chips(page).filter({ visible: true }).count()).toBeGreaterThanOrEqual(2);
+  await expect.poll(() => chips(page).filter({ visible: true }).count()).toBeGreaterThanOrEqual(2); // after the first fit eases in
   await expect(map(page).getByTestId("map-site")).toHaveCount(5);
   await expect(map(page).getByRole("button", { name: /^Site DEV Kuala Lumpur DC, data centre, 3 spans$/ })).toBeVisible();
   await expect(map(page).getByRole("button", { name: /^Site DEV Penang Tower, other site/ })).toBeVisible();
@@ -164,4 +164,57 @@ test("map page has no horizontal scroll at 1200, 1280, 1440 and 1920", async ({ 
     await page.setViewportSize({ width: w, height: 900 });
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
   }
+});
+
+// The map stage is the growing child of its card: no blank band under the map, in each state (TASK-054 follow-up).
+test("map card fills its row and the stage fills the card: nothing, span and route selected", async ({ page }) => {
+  await signIn(page);
+  await expect(chips(page)).toHaveCount(5);
+  const gaps = () => page.evaluate(() => {
+    const card = document.querySelector("section[aria-labelledby=map-h]")!;
+    const body = card.lastElementChild!; // NetworkMap root: stage, then the note line and "not on the map"
+    const pad = parseFloat(getComputedStyle(card).paddingBottom);
+    const right = (card.nextElementSibling as HTMLElement).getBoundingClientRect();
+    return { underCard: Math.round(right.bottom - card.getBoundingClientRect().bottom), inCard: Math.round(card.getBoundingClientRect().bottom - pad - body.lastElementChild!.getBoundingClientRect().bottom) };
+  });
+  // Within a few px: the last line's box rounds to a pixel or two.
+  const check = async () => expect.poll(async () => { const g = await gaps(); return Math.abs(g.underCard) <= 3 && Math.abs(g.inCard) <= 3; }).toBe(true);
+  await check();
+  await chip(page, FAR).click();
+  await expect(page.getByRole("heading", { name: `Cores of ${FAR}` })).toBeVisible();
+  await check();
+  await page.evaluate(() => scrollTo(0, 0));
+  await settle(page);
+  await page.screenshot({ path: "e2e/screenshots/map-layout-fixed.png" });
+  await page.getByRole("radio", { name: "Route A to B" }).check({ force: true });
+  await page.getByLabel("From", { exact: true }).fill("DEV Kuala Lumpur DC");
+  await page.getByLabel("To", { exact: true }).fill("DEV Bukit Jalil TOC");
+  await page.getByLabel("Cores needed per span").fill("1");
+  await page.getByRole("list", { name: "Route options" }).getByTestId("route-option").first().click();
+  await expect(map(page).locator("[data-testid=map-line][data-selected=true]").first()).toBeVisible();
+  await check();
+});
+
+// Buildings and walking paths draw past the extract's zoom 14 (overzoom). Needs the basemap installed and WebGL.
+test("zoomed to 17 near DEV Kuala Lumpur DC the buildings layer draws", async ({ page }) => {
+  const outside = await offline(page);
+  await signIn(page);
+  test.skip((await mode(page)) !== "gl", "basemap not installed or no WebGL: no tile layers to check");
+  await page.waitForFunction(() => (window as { fiberMap?: { loaded(): boolean } }).fiberMap?.loaded());
+  const counts = await page.evaluate(() => new Promise<{ buildings: number; paths: number; zoom: number }>((done) => {
+    const m = (window as unknown as { fiberMap: import("maplibre-gl").Map }).fiberMap;
+    m.once("idle", () => done({
+      buildings: m.queryRenderedFeatures({ layers: ["buildings"] }).length,
+      paths: m.queryRenderedFeatures({ layers: ["paths"] }).length,
+      zoom: m.getZoom(),
+    }));
+    m.jumpTo({ center: [101.6869, 3.139], zoom: 17 });
+  }));
+  test.skip(counts.buildings === 0, "the installed extract has no buildings near this site");
+  expect(counts.zoom).toBeGreaterThanOrEqual(16);
+  expect(counts.buildings).toBeGreaterThan(0);
+  test.info().annotations.push({ type: "rendered", description: `${counts.buildings} buildings, ${counts.paths} path pieces at z${counts.zoom}` });
+  await page.waitForTimeout(1000); // glyphs for street names
+  await page.screenshot({ path: "e2e/screenshots/map-buildings.png" });
+  expect(outside).toEqual([]);
 });

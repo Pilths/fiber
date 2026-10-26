@@ -225,7 +225,7 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
       )}
       {view === "map" && (
         <main className="grid grid-cols-12 gap-4 px-6 pt-6 pb-10">
-          <section className="card col-span-8 flex flex-col self-start" aria-labelledby="map-h">
+          <section className={`card col-span-8 flex flex-col ${mapMin ? "self-start" : ""}`} aria-labelledby="map-h">
             <div className={`card-h ${mapMin ? "mb-0 border-b-0 pb-0" : ""}`}>
               <h2 id="map-h">Network map</h2>
               <small className="hint">{mode === "route" ? (routeName ? `Route ${routeName} selected` : "No route selected") : detail ? `${spanName(detail)} selected` : "Nothing selected"}</small>

@@ -31,59 +31,53 @@ const GROUPS: { g: Group; label: string; icon: IconName; cls: string }[] = [
 ];
 const willApply = (s: Sheet, override: boolean) => s.found && (!s.blocked || (s.needs_override && override));
 
-function CurrentFile({ data }: { data: { current: FileInfo | null; previous: FileInfo[] } | null }) {
+// Current file and previous uploads in one compact table, current first.
+function Files({ data }: { data: { current: FileInfo | null; previous: FileInfo[] } | null }) {
   if (!data) return <p className="text-[13px] text-muted-foreground">Loading…</p>;
   const c = data.current;
-  const rows = (f: FileInfo) => (["sites", "dcs"] as Kind[]).map((k) => {
-    const s = f.sheets[k];
-    return <span key={k} className="mr-4 whitespace-nowrap">{SHEET_LABEL[k]}: {s?.found ? <b className="font-semibold">{s.rows.toLocaleString("en-GB")} rows</b> : "not found"}</span>;
-  });
+  const n = (f: FileInfo, k: Kind) => { const x = f.sheets[k]; return x?.found ? x.rows.toLocaleString("en-GB") : <span className="text-muted-foreground">not found</span>; };
+  const list = [...(c ? [c] : []), ...data.previous.slice(0, 5)];
   return (
-    <div className="grid grid-cols-[1fr_1.4fr] gap-6">
-      <section aria-labelledby="sm-cur-h" data-testid="sm-current">
-        <h3 id="sm-cur-h" className="lbl mb-1">Current file</h3>
-        {c ? (
-          <dl className="grid grid-cols-[110px_1fr] gap-y-1 text-[13px]">
-            <dt className="text-muted-foreground">File</dt><dd className="font-semibold break-all">{c.filename}</dd>
-            <dt className="text-muted-foreground">Uploaded</dt><dd>{when(c.uploaded_at)} by {c.uploaded_by}</dd>
-            <dt className="text-muted-foreground">Applied</dt><dd>{when(c.applied_at)}</dd>
-            <dt className="text-muted-foreground">Rows</dt><dd>{rows(c)}</dd>
-          </dl>
-        ) : <p className="text-[13px] text-muted-foreground">No site master file applied yet.</p>}
-      </section>
-      <section aria-labelledby="sm-prev-h">
-        <h3 id="sm-prev-h" className="lbl mb-1">Previous uploads <span className="font-normal">(kept for comparison; there is no undo)</span></h3>
-        {data.previous.length === 0 ? <p className="text-[13px] text-muted-foreground">None.</p> : (
-          <table className="tbl text-[13px]!">
-            <thead><tr><th>File</th><th>Uploaded</th><th>Status</th><th>Rows</th></tr></thead>
+    <section aria-labelledby="sm-files-h" className="mt-5">
+      <h3 id="sm-files-h" className="lbl mb-1.5">Uploads</h3>
+      {!c && <p className="mb-2 text-[13px] text-muted-foreground">No site master file applied yet.</p>}
+      {list.length > 0 && (
+        <div className="tbox">
+          <table className="tbl band">
+            <thead><tr><th>File</th><th className="w-px">Uploaded</th><th className="w-px">Status</th><th className="num w-px">Sites</th><th className="num w-px">DCs</th></tr></thead>
             <tbody>
-              {data.previous.slice(0, 5).map((p) => (
-                <tr key={p.upload_id} className="[&>td]:h-10! [&>td]:text-[13px]!">
-                  <td className="max-w-[180px] truncate" title={p.filename}>{p.filename}</td>
-                  <td className="whitespace-nowrap">{when(p.uploaded_at)} · {p.uploaded_by}</td>
-                  <td>{p.status === "confirmed"
-                    ? <span className="pill h-green"><Icon name="ch" />Applied</span>
-                    : <span className="pill h-ns"><Icon name="ns" />Staged, not applied</span>}</td>
-                  <td className="text-muted-foreground">{rows(p)}</td>
+              {list.map((f) => (
+                <tr key={f.upload_id} data-testid={f === c ? "sm-current" : undefined}>
+                  <td className={`max-w-[360px] truncate ${f === c ? "font-semibold" : ""}`} title={f.filename}>{f.filename}</td>
+                  <td>{when(f.uploaded_at)} · {f.uploaded_by}</td>
+                  <td>{f === c ? <span className="inline-flex items-center gap-1.5 font-semibold text-green"><Icon name="ch" />Current, applied {when(f.applied_at)}</span>
+                    : f.status === "confirmed" ? <span className="inline-flex items-center gap-1.5"><Icon name="ch" />Applied</span>
+                    : <span className="inline-flex items-center gap-1.5 text-muted-foreground"><Icon name="ns" />Staged, not applied</span>}</td>
+                  <td className="num">{n(f, "sites")}</td>
+                  <td className="num">{n(f, "dcs")}</td>
                 </tr>
               ))}
             </tbody>
           </table>
-        )}
-        {data.previous.length > 5 && <p className="mt-1 text-xs text-muted-foreground">Showing the latest 5 of {data.previous.length}.</p>}
-      </section>
-    </div>
+        </div>
+      )}
+      <p className="mt-1.5 text-xs text-muted-foreground">
+        Previous uploads are kept for comparison; there is no undo.{data.previous.length > 5 && ` Showing the latest 5 of ${data.previous.length}.`}
+      </p>
+    </section>
   );
 }
 
 function RowDetail({ r, group }: { r: Row; group: Group }) {
+  const empty = !r.reason && group !== "changed" && !r.location_note && group !== "missing" && !r.possible_rename;
+  if (empty) return null;
   return (
-    <div className="space-y-1 py-2">
+    <div className="space-y-1">
       {r.reason && <p className="text-[13px]">{r.reason}</p>}
       {group === "changed" && <Changes changes={r.changes} />}
       {r.location_note && <p className="text-[13px] text-muted-foreground">{r.location_note}</p>}
       {group === "missing" && (r.in_use
-        ? <span className="pill h-amber"><Icon name="lo" />in use, stays active</span>
+        ? <span className="inline-flex items-center gap-1.5 font-semibold text-amber"><Icon name="lo" />in use, stays active</span>
         : <span className="text-[13px] text-muted-foreground">will be set inactive (never deleted)</span>)}
       {r.possible_rename && <p className="text-[13px] text-muted-foreground">Possible rename: {r.possible_rename.missing_dc_name} → {r.possible_rename.new_dc_name}</p>}
     </div>
@@ -107,7 +101,7 @@ function SheetPanel({ uploadId, s, override, onOverride }: { uploadId: number; s
   const g = GROUPS.find((x) => x.g === group)!;
   const hid = `sm-${s.kind}-h`;
   return (
-    <section aria-labelledby={hid} className="rounded-md border p-4" data-testid={`sheet-${s.kind}`}>
+    <section aria-labelledby={hid} data-testid={`sheet-${s.kind}`}>
       <div className="mb-3 flex flex-wrap items-baseline gap-x-3">
         <h3 id={hid} className="text-[15px] font-semibold">{SHEET_LABEL[s.kind]}</h3>
         <span className="text-[13px] text-muted-foreground">
@@ -136,19 +130,21 @@ function SheetPanel({ uploadId, s, override, onOverride }: { uploadId: number; s
           {error && <p role="alert" className="text-[13px] font-semibold text-red">{error}</p>}
           {data && (data.total === 0 ? <p className="text-[13px] text-muted-foreground">No {g.label.toLowerCase()} rows.</p> : (
             <>
-              <table className="tbl" aria-label={`${SHEET_LABEL[s.kind]}: ${g.label} rows`}>
-                <thead><tr><th className="w-16">Row</th><th className="w-[28%]">Name</th><th className="w-36">Status</th><th>Details</th></tr></thead>
+              <div className="tbox">
+              <table className="tbl band" aria-label={`${SHEET_LABEL[s.kind]}: ${g.label} rows`}>
+                <thead><tr><th className="num w-px">Row</th><th className="w-[28%]">Name</th><th className="w-px">Status</th><th>Details</th></tr></thead>
                 <tbody>
                   {data.items.map((r) => (
-                    <tr key={r.id} className="align-top [&>*]:h-auto! [&>*]:py-2!">
-                      <td className="text-muted-foreground">{r.row_number ?? "—"}</td>
-                      <th scope="row" className="text-left font-semibold break-words">{r.key || <i className="font-normal text-muted-foreground">blank</i>}</th>
-                      <td><span className={`pill ${g.cls}`}><Icon name={g.icon} />{group === "problem" ? "Needs review" : g.label}</span></td>
-                      <td><RowDetail r={r} group={group} /></td>
+                    <tr key={r.id}>
+                      <td className="num text-muted-foreground">{r.row_number ?? "—"}</td>
+                      <th scope="row" className="text-left font-semibold">{r.key || <i className="font-normal text-muted-foreground">blank</i>}</th>
+                      <td><span className={`inline-flex items-center gap-1.5 ${g.cls === "h-amber" ? "font-semibold text-amber" : ""}`}><Icon name={g.icon} />{group === "problem" ? "Needs review" : g.label}</span></td>
+                      <td className="whitespace-normal! [&:has(*)]:h-auto! [&:has(*)]:py-1.5!"><RowDetail r={r} group={group} /></td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+              </div>
               <Pager total={data.total} page={page} onPage={setPage} />
             </>
           ))}
@@ -160,13 +156,13 @@ function SheetPanel({ uploadId, s, override, onOverride }: { uploadId: number; s
 
 function Renames({ list, decisions, onDecide }: { list: Rename[]; decisions: Record<number, "rename" | "separate">; onDecide: (id: number, d: "rename" | "separate") => void }) {
   return (
-    <section aria-labelledby="sm-ren-h" className="rounded-md border border-amber-bd p-4">
+    <section aria-labelledby="sm-ren-h">
       <h3 id="sm-ren-h" className="text-[15px] font-semibold">Possible renames <span className="font-normal text-muted-foreground">({list.length}, each needs a choice)</span></h3>
       <p className="mb-3 text-[13px] text-muted-foreground">A DC is missing from the file and a new DC has the same LRD and coordinates. Rename keeps the existing DC and its history under the new name; Keep separate adds the new DC and sets the missing one inactive.</p>
-      <ul className="space-y-2">
+      <ul className="tbox divide-y divide-rule">
         {list.map((r) => (
           <li key={r.missing_dc_id}>
-            <fieldset className="flex flex-wrap items-center gap-x-6 gap-y-1 rounded-md border bg-[#f7f8fa] px-3.5 py-2.5 text-[13px]">
+            <fieldset className="flex flex-wrap items-center gap-x-6 gap-y-1 px-3 py-2 text-[13px]">
               <legend className="sr-only">{r.missing_dc_name} to {r.new_dc_name}</legend>
               <span className="min-w-[340px] flex-1"><b className="font-semibold">{r.missing_dc_name}</b> → <b className="font-semibold">{r.new_dc_name}</b>
                 <span className="text-muted-foreground"> · LRD {r.lrd ?? "—"} · file row {r.new_row_number}</span></span>
@@ -176,7 +172,7 @@ function Renames({ list, decisions, onDecide }: { list: Rename[]; decisions: Rec
                   {d === "rename" ? "Rename" : "Keep separate"}
                 </label>
               ))}
-              {!decisions[r.missing_dc_id] && <span className="pill h-amber"><Icon name="lo" />Choose one</span>}
+              {!decisions[r.missing_dc_id] && <span className="inline-flex items-center gap-1.5 font-semibold text-amber"><Icon name="lo" />Choose one</span>}
             </fieldset>
           </li>
         ))}
@@ -245,13 +241,13 @@ export function SiteMasterUpload() {
   };
 
   return (
+    <div className="space-y-4">
     <section className="card" aria-labelledby="sm-h">
       <div className="card-h">
         <h2 id="sm-h">Site master workbook</h2>
         <small className="hint">Sites and DCs. The file replaces the site list: rows missing from it are set inactive, never deleted.</small>
       </div>
-      <CurrentFile data={cur} />
-      <div className="mt-5 space-y-4">
+      <div className="space-y-4">
         <FilePick label="Upload a site master workbook" busy={busy} onFile={pick} />
         {error && <Note tone="red" role="alert" title={error} />}
         <div aria-live="polite" data-testid="sm-result">
@@ -271,27 +267,31 @@ export function SiteMasterUpload() {
             </Note>
           )}
         </div>
-        {staged && (
-          <section aria-labelledby="sm-prev-title" className="space-y-4" data-testid="sm-preview">
-            <div className="flex items-baseline gap-3">
-              <h3 id="sm-prev-title" className="text-base font-semibold">Preview of {staged.filename}</h3>
-            </div>
-            <Note tone="blue" title="Nothing is saved until you apply." />
-            {sheets.map((s) => <SheetPanel key={`${staged.upload_id}-${s.kind}`} uploadId={staged.upload_id} s={s} override={override[s.kind]} onOverride={(on) => setOverride((o) => ({ ...o, [s.kind]: on }))} />)}
-            {renames.length > 0 && <Renames list={renames} decisions={decisions} onDecide={(id, d) => setDecisions((x) => ({ ...x, [id]: d }))} />}
-            <div className="flex flex-wrap items-end gap-4 border-t pt-4">
-              {anyOverride && (
-                <label className="w-[420px]"><span className="lbl mb-1 block text-[13px]! text-foreground!">Reason for the override (required)</span>
-                  <input className="field" value={reason} onChange={(e) => setReason(e.target.value)} />
-                </label>
-              )}
-              <button type="button" className="btn btn-p" disabled={!!why} aria-describedby="sm-why" onClick={() => setConfirming(true)}>Apply…</button>
-              <button type="button" className="btn" onClick={() => setStaged(null)}>Discard preview</button>
-              <p id="sm-why" className="text-[13px] text-muted-foreground">{why ?? `Ready: ${applying.map((s) => SHEET_LABEL[s.kind]).join(" and ")} will be applied.`}</p>
-            </div>
-          </section>
-        )}
       </div>
+      <Files data={cur} />
+    </section>
+    {staged && (
+      <section aria-labelledby="sm-prev-title" className="card" data-testid="sm-preview">
+        <div className="card-h">
+          <h2 id="sm-prev-title" className="truncate">Preview of {staged.filename}</h2>
+          <small className="hint flex-none">Nothing is saved until you apply.</small>
+        </div>
+        <div className="space-y-6">
+          {sheets.map((s) => <SheetPanel key={`${staged.upload_id}-${s.kind}`} uploadId={staged.upload_id} s={s} override={override[s.kind]} onOverride={(on) => setOverride((o) => ({ ...o, [s.kind]: on }))} />)}
+          {renames.length > 0 && <Renames list={renames} decisions={decisions} onDecide={(id, d) => setDecisions((x) => ({ ...x, [id]: d }))} />}
+          <div className="flex flex-wrap items-end gap-4 border-t pt-4">
+            {anyOverride && (
+              <label className="w-[420px]"><span className="lbl mb-1 block text-[13px]! text-foreground!">Reason for the override (required)</span>
+                <input className="field" value={reason} onChange={(e) => setReason(e.target.value)} />
+              </label>
+            )}
+            <button type="button" className="btn btn-p" disabled={!!why} aria-describedby="sm-why" onClick={() => setConfirming(true)}>Apply…</button>
+            <button type="button" className="btn" onClick={() => setStaged(null)}>Discard preview</button>
+            <p id="sm-why" className="text-[13px] text-muted-foreground">{why ?? `Ready: ${applying.map((s) => SHEET_LABEL[s.kind]).join(" and ")} will be applied.`}</p>
+          </div>
+        </div>
+      </section>
+    )}
       {confirming && staged && (
         <Dialog title="Apply this site master file?" onClose={() => setConfirming(false)} wide>
           <ul className="mt-3 space-y-2 text-[13px]">
@@ -313,6 +313,6 @@ export function SiteMasterUpload() {
           </div>
         </Dialog>
       )}
-    </section>
+    </div>
   );
 }

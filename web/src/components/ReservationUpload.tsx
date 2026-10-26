@@ -35,7 +35,8 @@ const OTHER: Group[] = ["new", "changed", "unchanged", "missing", "conflicts", "
 const SPAN_GROUPS: Group[] = ["new", "changed", "unchanged", "missing"];
 const FIELD: Record<string, string> = { region: "Region", distance_km: "Distance (km)", survey_cores: "Surveyed cores" };
 
-const Pill = ({ g }: { g: Group }) => <span className={`pill ${GROUP[g].cls}`}><Icon name={GROUP[g].icon} />{GROUP[g].word}</span>;
+const TEXT: Record<string, string> = { "h-red": "font-semibold text-red", "h-amber": "font-semibold text-amber", "h-green": "text-green", "h-blue": "text-blue", "h-ns": "text-muted-foreground" };
+const Pill = ({ g }: { g: Group }) => <span className={`inline-flex items-center gap-1.5 ${TEXT[GROUP[g].cls]}`}><Icon name={GROUP[g].icon} />{GROUP[g].word}</span>;
 const date = (d: string | null) => d ? new Intl.DateTimeFormat("en-GB", { timeZone: "UTC", day: "numeric", month: "short", year: "numeric" }).format(new Date(d)) : "—";
 const ports = (p: Shown["ports"]) => p?.length
   ? p.map(([, labels]) => labels.length > 1 ? `${labels[0]} … ${labels[labels.length - 1]}` : labels[0]).join(" ↔ ")
@@ -62,11 +63,10 @@ function ImportSwitch({ state, onClosed }: { state: Switch | null; onClosed: (s:
   if (!state) return null;
   if (state.closed) {
     return (
-      <div data-testid="import-switch">
-        <Note tone="amber" role="status" title={`Reservation import closed on ${when(state.closed_at)} by ${state.closed_by}: ${state.reason}`}>
-          Reservation rows in uploaded workbooks are ignored and listed as a warning. New reservations are made only in the dashboard. This cannot be reopened.
-        </Note>
-      </div>
+      <p data-testid="import-switch" role="status" className="text-[13px]">
+        <span className="inline-flex items-center gap-1.5 font-semibold text-amber"><Icon name="lo" />Reservation import closed on {when(state.closed_at)} by {state.closed_by}: {state.reason}</span>
+        <span className="text-muted-foreground"> · Reservation rows in uploads are ignored with a warning; new reservations are made only in the dashboard. This cannot be reopened.</span>
+      </p>
     );
   }
   const submit = async (e: React.FormEvent) => {
@@ -80,10 +80,10 @@ function ImportSwitch({ state, onClosed }: { state: Switch | null; onClosed: (s:
     }
   };
   return (
-    <div data-testid="import-switch" className="flex items-center gap-4 rounded-md border px-4 py-3">
-      <span className="pill h-green"><Icon name="ch" />Import open</span>
-      <p className="flex-1 text-[13px] text-muted-foreground">Uploads import approved reservation rows whose cores are free. Closing is optional and one-time: after it, reservation rows in uploads are ignored and reservations are made only in the dashboard.</p>
-      <button type="button" className="btn" onClick={() => { setOpen(true); setReason(""); setError(null); }}>Close reservation import…</button>
+    <div data-testid="import-switch" className="flex items-center gap-3 text-[13px]">
+      <span className="inline-flex items-center gap-1.5 font-semibold text-green"><Icon name="ch" />Import open</span>
+      <p className="flex-1 text-muted-foreground">Uploads import approved reservation rows whose cores are free. Closing is optional and one-time.</p>
+      <button type="button" className="btn h-8! px-3!" onClick={() => { setOpen(true); setReason(""); setError(null); }}>Close reservation import…</button>
       {open && (
         <Dialog title="Close reservation import?" onClose={() => setOpen(false)}>
           <form onSubmit={submit} noValidate>
@@ -107,32 +107,36 @@ function Reservations({ uploadId, total }: { uploadId: number; total: number }) 
   const [page, setPage] = useState(1);
   const { data, error } = useRows(uploadId, "reservations", page);
   return (
-    <section aria-labelledby="ru-res-h" className="rounded-md border p-4" data-testid="ru-reservations">
-      <h3 id="ru-res-h" className="mb-1 text-[15px] font-semibold">Reservations to import <span className="font-normal text-muted-foreground">({total.toLocaleString("en-GB")})</span></h3>
-      <p className="mb-3 text-[13px] text-muted-foreground">Imported as approved. Existing reservations are never changed; a row whose core is held by then is skipped.</p>
+    <section aria-labelledby="ru-res-h" data-testid="ru-reservations">
+      <div className="mb-2 flex flex-wrap items-baseline gap-x-3">
+        <h3 id="ru-res-h" className="text-[15px] font-semibold">Reservations to import <span className="font-normal text-muted-foreground">({total.toLocaleString("en-GB")})</span></h3>
+        <span className="text-[13px] text-muted-foreground">Imported as approved. Existing reservations are never changed; a row whose core is held by then is skipped.</span>
+      </div>
       {error && <p role="alert" className="text-[13px] font-semibold text-red">{error}</p>}
       {data && (data.total === 0 ? <p className="text-[13px] text-muted-foreground">No reservation rows will be imported.</p> : (
         <>
-          <table className="tbl" aria-label="Reservations to import">
-            <thead><tr><th>Row</th><th>Customer</th><th>Span</th><th>Cores</th><th>Planned date</th><th>Group</th><th>Additional</th><th>Ports</th></tr></thead>
+          <div className="tbox">
+          <table className="tbl band" aria-label="Reservations to import">
+            <thead><tr><th className="num w-px">Row</th><th>Customer</th><th>Span</th><th className="num w-px">Cores</th><th className="w-px">Planned date</th><th>Group</th><th className="w-px">Additional</th><th>Ports</th></tr></thead>
             <tbody>
               {data.items.map((r) => {
                 const s = r.data.reservation!;
                 return (
-                  <tr key={r.id} className="align-top [&>*]:h-auto! [&>*]:py-2.5!">
-                    <td className="text-muted-foreground">{r.row_number}</td>
+                  <tr key={r.id}>
+                    <td className="num text-muted-foreground">{r.row_number}</td>
                     <th scope="row" className="text-left font-semibold">{s.customer}</th>
-                    <td className="whitespace-nowrap">{s.span}</td>
-                    <td className="whitespace-nowrap">{cores(s)}</td>
-                    <td className="whitespace-nowrap">{date(s.planned_date)}{r.warnings.map((w) => <span key={w} className="mt-1 flex items-center gap-1.5 text-xs text-amber"><Icon name="lo" />{w}</span>)}</td>
+                    <td>{s.span}</td>
+                    <td className="num">{cores(s)}</td>
+                    <td>{date(s.planned_date)}{r.warnings.length > 0 && <span className="ml-2 inline-flex items-center gap-1 text-xs font-semibold text-amber" title={r.warnings.join("; ")}><Icon name="lo" />{r.warnings.length === 1 ? r.warnings[0] : `${r.warnings.length} warnings`}</span>}</td>
                     <td>{s.group_label ?? "—"}</td>
                     <td>{s.additional ? "Yes" : "No"}</td>
-                    <td className="max-w-[260px] text-[13px] break-words">{ports(s.ports)}</td>
+                    <td className="max-w-[260px] truncate" title={ports(s.ports)}>{ports(s.ports)}</td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
+          </div>
           <Pager total={data.total} page={page} onPage={setPage} />
         </>
       ))}
@@ -146,24 +150,25 @@ function GroupRows({ uploadId, counts, wins, onWin }: { uploadId: number; counts
   const { data, error } = useRows(uploadId, group, page);
   const span = SPAN_GROUPS.includes(group);
   return (
-    <section aria-labelledby="ru-rows-h" className="rounded-md border p-4" data-testid="ru-groups">
-      <h3 id="ru-rows-h" className="mb-3 text-[15px] font-semibold">Rows by group</h3>
+    <section aria-labelledby="ru-rows-h" data-testid="ru-groups">
+      <h3 id="ru-rows-h" className="mb-2 text-[15px] font-semibold">Rows by group</h3>
       <div role="group" aria-label="Groups" className="mb-3 flex flex-wrap gap-2">
         {OTHER.map((g) => <Chip key={g} label={GROUP[g].label} icon={GROUP[g].icon} n={counts[g]} pressed={group === g} onClick={() => { setGroup(g); setPage(1); }} />)}
       </div>
       {error && <p role="alert" className="text-[13px] font-semibold text-red">{error}</p>}
       {data && (data.total === 0 ? <p className="text-[13px] text-muted-foreground">No rows in {GROUP[group].label}.</p> : (
         <>
-          <table className="tbl" aria-label={`${GROUP[group].label} rows`}>
-            <thead><tr>{span ? <><th>Span</th><th>File rows</th></> : <><th>Row</th><th>Sheet</th></>}<th>Status</th><th>Details</th></tr></thead>
+          <div className="tbox">
+          <table className="tbl band" aria-label={`${GROUP[group].label} rows`}>
+            <thead><tr>{span ? <><th>Span</th><th>File rows</th></> : <><th className="num w-px">Row</th><th className="w-px">Sheet</th></>}<th className="w-px">Status</th><th>Details</th></tr></thead>
             <tbody>
               {data.items.map((r) => (
-                <tr key={r.id} className="align-top [&>*]:h-auto! [&>*]:py-2.5!">
+                <tr key={r.id} className="align-top [&>*]:py-2.5! [&>*]:h-auto!">
                   {span
-                    ? <><th scope="row" className="text-left font-semibold whitespace-nowrap">{r.data.key}</th><td className="text-muted-foreground">{r.data.rows?.join(", ") ?? "—"}</td></>
-                    : <><td className="text-muted-foreground">{r.row_number}</td><td className="text-muted-foreground">{r.sheet_name}</td></>}
+                    ? <><th scope="row" className="text-left font-semibold">{r.data.key}</th><td className="text-muted-foreground">{r.data.rows?.join(", ") ?? "—"}</td></>
+                    : <><td className="num text-muted-foreground">{r.row_number}</td><td className="text-muted-foreground">{r.sheet_name}</td></>}
                   <td><Pill g={group} /></td>
-                  <td className="text-[13px]">
+                  <td className="whitespace-normal!">
                     {r.reason && <p>{r.reason}</p>}
                     {r.data.reservation && !span && <p className="text-muted-foreground">{r.data.reservation.customer ?? "no customer"} · {r.data.reservation.span} · {cores(r.data.reservation)}</p>}
                     {group === "new" && r.data.fields && <p>{Object.entries(r.data.fields).map(([k, v]) => `${FIELD[k] ?? k} ${v}`).join(" · ") || "No span values in the file"}</p>}
@@ -182,6 +187,7 @@ function GroupRows({ uploadId, counts, wins, onWin }: { uploadId: number; counts
               ))}
             </tbody>
           </table>
+          </div>
           <Pager total={data.total} page={page} onPage={setPage} />
         </>
       ))}
@@ -189,15 +195,21 @@ function GroupRows({ uploadId, counts, wins, onWin }: { uploadId: number; counts
   );
 }
 
+// Warnings as one quiet list: the first 3, then "Show all".
 function Warnings({ list }: { list: Warning[] }) {
   const [all, setAll] = useState(false);
   if (!list.length) return null;
-  const shown = all ? list : list.slice(0, 10);
+  const shown = all ? list : list.slice(0, 3);
   return (
-    <Note tone="amber" title={`${list.length} ${list.length === 1 ? "warning" : "warnings"}`}>
-      <ul className="list-disc space-y-0.5 pl-4" aria-label="Warnings">{shown.map((w, i) => <li key={i} data-kind={w.kind}>{w.message}</li>)}</ul>
-      {list.length > 10 && <button type="button" className="btn mt-2 h-8!" onClick={() => setAll((a) => !a)}>{all ? "Show fewer" : `Show all ${list.length}`}</button>}
-    </Note>
+    <section aria-labelledby="ru-warn-h" className="text-[13px]">
+      <h3 id="ru-warn-h" className="inline-flex items-center gap-1.5 font-semibold text-amber"><Icon name="lo" />{list.length} {list.length === 1 ? "warning" : "warnings"}</h3>
+      <ul className="mt-1 list-disc space-y-0.5 pl-9" aria-label="Warnings">{shown.map((w, i) => <li key={i} data-kind={w.kind}>{w.message}</li>)}</ul>
+      {list.length > 3 && (
+        <button type="button" className="mt-1 ml-5 font-semibold text-blue underline underline-offset-2" aria-expanded={all} onClick={() => setAll((a) => !a)}>
+          {all ? "Show fewer" : `Show all ${list.length}`}
+        </button>
+      )}
+    </section>
   );
 }
 
@@ -238,14 +250,15 @@ export function ReservationUpload() {
   const notImported = c ? c.already_imported + c.ignored + c.needs_review + c.rejected : 0;
 
   return (
+    <div className="space-y-4">
     <section className="card" aria-labelledby="ru-h">
       <div className="card-h">
         <h2 id="ru-h">Reservation workbook</h2>
         <small className="hint">Spans, survey counts, loss results and reservations. Rows missing from the file are left untouched.</small>
       </div>
       <div className="space-y-4">
-        <ImportSwitch state={sw} onClosed={setSw} />
         <FilePick label="Upload a Reservation workbook" busy={busy} onFile={pick} />
+        <ImportSwitch state={sw} onClosed={setSw} />
         {error && <Note tone="red" role="alert" title={error} />}
         <div aria-live="polite" data-testid="ru-result">
           {result && (
@@ -265,22 +278,28 @@ export function ReservationUpload() {
             </Note>
           )}
         </div>
-        {preview && c && (
-          <section aria-labelledby="ru-prev-h" className="space-y-4" data-testid="ru-preview">
-            <h3 id="ru-prev-h" className="text-base font-semibold">Preview of {preview.filename}</h3>
-            <Note tone="blue" title="Nothing is saved until you confirm.">
-              {preview.switch_closed ? "Reservation import is closed: reservation rows are ignored." : `${plural(c.reservations, "reservation")} will be imported; ${plural(notImported, "row")} will not be imported.`}
-            </Note>
-            <Warnings list={preview.warnings} />
-            <Reservations uploadId={preview.upload_id} total={c.reservations} />
-            <GroupRows uploadId={preview.upload_id} counts={c} wins={wins} onWin={(k, on) => setWins((w) => { const n = new Set(w); if (on) n.add(k); else n.delete(k); return n; })} />
-            <div className="flex items-center gap-4 border-t pt-4">
-              <button type="button" className="btn btn-p" onClick={() => setConfirming(true)}>Confirm import…</button>
-              <button type="button" className="btn" onClick={() => setPreview(null)}>Discard preview</button>
-            </div>
-          </section>
-        )}
       </div>
+    </section>
+    {preview && c && (
+      <section aria-labelledby="ru-prev-h" className="card" data-testid="ru-preview">
+        <div className="card-h">
+          <h2 id="ru-prev-h" className="truncate">Preview of {preview.filename}</h2>
+          <small className="hint flex-none">Nothing is saved until you confirm.</small>
+        </div>
+        <div className="space-y-6">
+          <p className="-mt-2 text-[13px]">
+            {preview.switch_closed ? "Reservation import is closed: reservation rows are ignored." : `${plural(c.reservations, "reservation")} will be imported; ${plural(notImported, "row")} will not be imported.`}
+          </p>
+          <Warnings list={preview.warnings} />
+          <Reservations uploadId={preview.upload_id} total={c.reservations} />
+          <GroupRows uploadId={preview.upload_id} counts={c} wins={wins} onWin={(k, on) => setWins((w) => { const n = new Set(w); if (on) n.add(k); else n.delete(k); return n; })} />
+          <div className="flex items-center gap-4 border-t pt-4">
+            <button type="button" className="btn btn-p" onClick={() => setConfirming(true)}>Confirm import…</button>
+            <button type="button" className="btn" onClick={() => setPreview(null)}>Discard preview</button>
+          </div>
+        </div>
+      </section>
+    )}
       {confirming && c && (
         <Dialog title="Confirm this upload?" onClose={() => setConfirming(false)} wide>
           <ul className="mt-3 list-disc space-y-1 pl-4 text-[13px]">
@@ -297,6 +316,6 @@ export function ReservationUpload() {
           </div>
         </Dialog>
       )}
-    </section>
+    </div>
   );
 }
