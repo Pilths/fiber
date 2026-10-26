@@ -284,3 +284,12 @@ class JobRun(Base):
     job_name: Mapped[str] = mapped_column(Text, primary_key=True)
     run_date: Mapped[date] = mapped_column(Date, primary_key=True)
     ran_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class LoginSession(Base):
+    __tablename__ = "sessions"
+    id: Mapped[str] = mapped_column(Text, primary_key=True)  # SHA-256 hex of the cookie token
+    user_id: Mapped[int] = _fk("users")
+    created_at: Mapped[datetime] = _created()
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    __table_args__ = (Index("sessions_user_ix", "user_id"),)

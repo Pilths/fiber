@@ -1,8 +1,10 @@
 """Synthetic dev data (interim, until the real seed from the mock Excel). Run: python -m app.seed_dev"""
+import os
 import random
 import sys
 from typing import Any
 
+from argon2 import PasswordHasher
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
@@ -37,9 +39,10 @@ def run(db: Session) -> None:
     def ins(sql: str, **p: Any) -> None:
         db.execute(text(sql), p)
 
+    dev_hash = PasswordHasher().hash(os.environ.get("DEV_PASSWORD", "dev-password-123"))  # development only
     user = {
-        u: one("INSERT INTO users (username, display_name, role, must_change_password) "
-               "VALUES (:u, :d, :r, false) RETURNING id", u=u, d=f"DEV {u}", r=r)
+        u: one("INSERT INTO users (username, display_name, role, password_hash, must_change_password) "
+               "VALUES (:u, :d, :r, :h, false) RETURNING id", u=u, d=f"DEV {u}", r=r, h=dev_hash)
         for u, r in [("planner1", "planner"), ("planner2", "planner"), ("admin1", "admin"), ("admin2", "admin")]
     }
 

@@ -1,8 +1,10 @@
 """Load the Ready rows of a sample workbook. Run: python -m app.seed <file>"""
 import json
+import os
 import sys
 from typing import Any
 
+from argon2 import PasswordHasher
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
@@ -25,9 +27,10 @@ def load(db: Any, path: str) -> tuple[dict[str, int], list[str]]:
     if one("SELECT count(*) FROM sites"):
         sys.exit("sites table is not empty; refusing to seed")
     user = {}
+    dev_hash = PasswordHasher().hash(os.environ.get("DEV_PASSWORD", "dev-password-123"))  # dev users only
     for u, role in [("planner1", "planner"), ("admin1", "admin")]:
-        ins("INSERT INTO users (username, display_name, role, must_change_password) VALUES (:u, :u, :r, false) "
-            "ON CONFLICT (username) DO NOTHING", u=u, r=role)
+        ins("INSERT INTO users (username, display_name, role, password_hash, must_change_password) "
+            "VALUES (:u, :u, :r, :h, false) ON CONFLICT (username) DO NOTHING", u=u, r=role, h=dev_hash)
         user[u] = one("SELECT id FROM users WHERE username = :u", u=u)
 
     rows = parse_workbook(path)

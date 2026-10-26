@@ -16,11 +16,6 @@ User = Annotated[CurrentUser, Depends(get_current_user)]
 Admin = Annotated[CurrentUser, Depends(require_admin)]
 
 
-@router.get("/me")
-def me(user: User) -> CurrentUser:
-    return user
-
-
 @router.post("/reservations")
 def create_reservation(db: DB, user: User, body: ReservationCreate) -> ReservationOut:
     return service.create(db, user, body.customer_id, body.planned_date, body.cores)
