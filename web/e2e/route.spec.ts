@@ -51,7 +51,7 @@ test("route options: up to 3, a Best match, every field shown", async ({ page })
   await expect(table.locator("tfoot")).toContainText(/Total, \d+ spans/);
   await expect(table.locator("tfoot")).toContainText(/\d+ of \d+ measured/);
   const section = page.getByTestId("route-section");
-  await expect(section.getByRole("heading", { level: 2 })).toHaveText([/^End-to-end span diagram/, "Spans on this path"]);
+  await expect(section.getByRole("heading", { level: 2 })).toHaveText([/^End-to-end span diagram/, "Spans on this path", "Reserve on this route"]);
   // diagram: a node per site, a span group per span, End total
   const rows = await table.locator("tbody tr").count();
   await expect(groups(page)).toHaveCount(rows);
@@ -96,6 +96,14 @@ test("route options: up to 3, a Best match, every field shown", async ({ page })
     }
     await expect(cells.nth(5), `row ${i + 1} measured`).toHaveText(/^(\d+\.\d\d dB|Not measured)$/);
   }
+  // Full-width table, single-line rows (v4 nowrap), in its own focusable scroll box
+  const heights = await rowsAll.evaluateAll((trs) => trs.map((tr) => tr.getBoundingClientRect().height));
+  for (const h of heights) expect(h).toBeLessThanOrEqual(44);
+  const tbox = page.getByTestId("route-table-box");
+  expect(await tbox.evaluate((el) => [getComputedStyle(el).overflowX, el.tabIndex])).toEqual(["auto", 0]);
+  await expect(tbox).toHaveAccessibleName("Spans on this path, scrolls sideways");
+  const card = (await page.locator("section", { has: table }).boundingBox())!;
+  expect((await tbox.boundingBox())!.width).toBeGreaterThan(card.width - 48);
   await toSection(page);
   await expect(groups(page)).toHaveCount(three >= 0 ? 3 : await table.locator("tbody tr").count());
   await page.screenshot({ path: "e2e/screenshots/route-v4-diagram.png" });
@@ -231,6 +239,8 @@ test("route state has no horizontal scroll at 1200, 1280, 1440, 1920", async ({ 
       await page.waitForTimeout(100);
       const over = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
       expect(over, `option ${idx + 1}, width ${width}`).toBeLessThanOrEqual(0);
+      const tall = await page.getByTestId("route-table").locator("tbody tr").evaluateAll((trs) => Math.max(...trs.map((tr) => tr.getBoundingClientRect().height)));
+      expect(tall, `option ${idx + 1}, width ${width}, rows single-line`).toBeLessThanOrEqual(44);
     }
   }
   // A long route (3+ spans) at 1200: the diagram is at least v4's width and any overflow scrolls inside its own focusable box.

@@ -288,14 +288,14 @@ export function RouteSection({ rp, spans, onDone }: { rp: RoutePlanner; spans: S
       </section>
       <section className="card" aria-labelledby="route-t">
         <div className="card-h"><h2 id="route-t">Spans on this path</h2></div>
-        <div className="grid grid-cols-[minmax(0,1fr)_320px] items-start gap-6">
-          <div className="overflow-hidden rounded-md border">
-            <table className="tbl [&_tbody_th]:h-10 [&_td]:h-10 [&_td]:px-3! [&_th]:px-3!" data-testid="route-table">
+        {/* v4 .tw: full card width, cells never wrap, long names scroll inside this box */}
+        <div tabIndex={0} role="region" aria-label="Spans on this path, scrolls sideways" className="overflow-x-auto rounded-md border" data-testid="route-table-box">
+            <table className="tbl [&_tbody_th]:h-10 [&_td]:h-10 [&_td]:px-3! [&_th]:px-3! [&_td]:whitespace-nowrap [&_th]:whitespace-nowrap" data-testid="route-table">
               <caption className="sr-only">Spans on this route, in travel order, with loss and free cores</caption>
               <thead className="[&_th]:bg-[#f7f8fa]"><tr>
-                <th scope="col">#</th><th scope="col">Span</th><th scope="col">Type</th><th scope="col">From → to</th>
-                <th scope="col" className="text-right!">km</th><th scope="col" className="text-right!">Est. loss (dB)</th>
-                <th scope="col" className="text-right!">Measured</th><th scope="col" className="text-right!">Free cores</th>
+                <th scope="col" className="w-px">#</th><th scope="col">Span</th><th scope="col" className="w-px">Type</th><th scope="col">From → to</th>
+                <th scope="col" className="w-px text-right!">km</th><th scope="col" className="w-px text-right!">Est. loss (dB)</th>
+                <th scope="col" className="w-px text-right!">Measured</th><th scope="col" className="w-px text-right!">Free cores</th>
               </tr></thead>
               <tbody>
                 {op.spans.map((s, i) => {
@@ -329,10 +329,9 @@ export function RouteSection({ rp, spans, onDone }: { rp: RoutePlanner; spans: S
                 </tr>
               </tfoot>
             </table>
-          </div>
-          <ReserveBox key={ids} op={op} need={need} onDone={onDone} />
         </div>
       </section>
+      <ReserveBox key={ids} op={op} need={need} onDone={onDone} />
     </div>
   );
 }
@@ -460,18 +459,20 @@ function ReserveBox({ op, need, onDone }: { op: RouteOption; need: number; onDon
     }
   };
   return (
-    <aside className="rounded-md border bg-[#f7f8fa] p-4" aria-labelledby={`${id}-h`} data-testid="route-reserve">
-      <h3 id={`${id}-h`} className="text-sm font-semibold">Reserve on this route</h3>
-      <p className="mt-1.5 text-[13px] text-muted-foreground">
+    <section className="card" aria-labelledby={`${id}-h`} data-testid="route-reserve">
+      <div className="card-h"><h2 id={`${id}-h`}>Reserve on this route</h2></div>
+      <div className="flex items-end gap-6">
+      <p className="max-w-[380px] flex-1 self-center text-[13px] text-muted-foreground">
         <b className="text-foreground">{need}</b> {need === 1 ? "core" : "cores"} on each of <b className="text-foreground">{op.total_spans}</b> spans, <b className="text-foreground">{total}</b> in total. Cores are assigned from the first free cores on each span.
       </p>
-      <form className="mt-3 grid gap-3" onSubmit={submit} noValidate>
+      <form className="flex flex-1 items-end justify-end gap-3" onSubmit={submit} noValidate>
         {field}
-        <label className="grid gap-1"><span className="lbl">Planned date</span>
+        <label className="grid w-[170px] shrink-0 gap-1"><span className="lbl">Planned date</span>
           <input type="date" className="field" value={date} onChange={(e) => setDate(e.target.value)} />
         </label>
-        <button type="submit" className="btn btn-p w-full" disabled={busy || !!short} aria-describedby={short ? `${id}-why` : undefined}>Reserve on this route</button>
+        <button type="submit" className="btn btn-p shrink-0" disabled={busy || !!short} aria-describedby={short ? `${id}-why` : undefined}>Reserve on this route</button>
       </form>
+      </div>
       {short && (
         <p id={`${id}-why`} className="mt-3 flex gap-2 rounded-md border border-l-3 border-red-bd border-l-red bg-red-bg px-3 py-2.5 text-[13px] text-red">
           <Icon name="fl" className="ic mt-[3px]" />
@@ -482,6 +483,6 @@ function ReserveBox({ op, need, onDone }: { op: RouteOption; need: number; onDon
       {tried && !customer && <p role="alert" className="mt-2.5 text-[13px] font-bold text-red">Choose a customer before submitting.</p>}
       {msg && <p role={msg.ok ? "status" : "alert"} className={`mt-2.5 text-[13px] ${msg.ok ? "font-semibold" : "font-bold text-red"}`}>{msg.text}</p>}
       <p className="mt-2 text-xs text-muted-foreground">Goes to an admin for approval.</p>
-    </aside>
+    </section>
   );
 }
