@@ -77,6 +77,13 @@ export function NetworkMap({ selectedIds, routeKey, visible, onSelectSpan, onSit
   const [err, setErr] = useState(false);
   const [layerOn, setLayerOn] = useState(true);
   const [layersOpen, setLayersOpen] = useState(false);
+  const [full, setFull] = useState(false);
+  useEffect(() => {
+    const on = () => setFull(document.fullscreenElement === box.current);
+    document.addEventListener("fullscreenchange", on);
+    return () => document.removeEventListener("fullscreenchange", on);
+  }, []);
+  const toggleFull = () => (full ? document.exitFullscreen() : box.current!.requestFullscreen()).catch(() => {});
 
   useEffect(() => {
     let live = true;
@@ -192,7 +199,7 @@ export function NetworkMap({ selectedIds, routeKey, visible, onSelectSpan, onSit
   return (
     <div className="flex flex-1 flex-col">
       <div ref={box} role="region" aria-label="Network map" aria-describedby="map-instr" data-testid="network-map" data-mode={base === "gl" ? "gl" : base === "loading" ? "loading" : "svg"}
-        className="relative min-h-[clamp(520px,calc(100vh-210px),860px)] flex-1 overflow-hidden rounded-md border border-border bg-[#eef1f5] select-none"
+        className={`relative flex-1 overflow-hidden bg-[#eef1f5] select-none ${full ? "" : "min-h-[clamp(520px,calc(100vh-210px),860px)] rounded-md border border-border"}`}
         onKeyDown={(e) => { if (e.key === "Escape") { setLayersOpen(false); onClear(); } }}
         onPointerDown={onDown} onPointerMove={onMove} onPointerUp={() => { drag.current = null; }}>
         <div ref={glBox} style={{ position: "absolute", inset: 0 }} aria-hidden="true" />{/* inline: MapLibre's CSS sets position: relative */}
@@ -263,6 +270,14 @@ export function NetworkMap({ selectedIds, routeKey, visible, onSelectSpan, onSit
             <button type="button" className="mbtn -ml-px w-[34px] justify-center rounded-l-none! px-0! text-base" aria-label="Zoom out" onClick={() => view && go({ ...view, zoom: Math.max(4, view.zoom - 1) })}>&minus;</button>
           </div>
           <button type="button" className="mbtn" onClick={() => fitTo(selectedIds.length ? selectedIds : null)}>Fit selection</button>
+          {document.fullscreenEnabled && (
+            <button type="button" className="mbtn" aria-pressed={full} onClick={toggleFull}>
+              <svg className="ni" viewBox="0 0 16 16" aria-hidden="true">
+                <path d={full ? "M6 2v4H2M10 2v4h4M6 14v-4H2M10 14v-4h4" : "M2 6V2h4M14 6V2h-4M2 10v4h4M14 10v4h-4"} />
+              </svg>
+              {full ? "Exit full screen" : "Full screen"}
+            </button>
+          )}
         </div>
 
         <ul aria-label="Map key" className="mleg">

@@ -23,6 +23,8 @@
 <body>
 <nav>
   <b>Fiber mockups</b>
+  <button data-show="theme">Background theme</button>
+  <button data-show="colour">Colour status</button>
   <button data-show="map">Map page</button>
   <button data-show="v4">V4 (cards, bold, colour)</button>
   <button data-show="v3">V3 (Fable Taste, no boxes)</button>
@@ -41,6 +43,8 @@
   <button data-show="fable-impeccable">Fable + Impeccable</button>
 </nav>
 <div id="grid" class="all">
+  <figure data-id="theme" hidden><figcaption>Background theme: Current vs 3 coloured themes (switch at the top) <a href="theme/index.html" target="_blank">open full</a></figcaption><iframe src="theme/index.html" title="Background theme"></iframe></figure>
+  <figure data-id="colour" hidden><figcaption>Colour status: current theme with status colours (use the Current | Colour switch) <a href="colour/index.html" target="_blank">open full</a></figcaption><iframe src="colour/index.html" title="Colour status"></iframe></figure>
   <figure data-id="map" hidden><figcaption>Map page: search, map, inspector, route diagram (use the Mock states strip) <a href="map/index.html" target="_blank">open full</a></figcaption><iframe src="map/index.html" title="Map page"></iframe></figure>
   <figure data-id="v4" hidden><figcaption>V4: even cards, bold numbers, semantic colour <a href="v4/index.html" target="_blank">open full</a></figcaption><iframe src="v4/index.html" title="V4"></iframe></figure>
   <figure data-id="v3" hidden><figcaption>V3: Fable Taste data, V2 rules, no boxes <a href="v3/index.html" target="_blank">open full</a></figcaption><iframe src="v3/index.html" title="V3"></iframe></figure>
@@ -63,7 +67,7 @@
     const show = b.dataset.show;
     document.querySelectorAll('nav button').forEach(x => x.setAttribute('aria-pressed', x === b));
     grid.classList.toggle('all', show === 'all');
-    grid.querySelectorAll('figure').forEach(f => f.hidden = show === 'all' ? ['map','v4','v3','v2','route','final','merged','fable-garden','fable-tastemaker','opus-garden','opus-tastemaker'].includes(f.dataset.id) : f.dataset.id !== show);
+    grid.querySelectorAll('figure').forEach(f => f.hidden = show === 'all' ? ['colour','map','v4','v3','v2','route','final','merged','fable-garden','fable-tastemaker','opus-garden','opus-tastemaker'].includes(f.dataset.id) : f.dataset.id !== show);
   });
 </script>
 </body>
