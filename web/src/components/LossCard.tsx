@@ -28,7 +28,7 @@ function Metric({ label, value, sub, children }: { label: string; value?: string
 }
 
 // "Loss" card for one span, after the held table (PRD story 4).
-export function LossCard({ loss, coverage }: { loss: LossDetail | null; coverage: { measured: number; total: number } | null }) {
+export function LossCard({ loss }: { loss: LossDetail | null }) {
   const [all, setAll] = useState(false);
   const calc = loss?.calculated_db ?? null;
   const rows = loss ? (all ? loss.history : loss.history.slice(0, 5)) : [];
@@ -36,7 +36,6 @@ export function LossCard({ loss, coverage }: { loss: LossDetail | null; coverage
     <section id="loss" className="card" aria-labelledby="loss-h" data-testid="loss-card">
       <div className="card-h">
         <h2 id="loss-h" tabIndex={-1} className="outline-offset-4">Loss{loss && <span className="font-normal text-muted-foreground"> of {loss.span_name}</span>}</h2>
-        {coverage && <small className="hint" data-testid="loss-coverage"><b className="font-semibold text-foreground">{coverage.measured} of {coverage.total}</b> spans measured</small>}
       </div>
       {!loss ? <p className="text-[13px] text-muted-foreground">Loading loss...</p> : (
         <>
@@ -56,13 +55,6 @@ export function LossCard({ loss, coverage }: { loss: LossDetail | null; coverage
               <b className="font-semibold text-foreground">{NOTE[loss.status]}</b>
             </p>
           )}
-          <p className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground" data-testid="loss-legend">
-            <span>Bands, measured against calculated:</span>
-            <span className="inline-flex items-center gap-1.5"><Icon name="ch" />0 to 3% (or below calculated)</span>
-            <span className="inline-flex items-center gap-1.5"><Icon name="lo" />3 to 7%</span>
-            <span className="inline-flex items-center gap-1.5"><Icon name="fl" />7 to 10%</span>
-            <span className="inline-flex items-center gap-1.5"><Icon name="ex" />above 10%, off scale</span>
-          </p>
           {loss.history.length > 0 && (
             <div className="mt-4 border-t pt-3">
               <div className="lbl">Tests, newest first</div>

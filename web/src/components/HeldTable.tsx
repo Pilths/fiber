@@ -16,14 +16,11 @@ export function HeldTable({ d, onOpen }: { d: Detail; onOpen: (c: Detail["cores"
   const filters = (["All", "Reserved", "Requested", "In use", "Faulty", "Count only"] as Filter[]).filter((f) => f === "All" || count(f) > 0);
   const rows = held.filter((c) => filter === "All" || c.status === filter);
   const showCount = d.unassigned_reserved > 0 && (filter === "All" || filter === "Count only");
-  const withCores = held.filter((c) => c.status !== "Faulty").length;
-  const faulty = held.length - withCores;
 
   return (
     <section className="card" aria-labelledby="held-h">
       <div className="card-h">
-        <h2 id="held-h">Held on this span</h2>
-        <small className="hint">{withCores} cores held with numbers, {d.unassigned_reserved} held without, {faulty} faulty</small>
+        <h2 id="held-h" tabIndex={-1} className="outline-offset-4">Held on this span</h2>
       </div>
       {held.length === 0 && !d.unassigned_reserved ? <p className="text-[13px] text-muted-foreground">Nothing is held on this span.</p> : (
         <>

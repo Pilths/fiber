@@ -17,7 +17,6 @@ test("keyboard: roving tabindex, arrows, Space/Enter select only Available", asy
   const cells = page.getByRole("gridcell");
   expect(await cells.count()).toBe(24);
   await expect(page.getByRole("region", { name: /^Cores of/ })).toContainText("24 surveyed of 144");
-  await expect(page.getByTestId("capacity")).toContainText("18 Available minus 0 held without cores = 18 free to reserve");
   // 12 cores per row, and the whole row fits the panel at 1280px (no horizontal scroll)
   const tops = await cells.evaluateAll((els) => els.slice(0, 13).map((e) => Math.round(e.getBoundingClientRect().top)));
   expect(new Set(tops.slice(0, 12)).size).toBe(1);
@@ -109,7 +108,6 @@ test("each status has a distinct symbol and text, not colour alone", async ({ pa
       tableCell: "tbody td",
       button: "main button.btn-p",
       navCurrent: "nav button[aria-current]",
-      equation: "[data-testid=capacity]",
       later: ".later",
       badge: "[aria-label=Spans] .pill",
       ...Object.fromEntries(["Available", "Requested", "Reserved", "In use", "Faulty"].map((st) => [`cell ${st}`, `[role=gridcell][data-status="${st}"]`])),
@@ -122,8 +120,7 @@ test("each status has a distinct symbol and text, not colour alone", async ({ pa
 test("count-only reservation shows on the span and in My reservations; admin sees Approvals", async ({ page }) => {
   await signIn(page);
   await pickSpan(page, /^DEV Cyberjaya DC - DEV Bukit Jalil/);
-  await expect(page.getByTestId("capacity")).toContainText("3 reserved, not assigned");
-  await expect(page.getByTestId("capacity")).toContainText("= 17 free to reserve");
+  await expect(page.getByTestId("inspector-held")).toContainText("cores held");
   await expect(page.getByRole("table", { name: "Held cores on this span" })).toContainText("Count only");
   await page.getByRole("button", { name: /My reservations/ }).click();
   await expect(page.getByTestId("reservation").filter({ hasText: "3 not assigned yet" })).toBeVisible();

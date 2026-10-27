@@ -35,8 +35,6 @@ test("each level shows a pill with its own symbol and word, below the held table
   const held = await page.getByRole("region", { name: "Held on this span" }).boundingBox();
   const loss = await card(page).boundingBox();
   expect(loss!.y).toBeGreaterThan(held!.y);
-  await expect(card(page).getByTestId("loss-coverage")).toContainText(/\d+ of \d+ spans measured/);
-  await expect(card(page).getByTestId("loss-legend")).toContainText("above 10%");
 });
 
 test("amber span: metrics and history newest first", async ({ page }) => {

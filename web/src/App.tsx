@@ -81,7 +81,6 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
   const [mapMin, setMapMin] = useState(false);
   const [loss, setLoss] = useState<LossDetail | null>(null);
   const [lossList, setLossList] = useState<SpanLoss[]>([]);
-  const [coverage, setCoverage] = useState<{ measured: number; total: number } | null>(null);
   const [version, setVersion] = useState(0); // bumped after a booking or edit so the span list and grid reload
   const [drawerCore, setDrawerCore] = useState<number | null>(null);
   const [editSpan, setEditSpan] = useState<{ focus?: "survey" } | null>(null);
@@ -125,7 +124,6 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
   useEffect(() => {
     if (view !== "map") return;
     api.get("/api/loss/spans").then(setLossList).catch(() => {});
-    api.get("/api/loss/coverage").then(setCoverage).catch(() => {});
   }, [view, version]);
 
   useEffect(() => {
@@ -199,8 +197,8 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
     if (location.hash.startsWith("#span=")) history.replaceState(null, "", location.pathname);
   };
   const routeName = rp.option && `${rp.option.spans[0].site_a} to ${rp.option.spans[rp.option.spans.length - 1].site_b}`;
-  const goToLoss = () => {
-    const h = document.getElementById("loss-h");
+  const goTo = (id: string) => () => {
+    const h = document.getElementById(id);
     h?.scrollIntoView({ block: "start" });
     h?.focus({ preventScroll: true });
   };
@@ -238,7 +236,7 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
           </section>
           <div className="col-span-4 flex min-w-0 flex-col gap-4">
             <FindCard spans={spans} selectedId={spanId} onSelect={(id) => open(id)} loss={lossList} mode={mode} onMode={setMode} route={<RouteForm rp={rp} />} filter={filter} onFilter={setFilter} />
-            <Inspector detail={detail} loading={spanId != null && !detail} onGoToCores={goToCores} loss={loss?.span_id === spanId ? loss : null} onSeeLoss={goToLoss} admin={admin}
+            <Inspector detail={detail} loading={spanId != null && !detail} onGoToCores={goToCores} loss={loss?.span_id === spanId ? loss : null} onSeeLoss={goTo("loss-h")} onSeeHeld={goTo("held-h")} admin={admin}
               onPlanRoute={planRoute} route={mode === "route" ? <RouteSummary key={`${rp.idx}-${routeName}`} rp={rp} onGo={goToRoute} /> : undefined} />
           </div>
 
@@ -271,7 +269,7 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
                       onDone={() => { setSelected(new Set()); setVersion((v) => v + 1); refreshBell(); }} />}
               </section>
               <HeldTable d={detail} onOpen={(c) => setDrawerCore(c.id)} />
-              <LossCard key={detail.id} loss={loss?.span_id === detail.id ? loss : null} coverage={coverage} />
+              <LossCard key={detail.id} loss={loss?.span_id === detail.id ? loss : null} />
             </div>
           )}
           {detail && drawn && <CoreDrawer key={drawn.id} core={drawn} span={spanName(detail)} me={me} onClose={() => setDrawerCore(null)} onChanged={changed} />}
@@ -288,13 +286,8 @@ function Cores({ d, selected, chosen, toggle, focusCoreId, onOpen, onClear, onDo
   onOpen: (c: Detail["cores"][number]) => void; onClear: () => void; onDone: () => void;
 }) {
   const n = countBy(d);
-  const notSurveyed = d.not_surveyed ?? 0;
   return (
     <>
-      <p className="-mt-1.5 mb-3.5 text-[13px] text-muted-foreground" data-testid="capacity">
-        <b className="font-bold text-foreground">{n.Available}</b> Available minus <b className="font-bold text-foreground">{d.unassigned_reserved}</b> held without cores = <b className="font-bold text-foreground">{d.free_to_reserve}</b> free to reserve.
-        {d.unassigned_reserved > 0 && ` ${d.unassigned_reserved} reserved, not assigned: cores held by count with no core numbers yet; they lower this number but mark no cell.`}
-      </p>
       <ul aria-label="Status key" className="mb-1 flex flex-wrap gap-x-5 gap-y-2 text-[13px] text-muted-foreground">
         {(["Available", "Chosen", ...STATUS_ORDER.slice(1)] as const).map((s) => {
           const st = s === "Chosen" ? STATUS.Available : STATUS[s];
@@ -307,11 +300,6 @@ function Cores({ d, selected, chosen, toggle, focusCoreId, onOpen, onClear, onDo
         })}
       </ul>
       <PortGrid cores={d.cores} selected={selected} onToggle={toggle} onOpen={onOpen} focusCoreId={focusCoreId} />
-      {notSurveyed > 0 && (
-        <p className="mt-3.5 text-[13px] text-muted-foreground">
-          <b className="font-semibold text-foreground">{notSurveyed} cores not surveyed</b> (cores {(d.survey_cores ?? 0) + 1} to {d.cable_size}). Not drawn, and cannot be booked until an admin enters a survey count.
-        </p>
-      )}
       <ChosenBar key={d.id} cores={chosen.map((c) => ({ id: c.id, number: c.number }))} free={d.free_to_reserve} onClear={onClear} onDone={onDone} />
     </>
   );

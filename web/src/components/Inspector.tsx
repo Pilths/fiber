@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import type { components } from "@/api/schema";
 import { Icon } from "@/components/Icon";
 import { LossPill } from "@/components/LossCard";
-import { countBy, db, health, pct, spanName, STATUS, type CoreStatus, type LossDetail } from "@/lib/status";
+import { countBy, db, health, pct, spanName, type LossDetail } from "@/lib/status";
 
 type Detail = components["schemas"]["SpanDetail"];
 
@@ -14,27 +14,10 @@ export const Facts = ({ d }: { d: Detail }) => (
   </>
 );
 
-const numbers = (ns: number[]) => (ns.length === 1 ? `Core ${ns[0]}` : ns.length <= 4 ? `Cores ${ns.join(", ")}` : `${ns.length} cores`);
-
-// Short held list: one line per status and customer, most urgent first.
-function heldLines(d: Detail) {
-  const groups = new Map<string, { status: CoreStatus; who: string; ns: number[] }>();
-  for (const s of ["Requested", "Reserved", "In use"] as CoreStatus[])
-    for (const c of d.cores.filter((c) => c.status === s)) {
-      const k = `${s}|${c.customer ?? ""}`;
-      if (!groups.has(k)) groups.set(k, { status: s, who: c.customer ?? "-", ns: [] });
-      groups.get(k)!.ns.push(c.number);
-    }
-  const lines = [...groups.values()].map((g) => ({ key: g.status + g.who, icon: STATUS[g.status].icon, tone: STATUS[g.status].tone, word: g.status as string, who: g.who, meta: numbers(g.ns) }));
-  if (d.unassigned_reserved > 0)
-    lines.splice(Math.min(2, lines.length), 0, { key: "count", icon: "co", tone: "text-[#50555d]", word: "Count only", who: "-", meta: `${d.unassigned_reserved} cores` });
-  return lines;
-}
-
 type Admin = { onEditSpan: (focus?: "survey") => void; onEditSite: (end: "a" | "b") => void } | null; // null for planners
 
-export function Inspector({ detail, loading, onGoToCores, loss, onSeeLoss, admin, onPlanRoute, route }: {
-  detail: Detail | null; loading: boolean; onGoToCores: () => void; loss: LossDetail | null; onSeeLoss: () => void; admin: Admin;
+export function Inspector({ detail, loading, onGoToCores, loss, onSeeLoss, onSeeHeld, admin, onPlanRoute, route }: {
+  detail: Detail | null; loading: boolean; onGoToCores: () => void; loss: LossDetail | null; onSeeLoss: () => void; onSeeHeld: () => void; admin: Admin;
   onPlanRoute: (site: string) => void; route?: ReactNode; // route: the route summary, shown instead of the span in Route mode
 }) {
   const tab = "relative inline-flex h-10 items-center gap-2 border-b-2 border-transparent -mb-px px-2.5 font-semibold whitespace-nowrap focus-visible:-outline-offset-3";
@@ -57,7 +40,7 @@ export function Inspector({ detail, loading, onGoToCores, loss, onSeeLoss, admin
             <b className="mb-0.5 block text-sm font-semibold text-foreground">{loading ? "Loading span..." : "No span selected"}</b>
             {!loading && "Choose a span in Find, or search in the top bar."}
           </p>
-        ) : <Body d={detail} onGoToCores={onGoToCores} loss={loss} onSeeLoss={onSeeLoss} admin={admin} onPlanRoute={onPlanRoute} />)}
+        ) : <Body d={detail} onGoToCores={onGoToCores} loss={loss} onSeeLoss={onSeeLoss} onSeeHeld={onSeeHeld} admin={admin} onPlanRoute={onPlanRoute} />)}
       </div>
     </section>
   );
@@ -65,8 +48,8 @@ export function Inspector({ detail, loading, onGoToCores, loss, onSeeLoss, admin
 
 const link = "font-[inherit] underline decoration-line decoration-1 underline-offset-4 hover:text-blue hover:decoration-blue";
 
-function Body({ d, onGoToCores, loss, onSeeLoss, admin, onPlanRoute }: {
-  d: Detail; onGoToCores: () => void; loss: LossDetail | null; onSeeLoss: () => void; admin: Admin; onPlanRoute: (site: string) => void;
+function Body({ d, onGoToCores, loss, onSeeLoss, onSeeHeld, admin, onPlanRoute }: {
+  d: Detail; onGoToCores: () => void; loss: LossDetail | null; onSeeLoss: () => void; onSeeHeld: () => void; admin: Admin; onPlanRoute: (site: string) => void;
 }) {
   const h = health(d);
   const n = countBy(d);
@@ -78,7 +61,6 @@ function Body({ d, onGoToCores, loss, onSeeLoss, admin, onPlanRoute }: {
     { k: "k-cores", v: withCores, label: "held with cores" },
     { k: "k-fault", v: n.Faulty, label: "faulty" },
   ];
-  const lines = heldLines(d).slice(0, 3);
   return (
     <>
       <h3 className="text-2xl leading-[30px] font-bold tracking-tight">
@@ -102,7 +84,6 @@ function Body({ d, onGoToCores, loss, onSeeLoss, admin, onPlanRoute }: {
         </div>
         {surveyed ? (
           <>
-            <p className="mt-1 text-[13px] text-muted-foreground">{n.Available} Available minus {d.unassigned_reserved} held without cores, of {d.survey_cores} surveyed</p>
             <div className="mt-3.5 flex h-2 gap-0.5" aria-hidden>
               {parts.filter((p) => p.v > 0).map((p) => <span key={p.k} className={`k ${p.k} h-full rounded`} style={{ flex: p.v }} />)}
             </div>
@@ -132,20 +113,15 @@ function Body({ d, onGoToCores, loss, onSeeLoss, admin, onPlanRoute }: {
         </span>
         <button type="button" className="flex-none font-semibold text-blue underline underline-offset-2 hover:no-underline" onClick={onSeeLoss}>See loss</button>
       </div>
-      {lines.length > 0 && (
-        <div className="mt-5 border-t pt-4">
-          <div className="lbl">Held on this span</div>
-          <ul className="mt-1">
-            {lines.map((l) => (
-              <li key={l.key} className="grid min-h-10 grid-cols-[118px_1fr_auto] items-center gap-2 border-b border-rule text-[13px] last:border-b-0">
-                <span className={`inline-flex items-center gap-1.5 font-semibold whitespace-nowrap ${l.tone}`}><Icon name={l.icon} />{l.word}</span>
-                <span className="truncate">{l.who}</span>
-                <span className="whitespace-nowrap text-muted-foreground">{l.meta}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+      <div className="mt-3 flex items-center gap-2 border-t pt-3 text-[13px]" data-testid="inspector-held">
+        <span className="lbl">Held</span>
+        <span className="min-w-0 flex-1">
+          {withCores + n.Faulty + d.unassigned_reserved === 0 ? <span className="text-muted-foreground">Nothing held</span> : (
+            <><b className="font-semibold">{withCores + d.unassigned_reserved}</b> cores held{n.Requested > 0 && `, ${n.Requested} waiting approval`}{n.Faulty > 0 && `, ${n.Faulty} faulty`}</>
+          )}
+        </span>
+        <button type="button" className="flex-none font-semibold text-blue underline underline-offset-2 hover:no-underline" onClick={onSeeHeld}>See held</button>
+      </div>
       <div className="-mx-5 mt-auto flex flex-wrap gap-2 border-t bg-white px-5 py-5">
         <button type="button" className="btn btn-p flex-1" onClick={onGoToCores} disabled={!surveyed}>Go to cores</button>
         <button type="button" className="btn flex-1" onClick={() => onPlanRoute(d.site_a)}>Plan a route from here</button>

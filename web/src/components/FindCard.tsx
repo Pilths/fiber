@@ -33,7 +33,7 @@ export function FindCard({ spans, selectedId, onSelect, loss, mode, onMode, rout
 
   return (
     <section className="card" aria-labelledby="find-h">
-      <div className="card-h"><h2 id="find-h">Find</h2><small className="hint">Search works without the map</small></div>
+      <div className="card-h"><h2 id="find-h">Find</h2></div>
       <div role="radiogroup" aria-label="Find mode" className="grid h-9 grid-cols-2 overflow-hidden rounded-md border border-line">
         {([["span", "Span or site"], ["route", "Route A to B"]] as const).map(([m, label], i) => (
           <label key={m} className={`relative flex cursor-pointer items-center justify-center px-3 font-medium whitespace-nowrap has-checked:bg-foreground has-checked:font-semibold has-checked:text-white has-focus-visible:z-10 has-focus-visible:outline-3 has-focus-visible:outline-blue ${i ? "border-l border-line" : ""}`}>
@@ -88,7 +88,6 @@ export function FindCard({ spans, selectedId, onSelect, loss, mode, onMode, rout
             {opts("route_type").map((o) => <option key={o}>{o}</option>)}
           </select>
         </label>
-        <p className="col-span-2 text-xs text-muted-foreground" aria-live="polite"><b className="text-foreground">{shown.length} of {all.length}</b> spans shown</p>
       </div>}
     </section>
   );
