@@ -46,7 +46,7 @@ export function Inspector({ detail, loading, onGoToCores, loss, onSeeLoss, onSee
   );
 }
 
-const link = "font-[inherit] underline decoration-line decoration-1 underline-offset-4 hover:text-blue hover:decoration-blue";
+const link = "font-[inherit] underline-offset-4 hover:text-blue hover:underline";
 
 function Body({ d, onGoToCores, loss, onSeeLoss, onSeeHeld, admin, onPlanRoute }: {
   d: Detail; onGoToCores: () => void; loss: LossDetail | null; onSeeLoss: () => void; onSeeHeld: () => void; admin: Admin; onPlanRoute: (site: string) => void;

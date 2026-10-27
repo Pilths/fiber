@@ -213,7 +213,7 @@ export function Header({ onPick, view, onView, me, approvals, stale, onSignOut, 
           {tabs.map(([v, label, d, extra]) => (
             <li key={v}>
               <button type="button" aria-current={view === v ? "page" : undefined} onClick={() => onView(v)}
-                className="flex h-9 items-center gap-2 rounded-md px-2.5 whitespace-nowrap text-[#3d4046] hover:bg-raised aria-[current=page]:bg-[#e4e7ec] aria-[current=page]:font-semibold aria-[current=page]:text-foreground">
+                className="flex h-9 items-center gap-2 rounded-md px-2.5 whitespace-nowrap text-[#3d4046] hover:bg-raised aria-[current=page]:bg-foreground aria-[current=page]:font-semibold aria-[current=page]:text-white">
                 <NavIcon d={d} /><span>{label}</span>{extra}
               </button>
             </li>
