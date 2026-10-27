@@ -196,7 +196,7 @@ export function Header({ onPick, view, onView, me, approvals, stale, onSignOut, 
     ["mine", "My reservations", "M4 2.5h8v11l-4-3-4 3z", stale > 0 && <span key="b" className="badge">{stale}<span className="sr-only"> stale</span></span>],
   ];
   if (admin) {
-    tabs.push(["approvals", "Approvals", "M3 8.5l3 3 7-7", approvals ? <span key="b" className="badge">{approvals} waiting</span> : null]);
+    tabs.push(["approvals", "Approvals", "M3 8.5l3 3 7-7", approvals ? <span key="b" className="badge">{approvals}<span className="sr-only"> waiting</span></span> : null]);
     tabs.push(["upload", "Upload", "M8 11V3M5 6l3-3 3 3M3 13h10", null]);
   }
   return (
