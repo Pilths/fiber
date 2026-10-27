@@ -20,7 +20,6 @@ from app.ingest.excel import _json
 from app.routing.graph import invalidate as invalidate_routes
 
 BLANKS = {"", "tba", "n/a", "na", "-", "tbc"}
-HEADER_SCAN_ROWS = 10
 DROP_LIMIT = (9, 10)  # a sheet with file rows * 10 <= database rows * 9 (10% or more fewer) is blocked
 UPLOAD_REASON = "site master upload"
 LOCATION_FIELDS = {"location", "geom", "lat", "lon", "latitude", "longitude"}
@@ -127,13 +126,18 @@ class SheetResult:
 # ---- reading the workbook -------------------------------------------------------------------------------------
 
 def _find_sheet(wb: Any, kind: str, taken: set[str]) -> tuple[Any, int, list[str]] | None:
-    need = set(SHEETS[kind][0])
+    """Scan each sheet top to bottom, any row and column, for the name header (site_name / DC Name / Link). That row,
+    holding the other required headers too, is the header row."""
+    anchor, *rest = SHEETS[kind][0]
     for ws in wb.worksheets:
         if ws.title in taken:
             continue
-        for n, row in enumerate(ws.iter_rows(min_row=1, max_row=HEADER_SCAN_ROWS, values_only=True), 1):
-            if need <= {hkey(c) for c in row if not blank(c)}:
-                return ws, n, [" ".join(str(c).split()) if not blank(c) else "" for c in row]
+        for n, row in enumerate(ws.iter_rows(values_only=True), 1):
+            if not any(not blank(c) and hkey(c) == anchor for c in row):
+                continue
+            headers = [" ".join(str(c).split()) if not blank(c) else "" for c in row]
+            if set(rest) <= {hkey(h) for h in headers if h}:
+                return ws, n, headers
     return None
 
 

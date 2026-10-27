@@ -93,6 +93,13 @@ def test_sheets_found_by_headers_not_name_or_row(client, admin):
     assert s["dcs"]["found"] and s["dcs"]["sheet_name"] == "zz2" and s["dcs"]["counts"]["added"] == 1
 
 
+def test_header_row_found_below_row_ten_and_away_from_column_a(client, admin):
+    pad = [None, None, None]
+    data = workbook([pad + site("AAAA")], None, site_offset=24, site_head=pad + SITE_HEAD)
+    s = sheets(post(client, data))
+    assert s["sites"]["found"] and s["sites"]["counts"]["added"] == 1
+
+
 def test_no_matching_sheet_blocks_that_part_with_expected_headers(client, admin):
     s = sheets(post(client, workbook([site("AAAA")], None)))
     assert not s["dcs"]["found"] and s["dcs"]["blocked"] and not s["dcs"]["needs_override"]
