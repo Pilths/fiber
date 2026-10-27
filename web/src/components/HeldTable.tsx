@@ -4,17 +4,17 @@ import { Icon } from "@/components/Icon";
 import { STATUS, type CoreStatus } from "@/lib/status";
 
 type Detail = components["schemas"]["SpanDetail"];
-type Filter = "All" | Exclude<CoreStatus, "Available"> | "Count only";
+type Filter = "All" | Exclude<CoreStatus, "Available"> | "Unassigned";
 
 // One row per held core from GET /api/spans/{id}, plus one count-only row. Age and the reservation's planner
 // are not on the span endpoint (history is TASK-077), so those columns are left out.
 export function HeldTable({ d, onOpen }: { d: Detail; onOpen: (c: Detail["cores"][number]) => void }) {
   const [filter, setFilter] = useState<Filter>("All");
   const held = d.cores.filter((c) => c.status !== "Available");
-  const count = (f: Filter) => (f === "All" ? held.length + (d.unassigned_reserved ? 1 : 0) : f === "Count only" ? (d.unassigned_reserved ? 1 : 0) : held.filter((c) => c.status === f).length);
-  const filters = (["All", "Reserved", "Requested", "In use", "Faulty", "Count only"] as Filter[]).filter((f) => f === "All" || count(f) > 0);
+  const count = (f: Filter) => (f === "All" ? held.length + (d.unassigned_reserved ? 1 : 0) : f === "Unassigned" ? (d.unassigned_reserved ? 1 : 0) : held.filter((c) => c.status === f).length);
+  const filters = (["All", "Reserved", "Requested", "In use", "Faulty", "Unassigned"] as Filter[]).filter((f) => f === "All" || count(f) > 0);
   const rows = held.filter((c) => filter === "All" || c.status === filter);
-  const showCount = d.unassigned_reserved > 0 && (filter === "All" || filter === "Count only");
+  const showCount = d.unassigned_reserved > 0 && (filter === "All" || filter === "Unassigned");
 
   return (
     <section className="card" aria-labelledby="held-h">
@@ -26,7 +26,7 @@ export function HeldTable({ d, onOpen }: { d: Detail; onOpen: (c: Detail["cores"
           <div role="group" aria-label="Filter held cores by status" className="mb-2 flex flex-wrap gap-2">
             {filters.map((f) => (
               <button key={f} type="button" className="chip" aria-pressed={filter === f} onClick={() => setFilter(f)}>
-                {f !== "All" && <Icon name={f === "Count only" ? "co" : STATUS[f].icon} className={`ic ${filter === f ? "" : f === "Count only" ? "text-use" : STATUS[f].tone}`} />}{f} <b>{count(f)}</b>
+                {f !== "All" && <Icon name={f === "Unassigned" ? "co" : STATUS[f].icon} className={`ic ${filter === f ? "" : f === "Unassigned" ? "text-use" : STATUS[f].tone}`} />}{f} <b>{count(f)}</b>
               </button>
             ))}
           </div>
@@ -34,7 +34,7 @@ export function HeldTable({ d, onOpen }: { d: Detail; onOpen: (c: Detail["cores"
             <caption className="sr-only">Held cores on this span</caption>
             <thead><tr>
               <th scope="col" className="w-[9%]">Cores</th><th scope="col" className="w-[14%]">Status</th><th scope="col" className="w-[17%]">Held by</th>
-              <th scope="col">Ports or detail</th><th scope="col" className="w-[14%]">Circuit</th><th scope="col" className="w-[15%] pr-0! text-right!">Planned</th>
+              <th scope="col">Ports or detail</th><th scope="col" className="w-[14%]">Circuit</th><th scope="col" className="w-[15%] pr-0!">Planned</th>
             </tr></thead>
             <tbody>
               {rows.map((c) => (
@@ -47,17 +47,17 @@ export function HeldTable({ d, onOpen }: { d: Detail; onOpen: (c: Detail["cores"
                   <td className="truncate">{c.customer ?? "-"}</td>
                   <td className="py-2 leading-snug">{c.status === "Faulty" ? "Not bookable" : c.port_a || c.port_b ? `${c.port_a ?? "-"} to ${c.port_b ?? "-"}` : "-"}</td>
                   <td className="truncate font-mono text-body">{c.circuit_id ?? "-"}</td>
-                  <td className="pr-0 text-right whitespace-nowrap">{c.planned_date ?? "-"}</td>
+                  <td className="pr-0 whitespace-nowrap">{c.planned_date ?? "-"}</td>
                 </tr>
               ))}
               {showCount && (
                 <tr>
-                  <th scope="row" className="text-left font-semibold">{d.unassigned_reserved}, not assigned</th>
-                  <td><span className="inline-flex items-center gap-2 font-semibold whitespace-nowrap text-use"><Icon name="co" />Count only</span></td>
+                  <th scope="row" className="text-left font-semibold">{d.unassigned_reserved}</th>
+                  <td><span className="inline-flex items-center gap-2 font-semibold whitespace-nowrap text-use"><Icon name="co" />Unassigned</span></td>
                   <td>-</td>
-                  <td className="py-2 leading-snug">Reserved by count, no cell; an admin assigns cores later</td>
+                  <td className="py-2 leading-snug">-</td>
                   <td>-</td>
-                  <td className="pr-0 text-right">-</td>
+                  <td className="pr-0">-</td>
                 </tr>
               )}
             </tbody>
