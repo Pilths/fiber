@@ -302,7 +302,7 @@ function Cores({ d, selected, chosen, toggle, focusCoreId, onOpen, onClear, onDo
       <PortGrid cores={d.cores} selected={selected} onToggle={toggle} onOpen={onOpen} focusCoreId={focusCoreId} />
       <ChosenBar key={d.id} cores={chosen.map((c) => ({ id: c.id, number: c.number }))} free={d.free_to_reserve} onClear={onClear} onDone={onDone} />
       <p className="mt-3 flex items-center gap-2 rounded-md border border-amber-bd bg-amber-bg px-3 py-2 text-[13px]">
-        <Icon name="lo" className="flex-none text-amber" />
+        <Icon name="lo" className="ic flex-none text-amber" />
         <span><b className="font-semibold text-amber">Stale after 3 months.</b> An approved reservation not kept for 3 months is flagged Stale. Keep or release it in My reservations.</span>
       </p>
     </>

@@ -26,7 +26,7 @@ export function HeldTable({ d, onOpen }: { d: Detail; onOpen: (c: Detail["cores"
           <div role="group" aria-label="Filter held cores by status" className="mb-2 flex flex-wrap gap-2">
             {filters.map((f) => (
               <button key={f} type="button" className="chip" aria-pressed={filter === f} onClick={() => setFilter(f)}>
-                {f !== "All" && <Icon name={f === "Count only" ? "co" : STATUS[f].icon} className={filter === f ? "" : f === "Count only" ? "text-[#50555d]" : STATUS[f].tone} />}{f} <b>{count(f)}</b>
+                {f !== "All" && <Icon name={f === "Count only" ? "co" : STATUS[f].icon} className={`ic ${filter === f ? "" : f === "Count only" ? "text-[#50555d]" : STATUS[f].tone}`} />}{f} <b>{count(f)}</b>
               </button>
             ))}
           </div>
