@@ -57,8 +57,8 @@ function Body({ d, onGoToCores, loss, onSeeLoss, onSeeHeld, admin, onPlanRoute }
   const withCores = n.Reserved + n.Requested + n["In use"];
   const parts = [
     { k: "k-free", v: d.free_to_reserve, label: "free" },
-    { k: "k-hold", v: d.unassigned_reserved, label: "held without cores" },
-    { k: "k-cores", v: withCores, label: "held with cores" },
+    { k: "k-hold", v: d.unassigned_reserved, label: "unassigned" },
+    { k: "k-cores", v: withCores, label: "assigned" },
     { k: "k-fault", v: n.Faulty, label: "faulty" },
   ];
   return (
@@ -114,13 +114,13 @@ function Body({ d, onGoToCores, loss, onSeeLoss, onSeeHeld, admin, onPlanRoute }
         <button type="button" className="flex-none font-semibold link" onClick={onSeeLoss}>See loss</button>
       </div>
       <div className="mt-3 flex items-center gap-2 border-t pt-3 text-body" data-testid="inspector-held">
-        <span className="lbl">Held</span>
+        <span className="lbl">Taken</span>
         <span className="min-w-0 flex-1">
-          {withCores + n.Faulty + d.unassigned_reserved === 0 ? <span className="text-muted-foreground">Nothing held</span> : (
-            <><b className="font-semibold">{withCores + d.unassigned_reserved}</b> cores held{n.Requested > 0 && `, ${n.Requested} waiting approval`}{n.Faulty > 0 && `, ${n.Faulty} faulty`}</>
+          {withCores + n.Faulty + d.unassigned_reserved === 0 ? <span className="text-muted-foreground">None taken</span> : (
+            <><b className="font-semibold">{withCores + d.unassigned_reserved}</b> taken{n.Requested > 0 && `, ${n.Requested} waiting approval`}{n.Faulty > 0 && `, ${n.Faulty} faulty`}</>
           )}
         </span>
-        <button type="button" className="flex-none font-semibold link" onClick={onSeeHeld}>See held</button>
+        <button type="button" className="flex-none font-semibold link" onClick={onSeeHeld}>See taken</button>
       </div>
       <div className="-mx-5 mt-auto flex flex-wrap gap-2 border-t bg-white px-5 py-5">
         <button type="button" className="btn btn-p flex-1" onClick={onGoToCores} disabled={!surveyed}>Go to cores</button>

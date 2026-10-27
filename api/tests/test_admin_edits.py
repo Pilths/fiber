@@ -1,9 +1,8 @@
 """Session 8 backend: core status edit, span and site edits, history (TEST-011, TEST-021)."""
 import pytest
-from sqlalchemy import text
-
 import test_reservation_upload as tru
 import test_site_master as tsm
+from sqlalchemy import text
 from test_auth import mkuser
 from test_reservations import H, act, book, build, one
 
@@ -62,7 +61,7 @@ def test_faulty_held_core_in_action_needed(client, w):
 def test_011_distance_edit_changes_calculated_loss(client, w):
     s = w["s1"]
     assert post(client, f"spans/{s}", distance_km="10", reason="from the file").status_code == 200
-    calc = lambda: client.get(f"/api/loss/spans/{s}", headers=H("planner1")).json()["calculated_db"]  # noqa: E731
+    calc = lambda: client.get(f"/api/loss/spans/{s}", headers=H("planner1")).json()["calculated_db"]
     first = float(calc())
     assert first == pytest.approx(3.0)
     assert post(client, f"spans/{s}", distance_km="20", reason="resurveyed").status_code == 200
@@ -136,7 +135,7 @@ def test_not_surveyed_span_bookable_after_count(client, w, db):
 
 def test_span_sites_change_rules(client, w, db):
     s1, s2 = w["s1"], w["s2"]
-    a, b, c, d = (one(db, "SELECT id FROM sites WHERE name = :n", n=n) for n in "ABCD")
+    a, b, c, _d = (one(db, "SELECT id FROM sites WHERE name = :n", n=n) for n in "ABCD")
     e = one(db, "INSERT INTO sites (name, kind) VALUES ('E','site') RETURNING id")
     assert post(client, f"spans/{s1}", site_b_id=a, reason="x").status_code == 422  # same site
     assert post(client, f"spans/{s1}", site_b_id=99999, reason="x").status_code == 422  # unknown
@@ -212,7 +211,7 @@ def test_021_reservation_history_in_order(client, w, db):
     act(client, rid, "release", cores=[c1])
     h = client.get(f"/api/reservations/{rid}/history", headers=H("planner1")).json()
     assert [e["type"] for e in h] == ["requested", "approved", "release_requested", "release_declined", "corrected", "released"]
-    nums = lambda e: [c["number"] for c in e["cores"]]  # noqa: E731
+    nums = lambda e: [c["number"] for c in e["cores"]]
     assert nums(h[0]) == [1, 2, 3] and nums(h[1]) == [] and nums(h[2]) == [3] and nums(h[5]) == [1]
     assert [e["user"] for e in h] == ["planner1", "admin1", "planner1", "admin1", "admin1", "admin1"]
     assert h[3]["reason"] == "still needed" and h[4]["reason"] == "typo" and h[4]["planned_date"] == "2026-12-01"
@@ -301,8 +300,8 @@ def test_lowered_cores_are_hidden_everywhere_and_raise_reuses_rows(client, w, db
     d = client.get(f"/api/spans/{s}", headers=H("planner1")).json()
     assert [c["number"] for c in d["cores"]] == [1, 2] and d["survey_cores"] == 2
     assert d["free_cores"] == 2 and d["free_to_reserve"] == 2 and d["status_mix"] == {"Available": 2}
-    assert [x["id"] for x in client.get("/api/spans", headers=H("planner1")).json() if x["id"] == s][0] == s
-    assert [x for x in client.get("/api/spans", headers=H("planner1")).json() if x["id"] == s][0]["free_cores"] == 2
+    assert next(x["id"] for x in client.get("/api/spans", headers=H("planner1")).json() if x["id"] == s) == s
+    assert next(x for x in client.get("/api/spans", headers=H("planner1")).json() if x["id"] == s)["free_cores"] == 2
     hidden = book(client, w, [ids[3]])
     assert hidden.status_code == 409 and hidden.json()["detail"]["taken_core_ids"] == [ids[3]]
     assert book(client, w, [ids[1], ids[3]]).status_code == 409

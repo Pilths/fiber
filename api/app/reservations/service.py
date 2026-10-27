@@ -126,7 +126,7 @@ def needs_review(db: Session, user: CurrentUser) -> list[NeedsReviewItem]:
             items.append(NeedsReviewItem(kind="release_requested", reservation=r, detail="Release requested, waiting for an admin."))
         if r.id in faulty:
             items.append(NeedsReviewItem(kind="faulty_held", reservation=r,
-                                         detail="Faulty core held: " + ", ".join(map(str, faulty[r.id]))))
+                                         detail="Faulty core taken: " + ", ".join(map(str, faulty[r.id]))))
     return items
 
 
@@ -255,7 +255,7 @@ def _held(db: Session, rid: int, core_ids: list[int]) -> list[int]:
     held = _ids(db, "SELECT core_id FROM core_holds WHERE reservation_id = :r AND core_id = ANY(CAST(:ids AS bigint[]))",
                 r=rid, ids=ids)
     if len(held) != len(ids):
-        raise HTTPException(422, "Cores must be held by this reservation: " + ", ".join(map(str, sorted(set(ids) - set(held)))))
+        raise HTTPException(422, "Cores must belong to this reservation: " + ", ".join(map(str, sorted(set(ids) - set(held)))))
     return ids
 
 

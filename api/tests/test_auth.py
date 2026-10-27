@@ -12,7 +12,7 @@ def mkuser(db, name, role="planner", must_change=False, active=True, pw=PW):
     return db.execute(
         text("INSERT INTO users (username, display_name, role, password_hash, must_change_password, active) "
              "VALUES (:u, :u, :r, :h, :m, :a) RETURNING id"),
-        dict(u=name, r=role, h=PasswordHasher().hash(pw), m=must_change, a=active)).scalar_one()
+        {"u": name, "r": role, "h": PasswordHasher().hash(pw), "m": must_change, "a": active}).scalar_one()
 
 
 def login(client, name, pw=PW):
@@ -20,7 +20,7 @@ def login(client, name, pw=PW):
 
 
 def sessions(db, uid):
-    return db.execute(text("SELECT count(*) FROM sessions WHERE user_id = :u"), dict(u=uid)).scalar_one()
+    return db.execute(text("SELECT count(*) FROM sessions WHERE user_id = :u"), {"u": uid}).scalar_one()
 
 
 def test_login_sets_httponly_cookie_and_me_works(client, db):
@@ -57,7 +57,7 @@ def test_logout_invalidates_session(client, db):
 def test_expired_session_is_401(client, db):
     uid = mkuser(db, "pat")
     login(client, "pat")
-    db.execute(text("UPDATE sessions SET expires_at = now() - interval '1 minute' WHERE user_id = :u"), dict(u=uid))
+    db.execute(text("UPDATE sessions SET expires_at = now() - interval '1 minute' WHERE user_id = :u"), {"u": uid})
     assert client.get("/api/me").status_code == 401
 
 
@@ -109,18 +109,18 @@ def test_admin_creates_user_with_one_time_password(client, db, admin):
     assert "temporary_password" not in client.get("/api/admin/users").text
     assert client.post("/api/admin/users", json={"username": "kim", "role": "planner"}).status_code == 409
     assert db.execute(text("SELECT user_id FROM data_edits WHERE entity = 'user' AND entity_id = :i"),
-                      dict(i=u["id"])).scalar_one() == admin
+                      {"i": u["id"]}).scalar_one() == admin
     client.cookies.clear()
     assert login(client, "kim", u["temporary_password"]).json()["must_change_password"] is True
 
 
 def test_reset_password_and_deactivate_delete_sessions(client, db, admin):
     uid = mkuser(db, "kim")
-    db.execute(text("INSERT INTO sessions (id, user_id, expires_at) VALUES ('x', :u, now() + interval '1 hour')"), dict(u=uid))
+    db.execute(text("INSERT INTO sessions (id, user_id, expires_at) VALUES ('x', :u, now() + interval '1 hour')"), {"u": uid})
     r = client.post(f"/api/admin/users/{uid}/reset-password")
     assert r.status_code == 200 and r.json()["must_change_password"] is True and r.json()["temporary_password"]
     assert sessions(db, uid) == 0
-    db.execute(text("INSERT INTO sessions (id, user_id, expires_at) VALUES ('y', :u, now() + interval '1 hour')"), dict(u=uid))
+    db.execute(text("INSERT INTO sessions (id, user_id, expires_at) VALUES ('y', :u, now() + interval '1 hour')"), {"u": uid})
     assert client.post(f"/api/admin/users/{uid}/deactivate").json()["active"] is False
     assert sessions(db, uid) == 0
 

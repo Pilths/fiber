@@ -2,7 +2,6 @@
 import io
 from typing import Annotated, Any, Literal
 
-import openpyxl
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile
 from pydantic import BaseModel
 from sqlalchemy import text

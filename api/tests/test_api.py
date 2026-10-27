@@ -17,7 +17,7 @@ def net(db):
                for n in ("Alpha Hub", "Bravo Hub", "Charlie Hub"))
     s1 = one(db, "INSERT INTO spans (site_a_id, site_b_id, region, route_type, distance_km) "
                  "VALUES (:a,:b,'North','Trunk',10) RETURNING id", a=a, b=b)
-    db.execute(text("UPDATE spans SET survey_cores = 5 WHERE id = :s"), dict(s=s1))
+    db.execute(text("UPDATE spans SET survey_cores = 5 WHERE id = :s"), {"s": s1})
     s2 = one(db, "INSERT INTO spans (site_a_id, site_b_id, region) VALUES (:a,:b,'Central') RETURNING id", a=b, b=c)
     cores = {}
     for n in range(1, 6):
@@ -31,17 +31,17 @@ def net(db):
     def reserve(core: int, approved: bool) -> None:
         res = one(db, "INSERT INTO reservations (customer_id, planner_id, planned_date) "
                       "VALUES (:c,:u,'2026-12-01') RETURNING id", c=cust, u=u)
-        db.execute(text("INSERT INTO reservation_cores VALUES (:r,:c)"), dict(r=res, c=core))
-        db.execute(text("INSERT INTO core_holds VALUES (:c,:r)"), dict(r=res, c=core))
+        db.execute(text("INSERT INTO reservation_cores VALUES (:r,:c)"), {"r": res, "c": core})
+        db.execute(text("INSERT INTO core_holds VALUES (:c,:r)"), {"r": res, "c": core})
         for t, who in [("requested", u)] + ([("approved", adm)] if approved else []):
             db.execute(text("INSERT INTO reservation_events (reservation_id, type, user_id) VALUES (:r,:t,:u)"),
-                       dict(r=res, t=t, u=who))
+                       {"r": res, "t": t, "u": who})
 
     reserve(cores[2], approved=False)  # Requested
     reserve(cores[3], approved=True)   # Reserved
     db.execute(text("INSERT INTO data_edits (entity, entity_id, field, new_value, reason, user_id) "
-                    "VALUES ('core', :c, 'status', 'Faulty', 'test', :u)"), dict(c=cores[5], u=adm))
-    return dict(s1=s1, s2=s2, cores=cores)
+                    "VALUES ('core', :c, 'status', 'Faulty', 'test', :u)"), {"c": cores[5], "u": adm})
+    return {"s1": s1, "s2": s2, "cores": cores}
 
 
 def test_requires_user(client, net):

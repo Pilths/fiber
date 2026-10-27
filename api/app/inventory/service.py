@@ -4,7 +4,14 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.inventory.schemas import (
-    CoreDetail, CoreHolderDetail, Customer, Holder, Owner, SearchResult, SpanDetail, SpanSummary,
+    CoreDetail,
+    CoreHolderDetail,
+    Customer,
+    Holder,
+    Owner,
+    SearchResult,
+    SpanDetail,
+    SpanSummary,
 )
 
 PER_TYPE = 20

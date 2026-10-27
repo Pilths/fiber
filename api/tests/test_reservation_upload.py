@@ -5,9 +5,9 @@ from datetime import datetime
 import openpyxl
 import pytest
 from sqlalchemy import text
+from test_auth import mkuser
 
 from app.ingest import reservation_upload as ru
-from test_auth import mkuser
 
 HEAD = ["Region", "Nodes", "Distance(KM)", "Core Secured", "Expected CV Ready", "Port Info", "Contractor", "Remark",
         "Fiber core monitoring ", "Fiber montiored \nY/N/WIP", "Fiber core requestor", "Fiber core request date",
@@ -232,7 +232,7 @@ def test_held_core_conflict_skipped_at_confirm(client, db, admin):
     assert confirm(client, a).json()["counts"]["reservations"] == 1
     out = confirm(client, b).json()
     assert out["counts"]["reservations"] == 0 and out["skipped"][0]["row_number"] == 2
-    assert "already held" in out["skipped"][0]["reason"]
+    assert "already taken" in out["skipped"][0]["reason"]
     assert n(db, "SELECT count(*) FROM reservations") == 1 and n(db, "SELECT count(*) FROM core_holds") == 2
 
 

@@ -18,7 +18,7 @@ async function pick(page: Page, name: RegExp) {
 
 test.use({ viewport: { width: 1440, height: 900 } });
 
-test("each level shows a pill with its own symbol and word, below the held table", async ({ page }) => {
+test("each level shows a pill with its own symbol and word, below the taken-cores table", async ({ page }) => {
   await signIn(page);
   const seen: Record<string, string | null> = {};
   for (const [level, word, key] of [["amber", "Over 3%", "amber"], ["red", "Over 7%", "red"], ["off_scale", "Off scale (over 10%)", "off"], ["green", "Below calculated", "below"]] as const) {
@@ -31,8 +31,8 @@ test("each level shows a pill with its own symbol and word, below the held table
     expect(r.pill, `${level} ${r.pill.toFixed(2)}`).toBeGreaterThanOrEqual(4.5);
   }
   expect(new Set(Object.values(seen)).size).toBe(4); // four symbols, never colour alone
-  // placement: the Loss card comes after "Held on this span"
-  const held = await page.getByRole("region", { name: "Held on this span" }).boundingBox();
+  // placement: the Loss card comes after "Taken cores"
+  const held = await page.getByRole("region", { name: "Taken cores" }).boundingBox();
   const loss = await card(page).boundingBox();
   expect(loss!.y).toBeGreaterThan(held!.y);
 });

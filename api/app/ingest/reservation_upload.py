@@ -9,15 +9,22 @@ chained segments with more than one path (this workbook carries no segments), sp
 """
 import json
 from dataclasses import dataclass, field
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from typing import Any
 
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.ingest.excel import RowResult, _json
-from app.ingest.reservation_import import Skip, add_cores, ensure_span, find_span, place_reservation, port_pairs
+from app.ingest.excel import RowResult
+from app.ingest.reservation_import import (
+    Skip,
+    add_cores,
+    ensure_span,
+    find_span,
+    place_reservation,
+    port_pairs,
+)
 from app.inventory import service as inventory
 from app.routing.graph import invalidate as invalidate_routes
 
@@ -237,7 +244,7 @@ def _reservation_row(db: Session, r: Row, sp: SpanItem, sites: dict[str, int], c
                           {"i": found}).all() if found else []
         if held:
             r.extra["held_by"] = sorted({h[1] for h in held})
-            return _set(r, "conflicts", "core already held by reservation " + ", ".join(f"#{i}" for i in r.extra["held_by"])
+            return _set(r, "conflicts", "core already taken by reservation " + ", ".join(f"#{i}" for i in r.extra["held_by"])
                         + "; this row will be skipped")
         used = db.execute(text("SELECT DISTINCT reservation_id FROM reservation_cores WHERE core_id = ANY(CAST(:i AS bigint[]))"),
                           {"i": found}).scalars().all() if found else []
@@ -290,7 +297,7 @@ def _faulty_row(db: Session, r: Row, sp: SpanItem, sites: dict[str, int]) -> Non
     held = db.execute(text("SELECT DISTINCT reservation_id FROM core_holds WHERE core_id = ANY(CAST(:i AS bigint[]))"), {"i": todo}).scalars().all()
     r.extra.update(core_ids=todo, old_status={str(c): status[c] for c in todo}, held_by=sorted(held))
     if held:
-        r.warnings.append("marks held core(s) Faulty: reservation " + ", ".join(f"#{i}" for i in sorted(held)) + " goes to the Action needed list")
+        r.warnings.append("marks taken core(s) Faulty: reservation " + ", ".join(f"#{i}" for i in sorted(held)) + " goes to the Action needed list")
     _set(r, "faulty")
 
 
@@ -469,11 +476,11 @@ def confirm(db: Session, admin_id: int, upload_id: int, excel_wins: list[dict[st
                     with db.begin_nested():
                         place_reservation(db, counts, r.p, sites, admin_id, admin_id)
                 except (Skip, IntegrityError) as e:
-                    skipped.append({"row_number": r.n, "reason": str(e) or "core already held"})
+                    skipped.append({"row_number": r.n, "reason": str(e) or "core already taken"})
         for r in ev.rows:
             if r.group in ("conflicts",):
                 skipped.append({"row_number": r.n, "reason": r.reason})
-        summary = dict(up["summary"], applied={"by": admin_id, "at": datetime.now(timezone.utc).isoformat(), "counts": counts,
+        summary = dict(up["summary"], applied={"by": admin_id, "at": datetime.now(UTC).isoformat(), "counts": counts,
                                                "skipped": skipped, "excel_wins": [list(w) for w in sorted(wins)],
                                                "ignored_reservation_rows": ev.counts()["ignored"]})
         db.execute(text("UPDATE uploads SET status = 'confirmed', confirmed_at = now(), summary = CAST(:s AS jsonb) WHERE id = :i"),

@@ -39,8 +39,8 @@ test("core drawer: opens from a taken core with history, Keep for the owner, Esc
   await expect(d).toBeHidden();
   await expect(cell(page, 1)).toBeFocused();
 
-  // the held table opens the same drawer
-  await page.getByRole("table", { name: "Held cores on this span" }).getByRole("button", { name: "Core 2 details" }).click();
+  // the taken-cores table opens the same drawer
+  await page.getByRole("table", { name: "Taken cores on this span" }).getByRole("button", { name: "Core 2 details" }).click();
   await expect(drawer(page).getByRole("heading", { level: 2 })).toHaveText(/^Core 2 on/);
 });
 
@@ -50,7 +50,7 @@ test("planner sees no Keep on others' cores and no edit buttons", async ({ page 
   await cell(page, 1).click({ force: true }); // taken cells are aria-disabled (not selectable), which Playwright treats as disabled
   const d = drawer(page);
   await expect(d).toContainText("DEV Telco Alpha");
-  await expect(d.getByText(/^DEV planner1, reservation #\d+$/)).toBeVisible(); // Held by: from GET /api/cores/{id}
+  await expect(d.getByText(/^DEV planner1, reservation #\d+$/)).toBeVisible(); // Reserved by: from GET /api/cores/{id}
   await expect(d).toContainText("No events on this core that you can see"); // another planner's reservation
   await expect(d.getByRole("button", { name: "Keep" })).toHaveCount(0);
   await expect(d.getByRole("button", { name: /Request release/ })).toHaveCount(0);
@@ -60,14 +60,14 @@ test("planner sees no Keep on others' cores and no edit buttons", async ({ page 
   await expect(inspector.getByRole("button", { name: /^Edit site/ })).toHaveCount(0);
 });
 
-test("held table tags stale cores", async ({ page }) => {
+test("taken-cores table tags stale cores", async ({ page }) => {
   await signIn(page, "admin1");
   const rs: { stale: boolean; cores: { core_id: number; held: boolean }[] }[] = await (await page.request.get("/api/reservations")).json();
   const core = rs.filter((r) => r.stale).flatMap((r) => r.cores).find((c) => c.held);
   test.skip(!core, "Dev data has no stale reservation holding a core; not faking one by changing server data.");
   const c: { number: number; span_name: string } = await (await page.request.get(`/api/cores/${core!.core_id}`)).json();
   await pick(page, new RegExp(`^${c.span_name}`));
-  const row = page.getByRole("table", { name: "Held cores on this span" }).getByRole("row").filter({ has: page.getByRole("button", { name: `Core ${c.number} details` }) });
+  const row = page.getByRole("table", { name: "Taken cores on this span" }).getByRole("row").filter({ has: page.getByRole("button", { name: `Core ${c.number} details` }) });
   await expect(row).toContainText(/Stale: no keep for over 3 months since /);
 });
 
@@ -131,7 +131,7 @@ test("admin edits span distance with a reason; calculated loss follows; then rev
   await expect(page.getByTestId("edit-history").getByRole("listitem").first()).toContainText("Reason: E2E: revert");
 });
 
-test("lowering the survey count below held cores is refused in plain words", async ({ page }) => {
+test("lowering the survey count below taken cores is refused in plain words", async ({ page }) => {
   await signIn(page, "admin1");
   await pick(page, KLCJ);
   await page.getByRole("region", { name: "Inspector" }).getByRole("button", { name: "Edit span" }).click();

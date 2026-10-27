@@ -7,7 +7,13 @@ from app.auth.deps import CurrentUser, get_current_user
 from app.db import get_db
 from app.inventory import service
 from app.inventory.schemas import (
-    CoreHolderDetail, Customer, CustomerCreate, CustomerResult, SearchResult, SpanDetail, SpanSummary,
+    CoreHolderDetail,
+    Customer,
+    CustomerCreate,
+    CustomerResult,
+    SearchResult,
+    SpanDetail,
+    SpanSummary,
 )
 
 router = APIRouter(prefix="/api", dependencies=[Depends(get_current_user)])

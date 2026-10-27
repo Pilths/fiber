@@ -3,13 +3,13 @@ import io
 
 import openpyxl
 import pytest
-from alembic import command
+from conftest import alembic_cfg
 from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
-
-from app.ingest import site_master as sm
-from conftest import alembic_cfg
 from test_auth import PW, login, mkuser
+
+from alembic import command
+from app.ingest import site_master as sm
 
 SITE_HEAD = ["SITE_NAME", "LATITUDE_IN_DECIMAL", "LONGITUDE_IN_DECIMAL", "REGION", "SITE_TYPE"]
 DC_HEAD = ["No", "State", "DC NAME / LINK", "LRD", "lat", "long"]

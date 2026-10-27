@@ -1,9 +1,9 @@
 import pytest
-from alembic import command
+from conftest import alembic_cfg
 from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError, IntegrityError
 
-from conftest import alembic_cfg
+from alembic import command
 
 
 def one(db, sql, **p):
@@ -14,12 +14,12 @@ def one(db, sql, **p):
 def ids(db):
     """A user, three sites, a span, a core and a reservation."""
     u = one(db, "INSERT INTO users (username, display_name, role) VALUES ('u','U','admin') RETURNING id")
-    a, b, c = (one(db, "INSERT INTO sites (name, kind) VALUES (:n,'site') RETURNING id", n=n) for n in "ABC")
+    a, b, _c = (one(db, "INSERT INTO sites (name, kind) VALUES (:n,'site') RETURNING id", n=n) for n in "ABC")
     span = one(db, "INSERT INTO spans (site_a_id, site_b_id) VALUES (:a,:b) RETURNING id", a=a, b=b)
     core = one(db, "INSERT INTO cores (span_id, number) VALUES (:s,1) RETURNING id", s=span)
     cust = one(db, "INSERT INTO customers (name) VALUES ('X') RETURNING id")
     res = one(db, "INSERT INTO reservations (customer_id, planner_id) VALUES (:c,:u) RETURNING id", c=cust, u=u)
-    return dict(user=u, a=a, b=b, span=span, core=core, res=res)
+    return {"user": u, "a": a, "b": b, "span": span, "core": core, "res": res}
 
 
 def test_migration_roundtrip(engine):

@@ -6,8 +6,8 @@ from app.loss.service import calculated_loss_db, deviation_pct, warning_level
 
 
 def test_008_below_calculated_is_green():
-    assert warning_level(deviation_pct(D("8"), D("10"))) == "green"
-    assert warning_level(D("-50")) == "green"
+    assert warning_level(deviation_pct(D(8), D(10))) == "green"
+    assert warning_level(D(-50)) == "green"
 
 
 @pytest.mark.parametrize("pct,level", [
@@ -19,15 +19,15 @@ def test_008_boundaries_belong_to_lower_level(pct, level):
 
 
 def test_008_exact_boundary_from_loss_values():
-    assert warning_level(deviation_pct(D("10.3"), D("10"))) == "green"  # exactly +3%
-    assert warning_level(deviation_pct(D("11"), D("10"))) == "red"  # exactly +10%
+    assert warning_level(deviation_pct(D("10.3"), D(10))) == "green"  # exactly +3%
+    assert warning_level(deviation_pct(D(11), D(10))) == "red"  # exactly +10%
 
 
 def test_008_missing_distance_gives_no_loss_not_zero():
     assert calculated_loss_db(None) is None
-    assert calculated_loss_db(D("10")) == D("3.0")
-    assert deviation_pct(D("5"), None) is None and deviation_pct(None, D("3")) is None
-    assert deviation_pct(D("5"), D("0")) is None
+    assert calculated_loss_db(D(10)) == D("3.0")
+    assert deviation_pct(D(5), None) is None and deviation_pct(None, D(3)) is None
+    assert deviation_pct(D(5), D(0)) is None
     assert warning_level(None) is None
 
 

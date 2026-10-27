@@ -1,12 +1,13 @@
 import os
 
 import pytest
-from alembic import command
 from alembic.config import Config
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import NullPool
+
+from alembic import command
 
 _base = make_url(os.environ["DATABASE_URL"])
 TEST_URL = _base.set(database="fiber_test").render_as_string(hide_password=False)
