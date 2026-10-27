@@ -8,7 +8,7 @@ export const STATUS: Record<CoreStatus, { icon: IconName; cls: string; tone: str
   Available: { icon: "av", cls: "core-available", tone: "text-muted-foreground" },
   Requested: { icon: "rq", cls: "core-requested", tone: "text-amber" },
   Reserved: { icon: "rs", cls: "core-reserved", tone: "text-foreground" },
-  "In use": { icon: "iu", cls: "core-inuse", tone: "text-[#50555d]" },
+  "In use": { icon: "iu", cls: "core-inuse", tone: "text-use" },
   Faulty: { icon: "fl", cls: "core-faulty", tone: "text-red" },
 };
 export const STATUS_ORDER = Object.keys(STATUS) as CoreStatus[];

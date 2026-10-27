@@ -155,7 +155,7 @@ export function RouteForm({ rp }: { rp: RoutePlanner }) {
             onChange={(e) => (k === "from" ? rp.setFrom : rp.setTo)(e.target.value)}
             onFocus={() => setLeft((l) => ({ ...l, [k]: false }))} onBlur={() => setLeft((l) => ({ ...l, [k]: true }))} />
         </div>
-        {err ? <p id={`${id}-${k}-e`} className="text-[13px] font-semibold text-red">{err}</p>
+        {err ? <p id={`${id}-${k}-e`} className="text-body font-semibold text-red">{err}</p>
           : <p id={`${id}-${k}-k`} className="text-xs text-muted-foreground">{site ? cap(kindWord(site.kind)) : "Data centre or site"}</p>}
       </div>
     );
@@ -183,13 +183,13 @@ export function RouteForm({ rp }: { rp: RoutePlanner }) {
           aria-invalid={!!rp.errs.cores_needed} aria-describedby={rp.errs.cores_needed ? `${id}-need-e` : undefined}
           onChange={(e) => rp.setCores(e.target.value)} />
       </div>
-      {rp.errs.cores_needed && <p id={`${id}-need-e`} className="mt-1 text-right text-[13px] font-semibold text-red">{rp.errs.cores_needed}</p>}
-      {rp.errs.form && <p role="alert" className="mt-2 text-[13px] font-semibold text-red">{rp.errs.form}</p>}
+      {rp.errs.cores_needed && <p id={`${id}-need-e`} className="mt-1 text-right text-body font-semibold text-red">{rp.errs.cores_needed}</p>}
+      {rp.errs.form && <p role="alert" className="mt-2 text-body font-semibold text-red">{rp.errs.form}</p>}
 
       <div className="mt-3 border-t pt-3" aria-live="polite">
-        {!rp.from || !rp.to ? <p className="text-[13px] text-muted-foreground">Choose From and To to see up to 3 route options.</p>
-          : rp.loading && !rp.res ? <p className="text-[13px] text-muted-foreground">Finding routes...</p>
-          : rp.res && o.length === 0 ? <p className="rounded-md border border-dashed border-line px-4 py-3 text-[13px]"><b className="block font-semibold">{rp.res.message ?? "No route found"}</b>Pick other sites.</p>
+        {!rp.from || !rp.to ? <p className="text-body text-muted-foreground">Choose From and To to see up to 3 route options.</p>
+          : rp.loading && !rp.res ? <p className="text-body text-muted-foreground">Finding routes...</p>
+          : rp.res && o.length === 0 ? <p className="empty px-4 py-3 text-body"><b className="block font-semibold">{rp.res.message ?? "No route found"}</b>Pick other sites.</p>
           : o.length > 0 && (
             <>
               <p className="lbl mb-1.5">{o.length} {o.length === 1 ? "option" : "options"}, {rp.sort === "km" ? "shortest first" : "most free cores first"}</p>
@@ -207,7 +207,7 @@ function OptionCard({ op, i, need, pressed, onClick }: { op: RouteOption; i: num
   const short = op.spans.find((s) => isShort(s, need));
   return (
     <button type="button" aria-pressed={pressed} onClick={onClick} data-testid="route-option"
-      className="block w-full rounded-md border border-l-3 border-border border-l-transparent px-3.5 py-2.5 text-left text-[13px] hover:bg-ground focus-visible:-outline-offset-3 aria-pressed:border-l-blue aria-pressed:bg-blue-bg">
+      className="block w-full rounded-md border border-l-3 border-border border-l-transparent px-3.5 py-2.5 text-left text-body hover:bg-ground focus-visible:-outline-offset-3 aria-pressed:border-l-blue aria-pressed:bg-blue-bg">
       <span className="mb-0.5 flex items-start justify-between gap-2">
         <b className="text-sm font-semibold">Option {i + 1}</b>
         {op.best_match && <span className="pill h-blue">Best match</span>}
@@ -231,7 +231,7 @@ export function RouteSummary({ rp, onGo }: { rp: RoutePlanner; onGo: () => void 
   const op = rp.option;
   if (!op) {
     return (
-      <p className="rounded-md border border-dashed border-line px-4 py-5 text-center text-[13px] text-muted-foreground">
+      <p className="empty px-4 py-5 text-center text-body text-muted-foreground">
         <b className="mb-0.5 block text-sm font-semibold text-foreground">No route selected</b>
         Choose From and To in Find, then pick an option.
       </p>
@@ -243,7 +243,7 @@ export function RouteSummary({ rp, onGo }: { rp: RoutePlanner; onGo: () => void 
     <div className="flex flex-1 flex-col" data-testid="route-summary">
       <p className="lbl">Route, option {(rp.idx ?? 0) + 1}</p>
       <h3 className="text-2xl leading-[30px] font-bold tracking-tight">{op.spans[0].site_a} to {op.spans[op.spans.length - 1].site_b}</h3>
-      <p className="mt-1 text-[13px] text-muted-foreground"><b className="text-foreground">{need}</b> {need === 1 ? "core" : "cores"} needed per span</p>
+      <p className="mt-1 text-body text-muted-foreground"><b className="text-foreground">{need}</b> {need === 1 ? "core" : "cores"} needed per span</p>
       <dl className="mt-4 grid grid-cols-3 rounded-md border">
         <div className="p-3"><dt className="lbl">Spans</dt><dd className="text-2xl font-bold">{op.total_spans}</dd></div>
         <div className="border-l p-3"><dt className="lbl">Distance</dt><dd className="text-2xl font-bold">{totalKm(op)}<small className="ml-1 text-xs font-normal text-muted-foreground">km</small></dd></div>
@@ -252,7 +252,7 @@ export function RouteSummary({ rp, onGo }: { rp: RoutePlanner; onGo: () => void 
         </div>
       </dl>
       {short && (
-        <p className="mt-3 flex gap-2 rounded-md border border-l-3 border-red-bd border-l-red bg-red-bg px-3 py-2.5 text-[13px] font-medium text-red">
+        <p className="mt-3 flex gap-2 rounded-md border border-l-3 border-red-bd border-l-red bg-red-bg px-3 py-2.5 text-body font-medium text-red">
           <Icon name="fl" className="ic mt-[3px]" /><span>{shortText(short, need)}. Pick another option or lower the cores needed.</span>
         </p>
       )}
@@ -293,7 +293,7 @@ export function RouteSection({ rp, spans, onDone }: { rp: RoutePlanner; spans: S
         <div tabIndex={0} role="region" aria-label="Spans on this path, scrolls sideways" className="overflow-x-auto rounded-md border" data-testid="route-table-box">
             <table className="tbl [&_tbody_th]:h-10 [&_td]:h-10 [&_td]:px-3! [&_th]:px-3! [&_td]:whitespace-nowrap [&_th]:whitespace-nowrap" data-testid="route-table">
               <caption className="sr-only">Spans on this route, in travel order, with loss and free cores</caption>
-              <thead className="[&_th]:bg-[#f7f8fa]"><tr>
+              <thead className="[&_th]:bg-subtle"><tr>
                 <th scope="col" className="w-px">#</th><th scope="col">Span</th><th scope="col" className="w-px">Type</th><th scope="col">From → to</th>
                 <th scope="col" className="w-px text-right!">km</th><th scope="col" className="w-px text-right!">Est. loss (dB)</th>
                 <th scope="col" className="w-px text-right!">Measured</th><th scope="col" className="w-px text-right!">Free cores</th>
@@ -463,7 +463,7 @@ function ReserveBox({ op, need, onDone }: { op: RouteOption; need: number; onDon
     <section className="card" aria-labelledby={`${id}-h`} data-testid="route-reserve">
       <div className="card-h"><h2 id={`${id}-h`}>Reserve on this route</h2></div>
       <div className="flex items-end gap-6">
-      <p className="max-w-[380px] flex-1 self-center text-[13px] text-muted-foreground">
+      <p className="max-w-[380px] flex-1 self-center text-body text-muted-foreground">
         <b className="text-foreground">{need}</b> {need === 1 ? "core" : "cores"} on each of <b className="text-foreground">{op.total_spans}</b> spans, <b className="text-foreground">{total}</b> in total. Cores are assigned from the first free cores on each span.
       </p>
       <form className="flex flex-1 items-end justify-end gap-3" onSubmit={submit} noValidate>
@@ -475,14 +475,14 @@ function ReserveBox({ op, need, onDone }: { op: RouteOption; need: number; onDon
       </form>
       </div>
       {short && (
-        <p id={`${id}-why`} className="mt-3 flex gap-2 rounded-md border border-l-3 border-red-bd border-l-red bg-red-bg px-3 py-2.5 text-[13px] text-red">
+        <p id={`${id}-why`} className="mt-3 flex gap-2 rounded-md border border-l-3 border-red-bd border-l-red bg-red-bg px-3 py-2.5 text-body text-red">
           <Icon name="fl" className="ic mt-[3px]" />
           <span><b>Reserve is off:</b> {short.surveyed ? `${short.name} has ${short.free_to_reserve} free, fewer than the ${need} needed.` : `${short.name} is not surveyed, so it cannot be booked.`} Pick another option or lower the cores needed.</span>
         </p>
       )}
       {warning}
-      {tried && !customer && <p role="alert" className="mt-2.5 text-[13px] font-bold text-red">Choose a customer before submitting.</p>}
-      {msg && <p role={msg.ok ? "status" : "alert"} className={`mt-2.5 text-[13px] ${msg.ok ? "font-semibold" : "font-bold text-red"}`}>{msg.text}</p>}
+      {tried && !customer && <p role="alert" className="mt-2.5 text-body font-bold text-red">Choose a customer before submitting.</p>}
+      {msg && <p role={msg.ok ? "status" : "alert"} className={`mt-2.5 text-body ${msg.ok ? "font-semibold" : "font-bold text-red"}`}>{msg.text}</p>}
       <p className="mt-2 text-xs text-muted-foreground">Goes to an admin for approval.</p>
     </section>
   );

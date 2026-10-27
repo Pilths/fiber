@@ -63,7 +63,7 @@ function ImportSwitch({ state, onClosed }: { state: Switch | null; onClosed: (s:
   if (!state) return null;
   if (state.closed) {
     return (
-      <p data-testid="import-switch" role="status" className="text-[13px]">
+      <p data-testid="import-switch" role="status" className="text-body">
         <span className="inline-flex items-center gap-1.5 font-semibold text-amber"><Icon name="lo" />Reservation import closed on {when(state.closed_at)} by {state.closed_by}: {state.reason}</span>
         <span className="text-muted-foreground"> · Reservation rows in uploads are ignored with a warning; new reservations are made only in the dashboard. This cannot be reopened.</span>
       </p>
@@ -80,21 +80,21 @@ function ImportSwitch({ state, onClosed }: { state: Switch | null; onClosed: (s:
     }
   };
   return (
-    <div data-testid="import-switch" className="flex items-center gap-3 text-[13px]">
+    <div data-testid="import-switch" className="flex items-center gap-3 text-body">
       <span className="inline-flex items-center gap-1.5 font-semibold text-green"><Icon name="ch" />Import open</span>
       <p className="flex-1 text-muted-foreground">Uploads import approved reservation rows whose cores are free. Closing is optional and one-time.</p>
-      <button type="button" className="btn h-8! px-3!" onClick={() => { setOpen(true); setReason(""); setError(null); }}>Close reservation import…</button>
+      <button type="button" className="btn btn-sm" onClick={() => { setOpen(true); setReason(""); setError(null); }}>Close reservation import…</button>
       {open && (
         <Dialog title="Close reservation import?" onClose={() => setOpen(false)}>
           <form onSubmit={submit} noValidate>
-            <p className="mt-1 text-[13px] text-muted-foreground">After closing, reservation rows in uploaded workbooks are ignored and new reservations are made only in the dashboard. This is one-time: there is no way to reopen it.</p>
-            {error && <p role="alert" className="mt-3 rounded-md border border-red bg-red-bg px-3 py-2 text-[13px] font-semibold text-red">{error}</p>}
-            <label className="mt-4 block"><span className="lbl mb-1 block text-[13px]! text-foreground!">Reason (required)</span>
+            <p className="mt-1 text-body text-muted-foreground">After closing, reservation rows in uploaded workbooks are ignored and new reservations are made only in the dashboard. This is one-time: there is no way to reopen it.</p>
+            {error && <p role="alert" className="mt-3 rounded-md border border-red bg-red-bg px-3 py-2 text-body font-semibold text-red">{error}</p>}
+            <label className="mt-4 block"><span className="lbl mb-1 block text-body! text-foreground!">Reason (required)</span>
               <textarea className="field h-20! py-2" value={reason} onChange={(e) => setReason(e.target.value)} autoFocus aria-invalid={!!error && !reason.trim()} />
             </label>
             <div className="mt-5 flex justify-end gap-2">
               <button type="button" className="btn" onClick={() => setOpen(false)}>Cancel</button>
-              <button type="submit" className="btn border-red! bg-red! text-white!">Close import</button>
+              <button type="submit" className="btn btn-danger">Close import</button>
             </div>
           </form>
         </Dialog>
@@ -110,10 +110,10 @@ function Reservations({ uploadId, total }: { uploadId: number; total: number }) 
     <section aria-labelledby="ru-res-h" data-testid="ru-reservations">
       <div className="mb-2 flex flex-wrap items-baseline gap-x-3">
         <h3 id="ru-res-h" className="text-[15px] font-semibold">Reservations to import <span className="font-normal text-muted-foreground">({total.toLocaleString("en-GB")})</span></h3>
-        <span className="text-[13px] text-muted-foreground">Imported as approved. Existing reservations are never changed; a row whose core is held by then is skipped.</span>
+        <span className="text-body text-muted-foreground">Imported as approved. Existing reservations are never changed; a row whose core is held by then is skipped.</span>
       </div>
-      {error && <p role="alert" className="text-[13px] font-semibold text-red">{error}</p>}
-      {data && (data.total === 0 ? <p className="text-[13px] text-muted-foreground">No reservation rows will be imported.</p> : (
+      {error && <p role="alert" className="text-body font-semibold text-red">{error}</p>}
+      {data && (data.total === 0 ? <p className="text-body text-muted-foreground">No reservation rows will be imported.</p> : (
         <>
           <div className="tbox">
           <table className="tbl band" aria-label="Reservations to import">
@@ -155,8 +155,8 @@ function GroupRows({ uploadId, counts, wins, onWin }: { uploadId: number; counts
       <div role="group" aria-label="Groups" className="mb-3 flex flex-wrap gap-2">
         {OTHER.map((g) => <Chip key={g} label={GROUP[g].label} icon={GROUP[g].icon} n={counts[g]} pressed={group === g} onClick={() => { setGroup(g); setPage(1); }} />)}
       </div>
-      {error && <p role="alert" className="text-[13px] font-semibold text-red">{error}</p>}
-      {data && (data.total === 0 ? <p className="text-[13px] text-muted-foreground">No rows in {GROUP[group].label}.</p> : (
+      {error && <p role="alert" className="text-body font-semibold text-red">{error}</p>}
+      {data && (data.total === 0 ? <p className="text-body text-muted-foreground">No rows in {GROUP[group].label}.</p> : (
         <>
           <div className="tbox">
           <table className="tbl band" aria-label={`${GROUP[group].label} rows`}>
@@ -201,7 +201,7 @@ function Warnings({ list }: { list: Warning[] }) {
   if (!list.length) return null;
   const shown = all ? list : list.slice(0, 3);
   return (
-    <section aria-labelledby="ru-warn-h" className="text-[13px]">
+    <section aria-labelledby="ru-warn-h" className="text-body">
       <h3 id="ru-warn-h" className="inline-flex items-center gap-1.5 font-semibold text-amber"><Icon name="lo" />{list.length} {list.length === 1 ? "warning" : "warnings"}</h3>
       <ul className="mt-1 list-disc space-y-0.5 pl-9" aria-label="Warnings">{shown.map((w, i) => <li key={i} data-kind={w.kind}>{w.message}</li>)}</ul>
       {list.length > 3 && (
@@ -287,7 +287,7 @@ export function ReservationUpload() {
           <small className="hint flex-none">Nothing is saved until you confirm.</small>
         </div>
         <div className="space-y-6">
-          <p className="-mt-2 text-[13px]">
+          <p className="-mt-2 text-body">
             {preview.switch_closed ? "Reservation import is closed: reservation rows are ignored." : `${plural(c.reservations, "reservation")} will be imported; ${plural(notImported, "row")} will not be imported.`}
           </p>
           <Warnings list={preview.warnings} />
@@ -302,14 +302,14 @@ export function ReservationUpload() {
     )}
       {confirming && c && (
         <Dialog title="Confirm this upload?" onClose={() => setConfirming(false)} wide>
-          <ul className="mt-3 list-disc space-y-1 pl-4 text-[13px]">
+          <ul className="mt-3 list-disc space-y-1 pl-4 text-body">
             <li>Import <b>{plural(c.reservations, "reservation")}</b> as approved.</li>
             <li>Add <b>{c.new}</b> new spans; update <b>{c.changed}</b> changed spans{wins.size ? ` (Excel value used for ${wins.size} dashboard-edited ${wins.size === 1 ? "field" : "fields"})` : " (dashboard-edited fields keep the dashboard value)"}.</li>
             {c.faulty > 0 && <li>Mark cores Faulty from <b>{c.faulty}</b> rows.</li>}
             <li>Skip <b>{c.conflicts}</b> conflicts; <b>{notImported}</b> rows are not imported (already imported, ignored, needs review, rejected).</li>
             <li><b>{c.missing}</b> spans not in this file stay as they are.</li>
           </ul>
-          <p className="mt-3 text-[13px] text-muted-foreground">Everything is saved in one step. Existing reservations are never changed.</p>
+          <p className="mt-3 text-body text-muted-foreground">Everything is saved in one step. Existing reservations are never changed.</p>
           <div className="mt-5 flex justify-end gap-2">
             <button type="button" className="btn" onClick={() => setConfirming(false)}>Cancel</button>
             <button type="button" className="btn btn-p" onClick={confirm} autoFocus>Confirm</button>

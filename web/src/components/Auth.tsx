@@ -26,13 +26,13 @@ function Shell({ title, children }: { title: string; children: React.ReactNode }
 
 const Field = ({ label, ...p }: { label: string } & React.InputHTMLAttributes<HTMLInputElement>) => (
   <label className="mb-4 block">
-    <span className="lbl mb-1 block text-[13px]! text-foreground!">{label}</span>
+    <span className="lbl mb-1 block text-body! text-foreground!">{label}</span>
     <input className="field" required {...p} />
   </label>
 );
 
 const Alert = ({ text }: { text: string | null }) =>
-  text ? <p role="alert" className="mb-4 rounded-md border border-red bg-red-bg px-3 py-2 text-[13px] font-semibold text-red">{text}</p> : null;
+  text ? <p role="alert" className="mb-4 rounded-md border border-red bg-red-bg px-3 py-2 text-body font-semibold text-red">{text}</p> : null;
 
 export function Login({ onSignedIn }: { onSignedIn: (me: Me) => void }) {
   const [error, setError] = useState<string | null>(null);
@@ -87,7 +87,7 @@ export function ChangePassword({ me, forced, onDone, onSignOut, onCancel }: {
   const link = "font-semibold text-blue underline-offset-2 hover:underline";
   return (
     <Shell title="Change password">
-      {forced && <p className="mb-4 text-[13px] text-muted-foreground">Signed in as <b className="font-semibold text-foreground">{me.username}</b>. Choose a new password before you continue.</p>}
+      {forced && <p className="mb-4 text-body text-muted-foreground">Signed in as <b className="font-semibold text-foreground">{me.username}</b>. Choose a new password before you continue.</p>}
       <form onSubmit={submit}>
         <Alert text={error} />
         <input type="text" name="username" autoComplete="username" value={me.username} readOnly hidden />
@@ -97,7 +97,7 @@ export function ChangePassword({ me, forced, onDone, onSignOut, onCancel }: {
         <Field label="Confirm new password" name="confirm" type="password" autoComplete="new-password" />
         <button type="submit" className="btn btn-p mt-2 w-full" disabled={busy}>{busy ? "Changing…" : "Change password"}</button>
       </form>
-      <p className="mt-5 text-center text-[13px]">
+      <p className="mt-5 text-center text-body">
         {forced
           ? <button type="button" className={link} onClick={onSignOut}>Sign out</button>
           : <button type="button" className={link} onClick={onCancel}>Back to the dashboard</button>}

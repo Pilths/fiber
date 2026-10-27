@@ -13,16 +13,16 @@ const ROLE = { admin: "Admin", planner: "Planner" } as Record<string, string>;
 function TempPassword({ t, onClose }: { t: Temp; onClose: () => void }) {
   const [copied, setCopied] = useState(false);
   return (
-    <div role="region" aria-label="Temporary password" className="mb-4 rounded-md border border-amber-bd bg-amber-bg px-4 py-3">
-      <p className="text-[13px] font-semibold text-amber">Temporary password for {t.username}</p>
+    <div role="region" aria-label="Temporary password" className="mb-4 note px-4 py-3">
+      <p className="text-body font-semibold text-amber">Temporary password for {t.username}</p>
       <div className="mt-2 flex items-center gap-3">
         <code data-testid="temp-password" className="rounded border border-amber-bd bg-white px-3 py-1.5 font-mono text-base font-semibold tracking-wide">{t.temporary_password}</code>
-        <button type="button" className="btn h-8!" onClick={() => navigator.clipboard?.writeText(t.temporary_password).then(() => setCopied(true), () => {})}>
+        <button type="button" className="btn btn-sm" onClick={() => navigator.clipboard?.writeText(t.temporary_password).then(() => setCopied(true), () => {})}>
           {copied ? "Copied" : "Copy"}
         </button>
-        <button type="button" className="btn ml-auto h-8!" onClick={onClose}>Done</button>
+        <button type="button" className="btn btn-sm ml-auto" onClick={onClose}>Done</button>
       </div>
-      <p className="mt-2 text-[13px] text-foreground">Shown once. Give it to the user; they must change it at first sign-in.</p>
+      <p className="mt-2 text-body text-foreground">Shown once. Give it to the user; they must change it at first sign-in.</p>
     </div>
   );
 }
@@ -45,10 +45,10 @@ function AddUser({ onCreated, onCancel }: { onCreated: (t: Temp) => void; onCanc
       setBusy(false);
     }
   };
-  const lbl = "lbl mb-1 block text-[13px]! text-foreground!";
+  const lbl = "lbl mb-1 block text-body! text-foreground!";
   return (
-    <form onSubmit={submit} aria-label="Add user" className="mb-4 rounded-md border bg-[#f7f8fa] p-4">
-      {error && <p role="alert" className="mb-3 rounded-md border border-red bg-red-bg px-3 py-2 text-[13px] font-semibold text-red">{error}</p>}
+    <form onSubmit={submit} aria-label="Add user" className="mb-4 rounded-md border bg-subtle p-4">
+      {error && <p role="alert" className="mb-3 rounded-md border border-red bg-red-bg px-3 py-2 text-body font-semibold text-red">{error}</p>}
       <div className="grid grid-cols-[1fr_1fr_160px_1.4fr] gap-3">
         <label><span className={lbl}>Username</span><input name="username" className="field" required autoFocus autoComplete="off" spellCheck={false} /></label>
         <label><span className={lbl}>Display name</span><input name="display_name" className="field" autoComplete="off" /></label>
@@ -81,14 +81,14 @@ function ConfirmDeactivate({ user, onDone, onCancel }: { user: User; onDone: () 
   return (
     <dialog ref={ref} aria-labelledby="deact-h" onClose={onCancel} className="m-auto w-[440px] rounded-lg border bg-white p-6 backdrop:bg-black/30">
       <h2 id="deact-h" className="text-base font-semibold">Deactivate {user.username}?</h2>
-      <p className="mt-1 text-[13px] text-muted-foreground">They are signed out and cannot sign in until activated.</p>
-      {error && <p role="alert" className="mt-3 rounded-md border border-red bg-red-bg px-3 py-2 text-[13px] font-semibold text-red">{error}</p>}
-      <label className="mt-4 block"><span className="lbl mb-1 block text-[13px]! text-foreground!">Reason (optional)</span>
+      <p className="mt-1 text-body text-muted-foreground">They are signed out and cannot sign in until activated.</p>
+      {error && <p role="alert" className="mt-3 rounded-md border border-red bg-red-bg px-3 py-2 text-body font-semibold text-red">{error}</p>}
+      <label className="mt-4 block"><span className="lbl mb-1 block text-body! text-foreground!">Reason (optional)</span>
         <input className="field" value={reason} onChange={(e) => setReason(e.target.value)} autoFocus />
       </label>
       <div className="mt-5 flex justify-end gap-2">
         <button type="button" className="btn" onClick={() => ref.current?.close()}>Cancel</button>
-        <button type="button" className="btn border-red! bg-red! text-white!" onClick={go}>Deactivate</button>
+        <button type="button" className="btn btn-danger" onClick={go}>Deactivate</button>
       </div>
     </dialog>
   );
@@ -109,8 +109,8 @@ export function Users({ me }: { me: Me }) {
     return (
       <section className="card mx-auto max-w-3xl" aria-labelledby="users-h">
         <div className="card-h"><h2 id="users-h">Users</h2></div>
-        <p role="alert" className="text-[13px] font-semibold">Admins only</p>
-        <p className="mt-1 text-[13px] text-muted-foreground">Ask an admin to add, reset or deactivate accounts.</p>
+        <p role="alert" className="text-body font-semibold">Admins only</p>
+        <p className="mt-1 text-body text-muted-foreground">Ask an admin to add, reset or deactivate accounts.</p>
       </section>
     );
   }
@@ -135,10 +135,10 @@ export function Users({ me }: { me: Me }) {
         </div>
         {!adding && <button type="button" className="btn btn-p" onClick={() => { setAdding(true); setTemp(null); }}>Add user</button>}
       </div>
-      {error && <p role="alert" className="mb-4 rounded-md border border-red bg-red-bg px-3 py-2 text-[13px] font-semibold text-red">{error}</p>}
+      {error && <p role="alert" className="mb-4 rounded-md border border-red bg-red-bg px-3 py-2 text-body font-semibold text-red">{error}</p>}
       {temp && <TempPassword t={temp} onClose={() => setTemp(null)} />}
       {adding && <AddUser onCancel={() => setAdding(false)} onCreated={(t) => { setAdding(false); setTemp(t); load(); }} />}
-      {!users ? <p className="text-[13px] text-muted-foreground">Loading…</p> : (
+      {!users ? <p className="text-body text-muted-foreground">Loading…</p> : (
         <table className="tbl">
           <thead><tr><th>Username</th><th>Display name</th><th>Role</th><th>Status</th><th>Created</th><th><span className="sr-only">Actions</span></th></tr></thead>
           <tbody>
@@ -156,10 +156,10 @@ export function Users({ me }: { me: Me }) {
                 <td className="whitespace-nowrap">{created(u.created_at)}</td>
                 <td className="pr-0!">
                   <span className="flex justify-end gap-2">
-                    <button type="button" className="btn h-8!" onClick={() => act(u, "reset-password")} aria-label={`Reset password for ${u.username}`}>Reset password</button>
+                    <button type="button" className="btn btn-sm" onClick={() => act(u, "reset-password")} aria-label={`Reset password for ${u.username}`}>Reset password</button>
                     {u.active
-                      ? u.id !== me.id && <button type="button" className="btn h-8!" onClick={() => setConfirm(u)} aria-label={`Deactivate ${u.username}`}>Deactivate</button>
-                      : <button type="button" className="btn h-8!" onClick={() => act(u, "activate")} aria-label={`Activate ${u.username}`}>Activate</button>}
+                      ? u.id !== me.id && <button type="button" className="btn btn-sm" onClick={() => setConfirm(u)} aria-label={`Deactivate ${u.username}`}>Deactivate</button>
+                      : <button type="button" className="btn btn-sm" onClick={() => act(u, "activate")} aria-label={`Activate ${u.username}`}>Activate</button>}
                   </span>
                 </td>
               </tr>

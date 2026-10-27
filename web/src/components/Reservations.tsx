@@ -218,7 +218,7 @@ export function Approvals({ me, onChanged }: { me: Me; onChanged: () => void }) 
       </div>
       {me.role !== "admin" && <p role="alert">Admins only.</p>}
       {error && me.role === "admin" && <p role="alert">Could not load approvals.</p>}
-      {data && data.length === 0 && <p className="text-[13px] text-muted-foreground">Nothing is waiting.</p>}
+      {data && data.length === 0 && <p className="text-body text-muted-foreground">Nothing is waiting.</p>}
       {data && data.length > 0 && (
         <div className="tbox">
           <table className="tbl band" data-testid="approvals-table">
@@ -246,7 +246,7 @@ function ApprovalRow({ r, onChanged }: { r: Res; onChanged: () => void }) {
   const ask = (m: Mode) => { setMode(m); setReason(""); setMsg(null); setOpen(true); };
   return (
     <tbody data-testid="approval" className="border-b border-rule last:border-b-0 [&>tr>*]:border-b-0!">
-      <tr className={open ? "bg-[#f7f8fa]" : ""}>
+      <tr className={open ? "bg-subtle" : ""}>
         <td className="pr-0!">
           <button type="button" className="grid size-7 place-items-center rounded-md hover:bg-rule" aria-expanded={open} aria-controls={detailId}
             aria-label={`Details of request #${r.id}`} onClick={() => setOpen((o) => !o)}>
@@ -267,22 +267,22 @@ function ApprovalRow({ r, onChanged }: { r: Res; onChanged: () => void }) {
           <span className="inline-flex gap-2">
             {release ? (
               <>
-                <button type="button" className="btn h-8! px-3!" disabled={busy} onClick={() => run("release", { cores: r.release_requested_cores })}>Release</button>
-                <button type="button" className="btn h-8! px-3!" onClick={() => ask("decline-release")}>Decline</button>
+                <button type="button" className="btn btn-sm" disabled={busy} onClick={() => run("release", { cores: r.release_requested_cores })}>Release</button>
+                <button type="button" className="btn btn-sm" onClick={() => ask("decline-release")}>Decline</button>
               </>
             ) : (
               <>
-                <button type="button" className="btn btn-p h-8! px-3!" disabled={busy} onClick={() => run("approve")}>Approve</button>
-                <button type="button" className="btn h-8! px-3!" onClick={() => ask("reject")}>Reject</button>
+                <button type="button" className="btn btn-p btn-sm" disabled={busy} onClick={() => run("approve")}>Approve</button>
+                <button type="button" className="btn btn-sm" onClick={() => ask("reject")}>Reject</button>
               </>
             )}
           </span>
         </td>
       </tr>
-      <tr id={detailId} hidden={!open} className="bg-[#f7f8fa]">
+      <tr id={detailId} hidden={!open} className="bg-subtle">
         <td />
         <td colSpan={8} className="h-auto! py-3! whitespace-normal!">
-          <div className="space-y-1.5 text-[13px]">
+          <div className="space-y-1.5 text-body">
             <p className="text-muted-foreground">Request #{r.id}{r.imported && ", imported"}. Last event: {r.last_event ?? "none"}, {r.age_days} days ago.{r.stale && " Stale: no approval or keep for over 3 months."}</p>
             {r.unassigned_cores > 0 && <p>{r.unassigned_cores} cores reserved by count on {r.unassigned_span}; {r.remaining_unassigned} not assigned yet.</p>}
             {groupCores(r).map(([span, cs]) => <p key={span}>{span}: cores {cs.map((c) => c.held ? c.number : `${c.number} (released)`).join(", ")}</p>)}

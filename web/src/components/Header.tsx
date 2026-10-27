@@ -89,8 +89,8 @@ function GlobalSearch({ onPick }: { onPick: (r: Result) => void }) {
       />
       {showList && (
         <div id={`${id}-list`} role="listbox" aria-label="Search results" className="absolute inset-x-0 top-[42px] z-30 max-h-[440px] overflow-auto rounded-xl border border-line bg-white py-2">
-          {error && <p className="px-4 py-2 text-[13px] text-muted-foreground">Search failed. Try again.</p>}
-          {!error && results.length === 0 && <p className="px-4 py-2 text-[13px] text-muted-foreground">No matches.</p>}
+          {error && <p className="px-4 py-2 text-body text-muted-foreground">Search failed. Try again.</p>}
+          {!error && results.length === 0 && <p className="px-4 py-2 text-body text-muted-foreground">No matches.</p>}
           {GROUPS.map((g) => {
             const items = results.map((r, i) => ({ r, i })).filter((x) => x.r.type === g);
             if (!items.length) return null;
@@ -109,7 +109,7 @@ function GlobalSearch({ onPick }: { onPick: (r: Result) => void }) {
                     className={`flex min-h-10 cursor-pointer items-center px-4 py-1.5 aria-disabled:cursor-not-allowed ${i === active ? "bg-blue-bg" : ""}`}
                   >
                     <span className="font-semibold">{r.label}</span>
-                    {r.span_id == null && <span className="ml-2 text-[13px] text-muted-foreground">(no span yet)</span>}
+                    {r.span_id == null && <span className="ml-2 text-body text-muted-foreground">(no span yet)</span>}
                   </div>
                 ))}
               </div>
@@ -156,16 +156,16 @@ function Account({ me, onView, onSignOut, onChangePassword }: { me: Me; onView: 
     <div ref={box} className="relative flex-none" onKeyDown={(e) => { if (e.key === "Escape") { setOpen(false); box.current?.querySelector("button")?.focus(); } }}>
       <button type="button" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((o) => !o)}
         className="flex h-11 items-center gap-2.5 rounded-md pl-1.5 pr-2.5 text-left hover:bg-raised aria-expanded:bg-raised">
-        <span aria-hidden className="grid size-[30px] place-items-center rounded-full bg-[#272a30] text-xs font-semibold text-white">{initials}</span>
+        <span aria-hidden className="grid size-[30px] place-items-center rounded-full bg-res text-xs font-semibold text-white">{initials}</span>
         <span>
-          <b className="block text-[13px] leading-[17px] font-semibold">{me.display_name}</b>
+          <b className="block text-body leading-[17px] font-semibold">{me.display_name}</b>
           <small className="block text-xs leading-4 text-muted-foreground">{role}</small>
         </span>
         <svg viewBox="0 0 16 16" aria-hidden="true" className="ni"><path d="M4 6l4 4 4-4" /></svg>
       </button>
       {open && (
         <div ref={menu} role="menu" aria-label="Account" className="absolute right-0 top-[50px] z-30 min-w-[220px] rounded-xl border border-line bg-white py-1.5">
-          <p className="mb-1.5 border-b px-3 pb-2.5 pt-2 text-[13px] whitespace-nowrap text-muted-foreground"><b className="font-semibold text-foreground">{me.display_name}</b> · {role}</p>
+          <p className="mb-1.5 border-b px-3 pb-2.5 pt-2 text-body whitespace-nowrap text-muted-foreground"><b className="font-semibold text-foreground">{me.display_name}</b> · {role}</p>
           {me.role === "admin" && <button type="button" role="menuitem" className={item} onClick={() => { setOpen(false); onView("users"); }}>Users</button>}
           <button type="button" role="menuitem" className={item} onClick={() => { setOpen(false); onChangePassword(); }}>Change password</button>
           <button type="button" role="menuitem" className={item} onClick={() => { setOpen(false); onSignOut(); }}>Sign out</button>
@@ -213,7 +213,7 @@ export function Header({ onPick, view, onView, me, approvals, stale, onSignOut, 
           {tabs.map(([v, label, d, extra]) => (
             <li key={v}>
               <button type="button" aria-current={view === v ? "page" : undefined} onClick={() => onView(v)}
-                className="flex h-9 items-center gap-2 rounded-md px-2.5 whitespace-nowrap text-[#3d4046] hover:bg-raised aria-[current=page]:bg-foreground aria-[current=page]:font-semibold aria-[current=page]:text-white">
+                className="flex h-9 items-center gap-2 rounded-md px-2.5 whitespace-nowrap text-nav-ink hover:bg-raised aria-[current=page]:bg-foreground aria-[current=page]:font-semibold aria-[current=page]:text-white">
                 <NavIcon d={d} /><span>{label}</span>{extra}
               </button>
             </li>

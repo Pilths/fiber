@@ -14,12 +14,12 @@ const FIELD: Record<string, string> = {
   distance_km: "Distance (km)", route_type: "Route type", region: "Region", site_a_id: "Site A (id)", site_b_id: "Site B (id)",
   survey_cores: "Survey count", cable_size: "Cable size", name: "Name", location: "Location", active: "Active", status: "Status",
 };
-const lbl = "lbl mb-1 block text-[13px]! text-foreground!";
+const lbl = "lbl mb-1 block text-body! text-foreground!";
 
 // Latest edits of one item, newest first: who, when, field old -> new, reason.
 export function EditHistory({ rows }: { rows: Row[] }) {
   return (
-    <details className="mt-4 border-t pt-3 text-[13px]" data-testid="edit-history">
+    <details className="mt-4 border-t pt-3 text-body" data-testid="edit-history">
       <summary className="w-fit cursor-pointer font-semibold">History ({rows.length === 10 ? "last 10" : rows.length})</summary>
       {rows.length === 0 ? <p className="mt-2 text-muted-foreground">No edits yet.</p> : (
         <ol className="mt-2 max-h-56 overflow-y-auto">
@@ -49,7 +49,7 @@ function Reason({ value, onChange, missing }: { value: string; onChange: (v: str
   return (
     <label className="col-span-2 block"><span className={lbl}>Reason (required)</span>
       <input className="field" value={value} onChange={(e) => onChange(e.target.value)} aria-invalid={missing} />
-      {missing && <span role="alert" className="mt-1 block text-[13px] font-semibold text-red">Enter a reason: every edit is kept as history.</span>}
+      {missing && <span role="alert" className="mt-1 block text-body font-semibold text-red">Enter a reason: every edit is kept as history.</span>}
     </label>
   );
 }
@@ -73,7 +73,7 @@ function SitePicker({ label, site, onPick }: { label: string; site: Site | null;
     <label className="block"><span className={lbl}>{label}</span>
       <input className="field" list={id} value={text} onChange={(e) => change(e.target.value)} autoComplete="off" aria-invalid={!site} />
       <datalist id={id}>{opts.map((o) => <option key={o.id} value={o.name} />)}</datalist>
-      {!site && <span className="mt-1 block text-[13px] font-semibold text-red">Choose a site from the list.</span>}
+      {!site && <span className="mt-1 block text-body font-semibold text-red">Choose a site from the list.</span>}
     </label>
   );
 }
@@ -140,8 +140,8 @@ export function EditSpanDialog({ spanId, focus, onClose, onSaved }: { spanId: nu
 
   return (
     <Dialog title={s ? `Edit span ${s.site_a} - ${s.site_b}` : "Edit span"} onClose={onClose} wide>
-      {error && <p role="alert" className="mt-3 rounded-md border border-red bg-red-bg px-3 py-2 text-[13px] font-semibold text-red">{error}</p>}
-      {!s ? !error && <p className="mt-3 text-[13px] text-muted-foreground">Loading…</p> : (
+      {error && <p role="alert" className="mt-3 rounded-md border border-red bg-red-bg px-3 py-2 text-body font-semibold text-red">{error}</p>}
+      {!s ? !error && <p className="mt-3 text-body text-muted-foreground">Loading…</p> : (
         <form onSubmit={submit} noValidate aria-label="Edit span">
           <div className="mt-4 grid grid-cols-2 gap-3">
             <label><span className={lbl}>Distance (km)</span><input className="field" type="number" min="0" step="0.001" value={f.distance} onChange={set("distance")} /></label>
@@ -164,7 +164,7 @@ export function EditSpanDialog({ spanId, focus, onClose, onSaved }: { spanId: nu
               <input ref={survey} className="field" type="number" min="0" step="1" value={f.survey} onChange={set("survey")} placeholder="Not surveyed" />
             </label>
             <label><span className={lbl}>Cable size</span><input className="field" type="number" min="1" step="1" value={f.cable} onChange={set("cable")} /></label>
-            <p className="col-span-2 -mt-1 text-[13px] text-muted-foreground">
+            <p className="col-span-2 -mt-1 text-body text-muted-foreground">
               Survey count sets how many cores can be booked. Cable size is information only. Lowering the survey count is refused while a removed core is held, in use, faulty or has history. Changing sites is refused while the span has active reservations.
             </p>
             <Reason value={f.reason} onChange={(v) => setF((o) => ({ ...o, reason: v }))} missing={tried && !f.reason.trim()} />
@@ -219,8 +219,8 @@ export function EditSiteDialog({ siteId, onClose, onSaved }: { siteId: number; o
 
   return (
     <Dialog title={s ? `Edit site ${s.name}` : "Edit site"} onClose={onClose} wide>
-      {error && <p role="alert" className="mt-3 rounded-md border border-red bg-red-bg px-3 py-2 text-[13px] font-semibold text-red">{error}</p>}
-      {!s ? !error && <p className="mt-3 text-[13px] text-muted-foreground">Loading…</p> : (
+      {error && <p role="alert" className="mt-3 rounded-md border border-red bg-red-bg px-3 py-2 text-body font-semibold text-red">{error}</p>}
+      {!s ? !error && <p className="mt-3 text-body text-muted-foreground">Loading…</p> : (
         <form onSubmit={submit} noValidate aria-label="Edit site">
           <div className="mt-4 grid grid-cols-2 gap-3">
             <label className="col-span-2"><span className={lbl}>Name</span><input className="field" value={f.name} onChange={set("name")} /></label>
@@ -235,7 +235,7 @@ export function EditSiteDialog({ siteId, onClose, onSaved }: { siteId: number; o
             <label className="flex items-center gap-2 self-end pb-2 text-sm">
               <input type="checkbox" className="size-4" checked={f.active} onChange={(e) => setF((o) => ({ ...o, active: e.target.checked }))} />Active
             </label>
-            <p className="col-span-2 -mt-1 text-[13px] text-muted-foreground">
+            <p className="col-span-2 -mt-1 text-body text-muted-foreground">
               {f.active ? "Kind: " + s.kind.replace("_", " ") + "." : <b className="font-semibold text-amber">Inactive sites are kept, never deleted. A site used by a span cannot be deactivated.</b>}
             </p>
             <Reason value={f.reason} onChange={(v) => setF((o) => ({ ...o, reason: v }))} missing={tried && !f.reason.trim()} />

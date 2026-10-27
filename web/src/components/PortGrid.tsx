@@ -49,7 +49,7 @@ export function PortGrid({ cores, selected, onToggle, onOpen, focusCoreId }: {
           const tube = `Tube ${r + 1}, cores ${row[0].number} to ${row[row.length - 1].number}`;
           return (
             <div key={r} className="border-b border-rule pt-3.5 pb-4">
-              <p aria-hidden className="mb-2 text-[13px] text-muted-foreground">{tube}, <b className="font-semibold text-foreground">{free} available</b></p>
+              <p aria-hidden className="mb-2 text-body text-muted-foreground">{tube}, <b className="font-semibold text-foreground">{free} available</b></p>
               <div role="row" aria-label={`${tube}, ${free} available`} className="grid grid-cols-12 gap-1">
                 {row.map((c, j) => {
                   const i = r * COLS + j;
@@ -85,12 +85,12 @@ export function PortGrid({ cores, selected, onToggle, onOpen, focusCoreId }: {
         })}
       </div>
       <div className="mt-2 flex items-center gap-3">
-        <p className="min-h-5 flex-1 text-[13px] text-muted-foreground" data-testid="grid-caption">
+        <p className="min-h-5 flex-1 text-body text-muted-foreground" data-testid="grid-caption">
           {caption
             ? `${label(caption)}${caption.circuit_id ? `, circuit ${caption.circuit_id}` : ""}${caption.status !== "Available" ? " (not selectable; click or Enter for its detail)" : ""}`
             : "Hover or focus a core for details. Space or Enter chooses an Available core, or opens the detail of a taken one."}
         </p>
-        {cores[idx] && <button type="button" className="btn h-8! flex-none" onClick={() => onOpen(cores[idx])}>Core {cores[idx].number} details</button>}
+        {cores[idx] && <button type="button" className="btn btn-sm flex-none" onClick={() => onOpen(cores[idx])}>Core {cores[idx].number} details</button>}
       </div>
     </div>
   );

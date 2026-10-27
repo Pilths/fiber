@@ -33,14 +33,14 @@ const willApply = (s: Sheet, override: boolean) => s.found && (!s.blocked || (s.
 
 // Current file and previous uploads in one compact table, current first.
 function Files({ data }: { data: { current: FileInfo | null; previous: FileInfo[] } | null }) {
-  if (!data) return <p className="text-[13px] text-muted-foreground">Loading…</p>;
+  if (!data) return <p className="text-body text-muted-foreground">Loading…</p>;
   const c = data.current;
   const n = (f: FileInfo, k: Kind) => { const x = f.sheets[k]; return x?.found ? x.rows.toLocaleString("en-GB") : <span className="text-muted-foreground">not found</span>; };
   const list = [...(c ? [c] : []), ...data.previous.slice(0, 5)];
   return (
     <section aria-labelledby="sm-files-h" className="mt-5">
       <h3 id="sm-files-h" className="lbl mb-1.5">Uploads</h3>
-      {!c && <p className="mb-2 text-[13px] text-muted-foreground">No site master file applied yet.</p>}
+      {!c && <p className="mb-2 text-body text-muted-foreground">No site master file applied yet.</p>}
       {list.length > 0 && (
         <div className="tbox">
           <table className="tbl band">
@@ -73,13 +73,13 @@ function RowDetail({ r, group }: { r: Row; group: Group }) {
   if (empty) return null;
   return (
     <div className="space-y-1">
-      {r.reason && <p className="text-[13px]">{r.reason}</p>}
+      {r.reason && <p className="text-body">{r.reason}</p>}
       {group === "changed" && <Changes changes={r.changes} />}
-      {r.location_note && <p className="text-[13px] text-muted-foreground">{r.location_note}</p>}
+      {r.location_note && <p className="text-body text-muted-foreground">{r.location_note}</p>}
       {group === "missing" && (r.in_use
         ? <span className="inline-flex items-center gap-1.5 font-semibold text-amber"><Icon name="lo" />in use, stays active</span>
-        : <span className="text-[13px] text-muted-foreground">will be set inactive (never deleted)</span>)}
-      {r.possible_rename && <p className="text-[13px] text-muted-foreground">Possible rename: {r.possible_rename.missing_dc_name} → {r.possible_rename.new_dc_name}</p>}
+        : <span className="text-body text-muted-foreground">will be set inactive (never deleted)</span>)}
+      {r.possible_rename && <p className="text-body text-muted-foreground">Possible rename: {r.possible_rename.missing_dc_name} → {r.possible_rename.new_dc_name}</p>}
     </div>
   );
 }
@@ -104,7 +104,7 @@ function SheetPanel({ uploadId, s, override, onOverride }: { uploadId: number; s
     <section aria-labelledby={hid} data-testid={`sheet-${s.kind}`}>
       <div className="mb-3 flex flex-wrap items-baseline gap-x-3">
         <h3 id={hid} className="text-[15px] font-semibold">{SHEET_LABEL[s.kind]}</h3>
-        <span className="text-[13px] text-muted-foreground">
+        <span className="text-body text-muted-foreground">
           {s.found ? <>found as worksheet <b className="font-semibold text-foreground">“{s.sheet_name}”</b>, {s.counts.rows.toLocaleString("en-GB")} rows</> : "worksheet not found"}
         </span>
       </div>
@@ -127,8 +127,8 @@ function SheetPanel({ uploadId, s, override, onOverride }: { uploadId: number; s
           <div role="group" aria-label={`${SHEET_LABEL[s.kind]} rows by result`} className="mb-3 flex flex-wrap gap-2">
             {GROUPS.map((x) => <Chip key={x.g} label={x.label} icon={x.icon} n={s.counts[x.g]} pressed={group === x.g} onClick={() => { setGroup(x.g); setPage(1); }} />)}
           </div>
-          {error && <p role="alert" className="text-[13px] font-semibold text-red">{error}</p>}
-          {data && (data.total === 0 ? <p className="text-[13px] text-muted-foreground">No {g.label.toLowerCase()} rows.</p> : (
+          {error && <p role="alert" className="text-body font-semibold text-red">{error}</p>}
+          {data && (data.total === 0 ? <p className="text-body text-muted-foreground">No {g.label.toLowerCase()} rows.</p> : (
             <>
               <div className="tbox">
               <table className="tbl band" aria-label={`${SHEET_LABEL[s.kind]}: ${g.label} rows`}>
@@ -158,11 +158,11 @@ function Renames({ list, decisions, onDecide }: { list: Rename[]; decisions: Rec
   return (
     <section aria-labelledby="sm-ren-h">
       <h3 id="sm-ren-h" className="text-[15px] font-semibold">Possible renames <span className="font-normal text-muted-foreground">({list.length}, each needs a choice)</span></h3>
-      <p className="mb-3 text-[13px] text-muted-foreground">A DC is missing from the file and a new DC has the same LRD and coordinates. Rename keeps the existing DC and its history under the new name; Keep separate adds the new DC and sets the missing one inactive.</p>
+      <p className="mb-3 text-body text-muted-foreground">A DC is missing from the file and a new DC has the same LRD and coordinates. Rename keeps the existing DC and its history under the new name; Keep separate adds the new DC and sets the missing one inactive.</p>
       <ul className="tbox divide-y divide-rule">
         {list.map((r) => (
           <li key={r.missing_dc_id}>
-            <fieldset className="flex flex-wrap items-center gap-x-6 gap-y-1 px-3 py-2 text-[13px]">
+            <fieldset className="flex flex-wrap items-center gap-x-6 gap-y-1 px-3 py-2 text-body">
               <legend className="sr-only">{r.missing_dc_name} to {r.new_dc_name}</legend>
               <span className="min-w-[340px] flex-1"><b className="font-semibold">{r.missing_dc_name}</b> → <b className="font-semibold">{r.new_dc_name}</b>
                 <span className="text-muted-foreground"> · LRD {r.lrd ?? "—"} · file row {r.new_row_number}</span></span>
@@ -281,20 +281,20 @@ export function SiteMasterUpload() {
           {renames.length > 0 && <Renames list={renames} decisions={decisions} onDecide={(id, d) => setDecisions((x) => ({ ...x, [id]: d }))} />}
           <div className="flex flex-wrap items-end gap-4 border-t pt-4">
             {anyOverride && (
-              <label className="w-[420px]"><span className="lbl mb-1 block text-[13px]! text-foreground!">Reason for the override (required)</span>
+              <label className="w-[420px]"><span className="lbl mb-1 block text-body! text-foreground!">Reason for the override (required)</span>
                 <input className="field" value={reason} onChange={(e) => setReason(e.target.value)} />
               </label>
             )}
             <button type="button" className="btn btn-p" disabled={!!why} aria-describedby="sm-why" onClick={() => setConfirming(true)}>Apply…</button>
             <button type="button" className="btn" onClick={() => setStaged(null)}>Discard preview</button>
-            <p id="sm-why" className="text-[13px] text-muted-foreground">{why ?? `Ready: ${applying.map((s) => SHEET_LABEL[s.kind]).join(" and ")} will be applied.`}</p>
+            <p id="sm-why" className="text-body text-muted-foreground">{why ?? `Ready: ${applying.map((s) => SHEET_LABEL[s.kind]).join(" and ")} will be applied.`}</p>
           </div>
         </div>
       </section>
     )}
       {confirming && staged && (
         <Dialog title="Apply this site master file?" onClose={() => setConfirming(false)} wide>
-          <ul className="mt-3 space-y-2 text-[13px]">
+          <ul className="mt-3 space-y-2 text-body">
             {sheets.map((s) => (
               <li key={s.kind}><b className="font-semibold">{SHEET_LABEL[s.kind]}:</b>{" "}
                 {willApply(s, override[s.kind])
@@ -306,7 +306,7 @@ export function SiteMasterUpload() {
               <li><b className="font-semibold">Possible renames:</b> {renames.filter((r) => decisions[r.missing_dc_id] === "rename").length} renamed, {renames.filter((r) => decisions[r.missing_dc_id] === "separate").length} kept separate.</li>
             )}
           </ul>
-          <p className="mt-3 text-[13px] text-muted-foreground">Changes are saved in one step with a history record per field. There is no undo.</p>
+          <p className="mt-3 text-body text-muted-foreground">Changes are saved in one step with a history record per field. There is no undo.</p>
           <div className="mt-5 flex justify-end gap-2">
             <button type="button" className="btn" onClick={() => setConfirming(false)}>Cancel</button>
             <button type="button" className="btn btn-p" onClick={apply} autoFocus>Apply</button>

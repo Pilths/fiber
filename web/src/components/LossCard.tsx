@@ -21,7 +21,7 @@ function Metric({ label, value, sub, children }: { label: string; value?: string
       <dt className="lbl">{label}</dt>
       <dd className="mt-0.5">
         {children ?? <span className="block text-2xl leading-8 font-bold tracking-tight">{value}</span>}
-        {sub && <span className="mt-0.5 block text-[13px] text-muted-foreground">{sub}</span>}
+        {sub && <span className="mt-0.5 block text-body text-muted-foreground">{sub}</span>}
       </dd>
     </div>
   );
@@ -37,7 +37,7 @@ export function LossCard({ loss }: { loss: LossDetail | null }) {
       <div className="card-h">
         <h2 id="loss-h" tabIndex={-1} className="outline-offset-4">Loss{loss && <span className="font-normal text-muted-foreground"> of {loss.span_name}</span>}</h2>
       </div>
-      {!loss ? <p className="text-[13px] text-muted-foreground">Loading loss...</p> : (
+      {!loss ? <p className="text-body text-muted-foreground">Loading loss...</p> : (
         <>
           <dl className="grid grid-cols-4 gap-4">
             <Metric label="Calculated" value={calc == null ? "No distance" : db(calc)}
@@ -51,7 +51,7 @@ export function LossCard({ loss }: { loss: LossDetail | null }) {
             </Metric>
           </dl>
           {NOTE[loss.status] && (
-            <p role="status" className="mt-4 rounded-md border border-dashed border-line px-4 py-3 text-[13px] text-muted-foreground">
+            <p role="status" className="mt-4 empty px-4 py-3 text-body text-muted-foreground">
               <b className="font-semibold text-foreground">{NOTE[loss.status]}</b>
             </p>
           )}

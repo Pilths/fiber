@@ -42,7 +42,7 @@ export function useCustomerPicker(onError: (text: string) => void) {
       {customer ? (
         <p className="flex h-9 items-center justify-between gap-2 rounded-md border border-line bg-white pl-3 pr-1">
           <span className="truncate font-semibold">{customer.name}{customer.isNew && " (new customer)"}</span>
-          <button type="button" id={`${id}-c`} className="btn h-7 px-2.5 text-[13px]" onClick={() => { setCustomer(null); setListOpen(true); }}>Change</button>
+          <button type="button" id={`${id}-c`} className="btn h-7 px-2.5 text-body" onClick={() => { setCustomer(null); setListOpen(true); }}>Change</button>
         </p>
       ) : (
         <input id={`${id}-c`} aria-label="Search customers" role="combobox" aria-expanded={listOpen} aria-controls={`${id}-l`} aria-autocomplete="list"
@@ -68,11 +68,11 @@ export function useCustomerPicker(onError: (text: string) => void) {
     </div>
   );
   const warning = similar && similar.length > 0 && (
-    <div role="alert" className="mt-3 rounded-md border border-amber-bd bg-amber-bg p-3 text-[13px]">
+    <div role="alert" className="mt-3 note p-3 text-body">
       <strong className="text-amber">Similar customers already exist:</strong> {similar.map((s) => s.name).join(", ")}
       <div className="mt-2 flex flex-wrap gap-2">
-        {similar.map((s) => <button key={s.id} type="button" className="btn h-8" onClick={() => choose(s)}>Use {s.name}</button>)}
-        <button type="button" className="btn h-8" onClick={() => addNew(true)}>Create new anyway</button>
+        {similar.map((s) => <button key={s.id} type="button" className="btn btn-sm" onClick={() => choose(s)}>Use {s.name}</button>)}
+        <button type="button" className="btn btn-sm" onClick={() => addNew(true)}>Create new anyway</button>
       </div>
     </div>
   );
@@ -118,7 +118,7 @@ export function ChosenBar({ cores, free, onClear, onDone }: {
       <div className="flex min-h-[30px] flex-wrap items-center gap-x-3 gap-y-2">
         <b className="text-sm font-bold" aria-live="polite">{n === 0 ? "No cores chosen" : `${n} ${n === 1 ? "core" : "cores"} chosen`}</b>
         {n > 0 && <span className="flex flex-wrap gap-1">{cores.map((c) => <span key={c.id} className="cchip">{c.number}</span>)}</span>}
-        <span className={`text-[13px] ${left < 0 ? "font-bold text-red" : "text-muted-foreground"}`}>
+        <span className={`text-body ${left < 0 ? "font-bold text-red" : "text-muted-foreground"}`}>
           {n === 0 ? `Up to ${free} cores per request` : left >= 0 ? `${left} more can be chosen` : `Only ${free} free to reserve: remove ${-left}`}
         </span>
         <button type="button" className="btn ml-auto" onClick={onClear} disabled={n === 0}>Clear</button>
@@ -132,10 +132,10 @@ export function ChosenBar({ cores, free, onClear, onDone }: {
       </div>
 
       {warning}
-      {tried && !customer && n > 0 && <p role="alert" className="mt-2.5 text-[13px] font-bold text-red">Choose a customer before submitting.</p>}
-      {msg && <p role={msg.ok ? "status" : "alert"} className={`mt-2.5 text-[13px] ${msg.ok ? "font-semibold" : "font-bold text-red"}`}>{msg.text}</p>}
+      {tried && !customer && n > 0 && <p role="alert" className="mt-2.5 text-body font-bold text-red">Choose a customer before submitting.</p>}
+      {msg && <p role={msg.ok ? "status" : "alert"} className={`mt-2.5 text-body ${msg.ok ? "font-semibold" : "font-bold text-red"}`}>{msg.text}</p>}
       {!msg && !(tried && !customer) && (
-        <p className="mt-2.5 text-[13px] text-muted-foreground">
+        <p className="mt-2.5 text-body text-muted-foreground">
           {n === 0 ? "Reserve is off: choose at least one Available core in the grid." : <>Goes to an admin for approval. Free to reserve after this: <b className="font-bold text-foreground">{Math.max(left, 0)} of {free}</b>.</>}
         </p>
       )}

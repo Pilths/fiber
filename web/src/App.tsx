@@ -247,7 +247,7 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
                 <div className="card-h items-center">
                   <div className="flex min-w-0 flex-wrap items-baseline gap-x-5 gap-y-1">
                     <h2 id="cores-h" className="text-2xl! leading-8! font-bold! tracking-tight">Cores of {spanName(detail)}</h2>
-                    <span className="flex flex-wrap gap-x-4 text-[13px] text-muted-foreground">
+                    <span className="flex flex-wrap gap-x-4 text-body text-muted-foreground">
                       <Facts d={detail} />
                       {detail.survey_cores != null && <span><b className="font-semibold text-foreground">{detail.survey_cores}</b> surveyed of {detail.cable_size}</span>}
                     </span>
@@ -259,9 +259,9 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
                 </div>
                 {detail.survey_cores == null
                   ? (
-                    <div role="status" data-testid="capacity" className="flex items-center gap-3 text-[13px]">
+                    <div role="status" data-testid="capacity" className="flex items-center gap-3 text-body">
                       <p>{admin ? "Not surveyed: enter a survey count to make it bookable." : "Not surveyed, cannot be booked."} No cores to show. Cable size {detail.cable_size}.</p>
-                      {admin && <button type="button" className="btn h-8! px-3!" onClick={() => admin.onEditSpan("survey")}>Enter survey count</button>}
+                      {admin && <button type="button" className="btn btn-sm" onClick={() => admin.onEditSpan("survey")}>Enter survey count</button>}
                     </div>
                   )
                   : <Cores d={detail} selected={selected} chosen={chosen} toggle={toggle} focusCoreId={focusCoreId} onOpen={(c) => setDrawerCore(c.id)}
@@ -288,7 +288,7 @@ function Cores({ d, selected, chosen, toggle, focusCoreId, onOpen, onClear, onDo
   const n = countBy(d);
   return (
     <>
-      <ul aria-label="Status key" className="mb-1 flex flex-wrap gap-x-5 gap-y-2 text-[13px] text-muted-foreground">
+      <ul aria-label="Status key" className="mb-1 flex flex-wrap gap-x-5 gap-y-2 text-body text-muted-foreground">
         {(["Available", "Chosen", ...STATUS_ORDER.slice(1)] as const).map((s) => {
           const st = s === "Chosen" ? STATUS.Available : STATUS[s];
           return (
@@ -301,7 +301,7 @@ function Cores({ d, selected, chosen, toggle, focusCoreId, onOpen, onClear, onDo
       </ul>
       <PortGrid cores={d.cores} selected={selected} onToggle={toggle} onOpen={onOpen} focusCoreId={focusCoreId} />
       <ChosenBar key={d.id} cores={chosen.map((c) => ({ id: c.id, number: c.number }))} free={d.free_to_reserve} onClear={onClear} onDone={onDone} />
-      {chosen.length > 0 && <p className="mt-3 flex items-center gap-2 rounded-md border border-amber-bd bg-amber-bg px-3 py-2 text-[13px]">
+      {chosen.length > 0 && <p className="mt-3 flex items-center gap-2 note px-3 py-2 text-body">
         <Icon name="lo" className="ic flex-none text-amber" />
         <span><b className="font-semibold text-amber">Stale after 3 months.</b> An approved reservation not kept for 3 months is flagged Stale. Keep or release it in My reservations.</span>
       </p>}

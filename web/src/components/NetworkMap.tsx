@@ -199,7 +199,7 @@ export function NetworkMap({ selectedIds, routeKey, visible, onSelectSpan, onSit
   return (
     <div className="flex flex-1 flex-col">
       <div ref={box} role="region" aria-label="Network map" aria-describedby="map-instr" data-testid="network-map" data-mode={base === "gl" ? "gl" : base === "loading" ? "loading" : "svg"}
-        className={`relative flex-1 overflow-hidden bg-[#eef1f5] select-none ${full ? "" : "min-h-[clamp(520px,calc(100vh-210px),860px)] rounded-md border border-border"}`}
+        className={`relative flex-1 overflow-hidden bg-map select-none ${full ? "" : "min-h-[clamp(520px,calc(100vh-210px),860px)] rounded-md border border-border"}`}
         onKeyDown={(e) => { if (e.key === "Escape") { setLayersOpen(false); onClear(); } }}
         onPointerDown={onDown} onPointerMove={onMove} onPointerUp={() => { drag.current = null; }}>
         <div ref={glBox} style={{ position: "absolute", inset: 0 }} aria-hidden="true" />{/* inline: MapLibre's CSS sets position: relative */}
@@ -293,7 +293,7 @@ export function NetworkMap({ selectedIds, routeKey, visible, onSelectSpan, onSit
           <li><span className="rb-sh st size-2.5!" aria-hidden="true" />Other site</li>
         </ul>
         {(NOTE[base] || err) && (
-          <p role="status" data-testid="map-note" className="absolute top-3 right-3 z-10 max-w-[340px] rounded-md border border-amber-bd bg-amber-bg px-3 py-1.5 text-xs font-medium text-amber">
+          <p role="status" data-testid="map-note" className="absolute top-3 right-3 z-10 max-w-[340px] note px-3 py-1.5 text-xs font-medium text-amber">
             {err ? "Could not load the map data. Search and lists still work." : NOTE[base]}
           </p>
         )}

@@ -36,7 +36,7 @@ export function Inspector({ detail, loading, onGoToCores, loss, onSeeLoss, onSee
       </div>
       <div role="tabpanel" aria-label="Cores" className="flex flex-1 flex-col">
         {route ?? (!detail ? (
-          <p className="rounded-md border border-dashed border-line px-4 py-5 text-center text-[13px] text-muted-foreground">
+          <p className="empty px-4 py-5 text-center text-body text-muted-foreground">
             <b className="mb-0.5 block text-sm font-semibold text-foreground">{loading ? "Loading span..." : "No span selected"}</b>
             {!loading && "Choose a span in Find, or search in the top bar."}
           </p>
@@ -72,9 +72,9 @@ function Body({ d, onGoToCores, loss, onSeeLoss, onSeeHeld, admin, onPlanRoute }
           </>
         ) : spanName(d)}
       </h3>
-      <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-0.5 text-[13px] text-muted-foreground">
+      <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-0.5 text-body text-muted-foreground">
         <Facts d={d} />
-        {admin && <button type="button" className="btn ml-auto h-8! px-3!" onClick={() => admin.onEditSpan()}>Edit span</button>}
+        {admin && <button type="button" className="btn btn-sm ml-auto" onClick={() => admin.onEditSpan()}>Edit span</button>}
       </div>
       <div className="mt-5 border-t pt-4">
         <div className="lbl">Free to reserve</div>
@@ -87,7 +87,7 @@ function Body({ d, onGoToCores, loss, onSeeLoss, onSeeHeld, admin, onPlanRoute }
             <div className="mt-3.5 flex h-2 gap-0.5" aria-hidden>
               {parts.filter((p) => p.v > 0).map((p) => <span key={p.k} className={`k ${p.k} h-full rounded`} style={{ flex: p.v }} />)}
             </div>
-            <dl className="mt-2.5 grid grid-cols-2 gap-x-4 gap-y-1 text-[13px] text-muted-foreground">
+            <dl className="mt-2.5 grid grid-cols-2 gap-x-4 gap-y-1 text-body text-muted-foreground">
               {parts.map((p) => (
                 <div key={p.k} className="flex items-center gap-2">
                   <dt className="order-1">{p.label}</dt>
@@ -97,13 +97,13 @@ function Body({ d, onGoToCores, loss, onSeeLoss, onSeeHeld, admin, onPlanRoute }
             </dl>
           </>
         ) : admin ? (
-          <div className="mt-1 text-[13px]">
+          <div className="mt-1 text-body">
             <p className="text-muted-foreground">Not surveyed: enter a survey count to make it bookable. Cable size {d.cable_size}.</p>
-            <button type="button" className="btn mt-2 h-8! px-3!" onClick={() => admin.onEditSpan("survey")}>Enter survey count</button>
+            <button type="button" className="btn btn-sm mt-2" onClick={() => admin.onEditSpan("survey")}>Enter survey count</button>
           </div>
-        ) : <p className="mt-1 text-[13px] text-muted-foreground">Not surveyed, cannot be booked. Cable size {d.cable_size}.</p>}
+        ) : <p className="mt-1 text-body text-muted-foreground">Not surveyed, cannot be booked. Cable size {d.cable_size}.</p>}
       </div>
-      <div className="mt-5 flex items-center gap-2 border-t pt-4 text-[13px]" data-testid="inspector-loss">
+      <div className="mt-5 flex items-center gap-2 border-t pt-4 text-body" data-testid="inspector-loss">
         <span className="lbl">Loss</span>
         <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
           {!loss ? <span className="text-muted-foreground">Loading...</span>
@@ -111,16 +111,16 @@ function Body({ d, onGoToCores, loss, onSeeLoss, onSeeHeld, admin, onPlanRoute }
               <><span><b className="font-semibold">{db(loss.measured_db)}</b> measured{loss.deviation_pct != null && `, ${pct(loss.deviation_pct)}`}</span><LossPill l={loss} /></>
             ) : <span className="text-muted-foreground">{loss.status === "no_distance" ? "Not measured, no distance" : "Not measured"}</span>}
         </span>
-        <button type="button" className="flex-none font-semibold text-blue underline underline-offset-2 hover:no-underline" onClick={onSeeLoss}>See loss</button>
+        <button type="button" className="flex-none font-semibold link" onClick={onSeeLoss}>See loss</button>
       </div>
-      <div className="mt-3 flex items-center gap-2 border-t pt-3 text-[13px]" data-testid="inspector-held">
+      <div className="mt-3 flex items-center gap-2 border-t pt-3 text-body" data-testid="inspector-held">
         <span className="lbl">Held</span>
         <span className="min-w-0 flex-1">
           {withCores + n.Faulty + d.unassigned_reserved === 0 ? <span className="text-muted-foreground">Nothing held</span> : (
             <><b className="font-semibold">{withCores + d.unassigned_reserved}</b> cores held{n.Requested > 0 && `, ${n.Requested} waiting approval`}{n.Faulty > 0 && `, ${n.Faulty} faulty`}</>
           )}
         </span>
-        <button type="button" className="flex-none font-semibold text-blue underline underline-offset-2 hover:no-underline" onClick={onSeeHeld}>See held</button>
+        <button type="button" className="flex-none font-semibold link" onClick={onSeeHeld}>See held</button>
       </div>
       <div className="-mx-5 mt-auto flex flex-wrap gap-2 border-t bg-white px-5 py-5">
         <button type="button" className="btn btn-p flex-1" onClick={onGoToCores} disabled={!surveyed}>Go to cores</button>

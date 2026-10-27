@@ -49,7 +49,7 @@ export function FindCard({ spans, selectedId, onSelect, loss, mode, onMode, rout
             <input type="search" aria-label="Span or site name" placeholder="Span or site name" className="field pl-9" value={q} onChange={(e) => setQ(e.target.value)} />
           </div>
           <div className="lbl mt-3 flex justify-between px-2.5"><span>Span</span><span>Free to reserve</span></div>
-          {!spans && <p className="py-3 text-[13px] text-muted-foreground">Loading spans...</p>}
+          {!spans && <p className="py-3 text-body text-muted-foreground">Loading spans...</p>}
           <ul aria-label="Spans" className="max-h-[242px] overflow-auto">
             {shown.map((s) => (
               <li key={s.id}>
@@ -70,7 +70,7 @@ export function FindCard({ spans, selectedId, onSelect, loss, mode, onMode, rout
                 </button>
               </li>
             ))}
-            {spans && shown.length === 0 && <li className="py-3 text-[13px] text-muted-foreground">No spans match.</li>}
+            {spans && shown.length === 0 && <li className="py-3 text-body text-muted-foreground">No spans match.</li>}
           </ul>
         </>
       )}
