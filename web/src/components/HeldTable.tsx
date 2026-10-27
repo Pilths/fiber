@@ -30,11 +30,11 @@ export function HeldTable({ d, onOpen }: { d: Detail; onOpen: (c: Detail["cores"
               </button>
             ))}
           </div>
-          <table className="tbl table-fixed">
+          <table className="tbl table-fixed [&_td]:text-center! [&_th]:text-center!">
             <caption className="sr-only">Held cores on this span</caption>
             <thead><tr>
               <th scope="col" className="w-[9%]">Cores</th><th scope="col" className="w-[14%]">Status</th><th scope="col" className="w-[17%]">Held by</th>
-              <th scope="col">Ports or detail</th><th scope="col" className="w-[14%]">Circuit</th><th scope="col" className="w-[15%] pr-0!">Planned</th>
+              <th scope="col">Ports or detail</th><th scope="col" className="w-[14%]">Circuit</th><th scope="col" className="w-[15%] pr-0!">Planned date</th>
             </tr></thead>
             <tbody>
               {rows.map((c) => (
