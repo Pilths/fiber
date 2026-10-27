@@ -136,6 +136,8 @@ const Shape = ({ kind, className = "" }: { kind?: string; className?: string }) 
 export function RouteForm({ rp }: { rp: RoutePlanner }) {
   const id = useId();
   const [left, setLeft] = useState({ from: false, to: false });
+  // A picked site empties its box on focus (name kept as placeholder) so the datalist lists every site, not only the match.
+  const [blank, setBlank] = useState<"from" | "to" | null>(null);
   const need = rp.need ?? 0;
   const pickErr = (k: "from" | "to") => {
     const text = k === "from" ? rp.fromText : rp.toText;
@@ -145,15 +147,17 @@ export function RouteForm({ rp }: { rp: RoutePlanner }) {
   const picker = (k: "from" | "to", label: string) => {
     const err = pickErr(k);
     const site = k === "from" ? rp.from : rp.to;
+    const text = k === "from" ? rp.fromText : rp.toText;
     return (
       <div className="grid min-w-0 gap-1">
         <label htmlFor={`${id}-${k}`} className="lbl">{label}</label>
         <div className="relative">
           <Shape kind={site?.kind} className={`pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 ${site ? "" : "opacity-0"}`} />
-          <input id={`${id}-${k}`} list={`${id}-sites`} className="field pl-8" autoComplete="off" placeholder="Type a site"
-            value={k === "from" ? rp.fromText : rp.toText} aria-invalid={!!err} aria-describedby={err ? `${id}-${k}-e` : `${id}-${k}-k`}
-            onChange={(e) => (k === "from" ? rp.setFrom : rp.setTo)(e.target.value)}
-            onFocus={() => setLeft((l) => ({ ...l, [k]: false }))} onBlur={() => setLeft((l) => ({ ...l, [k]: true }))} />
+          <input id={`${id}-${k}`} list={`${id}-sites`} className="field pl-8" autoComplete="off" placeholder={blank === k ? text : "Type a site"}
+            value={blank === k ? "" : text} aria-invalid={!!err} aria-describedby={err ? `${id}-${k}-e` : `${id}-${k}-k`}
+            onChange={(e) => { setBlank(null); (k === "from" ? rp.setFrom : rp.setTo)(e.target.value); }}
+            onFocus={() => { setLeft((l) => ({ ...l, [k]: false })); if (site) setBlank(k); }}
+            onBlur={() => { setBlank(null); setLeft((l) => ({ ...l, [k]: true })); }} />
         </div>
         {err ? <p id={`${id}-${k}-e`} className="text-body font-semibold text-red">{err}</p>
           : <p id={`${id}-${k}-k`} className="text-xs text-muted-foreground">{site ? cap(kindWord(site.kind)) : "Data centre or site"}</p>}

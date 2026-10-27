@@ -6,6 +6,7 @@ Read before working: `docs/PRD.md` (requirements), `docs/architecture.md` (desig
 
 - `docker compose up -d --build`: start db, api (http://localhost:8000) and web (http://localhost:5173). Copy `.env.example` to `.env` first.
 - `docker compose exec api pytest`: backend tests.
+- Lint: `docker compose exec web npm run lint` (oxlint, TypeScript).
 - `docker compose exec api alembic upgrade head`: apply migrations.
 - Python dependencies: edit `api/requirements.in`, then regenerate `api/requirements.lock` with `pip freeze` inside a `python:3.14.8-slim` container. npm dependencies: `npm install --save-exact` inside the web container so `web/package-lock.json` updates.
 - Host venv for the editor and pyright only (the app runs in Docker): `python3 -m venv --without-pip api/.venv && python3 -m pip --python api/.venv/bin/python install -r api/requirements.lock`.
