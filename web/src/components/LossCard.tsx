@@ -57,7 +57,6 @@ export function LossCard({ loss }: { loss: LossDetail | null }) {
           )}
           {loss.history.length > 0 && (
             <div className="mt-4 border-t pt-3">
-              <div className="lbl">Tests, newest first</div>
               <table className="tbl table-fixed" data-testid="loss-history">
                 <caption className="sr-only">Loss tests on this span, newest first</caption>
                 <thead><tr>

@@ -5,7 +5,6 @@ import { STATUS, type CoreStatus } from "@/lib/status";
 
 type Detail = components["schemas"]["SpanDetail"];
 type Filter = "All" | Exclude<CoreStatus, "Available"> | "Count only";
-const DOT: Record<string, string> = { Reserved: "text-[#272a30]", Requested: "text-amber", "In use": "text-[#50555d]", Faulty: "text-red", "Count only": "text-[#50555d]" };
 
 // One row per held core from GET /api/spans/{id}, plus one count-only row. Age and the reservation's planner
 // are not on the span endpoint (history is TASK-077), so those columns are left out.
@@ -27,15 +26,15 @@ export function HeldTable({ d, onOpen }: { d: Detail; onOpen: (c: Detail["cores"
           <div role="group" aria-label="Filter held cores by status" className="mb-2 flex flex-wrap gap-2">
             {filters.map((f) => (
               <button key={f} type="button" className="chip" aria-pressed={filter === f} onClick={() => setFilter(f)}>
-                {f !== "All" && <span className={`dot ${filter === f ? "" : DOT[f]}`} />}{f} <b>{count(f)}</b>
+                {f !== "All" && <Icon name={f === "Count only" ? "co" : STATUS[f].icon} className={filter === f ? "" : f === "Count only" ? "text-[#50555d]" : STATUS[f].tone} />}{f} <b>{count(f)}</b>
               </button>
             ))}
           </div>
           <table className="tbl table-fixed">
             <caption className="sr-only">Held cores on this span</caption>
             <thead><tr>
-              <th scope="col" className="w-[13%]">Cores</th><th scope="col" className="w-[13%]">Status</th><th scope="col" className="w-[17%]">Held by</th>
-              <th scope="col">Ports or detail</th><th scope="col" className="w-[15%]">Circuit</th><th scope="col" className="w-[12%] pr-0! text-right!">Planned</th>
+              <th scope="col" className="w-[9%]">Cores</th><th scope="col" className="w-[14%]">Status</th><th scope="col" className="w-[17%]">Held by</th>
+              <th scope="col">Ports or detail</th><th scope="col" className="w-[14%]">Circuit</th><th scope="col" className="w-[15%] pr-0! text-right!">Planned</th>
             </tr></thead>
             <tbody>
               {rows.map((c) => (
@@ -48,7 +47,7 @@ export function HeldTable({ d, onOpen }: { d: Detail; onOpen: (c: Detail["cores"
                   <td className="truncate">{c.customer ?? "-"}</td>
                   <td className="py-2 leading-snug">{c.status === "Faulty" ? "Not bookable" : c.port_a || c.port_b ? `${c.port_a ?? "-"} to ${c.port_b ?? "-"}` : "-"}</td>
                   <td className="truncate font-mono text-[13px]">{c.circuit_id ?? "-"}</td>
-                  <td className="pr-0 text-right">{c.planned_date ?? "-"}</td>
+                  <td className="pr-0 text-right whitespace-nowrap">{c.planned_date ?? "-"}</td>
                 </tr>
               ))}
               {showCount && (
