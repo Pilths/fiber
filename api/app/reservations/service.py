@@ -113,12 +113,20 @@ def needs_review(db: Session, user: CurrentUser) -> list[NeedsReviewItem]:
             "SELECT h.reservation_id, c.number FROM core_holds h JOIN core_status_v v ON v.core_id = h.core_id "
             "JOIN cores c ON c.id = h.core_id WHERE v.status = 'Faulty' ORDER BY c.span_id, c.number")):
         faulty.setdefault(rid, []).append(number)
+    cut: dict[int, list[str]] = {}  # reservation -> names of cut spans it holds cores or a count on
+    for rid, name in db.execute(text(
+            "SELECT x.rid, a.name || ' - ' || b.name FROM ("
+            " SELECT h.reservation_id AS rid, c.span_id FROM core_holds h JOIN cores c ON c.id = h.core_id"
+            " UNION SELECT u.reservation_id, u.span_id FROM reservation_unassigned_v u WHERE u.remaining > 0) x "
+            "JOIN spans s ON s.id = x.span_id AND s.fiber_cut JOIN sites a ON a.id = s.site_a_id JOIN sites b ON b.id = s.site_b_id "
+            "ORDER BY x.rid, s.id")):
+        cut.setdefault(rid, []).append(name)
     where = ("(st.is_stale OR (st.status = 'approved' AND st.last_event = 'release_requested') "
-             "OR r.id = ANY(CAST(:faulty AS bigint[])))")
+             "OR r.id = ANY(CAST(:faulty AS bigint[])) OR r.id = ANY(CAST(:cut AS bigint[])))")
     if user.role != "admin":
         where += " AND r.planner_id = :uid"
     items = []
-    for r in load(db, where, "st.last_event_at, r.id", faulty=list(faulty), uid=user.id):
+    for r in load(db, where, "st.last_event_at, r.id", faulty=list(faulty), cut=list(cut), uid=user.id):
         if r.stale:
             items.append(NeedsReviewItem(kind="stale", reservation=r,
                                          detail=f"Stale: {r.age_days} days since last event. Keep it or request release."))
@@ -127,6 +135,8 @@ def needs_review(db: Session, user: CurrentUser) -> list[NeedsReviewItem]:
         if r.id in faulty:
             items.append(NeedsReviewItem(kind="faulty_held", reservation=r,
                                          detail="Faulty core taken: " + ", ".join(map(str, faulty[r.id]))))
+        if r.id in cut:
+            items.append(NeedsReviewItem(kind="fiber_cut", reservation=r, detail="Fiber cut: " + ", ".join(cut[r.id])))
     return items
 
 
@@ -203,6 +213,8 @@ def _check_book(db: Session, core_ids: list[int]) -> list[dict[str, Any]]:
         assert span is not None
         n = sum(r["span_id"] == sid for r in rows)
         label = f"{span.site_a} - {span.site_b}"
+        if span.fiber_cut:
+            raise conflict(f"{label} has a fiber cut and cannot be booked until an admin restores it.")
         if span.survey_cores is None:
             raise conflict(f"{label} is not surveyed yet; it cannot be booked.")
         if n > span.free_to_reserve:

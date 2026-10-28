@@ -29,7 +29,8 @@ class SpanSummary(BaseModel):
     cable_size: int
     not_surveyed: int | None  # cable_size - survey_cores
     unassigned_reserved: int  # cores reserved by count only, ports not assigned yet
-    free_to_reserve: int  # free_cores - unassigned_reserved (0 when not surveyed)
+    free_to_reserve: int  # free_cores - unassigned_reserved (0 when not surveyed or cut)
+    fiber_cut: bool  # whole cable out; cannot be booked or routed until an admin restores it
 
 
 class CoreDetail(BaseModel):

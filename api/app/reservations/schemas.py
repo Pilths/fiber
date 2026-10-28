@@ -61,7 +61,7 @@ class ReservationOut(BaseModel):
 
 
 class NeedsReviewItem(BaseModel):
-    kind: Literal["stale", "release_requested", "faulty_held"]
+    kind: Literal["stale", "release_requested", "faulty_held", "fiber_cut"]
     detail: str
     reservation: ReservationOut
 

@@ -94,7 +94,7 @@ def map_spans(db: Session) -> dict[str, Any]:
         surveyed = s["survey_cores"] is not None
         props = {"span_id": s["id"], "name": name, "site_a_id": g["site_a_id"], "site_b_id": g["site_b_id"],
                  "route_type": s["route_type"], "region": s["region"], "distance_km": s["distance_km"],
-                 "free_to_reserve": s["free_to_reserve"], "surveyed": surveyed,
+                 "free_to_reserve": s["free_to_reserve"], "surveyed": surveyed, "fiber_cut": s["fiber_cut"],
                  "chip": _chip(s["free_to_reserve"], surveyed), "segment_id": seg_id}
         if coords:
             props["shaped"] = True

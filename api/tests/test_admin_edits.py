@@ -4,7 +4,7 @@ import test_reservation_upload as tru
 import test_site_master as tsm
 from sqlalchemy import text
 from test_auth import mkuser
-from test_reservations import H, act, book, build, one
+from test_reservations import H, act, book, build, count_only as tru_count_only, one
 
 
 @pytest.fixture
@@ -373,3 +373,73 @@ def test_span_detail_lists_unassigned_holds(client, w, db):
     d = client.get(f"/api/spans/{w['s2']}", headers=H("planner1")).json()
     assert [(u["reservation_id"], u["remaining"]) for u in d["unassigned"]] == [(r2, 1)] and d["unassigned_reserved"] == 1
     assert client.get(f"/api/spans/{w['s1']}", headers=H("planner1")).json()["unassigned"] == []
+
+
+# ---------- span fiber cut ----------
+
+def cut(client, sid, on=True, user="admin1", **kw):
+    return post(client, f"spans/{sid}", user=user, **{"fiber_cut": on, "reason": "backhoe", **kw})
+
+
+def test_fiber_cut_edit_history_and_roles(client, w, db):
+    s1 = w["s1"]
+    assert cut(client, s1, reason="").status_code == 422
+    assert post(client, f"spans/{s1}", fiber_cut=True).status_code == 422
+    assert cut(client, s1, user="planner1").status_code == 403
+    assert client.get(f"/api/admin/spans/{s1}", headers=H("admin1")).json()["fiber_cut"] is False
+    assert cut(client, s1).status_code == 200
+    assert cut(client, s1).status_code == 400  # no change
+    assert client.get(f"/api/admin/spans/{s1}", headers=H("admin1")).json()["fiber_cut"] is True
+    assert cut(client, s1, False, reason="spliced").status_code == 200
+    assert edits(db, "span", s1) == [("fiber_cut", "false", "true", "backhoe"), ("fiber_cut", "true", "false", "spliced")]
+    assert one(db, "SELECT user_id FROM data_edits WHERE field = 'fiber_cut' LIMIT 1") == w["admin1"]
+
+
+def test_fiber_cut_read_side_and_free_to_reserve(client, w):
+    def sp(sid):
+        return client.get(f"/api/spans/{sid}", headers=H("planner1")).json()
+    assert sp(w["s1"])["free_to_reserve"] == 6 and sp(w["s1"])["fiber_cut"] is False
+    cut(client, w["s1"])
+    d = sp(w["s1"])
+    assert d["fiber_cut"] is True and d["free_to_reserve"] == 0 and d["survey_cores"] == 6 and len(d["cores"]) == 6
+    lst = {x["id"]: x for x in client.get("/api/spans", headers=H("planner1")).json()}
+    assert (lst[w["s1"]]["fiber_cut"], lst[w["s1"]]["free_to_reserve"]) == (True, 0)
+    assert (lst[w["s2"]]["fiber_cut"], lst[w["s2"]]["free_to_reserve"]) == (False, 4)  # a normal span is unaffected
+    cut(client, w["s1"], False, reason="restored")
+    assert sp(w["s1"])["free_to_reserve"] == 6 and sp(w["s1"])["fiber_cut"] is False
+
+
+def test_fiber_cut_refuses_booking_single_and_route(client, w, db):
+    cut(client, w["s2"])
+    r = book(client, w, [w["c2"][1]])
+    assert r.status_code == 409 and r.json()["detail"]["message"] == "B - C has a fiber cut and cannot be booked until an admin restores it."
+    assert book(client, w, [w["c1"][1], w["c2"][1]]).status_code == 409  # route request touching it
+    assert one(db, "SELECT count(*) FROM reservations") == 0
+    assert book(client, w, [w["c1"][1]]).status_code in (200, 201)  # other spans still book
+    cut(client, w["s2"], False, reason="restored")
+    assert book(client, w, [w["c2"][1]]).status_code in (200, 201)
+
+
+def test_fiber_cut_needs_review_and_existing_actions_not_blocked(client, w, db):
+    rid = approved(client, w, [w["c1"][1], w["c2"][1]])
+    pending = book(client, w, [w["c1"][2]]).json()["id"]
+    counted = tru_count_only(db, w, 1)
+    assert client.get("/api/needs-review", headers=H("planner1")).json() == []
+    cut(client, w["s2"])
+    items = client.get("/api/needs-review", headers=H("planner1")).json()
+    assert sorted((i["kind"], i["reservation"]["id"], i["detail"]) for i in items) == [("fiber_cut", rid, "Fiber cut: B - C"), ("fiber_cut", counted, "Fiber cut: B - C")]
+    assert act(client, pending, "approve").status_code == 200  # approve, release not blocked
+    assert act(client, rid, "release", cores=[w["c2"][1]]).status_code == 200
+    assert [i["reservation"]["id"] for i in client.get("/api/needs-review", headers=H("planner1")).json()] == [counted]
+
+
+def test_migration_0009_roundtrip(engine, db):
+    from conftest import alembic_cfg
+
+    from alembic import command
+    cfg = alembic_cfg()
+    command.downgrade(cfg, "0008")
+    assert one(db, "SELECT count(*) FROM information_schema.columns WHERE table_name = 'spans' AND column_name = 'fiber_cut'") == 0
+    command.upgrade(cfg, "head")
+    a, b = (one(db, "INSERT INTO sites (name, kind) VALUES (:n,'site') RETURNING id", n=n) for n in "AB")
+    assert one(db, "INSERT INTO spans (site_a_id, site_b_id) VALUES (:a,:b) RETURNING fiber_cut", a=a, b=b) is False

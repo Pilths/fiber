@@ -1379,7 +1379,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "stale" | "release_requested" | "faulty_held";
+            kind: "stale" | "release_requested" | "faulty_held" | "fiber_cut";
             /** Detail */
             detail: string;
             reservation: components["schemas"]["ReservationOut"];
@@ -1644,6 +1644,8 @@ export interface components {
             survey_cores?: number | null;
             /** Cable Size */
             cable_size?: number | null;
+            /** Fiber Cut */
+            fiber_cut?: boolean | null;
         };
         /** SpanDetail */
         SpanDetail: {
@@ -1679,6 +1681,8 @@ export interface components {
             unassigned_reserved: number;
             /** Free To Reserve */
             free_to_reserve: number;
+            /** Fiber Cut */
+            fiber_cut: boolean;
             /** Cores */
             cores: components["schemas"]["CoreDetail"][];
             /**
@@ -1709,6 +1713,8 @@ export interface components {
             survey_cores: number | null;
             /** Cable Size */
             cable_size: number;
+            /** Fiber Cut */
+            fiber_cut: boolean;
             /** History */
             history: components["schemas"]["HistoryRow"][];
         };
@@ -1816,6 +1822,8 @@ export interface components {
             unassigned_reserved: number;
             /** Free To Reserve */
             free_to_reserve: number;
+            /** Fiber Cut */
+            fiber_cut: boolean;
         };
         /** UnassignedHold */
         UnassignedHold: {

@@ -146,6 +146,7 @@ class SpanBody(BaseModel):
     site_b_id: int | None = None
     survey_cores: int | None = Field(None, ge=0)
     cable_size: int | None = Field(None, gt=0)
+    fiber_cut: bool | None = None
 
 
 class SpanEdit(BaseModel):
@@ -159,11 +160,12 @@ class SpanEdit(BaseModel):
     distance_km: Decimal | None
     survey_cores: int | None
     cable_size: int
+    fiber_cut: bool
     history: list[HistoryRow]
 
 
 SPAN_Q = ("SELECT s.id, s.site_a_id, s.site_b_id, a.name AS site_a, b.name AS site_b, s.route_type, s.region, s.distance_km, "
-          "s.survey_cores, s.cable_size FROM spans s JOIN sites a ON a.id = s.site_a_id JOIN sites b ON b.id = s.site_b_id "
+          "s.survey_cores, s.cable_size, s.fiber_cut FROM spans s JOIN sites a ON a.id = s.site_a_id JOIN sites b ON b.id = s.site_b_id "
           "WHERE s.id = :i")
 
 
@@ -238,9 +240,9 @@ def edit_span(db: DB, admin: Admin, sid: int, body: SpanBody) -> Edited:
     if "site_a_id" in changes or "site_b_id" in changes:  # one statement: a swap passes the differ check only as a pair
         db.execute(text("UPDATE spans SET site_a_id = :a, site_b_id = :b WHERE id = :i"),
                    {"a": changes.get("site_a_id", old["site_a_id"]), "b": changes.get("site_b_id", old["site_b_id"]), "i": sid})
-    done = _log(db, admin, "span", sid, [(f, old[f], v) for f, v in changes.items()], body.reason)
+    done = _log(db, admin, "span", sid, [(f, old[f], v) if f != "fiber_cut" else (f, str(old[f]).lower(), str(v).lower()) for f, v in changes.items()], body.reason)
     db.commit()
-    invalidate_routes()  # distance or site change alters the routing graph
+    invalidate_routes()  # distance, site or fiber cut change alters the routing graph
     return Edited(id=sid, changed=done, history=history(db, "span", sid, 10))
 
 

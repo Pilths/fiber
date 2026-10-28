@@ -84,3 +84,13 @@ def test_sites(client, db):
     assert by["DC fallback"]["geometry"]["coordinates"] == [101, 3]
     assert "location_from_site" not in by["DC own"]["properties"] and by["TOC"]["properties"]["kind"] == "toc"
     assert {n["name"] for n in r["not_drawn"]} == {"DC none", "Nogeo"}
+
+
+def test_spans_expose_fiber_cut_as_full(client, db):
+    mkuser(db)
+    a, b, c = (site(db, n, xy=(101 + i, 3)) for i, n in enumerate("ABC"))
+    ok, cut = span(db, a, b, 12), span(db, b, c, 12)
+    db.execute(text("UPDATE spans SET fiber_cut = true WHERE id = :s"), {"s": cut})
+    by = {f["properties"]["span_id"]: f["properties"] for f in client.get("/api/map/spans", headers=H()).json()["features"]}
+    assert (by[ok]["fiber_cut"], by[ok]["chip"]) == (False, "ok")
+    assert (by[cut]["fiber_cut"], by[cut]["chip"], by[cut]["free_to_reserve"]) == (True, "full", 0)

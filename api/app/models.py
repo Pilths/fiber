@@ -107,6 +107,7 @@ class Span(Base):
     distance_km: Mapped[Decimal | None] = mapped_column(Numeric(10, 3))
     survey_cores: Mapped[int | None] = mapped_column(Integer)
     cable_size: Mapped[int] = mapped_column(Integer, server_default=text("144"))
+    fiber_cut: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))  # whole cable out; set by an admin
     created_at: Mapped[datetime] = _created()
 
 

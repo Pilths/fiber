@@ -20,7 +20,7 @@ PER_TYPE = 20
 # Span list with free cores and status mix; status always comes from core_status_v.
 SPAN_SQL = """
 SELECT s.id, a.name AS site_a, b.name AS site_b, s.route_type, s.region, s.route, s.section, s.distance_km,
-       s.survey_cores, s.cable_size, COALESCE(mix.m, '{}'::jsonb) AS status_mix,
+       s.survey_cores, s.cable_size, s.fiber_cut, COALESCE(mix.m, '{}'::jsonb) AS status_mix,
        COALESCE((SELECT sum(u.remaining) FROM reservation_unassigned_v u WHERE u.span_id = s.id), 0)::int AS unassigned_reserved
 FROM spans s
 JOIN sites a ON a.id = s.site_a_id
@@ -105,7 +105,7 @@ def _summary(row: dict[str, Any]) -> dict[str, Any]:
     surveyed = row["survey_cores"] is not None
     return {**row, "free_cores": free,
             "not_surveyed": row["cable_size"] - row["survey_cores"] if surveyed else None,
-            "free_to_reserve": max(free - row["unassigned_reserved"], 0) if surveyed else 0}
+            "free_to_reserve": max(free - row["unassigned_reserved"], 0) if surveyed and not row["fiber_cut"] else 0}
 
 
 def list_spans(db: Session, region: str | None, route_type: str | None, q: str | None,

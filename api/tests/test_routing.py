@@ -179,3 +179,11 @@ def test_endpoints_ordered_by_section(client, g, db):
     names = [s["name"] for s in client.get("/api/routes/endpoints", headers=H()).json()]
     # A and C touch N-N, then B and D touch N-C, E has no section and goes last
     assert names == ["A", "C", "B", "D", "E"]
+
+
+def test_fiber_cut_span_is_not_routed(client, g, db):
+    db.execute(text("UPDATE spans SET fiber_cut = true WHERE id = :s"), {"s": g["BD"]})
+    invalidate()
+    opts = routes(client, g, n=1).json()["options"]
+    assert opts and all(g["BD"] not in [s["span_id"] for s in o["spans"]] for o in opts)
+    assert opts[0]["total_km"] == 8  # next best is A-C-D

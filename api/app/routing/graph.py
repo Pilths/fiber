@@ -23,7 +23,7 @@ def invalidate() -> None:
 
 def build(db: Session) -> nx.Graph:
     g = nx.Graph()
-    for sid, a, b, km in db.execute(text("SELECT id, site_a_id, site_b_id, distance_km FROM spans")):
+    for sid, a, b, km in db.execute(text("SELECT id, site_a_id, site_b_id, distance_km FROM spans WHERE NOT fiber_cut")):
         g.add_edge(a, b, span_id=sid, weight=float(km) if km is not None else FALLBACK_KM, no_distance=km is None)
     return g
 
