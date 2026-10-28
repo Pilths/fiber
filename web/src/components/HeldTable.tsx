@@ -3,7 +3,7 @@ import { api, errorText } from "@/api/client";
 import type { components } from "@/api/schema";
 import { Icon } from "@/components/Icon";
 import { Dialog } from "@/components/upload-parts";
-import { STATUS, type CoreStatus } from "@/lib/status";
+import { spanName, STATUS, type CoreStatus } from "@/lib/status";
 
 type Detail = components["schemas"]["SpanDetail"];
 type Hold = components["schemas"]["UnassignedHold"];
@@ -23,11 +23,11 @@ export function HeldTable({ d, admin, onOpen, onChanged }: { d: Detail; admin: b
   return (
     <section className="card" aria-labelledby="held-h">
       <div className="card-h">
-        <h2 id="held-h" tabIndex={-1} className="outline-offset-4">Taken cores</h2>
+        <h2 id="held-h" tabIndex={-1} className="outline-offset-4">Allocations<span className="font-normal text-muted-foreground"> of {spanName(d)}</span></h2>
       </div>
-      {held.length === 0 && !d.unassigned.length ? <p className="text-body text-muted-foreground">No cores taken.</p> : (
+      {held.length === 0 && !d.unassigned.length ? <p className="text-body text-muted-foreground">No allocations.</p> : (
         <>
-          <div role="group" aria-label="Filter taken cores by status" className="mb-2 flex flex-wrap gap-2">
+          <div role="group" aria-label="Filter allocations by status" className="mb-2 flex flex-wrap gap-2">
             {filters.map((f) => (
               <button key={f} type="button" className="chip" aria-pressed={filter === f} onClick={() => setFilter(f)}>
                 {f !== "All" && <Icon name={f === "Unassigned" ? "co" : STATUS[f].icon} className={`ic ${filter === f ? "" : f === "Unassigned" ? "text-use" : STATUS[f].tone}`} />}{f} <b>{count(f)}</b>
@@ -35,7 +35,7 @@ export function HeldTable({ d, admin, onOpen, onChanged }: { d: Detail; admin: b
             ))}
           </div>
           <table className="tbl table-fixed [&_td]:text-center! [&_th]:text-center!">
-            <caption className="sr-only">Taken cores on this span</caption>
+            <caption className="sr-only">Allocations on this span</caption>
             <thead><tr>
               <th scope="col" className="w-[9%]">Cores</th><th scope="col" className="w-[14%]">Status</th><th scope="col" className="w-[17%]">Customer</th>
               <th scope="col">Ports or detail</th><th scope="col" className="w-[14%]">Circuit</th><th scope="col" className="w-[15%] pr-0!">Planned date</th>

@@ -31,8 +31,8 @@ test("each level shows a pill with its own symbol and word, below the taken-core
     expect(r.pill, `${level} ${r.pill.toFixed(2)}`).toBeGreaterThanOrEqual(4.5);
   }
   expect(new Set(Object.values(seen)).size).toBe(4); // four symbols, never colour alone
-  // placement: the Loss card comes after "Taken cores"
-  const held = await page.getByRole("region", { name: "Taken cores" }).boundingBox();
+  // placement: the Loss card comes after "Allocations"
+  const held = await page.getByRole("region", { name: /^Allocations/ }).boundingBox();
   const loss = await card(page).boundingBox();
   expect(loss!.y).toBeGreaterThan(held!.y);
 });

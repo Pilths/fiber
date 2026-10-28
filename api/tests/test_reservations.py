@@ -268,13 +268,12 @@ def test_faulty_held_core_is_in_needs_review(client, w, db):
 
 # ---------- TEST-006 ----------
 
-def test_006_self_approval_only_for_the_only_admin(client, w, db):
+def test_006_admin_can_approve_their_own_request(client, w, db):
     rid = book(client, w, [w["c1"][1]], user="admin1").json()["id"]
-    assert act(client, rid, "approve", user="admin1").status_code == 403
-    assert act(client, rid, "approve", user="admin2").status_code == 200
-    rid2 = book(client, w, [w["c1"][2]], user="admin1").json()["id"]
-    db.execute(text("UPDATE users SET active = false WHERE username = 'admin2'"))
-    assert act(client, rid2, "approve", user="admin1").status_code == 200
+    r = act(client, rid, "approve", user="admin1")
+    assert r.status_code == 200 and r.json()["status"] == "approved"
+    ev = db.execute(text("SELECT type, user_id FROM reservation_events WHERE reservation_id = :r ORDER BY id"), {"r": rid}).all()
+    assert [e[0] for e in ev] == ["requested", "approved"] and ev[0][1] == ev[1][1]  # both events name the same admin
 
 
 def test_006_correction_rules(client, w, db):

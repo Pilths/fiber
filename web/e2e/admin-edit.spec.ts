@@ -40,7 +40,7 @@ test("core drawer: opens from a taken core with history, Keep for the owner, Esc
   await expect(cell(page, 1)).toBeFocused();
 
   // the taken-cores table opens the same drawer
-  await page.getByRole("table", { name: "Taken cores on this span" }).getByRole("button", { name: "Core 2 details" }).click();
+  await page.getByRole("table", { name: "Allocations on this span" }).getByRole("button", { name: "Core 2 details" }).click();
   await expect(drawer(page).getByRole("heading", { level: 2 })).toHaveText(/^Core 2 on/);
 });
 
@@ -67,7 +67,7 @@ test("taken-cores table tags stale cores", async ({ page }) => {
   test.skip(!core, "Dev data has no stale reservation holding a core; not faking one by changing server data.");
   const c: { number: number; span_name: string } = await (await page.request.get(`/api/cores/${core!.core_id}`)).json();
   await pick(page, new RegExp(`^${c.span_name}`));
-  const row = page.getByRole("table", { name: "Taken cores on this span" }).getByRole("row").filter({ has: page.getByRole("button", { name: `Core ${c.number} details` }) });
+  const row = page.getByRole("table", { name: "Allocations on this span" }).getByRole("row").filter({ has: page.getByRole("button", { name: `Core ${c.number} details` }) });
   await expect(row).toContainText(/Stale: no keep for over 3 months since /);
 });
 
@@ -209,11 +209,11 @@ test("admin edits a core's ports with a reason, then puts them back", async ({ p
 test("one Unassigned row per reservation; admin assign dialog limits the choice", async ({ page }) => {
   await signIn(page, "admin1");
   await pick(page, CJBJ);
-  const table = page.getByRole("table", { name: "Taken cores on this span" });
+  const table = page.getByRole("table", { name: "Allocations on this span" });
   const rows = table.getByTestId("unassigned-row");
   const n = await rows.count();
   expect(n).toBeGreaterThan(0);
-  await expect(page.getByRole("group", { name: "Filter taken cores by status" }).getByRole("button", { name: /^Unassigned/ })).toHaveText(`Unassigned ${n}`);
+  await expect(page.getByRole("group", { name: "Filter allocations by status" }).getByRole("button", { name: /^Unassigned/ })).toHaveText(`Unassigned ${n}`);
   const remaining = Number(await rows.first().getByRole("rowheader").innerText());
   let posted: unknown = null;
   await page.route("**/api/reservations/*/assign", (r) => { posted = r.request().postDataJSON(); return r.fulfill({ json: {} }); });

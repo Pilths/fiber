@@ -284,15 +284,9 @@ def request_release(db: Session, user: CurrentUser, rid: int, core_ids: list[int
 
 # ---------- admin ----------
 
-def _admin_count(db: Session) -> int:
-    return db.execute(text("SELECT count(*) FROM users WHERE role = 'admin' AND active")).scalar_one()
-
-
 def approve(db: Session, user: CurrentUser, rid: int) -> ReservationOut:
     row = _lock(db, rid)
     _require(row, "pending")
-    if row["planner_id"] == user.id and _admin_count(db) > 1:
-        raise HTTPException(403, "You cannot approve your own request while another admin can")
     _event(db, rid, "approved", user)
     db.commit()
     return get(db, rid)

@@ -62,7 +62,7 @@ export function LossCard({ loss }: { loss: LossDetail | null }) {
                 <caption className="sr-only">Loss tests on this span, newest first</caption>
                 <thead><tr>
                   <th scope="col" className="w-[18%]">Tested</th><th scope="col" className="w-[18%]">Measured</th><th scope="col" className="w-[18%]">Difference</th>
-                  <th scope="col">Method</th><th scope="col" className="pr-0!">Field team</th>
+                  <th scope="col">Method</th><th scope="col" className="pr-0!">Verified by</th>
                 </tr></thead>
                 <tbody>
                   {rows.map((h, i) => (

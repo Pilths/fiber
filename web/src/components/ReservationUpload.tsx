@@ -110,7 +110,7 @@ function Reservations({ uploadId, total }: { uploadId: number; total: number }) 
     <section aria-labelledby="ru-res-h" data-testid="ru-reservations">
       <div className="mb-2 flex flex-wrap items-baseline gap-x-3">
         <h3 id="ru-res-h" className="text-[15px] font-semibold">Reservations to import <span className="font-normal text-muted-foreground">({total.toLocaleString("en-GB")})</span></h3>
-        <span className="text-body text-muted-foreground">Imported as approved. Existing reservations are never changed; a row whose core is already taken is skipped.</span>
+        <span className="text-body text-muted-foreground">Imported as approved. Existing reservations are never changed; a row whose core is already allocated is skipped.</span>
       </div>
       {error && <p role="alert" className="text-body font-semibold text-red">{error}</p>}
       {data && (data.total === 0 ? <p className="text-body text-muted-foreground">No reservation rows will be imported.</p> : (
