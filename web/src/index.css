@@ -180,6 +180,7 @@
 .k-free { background: var(--green); }
 .k-hold { background: repeating-linear-gradient(135deg, #fff 0 2px, var(--use) 2px 3px); box-shadow: inset 0 0 0 1px var(--use); }
 .k-cores { background: var(--res); }
+.k-use { background: var(--use); }
 .k-fault { background: repeating-linear-gradient(135deg, var(--red-bg) 0 2px, var(--red) 2px 3px); box-shadow: inset 0 0 0 1px var(--red); }
 
 /* Chosen bar: footer band of the cores card, sticky to the viewport bottom while the card is in view.

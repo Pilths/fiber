@@ -3,7 +3,7 @@ import { api, errorText } from "@/api/client";
 import type { components } from "@/api/schema";
 import { Icon } from "@/components/Icon";
 import { Dialog } from "@/components/upload-parts";
-import { spanName, STATUS, type CoreStatus } from "@/lib/status";
+import { spanName, STATUS, statusLabel, type CoreStatus } from "@/lib/status";
 
 type Detail = components["schemas"]["SpanDetail"];
 type Hold = components["schemas"]["UnassignedHold"];
@@ -30,7 +30,7 @@ export function HeldTable({ d, admin, onOpen, onChanged }: { d: Detail; admin: b
           <div role="group" aria-label="Filter allocations by status" className="mb-2 flex flex-wrap gap-2">
             {filters.map((f) => (
               <button key={f} type="button" className="chip" aria-pressed={filter === f} onClick={() => setFilter(f)}>
-                {f !== "All" && <Icon name={f === "Unassigned" ? "co" : STATUS[f].icon} className={`ic ${filter === f ? "" : f === "Unassigned" ? "text-use" : STATUS[f].tone}`} />}{f} <b>{count(f)}</b>
+                {f !== "All" && <Icon name={f === "Unassigned" ? "co" : STATUS[f].icon} className={`ic ${filter === f ? "" : f === "Unassigned" ? "text-use" : STATUS[f].tone}`} />}{statusLabel(f)} <b>{count(f)}</b>
               </button>
             ))}
           </div>

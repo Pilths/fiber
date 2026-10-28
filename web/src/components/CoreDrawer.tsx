@@ -3,7 +3,7 @@ import { api, errorText, resAction } from "@/api/client";
 import type { components } from "@/api/schema";
 import { Icon } from "@/components/Icon";
 import { Dialog } from "@/components/upload-parts";
-import { EVENT_WORD, STATUS, when } from "@/lib/status";
+import { EVENT_WORD, STATUS, statusLabel, when } from "@/lib/status";
 
 type Core = components["schemas"]["CoreDetail"];
 type Holder = components["schemas"]["Holder"];
@@ -81,7 +81,7 @@ export function CoreDrawer({ core, span, ends, me, onClose, onChanged }: {
       cls="fixed inset-y-0 right-0 left-auto m-0 h-dvh max-h-dvh w-[460px] max-w-none overflow-y-auto rounded-none border-y-0 border-r-0 [&>h2]:pr-20">
       <button type="button" className="btn btn-sm absolute top-4 right-4" onClick={onClose} aria-label="Close core detail">Close</button>
       <div className="mt-3 flex flex-wrap items-center gap-2" data-testid="core-status">
-        <span className={`inline-flex items-center gap-1.5 font-semibold ${st.tone}`}><Icon name={st.icon} />{core.status}</span>
+        <span className={`inline-flex items-center gap-1.5 font-semibold ${st.tone}`}><Icon name={st.icon} />{statusLabel(core.status)}</span>
         {res?.stale && <span className="pill h-amber"><Icon name="lo" />Stale</span>}
         {res?.state === "release_requested" && <span className="pill h-blue"><Icon name="ex" />Release requested</span>}
       </div>
@@ -109,7 +109,7 @@ export function CoreDrawer({ core, span, ends, me, onClose, onChanged }: {
               <button type="button" className="btn" onClick={() => setMode("status")}>Mark {target}</button>
               <p className="mt-1.5 text-body text-muted-foreground">
                 {target === "Faulty"
-                  ? core.status === "Available" ? "Faulty cores cannot be booked." : "Its reservation goes to Action needed. In use and Reserved are not set here: they come from the Excel and the reservation flow."
+                  ? core.status === "Available" ? "Faulty cores cannot be booked." : "Its reservation goes to Action needed. In service and Reserved are not set here: they come from the Excel and the reservation flow."
                   : "Only a Faulty core can be marked Available here."}
               </p>
             </>

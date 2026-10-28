@@ -76,7 +76,7 @@ test("each status has a distinct symbol and text, not colour alone", async ({ pa
   const items = await key.getByRole("listitem").allInnerTexts();
   const icons = await key.locator("svg[data-icon]").evaluateAll((els) => els.map((e) => e.getAttribute("data-icon")));
   expect(new Set(icons).size).toBe(6); // 5 statuses + Chosen, each its own symbol
-  for (const s of ["Available", "Chosen", "Requested", "Reserved", "In use", "Faulty"]) expect(items.join("|")).toContain(s);
+  for (const s of ["Available", "Chosen", "Requested", "Reserved", "In service", "Faulty"]) expect(items.join("|")).toContain(s);
 
   // Cell patterns differ without any colour: compare border style/width and background-image.
   const looks = await page.evaluate(() => {
@@ -85,7 +85,7 @@ test("each status has a distinct symbol and text, not colour alone", async ({ pa
       const cs = getComputedStyle(el);
       const st = el.dataset.status!;
       seen[st] ??= `${cs.borderTopStyle}|${cs.borderTopWidth}|${cs.backgroundImage === "none" ? "plain" : "pattern"}`;
-      if (!el.textContent!.includes(st)) throw new Error(`cell without status text: ${st}`);
+      if (!el.textContent!.includes(st === "In use" ? "In service" : st)) throw new Error(`cell without status text: ${st}`);
     }
     return seen;
   });

@@ -17,7 +17,7 @@ import { RouteForm, RouteSection, RouteSummary, useRoutePlanner } from "@/compon
 import { Upload } from "@/components/Upload";
 import { Users } from "@/components/Users";
 import { Approvals, MyReservations, NeedsReview } from "@/components/Reservations";
-import { countBy, inFilter, NO_FILTER, spanName, STATUS, STATUS_ORDER, type LossDetail, type SpanFilter, type SpanLoss } from "@/lib/status";
+import { countBy, inFilter, NO_FILTER, spanName, STATUS, STATUS_ORDER, statusLabel, type LossDetail, type SpanFilter, type SpanLoss } from "@/lib/status";
 
 type Span = components["schemas"]["SpanSummary"];
 type Detail = components["schemas"]["SpanDetail"];
@@ -293,7 +293,7 @@ function Cores({ d, selected, chosen, toggle, focusCoreId, onOpen, onClear, onDo
           return (
             <li key={s} className="flex items-center gap-2" data-key={s}>
               <span aria-hidden className={`core sw ${st.cls} ${s === "Chosen" ? "sw-chosen" : ""}`}><Icon name={s === "Chosen" ? "ch" : st.icon} /></span>
-              {s} <b className="font-bold text-foreground">{s === "Chosen" ? chosen.length : n[s]}</b>
+              {statusLabel(s)} <b className="font-bold text-foreground">{s === "Chosen" ? chosen.length : n[s]}</b>
             </li>
           );
         })}

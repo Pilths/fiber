@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { components } from "@/api/schema";
 import { Icon } from "@/components/Icon";
-import { STATUS } from "@/lib/status";
+import { STATUS, statusLabel } from "@/lib/status";
 
 type Core = components["schemas"]["CoreDetail"];
 const COLS = 12; // one fibre tube per row
@@ -38,7 +38,7 @@ export function PortGrid({ cores, selected, onToggle, onOpen, focusCoreId }: {
     else if (e.key === "End") { e.preventDefault(); move(cores.length - 1); }
     else if (e.key === " " || e.key === "Enter") { e.preventDefault(); if (c.status === "Available") onToggle(c.id); else onOpen(c); }
   };
-  const label = (c: Core) => `Core ${c.number}: ${selected.has(c.id) ? "Chosen" : c.status}${c.customer ? `, ${c.customer}` : ""}`;
+  const label = (c: Core) => `Core ${c.number}: ${selected.has(c.id) ? "Chosen" : statusLabel(c.status)}${c.customer ? `, ${c.customer}` : ""}`;
   const rows = Array.from({ length: Math.ceil(cores.length / COLS) }, (_, r) => cores.slice(r * COLS, r * COLS + COLS));
 
   return (
@@ -75,7 +75,7 @@ export function PortGrid({ cores, selected, onToggle, onOpen, focusCoreId }: {
                     >
                       <span className="n">{c.number}</span>
                       <Icon name={chosen ? "ch" : STATUS[c.status].icon} />
-                      <span className="w">{chosen ? "Chosen" : c.status}</span>
+                      <span className="w">{chosen ? "Chosen" : statusLabel(c.status)}</span>
                     </div>
                   );
                 })}

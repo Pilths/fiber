@@ -12,6 +12,8 @@ export const STATUS: Record<CoreStatus, { icon: IconName; cls: string; tone: str
   Faulty: { icon: "fl", cls: "core-faulty", tone: "text-red" },
 };
 export const STATUS_ORDER = Object.keys(STATUS) as CoreStatus[];
+// The API and the data keep "In use"; the screens say "In service".
+export const statusLabel = (s: string) => (s === "In use" ? "In service" : s);
 
 type Health = { cls: string; icon: IconName; word: string; value: string };
 // Free-to-reserve health: green 10+, amber 1-9, red 0 (full), grey dashed when not surveyed.
