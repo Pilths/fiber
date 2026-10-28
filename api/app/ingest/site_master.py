@@ -7,7 +7,7 @@ import json
 import re
 from collections import Counter
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import openpyxl
@@ -578,7 +578,7 @@ def apply_upload(db: Session, admin_id: int, upload_id: int, override: dict[str,
             summary[k] = apply_sheet(db, admin_id, k, res[k], why, pairs, warnings, prot, snap)
         sheets = {k: {**summary[k], "applied": True} if k in summary else {"applied": False, "block_reasons": res[k].block_reasons}
                   for k in SHEETS}
-        applied = {"by": admin_id, "at": datetime.now(timezone.utc).isoformat(), "sheets": sheets, "warnings": warnings,
+        applied = {"by": admin_id, "at": datetime.now(UTC).isoformat(), "sheets": sheets, "warnings": warnings,
                    "override_drop": {k: bool(override.get(k)) for k in SHEETS}, "override_reason": reason}
         for k, on in override.items():
             if on and k in summary:

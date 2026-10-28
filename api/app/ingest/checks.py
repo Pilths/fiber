@@ -49,7 +49,7 @@ def split_nodes(v: object) -> tuple[str, str, bool] | None:
     """'AABB-BBCC' or 'AABB-BBCC (additional core)' -> (site, site, additional)."""
     if blank(v):
         return None
-    s, additional = re.subn(r"\(\s*additional\s+core\s*\)", "", str(v), flags=re.I)
+    s, additional = re.subn(r"\(\s*additional\s+core\s*\)", "", str(v), flags=re.IGNORECASE)
     parts = [p.strip() for p in s.split("-")]
     if len(parts) != 2 or not all(parts) or parts[0] == parts[1]:
         return None
@@ -91,7 +91,7 @@ def pair_ports(cell: object) -> tuple[Blocks | None, str | None]:
     blocks: Blocks = []
     for chunk in chunks:
         lines = [ln.strip() for ln in chunk.splitlines() if ln.strip()]
-        ranges = list(re.finditer(r"P(\d+)\s*-\s*P?(\d+)\s*$", lines[-1], flags=re.I))
+        ranges = list(re.finditer(r"P(\d+)\s*-\s*P?(\d+)\s*$", lines[-1], flags=re.IGNORECASE))
         if not ranges:
             return None, f"no port range (P<n>-P<m>) for '{lines[0]}'"
         start, end = int(ranges[-1].group(1)), int(ranges[-1].group(2))

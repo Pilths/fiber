@@ -147,7 +147,7 @@ def _resize(db: Session, sid: int, new: int) -> None:
         {"s": sid, "n": new}).all()
     if blocking:
         nums = [n for _, n in blocking]
-        raise conflict(f"Cannot lower to {new}: cores {', '.join(map(str, nums))} are held, in use, faulty, have ports "
+        raise conflict(f"Cannot lower to {new}: cores {', '.join(map(str, nums))} are reserved, in use, faulty, have ports "
                        "or have reservation history.", blocking_core_numbers=nums, blocking_core_ids=[i for i, _ in blocking])
     free_after = db.execute(text("SELECT count(*) FROM cores c JOIN core_status_v v ON v.core_id = c.id "
                                  "WHERE c.span_id = :s AND c.number <= :n AND v.status = 'Available'"), {"s": sid, "n": new}).scalar_one()

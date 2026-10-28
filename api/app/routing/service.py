@@ -1,6 +1,6 @@
 """Route options over the span graph. Free cores use inventory.list_spans (free_to_reserve), loss uses loss.span_rows."""
 import time
-from itertools import islice
+from itertools import islice, pairwise
 from typing import Any
 
 import networkx as nx
@@ -65,7 +65,7 @@ def find_routes(db: Session, frm: int, to: int, cores_needed: int, sort: str) ->
     options = []
     for path in paths:
         spans = []
-        for u, v in zip(path, path[1:]):
+        for u, v in pairwise(path):
             sid = g[u][v]["span_id"]
             s, lo = inv[sid], ls[sid]
             spans.append({"span_id": sid, "name": f"{s['site_a']} - {s['site_b']}", "site_a": names[u], "site_b": names[v],  # travel order
@@ -78,7 +78,7 @@ def find_routes(db: Session, frm: int, to: int, cores_needed: int, sort: str) ->
         fewest = bottleneck["free_to_reserve"]
         options.append({
             "spans": spans, "total_km": round(sum(x["km"] or 0 for x in spans), 3),
-            "_weight": sum(g[u][v]["weight"] for u, v in zip(path, path[1:])),  # fallback km for spans without distance
+            "_weight": sum(g[u][v]["weight"] for u, v in pairwise(path)),  # fallback km for spans without distance
             "distance_incomplete": any(x["km"] is None for x in spans),
             "estimated_db": None if None in calc else round(float(sum(calc)), 2),
             "fewest_free": fewest, "bottleneck_span_id": bottleneck["span_id"],

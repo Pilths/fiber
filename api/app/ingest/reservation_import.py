@@ -81,7 +81,7 @@ def place_reservation(db: Any, counts: dict[str, int], p: dict[str, Any], site_i
             else:
                 db.execute(text("UPDATE cores SET port_a_id = :a, port_b_id = :b WHERE id = :c"), {"a": pa, "b": pb, "c": core})
         elif one(db, "SELECT core_id FROM core_holds WHERE core_id = :c", c=core):
-            raise Skip("core already held")
+            raise Skip("core already taken")
         core_ids.append(core)
     cust = one(db, "SELECT id FROM customers WHERE lower(name) = lower(:n)", n=p["customer"])
     if cust is None:

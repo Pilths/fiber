@@ -67,7 +67,7 @@ export function CoreDrawer({ core, span, me, onClose, onChanged }: { core: Core;
   };
   const facts: [string, React.ReactNode][] = [
     ["Customer", core.customer ?? "-"],
-    ["Held by", res ? `${res.owner.display_name}, reservation #${res.reservation_id}` : "-"],
+    ["Reserved by", res ? `${res.owner.display_name}, reservation #${res.reservation_id}` : "-"],
     ["Ports", core.port_a || core.port_b ? `${core.port_a ?? "-"} to ${core.port_b ?? "-"}` : "-"],
     ["Circuit", core.circuit_id ? <span key="c" className="font-mono">{core.circuit_id}</span> : "-"],
     ["Planned date", core.planned_date ?? "-"],

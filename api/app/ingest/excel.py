@@ -65,6 +65,11 @@ def _sheet(wb: Any, name: str) -> Any:
     return next((ws for ws in wb.worksheets if norm(ws.title) == norm(name)), None)
 
 
+def _header_row(ws: Any, anchor: str) -> int | None:
+    """Number of the first row, top to bottom, that holds the anchor header in any column; None when no row does."""
+    return next((r[0].row for r in ws.iter_rows() if any(not blank(c.value) and norm(c.value) == anchor for c in r)), None)
+
+
 def _row(sheet: str, n: int, headers: list[str], values: list[Any]) -> tuple[RowResult, dict[str, Any]]:
     raw = {h: _json(v) for h, v in zip(headers, values) if h}
     return RowResult(sheet, n, raw), {norm(h): v for h, v in zip(headers, values) if h}
@@ -83,7 +88,7 @@ def _guard(r: RowResult, fn: Any) -> None:
 
 
 def _reservations(ws: Any, known: set[str]) -> list[RowResult]:
-    headers, rows = _read(ws, 1)
+    headers, rows = _read(ws, _header_row(ws, "nodes") or 1)  # Nodes is the anchor header; other columns sit beside it
     out: list[RowResult] = []
     label: str | None = None
     for n, values in rows:
@@ -201,9 +206,9 @@ def parse_reservation_workbook(path: Any) -> tuple[list[RowResult], list[str]]:
     Site codes are not judged here: the upload checks them against the database.
     """
     wb = openpyxl.load_workbook(path, data_only=True)
-    ws = _sheet(wb, "Reservation")
+    ws = _sheet(wb, "Reservation") or next((w for w in wb.worksheets if _header_row(w, "nodes")), None)  # else any sheet with Nodes
     if ws is None:
-        raise ValueError("no Reservation sheet found")
+        raise ValueError("no Reservation sheet found, and no sheet has a Nodes column")
     return _reservations(ws, set()), [w.title for w in wb.worksheets if w is not ws]
 
 

@@ -165,7 +165,7 @@ export function EditSpanDialog({ spanId, focus, onClose, onSaved }: { spanId: nu
             </label>
             <label><span className={lbl}>Cable size</span><input className="field" type="number" min="1" step="1" value={f.cable} onChange={set("cable")} /></label>
             <p className="col-span-2 -mt-1 text-body text-muted-foreground">
-              Survey count sets how many cores can be booked. Cable size is information only. Lowering the survey count is refused while a removed core is held, in use, faulty or has history. Changing sites is refused while the span has active reservations.
+              Survey count sets how many cores can be booked. Cable size is information only. Lowering the survey count is refused while a removed core is reserved, in use, faulty or has history. Changing sites is refused while the span has active reservations.
             </p>
             <Reason value={f.reason} onChange={(v) => setF((o) => ({ ...o, reason: v }))} missing={tried && !f.reason.trim()} />
           </div>

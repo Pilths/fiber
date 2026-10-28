@@ -286,7 +286,7 @@ function ApprovalRow({ r, onChanged }: { r: Res; onChanged: () => void }) {
             <p className="text-muted-foreground">Request #{r.id}{r.imported && ", imported"}. Last event: {r.last_event ?? "none"}, {r.age_days} days ago.{r.stale && " Stale: no approval or keep for over 3 months."}</p>
             {r.unassigned_cores > 0 && <p>{r.unassigned_cores} cores reserved by count on {r.unassigned_span}; {r.remaining_unassigned} not assigned yet.</p>}
             {groupCores(r).map(([span, cs]) => <p key={span}>{span}: cores {cs.map((c) => c.held ? c.number : `${c.number} (released)`).join(", ")}</p>)}
-            {release && <p>Release requested for cores {r.cores.filter((c) => r.release_requested_cores.includes(c.core_id)).map((c) => c.number).join(", ") || "held by count"}.</p>}
+            {release && <p>Release requested for cores {r.cores.filter((c) => r.release_requested_cores.includes(c.core_id)).map((c) => c.number).join(", ") || "unassigned"}.</p>}
             {r.last_reason && <p role="note">{r.status === "rejected" ? "Rejection reason" : "Release declined"}: {r.last_reason}</p>}
             {mode && (
               <form className="flex items-end gap-2 pt-1" onSubmit={(e) => { e.preventDefault(); if (reason.trim()) run(mode, { reason: reason.trim() }); }}>
@@ -312,7 +312,7 @@ export function NeedsReview({ me, onChanged }: { me: Me; onChanged: () => void }
   return (
     <section aria-labelledby="nr-h" className="card mx-auto w-full max-w-4xl space-y-3">
       <h2 id="nr-h" className="text-base leading-6 font-semibold">Action needed{data ? ` (${data.length})` : ""}</h2>
-      <p className="text-sm text-muted-foreground">Stale reservations, release requests and held cores that went faulty.</p>
+      <p className="text-sm text-muted-foreground">Stale reservations, release requests and taken cores that went faulty.</p>
       {error && <p role="alert">Could not load the list.</p>}
       {data && data.length === 0 && <p>Nothing needs action.</p>}
       <div className="space-y-3">
