@@ -78,6 +78,25 @@ test("site master preview: counts per sheet, 10% drop override, blocked DC sheet
   await preview.getByRole("button", { name: "Discard preview" }).click(); // never applied: would deactivate nothing, but keep the dev data as seeded
 });
 
+test("site master add and update only: no Missing rows, no row-count block (not applied)", async ({ page }) => {
+  await openUpload(page, "Site master workbook");
+  const addOnly = page.getByLabel("Add and update only");
+  await expect(addOnly).not.toBeChecked();
+  await addOnly.check();
+  await page.getByLabel("Upload a site master workbook").setInputFiles(file(`e2e-addonly-${stamp}.xlsx`, [
+    { name: "Site Location", rows: [SITE_HEAD, ["E2E Site One", 3.2, 101.5, "Central", "Tower"], ["E2E Site Two", "TBA", "TBA", "Central", "Tower"]] },
+  ]));
+  const preview = page.getByTestId("sm-preview");
+  await expect(preview).toContainText("Add and update only: sites not in this file are kept.");
+  const sites = page.getByTestId("sheet-sites");
+  await expect(sites.getByRole("button", { name: "Missing 0" })).toBeVisible();
+  await expect(sites).not.toContainText("limit is 10%");
+  await expect(sites.getByLabel(/^Override/)).toHaveCount(0);
+  await expect(sites.getByRole("button", { name: "Apply Site Location…" })).toBeEnabled();
+  await expect(addOnly).toBeChecked(); // the choice stays for the next file
+  await preview.getByRole("button", { name: "Discard preview" }).click(); // never applied: the dev data stays as seeded
+});
+
 test("site master apply: DC sheet applies, result shown, current file updates", async ({ page }) => {
   await openUpload(page, "Site master workbook");
   const name = `e2e-dcs-${stamp}.xlsx`;

@@ -2,7 +2,7 @@
 import io
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, Form, HTTPException, Query, UploadFile
 from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -41,6 +41,7 @@ class UploadOut(BaseModel):
     filename: str
     sheets: list[SheetOut]
     possible_renames: list[dict[str, Any]]
+    add_only: bool = False
 
 
 class RowsOut(BaseModel):
@@ -76,7 +77,8 @@ class ApplyOut(BaseModel):
 
 
 @router.post("/uploads", status_code=201)
-def upload(db: DB, admin: Admin, file: UploadFile) -> UploadOut:
+def upload(db: DB, admin: Admin, file: UploadFile, add_only: Annotated[bool, Form()] = False) -> UploadOut:
+    """add_only: the file is part of the list; sites not in it are kept active and the row-count check is skipped."""
     name = file.filename or ""
     if not name.lower().endswith(".xlsx"):
         raise HTTPException(422, "Only .xlsx files are accepted")
@@ -87,7 +89,7 @@ def upload(db: DB, admin: Admin, file: UploadFile) -> UploadOut:
         parsed = sm.parse_workbook(io.BytesIO(data))
     except Exception as e:
         raise HTTPException(422, f"Cannot read the workbook: {type(e).__name__}") from e
-    return UploadOut(**sm.stage(db, admin.id, name, parsed))
+    return UploadOut(**sm.stage(db, admin.id, name, parsed, add_only))
 
 
 @router.get("/uploads/{upload_id}/rows")

@@ -58,6 +58,10 @@ def post(client, data, name="sm.xlsx"):
     return client.post(f"{URL}/uploads", files={"file": (name, data, "application/octet-stream")})
 
 
+def post_add_only(client, data, name="sm.xlsx"):
+    return client.post(f"{URL}/uploads", files={"file": (name, data, "application/octet-stream")}, data={"add_only": "true"})
+
+
 def sheets(r):
     return {s["kind"]: s for s in r.json()["sheets"]}
 
@@ -408,3 +412,17 @@ def test_sheets_apply_one_at_a_time(client, admin, db):
     assert count(db, "SELECT count(*) FROM sites WHERE kind = 'data_center'") == 1
     assert client.get(f"{URL}/current").json()["current"]["upload_id"] == uid
     assert apply(client, uid).status_code == 409
+
+
+def test_add_only_keeps_sites_missing_from_the_file_and_skips_the_row_count_check(client, admin, db):
+    seed_sites(db, [f"S{i:03d}" for i in range(30)])
+    data = workbook([site("S000", 3.5), site("NEWW")])  # 2 rows against 30 active: normally blocked, rest would be deactivated
+    normal = post(client, data)
+    assert sheets(normal)["sites"]["blocked"] and sheets(normal)["sites"]["counts"]["missing"] == 29
+    r = post_add_only(client, data)
+    s = sheets(r)["sites"]
+    assert r.json()["add_only"] is True and not s["blocked"]
+    assert s["counts"]["missing"] == 0 and s["counts"]["added"] == 1 and s["counts"]["changed"] == 1
+    assert apply(client, r.json()["upload_id"]).status_code == 200
+    assert count(db, "SELECT count(*) FROM sites WHERE active") == 31  # 30 kept + 1 new, none deactivated
+    assert count(db, "SELECT ST_Y(geom) FROM sites WHERE name = 'S000'") == pytest.approx(3.5)  # S000 was updated by the file
