@@ -312,7 +312,7 @@ export function NeedsReview({ me, onChanged }: { me: Me; onChanged: () => void }
   return (
     <section aria-labelledby="nr-h" className="card mx-auto w-full max-w-4xl space-y-3">
       <h2 id="nr-h" className="text-base leading-6 font-semibold">Action needed{data ? ` (${data.length})` : ""}</h2>
-      <p className="text-sm text-muted-foreground">Stale reservations, release requests and allocated cores that went faulty.</p>
+      <p className="text-sm text-muted-foreground">Stale reservations, release requests, allocated cores that went faulty and reservations on a cut span (Fiber cut).</p>
       {error && <p role="alert">Could not load the list.</p>}
       {data && data.length === 0 && <p>Nothing needs action.</p>}
       <div className="space-y-3">

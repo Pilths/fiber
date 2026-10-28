@@ -16,8 +16,9 @@ export const STATUS_ORDER = Object.keys(STATUS) as CoreStatus[];
 export const statusLabel = (s: string) => (s === "In use" ? "In service" : s);
 
 type Health = { cls: string; icon: IconName; word: string; value: string };
-// Free-to-reserve health: green 10+, amber 1-9, red 0 (full), grey dashed when not surveyed.
-export function health(s: { survey_cores: number | null; free_to_reserve: number }): Health {
+// Free-to-reserve health: red "Cut" when the cable is cut, green 10+, amber 1-9, red 0 (full), grey dashed when not surveyed.
+export function health(s: { survey_cores: number | null; free_to_reserve: number; fiber_cut?: boolean }): Health {
+  if (s.fiber_cut) return { cls: "h-red", icon: "fl", word: "Cut", value: "0 cut" };
   if (s.survey_cores == null) return { cls: "h-ns", icon: "ns", word: "Not surveyed", value: "not surveyed" };
   const n = s.free_to_reserve;
   if (n >= 10) return { cls: "h-green", icon: "ch", word: "Healthy", value: String(n) };

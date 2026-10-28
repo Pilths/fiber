@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, ApiError, authEvents, setDevUser } from "@/api/client";
 import { ChangePassword, Login } from "@/components/Auth";
 import type { components } from "@/api/schema";
-import { EditSiteDialog, EditSpanDialog } from "@/components/AdminEdit";
+import { EditSiteDialog, EditSpanDialog, type SpanFocus } from "@/components/AdminEdit";
 import { ChosenBar } from "@/components/ChosenBar";
 import { CoreDrawer } from "@/components/CoreDrawer";
 import { FindCard } from "@/components/FindCard";
@@ -82,7 +82,7 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
   const [lossList, setLossList] = useState<SpanLoss[]>([]);
   const [version, setVersion] = useState(0); // bumped after a booking or edit so the span list and grid reload
   const [drawerCore, setDrawerCore] = useState<number | null>(null);
-  const [editSpan, setEditSpan] = useState<{ focus?: "survey" } | null>(null);
+  const [editSpan, setEditSpan] = useState<{ focus?: SpanFocus } | null>(null);
   const [editSite, setEditSite] = useState<number | null>(null);
   const [filter, setFilter] = useState<SpanFilter>(NO_FILTER);
   const routeOf = useMemo(() => new Map(spans?.map((s) => [s.id, s.route])), [spans]); // map features carry no route
@@ -177,7 +177,7 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
   const changed = () => { setVersion((v) => v + 1); refreshBell(); };
   const drawn = detail?.cores.find((c) => c.id === drawerCore);
   const admin = me.role === "admin" && spanId != null ? {
-    onEditSpan: (focus?: "survey") => setEditSpan({ focus }),
+    onEditSpan: (focus?: SpanFocus) => setEditSpan({ focus }),
     onEditSite: (end: "a" | "b") => {
       api.get("/api/admin/spans/{sid}", { path: { sid: spanId } }).then((x) => setEditSite(end === "a" ? x.site_a_id : x.site_b_id)).catch(() => setError("Could not load the span."));
     },

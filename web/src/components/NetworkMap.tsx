@@ -13,7 +13,7 @@ import { health } from "@/lib/status";
 
 export type SpanProps = {
   span_id: number; name: string; site_a_id: number; site_b_id: number; route_type: string | null; region: string | null;
-  distance_km: string | null; free_to_reserve: number; surveyed: boolean; chip: "ok" | "low" | "full" | "not_surveyed";
+  distance_km: string | null; free_to_reserve: number; surveyed: boolean; chip: "ok" | "low" | "full" | "not_surveyed"; fiber_cut?: boolean;
   segment_id: number | null; shaped?: boolean;
 };
 type SiteProps = { site_id: number; name: string; kind: string; lrd_site_id: number | null; region: string | null; location_from_site?: string };
@@ -189,7 +189,7 @@ export function NetworkMap({ selectedIds, routeKey, visible, onSelectSpan, onSit
   const siteXY = (sites?.features ?? []).map((f) => (view && size.w ? P(f.geometry.coordinates) : [0, 0]));
   siteXY.forEach(([x, y]) => placed.push([x - 11, y - 11, x + 11, y + 11]));
   const chipShown = new Set([...drawn].filter((d) => d.show).sort((a, b) => Number(b.on) - Number(a.on)).filter(({ p, on, mid }) => {
-    const w = 34 + 7.5 * health({ survey_cores: p.surveyed ? 1 : null, free_to_reserve: p.free_to_reserve }).value.length;
+    const w = 34 + 7.5 * health({ survey_cores: p.surveyed ? 1 : null, free_to_reserve: p.free_to_reserve, fiber_cut: p.fiber_cut }).value.length;
     return on ? fits(mid[0], mid[1] - 11, Math.max(w, 7.5 * p.name.length + 16), 46) : fits(mid[0], mid[1], w + 4, 24);
   }).map((d) => d.p.span_id));
   const nameShown = siteXY.map(([x, y], i) => fits(x, y + 33, 7.2 * sites!.features[i].properties.name.length + 12, 18));
@@ -232,7 +232,7 @@ export function NetworkMap({ selectedIds, routeKey, visible, onSelectSpan, onSit
               );
             })}
             {drawn.filter((d) => d.show).map(({ p, on, mid, dim }) => {
-              const h = health({ survey_cores: p.surveyed ? 1 : null, free_to_reserve: p.free_to_reserve });
+              const h = health({ survey_cores: p.surveyed ? 1 : null, free_to_reserve: p.free_to_reserve, fiber_cut: p.fiber_cut });
               return (
                 <button key={p.span_id} type="button" data-testid="map-chip" data-span-id={p.span_id} data-selected={on} aria-pressed={on}
                   aria-label={`Span ${p.name}, ${p.route_type ?? "no route type"}, ${p.surveyed ? `${p.free_to_reserve} free to reserve, ${h.word}` : "not surveyed"}`}

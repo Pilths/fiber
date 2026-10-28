@@ -1,8 +1,9 @@
 import type { ReactNode } from "react";
 import type { components } from "@/api/schema";
 import { Icon } from "@/components/Icon";
+import type { SpanFocus } from "@/components/AdminEdit";
 import { LossPill } from "@/components/LossCard";
-import { countBy, db, health, pct, spanName, type LossDetail } from "@/lib/status";
+import { countBy, db, health, LEVEL, pct, spanName, type LossDetail } from "@/lib/status";
 
 type Detail = components["schemas"]["SpanDetail"];
 
@@ -16,7 +17,7 @@ export const Facts = ({ d }: { d: Detail }) => (
   </>
 );
 
-type Admin = { onEditSpan: (focus?: "survey") => void; onEditSite: (end: "a" | "b") => void } | null; // null for planners
+type Admin = { onEditSpan: (focus?: SpanFocus) => void; onEditSite: (end: "a" | "b") => void } | null; // null for planners
 
 export function Inspector({ detail, loading, onGoToCores, loss, onSeeLoss, onSeeHeld, admin, onPlanRoute, route }: {
   detail: Detail | null; loading: boolean; onGoToCores: () => void; loss: LossDetail | null; onSeeLoss: () => void; onSeeHeld: () => void; admin: Admin;
@@ -57,12 +58,19 @@ function Body({ d, onGoToCores, loss, onSeeLoss, onSeeHeld, admin, onPlanRoute }
   const n = countBy(d);
   const surveyed = d.survey_cores != null;
   const withCores = n.Reserved + n.Requested + n["In use"];
-  const parts = [  // adds up to the surveyed cores: reserved includes cores held by count only
+  const cut = d.fiber_cut;
+  const parts = [  // reserved includes cores held by count only; faulty cores are in the core grid, not here
     { k: "k-free", v: d.free_to_reserve, label: "Free to reserve" },
     { k: "k-cores", v: n.Reserved + n.Requested + d.unassigned_reserved, label: "Reserved" },
     { k: "k-use", v: n["In use"], label: "In service" },
-    { k: "k-fault", v: n.Faulty, label: "Faulty" },
   ];
+  // Loss alert strip: amber or worse, measured only.
+  const lv = loss?.measured_db != null && loss.deviation_pct != null && loss.level && loss.level !== "green" ? loss.level : null;
+  const high = lv === "red" || lv === "off_scale";
+  // Literal class names so Tailwind finds them.
+  const tone = high
+    ? { strip: "border-red-bd bg-red-bg text-red", row: "bg-red-bg shadow-[inset_3px_0_0_var(--red)]", text: "text-red" }
+    : { strip: "border-amber-bd bg-amber-bg text-amber", row: "bg-amber-bg shadow-[inset_3px_0_0_var(--amber)]", text: "text-amber" };
   return (
     <>
       <h3 className="text-2xl leading-[30px] font-bold tracking-tight">
@@ -78,16 +86,37 @@ function Body({ d, onGoToCores, loss, onSeeLoss, onSeeHeld, admin, onPlanRoute }
         <Facts d={d} />
         {admin && <button type="button" className="btn btn-sm ml-auto" onClick={() => admin.onEditSpan()}>Edit span</button>}
       </div>
+      {(cut || lv) && (
+        <div className="mt-4 space-y-2 text-body">
+          {cut && (
+            <div data-testid="fiber-cut" className="flex items-center gap-2.5 rounded-md border border-red-bd bg-red-bg px-3 py-2 text-red">
+              <Icon name="fl" />
+              <p className="min-w-0 flex-1"><b className="font-semibold">Fiber cut</b><span className="block text-foreground">All cores on this span are unavailable.</span></p>
+              {admin && <button type="button" className="btn btn-sm flex-none" onClick={() => admin.onEditSpan("restore")}>Restore</button>}
+            </div>
+          )}
+          {lv && (
+            <p data-testid="loss-alert" data-level={lv} className={`flex items-center gap-2.5 rounded-md border px-3 py-2 ${tone.strip}`}>
+              <Icon name={LEVEL[lv].icon} />
+              <span className="min-w-0 flex-1"><b className="font-semibold">{high ? "High loss" : "Loss above calculated"}:</b> {db(loss!.measured_db!)} measured, {pct(loss!.deviation_pct!)} over calculated</span>
+              <span className="flex-none font-semibold">{LEVEL[lv].word}</span>
+            </p>
+          )}
+        </div>
+      )}
       <div className="mt-5 border-t pt-4">
         <div className="lbl">Free to reserve</div>
-        <div className={`mt-0.5 flex items-center gap-2.5 text-[40px] leading-[46px] font-bold tracking-tight ${surveyed ? h.cls.replace("h-", "v-") : "text-muted-foreground"}`}>
-          {surveyed ? d.free_to_reserve : "-"}
-          <span className={`pill tracking-normal ${h.cls}`} title={h.word}><Icon name={h.icon} /><span className="sr-only">{h.word}</span></span>
+        <div className={`mt-0.5 flex items-center gap-2.5 text-[40px] leading-[46px] font-bold tracking-tight ${surveyed || cut ? h.cls.replace("h-", "v-") : "text-muted-foreground"}`}>
+          {cut ? 0 : surveyed ? d.free_to_reserve : "-"}
+          {cut
+            ? <span className={`pill tracking-normal ${h.cls}`}><Icon name={h.icon} />{h.word}</span>
+            : <span className={`pill tracking-normal ${h.cls}`} title={h.word}><Icon name={h.icon} /><span className="sr-only">{h.word}</span></span>}
         </div>
         {surveyed ? (
           <>
-            <div className="mt-3.5 flex h-2 gap-0.5" aria-hidden>
-              {parts.filter((p) => p.v > 0).map((p) => <span key={p.k} className={`k ${p.k} h-full rounded`} style={{ flex: p.v }} />)}
+            <div className="mt-3.5 flex h-2 gap-0.5" aria-hidden data-testid="free-bar">
+              {cut ? <span className="k k-fault h-full rounded" style={{ flex: 1 }} />
+                : parts.filter((p) => p.v > 0).map((p) => <span key={p.k} className={`k ${p.k} h-full rounded`} style={{ flex: p.v }} />)}
             </div>
             <dl className="mt-2.5 grid grid-cols-2 gap-x-4 gap-y-1 text-body text-muted-foreground">
               {parts.map((p) => (
@@ -96,6 +125,12 @@ function Body({ d, onGoToCores, loss, onSeeLoss, onSeeHeld, admin, onPlanRoute }
                   <dd className="flex min-w-[38px] items-center gap-2 font-bold text-foreground"><span className={`k ${p.k}`} />{p.v}</dd>
                 </div>
               ))}
+              {cut && (
+                <div className="flex items-center gap-2">
+                  <dt className="order-1 font-semibold text-red">Fiber cut</dt>
+                  <dd className="flex min-w-[38px] items-center gap-2 font-bold text-red"><span className="k k-fault" />All</dd>
+                </div>
+              )}
             </dl>
           </>
         ) : admin ? (
@@ -105,12 +140,12 @@ function Body({ d, onGoToCores, loss, onSeeLoss, onSeeHeld, admin, onPlanRoute }
           </div>
         ) : <p className="mt-1 text-body text-muted-foreground">Not surveyed, cannot be booked. Cable size {d.cable_size}.</p>}
       </div>
-      <div className="mt-5 flex items-center gap-2 border-t pt-4 text-body" data-testid="inspector-loss">
+      <div className={`mt-5 flex items-center gap-2 border-t text-body ${lv ? `-mx-5 px-5 py-3 ${tone.row}` : "pt-4"}`} data-testid="inspector-loss" data-level={lv ?? undefined}>
         <span className="lbl">Loss</span>
         <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
           {!loss ? <span className="text-muted-foreground">Loading...</span>
             : loss.measured_db != null ? (
-              <><span><b className="font-semibold">{db(loss.measured_db)}</b> measured{loss.deviation_pct != null && `, ${pct(loss.deviation_pct)}`}</span><LossPill l={loss} compact /></>
+              <><span className={lv ? tone.text : undefined}><b className="font-semibold">{db(loss.measured_db)}</b> measured{loss.deviation_pct != null && `, ${pct(loss.deviation_pct)}`}</span><LossPill l={loss} compact /></>
             ) : <span className="text-muted-foreground">{loss.status === "no_distance" ? "Not measured, no distance" : "Not measured"}</span>}
         </span>
         <button type="button" className="flex-none font-semibold link" onClick={onSeeLoss}>See loss</button>
