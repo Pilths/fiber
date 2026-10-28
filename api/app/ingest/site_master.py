@@ -277,7 +277,6 @@ def _eval_sheet(kind: str, ps: ParsedSheet, snap: dict[str, DbSite], prot: dict[
         return res
     label = "site_name" if kind == "sites" else "DC Name / Link"
     counts = Counter(i.p["key"] for i in ps.items if i.p["key"])
-    dup = sorted(k for k, n in counts.items() if n > 1)
     for it in ps.items:
         p, reasons = it.p, list(it.p["reasons"])
         key = p["key"]
@@ -312,9 +311,6 @@ def _eval_sheet(kind: str, ps: ParsedSheet, snap: dict[str, DbSite], prot: dict[
     # whole-file checks
     if not ps.items:
         res.block_reasons.append("sheet is empty")
-        res.hard = True
-    if dup:
-        res.block_reasons.append(f"duplicate keys in file: {', '.join(dup[:5])}{' ...' if len(dup) > 5 else ''}")
         res.hard = True
     active = sum(1 for r in snap.values() if r.cls == kind and r.active)
     if ps.items and len(counts) * DROP_LIMIT[1] <= active * DROP_LIMIT[0]:

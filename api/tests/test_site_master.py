@@ -160,16 +160,25 @@ def test_ten_percent_drop_blocks_until_override(client, admin, db):
     assert not sheets(r)["sites"]["blocked"]
 
 
-@pytest.mark.parametrize("data, why", [
-    (workbook([]), "empty"),
-    (workbook([site("AAAA"), site("AAAA", 3.5)]), "duplicate"),
-])
-def test_empty_and_duplicate_keys_block_and_cannot_be_overridden(client, admin, db, data, why):
-    r = post(client, data)
+def test_empty_sheet_blocks_and_cannot_be_overridden(client, admin, db):
+    r = post(client, workbook([]))
     s = sheets(r)["sites"]
-    assert s["blocked"] and not s["needs_override"] and why in s["block_reasons"][0]
+    assert s["blocked"] and not s["needs_override"] and "empty" in s["block_reasons"][0]
     assert apply(client, r.json()["upload_id"], override_drop={"sites": True}, reason="x").status_code == 409
     assert count(db) == 0
+
+
+def test_duplicate_names_are_problem_rows_and_do_not_block_the_sheet(client, admin, db):
+    seed_sites(db, ["DUPE"])
+    r = post(client, workbook([site("AAAA"), site("DUPE"), site("DUPE", 3.5), site("BBBB")]))
+    s = sheets(r)["sites"]
+    assert not s["blocked"] and s["counts"]["added"] == 2 and s["counts"]["problem"] == 2
+    uid = r.json()["upload_id"]
+    p = rows(client, uid, "sites", "problem")["items"]
+    assert [i["key"] for i in p] == ["DUPE", "DUPE"] and "duplicate site_name 'DUPE' in file (rows" in p[0]["reason"]
+    assert apply(client, uid).status_code == 200
+    assert count(db, "SELECT count(*) FROM sites WHERE name IN ('AAAA', 'BBBB')") == 2
+    assert count(db, "SELECT count(*) FROM sites WHERE name = 'DUPE'") == 1 and count(db, "SELECT active FROM sites WHERE name = 'DUPE'")  # untouched
 
 
 def test_missing_headers_block_not_overridable(client, admin):
@@ -180,7 +189,7 @@ def test_missing_headers_block_not_overridable(client, admin):
 
 
 def test_failing_dc_sheet_does_not_block_good_sites_sheet(client, admin, db):
-    r = post(client, workbook([site("AAAA"), site("BBBB")], [dc("DC One", "AAAA"), dc("DC One", "BBBB")]))
+    r = post(client, workbook([site("AAAA"), site("BBBB")], []))  # a DC sheet with no rows is blocked for good
     s = sheets(r)
     assert not s["sites"]["blocked"] and s["dcs"]["blocked"]
     ok = apply(client, r.json()["upload_id"])
