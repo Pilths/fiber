@@ -78,7 +78,6 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
   const [view, setViewState] = useState<View>(location.hash === "#users" ? "users" : "map");
   const [bell, setBell] = useState<Bell | null>(null);
   const [stale, setStale] = useState(0);
-  const [mapMin, setMapMin] = useState(false);
   const [loss, setLoss] = useState<LossDetail | null>(null);
   const [lossList, setLossList] = useState<SpanLoss[]>([]);
   const [version, setVersion] = useState(0); // bumped after a booking or edit so the span list and grid reload
@@ -228,16 +227,14 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
       )}
       {view === "map" && (
         <main className="grid grid-cols-12 gap-4 px-6 pt-6 pb-10">
-          <section className={`card col-span-8 flex flex-col ${mapMin ? "self-start" : ""}`} aria-labelledby="map-h">
-            <div className={`card-h ${mapMin ? "mb-0 border-b-0 pb-0" : ""}`}>
+          <section className="card col-span-8 flex flex-col" aria-labelledby="map-h">
+            <div className="card-h">
               <h2 id="map-h">Network map</h2>
               <small className="hint">{mode === "route" ? (routeName ? `Route ${routeName} selected` : "No route selected") : detail ? `${spanName(detail)} selected` : "Nothing selected"}</small>
             </div>
-            {!mapMin && (
-              <NetworkMap version={version} onSelectSpan={(id) => open(id)} onSite={mapSite} onClear={clearSelection}
-                selectedIds={mode === "route" ? rp.option?.spans.map((s) => s.span_id) ?? [] : spanId != null ? [spanId] : []}
-                routeKey={mode === "route" && rp.option ? `${rp.idx}-${routeName}` : null} visible={(p) => inFilter(p, filter)} />
-            )}
+            <NetworkMap version={version} onSelectSpan={(id) => open(id)} onSite={mapSite} onClear={clearSelection}
+              selectedIds={mode === "route" ? rp.option?.spans.map((s) => s.span_id) ?? [] : spanId != null ? [spanId] : []}
+              routeKey={mode === "route" && rp.option ? `${rp.idx}-${routeName}` : null} visible={(p) => inFilter(p, filter)} />
           </section>
           <div className="col-span-4 flex min-w-0 flex-col gap-4">
             <FindCard spans={spans} selectedId={spanId} onSelect={(id) => open(id)} loss={lossList} mode={mode} onMode={setMode} route={<RouteForm rp={rp} />} filter={filter} onFilter={setFilter} />
@@ -257,10 +254,6 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
                       {detail.survey_cores != null && <span><b className="font-semibold text-foreground">{detail.survey_cores}</b> surveyed of {detail.cable_size}</span>}
                     </span>
                   </div>
-                  <button type="button" className="btn flex-none" aria-pressed={mapMin} onClick={() => setMapMin((m) => !m)}>
-                    {mapMin ? "Expand map" : "Collapse map"}
-                    <svg viewBox="0 0 16 16" aria-hidden="true" className={`ni ${mapMin ? "rotate-180" : ""}`}><path d="M4 10l4-4 4 4" /></svg>
-                  </button>
                 </div>
                 {detail.survey_cores == null
                   ? (
