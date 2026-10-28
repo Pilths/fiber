@@ -724,6 +724,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/cores/{core_id}/ports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Set Core Ports */
+        post: operations["set_core_ports_api_admin_cores__core_id__ports_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/spans/{sid}": {
         parameters: {
             query?: never;
@@ -925,6 +942,8 @@ export interface components {
     schemas: {
         /** ApplyIn */
         ApplyIn: {
+            /** Sheets */
+            sheets?: ("sites" | "dcs")[] | null;
             /**
              * @default {
              *       "sites": false,
@@ -952,6 +971,11 @@ export interface components {
             };
             /** Warnings */
             warnings: string[];
+            /**
+             * Complete
+             * @default true
+             */
+            complete: boolean;
         };
         /** Bell */
         Bell: {
@@ -1080,6 +1104,15 @@ export interface components {
         CoreIds: {
             /** Cores */
             cores?: number[];
+        };
+        /** CorePortsBody */
+        CorePortsBody: {
+            /** Port A */
+            port_a?: string | null;
+            /** Port B */
+            port_b?: string | null;
+            /** Reason */
+            reason: string;
         };
         /** CoreRef */
         CoreRef: {
@@ -1561,6 +1594,11 @@ export interface components {
             free_to_reserve: number;
             /** Cores */
             cores: components["schemas"]["CoreDetail"][];
+            /**
+             * Unassigned
+             * @default []
+             */
+            unassigned: components["schemas"]["UnassignedHold"][];
         };
         /** SpanEdit */
         SpanEdit: {
@@ -1687,6 +1725,17 @@ export interface components {
             unassigned_reserved: number;
             /** Free To Reserve */
             free_to_reserve: number;
+        };
+        /** UnassignedHold */
+        UnassignedHold: {
+            /** Reservation Id */
+            reservation_id: number;
+            /** Customer */
+            customer: string | null;
+            /** Remaining */
+            remaining: number;
+            /** Planned Date */
+            planned_date: string | null;
         };
         /** UploadOut */
         UploadOut: {
@@ -3435,6 +3484,45 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_core_ports_api_admin_cores__core_id__ports_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-dev-user"?: string | null;
+            };
+            path: {
+                core_id: number;
+            };
+            cookie?: {
+                fiber_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CorePortsBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoreHolderDetail"];
                 };
             };
             /** @description Validation Error */

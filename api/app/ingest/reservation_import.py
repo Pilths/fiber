@@ -53,36 +53,11 @@ def port(db: Any, counts: dict[str, int], label: str, site_id: int) -> int:
     return n
 
 
-def port_pairs(p: dict[str, Any], site_ids: dict[str, int], span_a: int, span_b: int) -> list[tuple[str, str]]:
-    """Paired port labels oriented (span site_a side, span site_b side); empty for a count-only row."""
-    labels = {site_ids[code]: lbls for code, lbls in p.get("ports") or []}
-    return list(zip(labels.get(span_a, []), labels.get(span_b, [])))
-
-
 def place_reservation(db: Any, counts: dict[str, int], p: dict[str, Any], site_ids: dict[str, int],
                       creator_id: int, approver_id: int) -> int:
-    """Insert an approved reservation (events requested + approved) for a parsed Ready row. Raises Skip if a core is held."""
+    """Insert an approved reservation (events requested + approved) for a parsed Ready row. Count-only: cores are assigned later by an admin."""
     a, b = site_ids[p["site_a"]], site_ids[p["site_b"]]
-    span_id, span_a = ensure_span(db, counts, a, b, p)
-    span_b = b if span_a == a else a
-    core_ids = []
-    for la, lb in port_pairs(p, site_ids, span_a, span_b):
-        pa, pb = port(db, counts, la, span_a), port(db, counts, lb, span_b)
-        core = one(db, "SELECT id FROM cores WHERE span_id = :s AND port_a_id = :a AND port_b_id = :b", s=span_id, a=pa, b=pb)
-        if core is None:  # next portless surveyed core in number order, else a new one
-            core = one(db, "SELECT id FROM cores WHERE span_id = :s AND port_a_id IS NULL AND port_b_id IS NULL "
-                           "AND number <= coalesce((SELECT survey_cores FROM spans WHERE id = :s), number) "
-                           "ORDER BY number LIMIT 1", s=span_id)
-            if core is None:
-                core = one(db, "INSERT INTO cores (span_id, number, port_a_id, port_b_id) VALUES "
-                               "(:s, (SELECT coalesce(max(number), 0) + 1 FROM cores WHERE span_id = :s), :a, :b) RETURNING id",
-                           s=span_id, a=pa, b=pb)
-                counts["cores"] = counts.get("cores", 0) + 1
-            else:
-                db.execute(text("UPDATE cores SET port_a_id = :a, port_b_id = :b WHERE id = :c"), {"a": pa, "b": pb, "c": core})
-        elif one(db, "SELECT core_id FROM core_holds WHERE core_id = :c", c=core):
-            raise Skip("core already taken")
-        core_ids.append(core)
+    span_id, _ = ensure_span(db, counts, a, b, p)
     cust = one(db, "SELECT id FROM customers WHERE lower(name) = lower(:n)", n=p["customer"])
     if cust is None:
         cust = one(db, "INSERT INTO customers (name, created_by) VALUES (:n, :u) RETURNING id", n=p["customer"], u=creator_id)
@@ -98,8 +73,5 @@ def place_reservation(db: Any, counts: dict[str, int], p: dict[str, Any], site_i
     ev = "INSERT INTO reservation_events (reservation_id, type, user_id) VALUES (:r, :t, :u)"
     db.execute(text(ev), {"r": res, "t": "requested", "u": creator_id})
     db.execute(text(ev), {"r": res, "t": "approved", "u": approver_id})
-    for core in core_ids:
-        db.execute(text("INSERT INTO reservation_cores (reservation_id, core_id) VALUES (:r, :c)"), {"r": res, "c": core})
-        db.execute(text("INSERT INTO core_holds (core_id, reservation_id) VALUES (:c, :r)"), {"c": core, "r": res})
     counts["reservations"] = counts.get("reservations", 0) + 1
     return res

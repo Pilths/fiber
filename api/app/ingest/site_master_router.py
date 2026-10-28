@@ -62,6 +62,7 @@ class OverrideIn(BaseModel):
 
 
 class ApplyIn(BaseModel):
+    sheets: list[Literal["sites", "dcs"]] | None = None  # apply only these sheets; None applies every sheet that can be applied
     override_drop: OverrideIn = OverrideIn()
     reason: str | None = None
     renames: list[RenameIn] = []
@@ -71,6 +72,7 @@ class ApplyOut(BaseModel):
     upload_id: int
     sheets: dict[str, dict[str, Any]]
     warnings: list[str]
+    complete: bool = True  # False while another sheet of this upload can still be applied
 
 
 @router.post("/uploads", status_code=201)
@@ -112,7 +114,7 @@ def rows(db: DB, upload_id: int, sheet: Literal["sites", "dcs"], group: Literal[
 def apply(db: DB, admin: Admin, upload_id: int, body: ApplyIn) -> ApplyOut:
     try:
         return ApplyOut(**sm.apply_upload(db, admin.id, upload_id, body.override_drop.model_dump(), body.reason,
-                                          [r.model_dump() for r in body.renames]))
+                                          [r.model_dump() for r in body.renames], body.sheets))
     except sm.ApplyError as e:
         raise HTTPException(e.status, e.message) from e
 

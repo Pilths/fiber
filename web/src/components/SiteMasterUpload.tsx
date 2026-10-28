@@ -15,13 +15,24 @@ type Row = {
   id: number; row_number: number | null; key: string; status: string | null; reason: string | null;
   changes: { field: string; old: unknown; new: unknown; protected?: boolean; note?: string }[];
   location_note: string | null; in_use: boolean | null; possible_rename: Rename | null;
+  raw: Record<string, unknown> | null;
+  parsed: { lat?: number | null; lon?: number | null; region?: string | null; lrd?: string | null; details?: Record<string, unknown> } | null;
+};
+// Parsed value first; a value the parser could not read (e.g. "TBA") shows as typed in the file.
+const field = (o: Record<string, unknown> | null | undefined, re: RegExp) => {
+  const k = o && Object.keys(o).find((x) => re.test(x.trim()));
+  return k ? o[k] : null;
+};
+const cell = (parsed: unknown, raw: unknown) => {
+  const v = parsed ?? raw;
+  return v == null || v === "" ? "—" : String(v);
 };
 type FileInfo = {
   upload_id: number; filename: string; status: string; uploaded_at: string; applied_at: string | null; uploaded_by: string;
   sheets: Partial<Record<Kind, { sheet_name: string | null; found: boolean; rows: number }>>;
 };
 
-const SHEET_LABEL: Record<Kind, string> = { sites: "Sites sheet", dcs: "DC sheet" };
+const SHEET_LABEL: Record<Kind, string> = { sites: "Site Location", dcs: "DC List" };
 const GROUPS: { g: Group; label: string; icon: IconName; cls: string }[] = [
   { g: "added", label: "Added", icon: "ch", cls: "h-green" },
   { g: "changed", label: "Changed", icon: "co", cls: "h-blue" },
@@ -30,6 +41,9 @@ const GROUPS: { g: Group; label: string; icon: IconName; cls: string }[] = [
   { g: "unchanged", label: "Unchanged", icon: "av", cls: "h-ns" },
 ];
 const willApply = (s: Sheet, override: boolean) => s.found && (!s.blocked || (s.needs_override && override));
+const resultLine = (s: Record<string, unknown>) => s.applied
+  ? `${s.added} added, ${s.changed} changed, ${s.renamed} renamed, ${s.deactivated} set inactive, ${s.kept_active} missing but kept active, ${s.protected_kept} dashboard edits kept${s.skipped ? `, ${s.skipped} skipped` : ""}.`
+  : `not applied (${((s.block_reasons as string[] | undefined) ?? []).join("; ")}).`;
 
 // Current file and previous uploads in one compact table, current first.
 function Files({ data }: { data: { current: FileInfo | null; previous: FileInfo[] } | null }) {
@@ -43,18 +57,19 @@ function Files({ data }: { data: { current: FileInfo | null; previous: FileInfo[
       {!c && <p className="mb-2 text-body text-muted-foreground">No site master file applied yet.</p>}
       {list.length > 0 && (
         <div className="tbox">
-          <table className="tbl band">
-            <thead><tr><th>File</th><th className="w-px">Uploaded</th><th className="w-px">Status</th><th className="num w-px">Sites</th><th className="num w-px">DCs</th></tr></thead>
+          <table className="tbl band table-fixed [&_td]:whitespace-nowrap [&_th]:whitespace-nowrap">
+            <thead><tr><th className="w-[320px]">File</th><th className="w-[260px]">Uploaded</th><th className="w-[120px]">Status</th><th className="num w-[90px]">Sites</th><th className="num w-[90px]">DCs</th><th aria-hidden /></tr></thead>
             <tbody>
               {list.map((f) => (
                 <tr key={f.upload_id} data-testid={f === c ? "sm-current" : undefined}>
-                  <td className={`max-w-[360px] truncate ${f === c ? "font-semibold" : ""}`} title={f.filename}>{f.filename}</td>
-                  <td>{when(f.uploaded_at)} · {f.uploaded_by}</td>
-                  <td>{f === c ? <span className="inline-flex items-center gap-1.5 font-semibold text-green"><Icon name="ch" />Current, applied {when(f.applied_at)}</span>
+                  <td className={`truncate ${f === c ? "font-semibold" : ""}`} title={f.filename}>{f.filename}</td>
+                  <td className="truncate" title={`${when(f.uploaded_at)} · ${f.uploaded_by}`}>{when(f.uploaded_at)} · {f.uploaded_by}</td>
+                  <td>{f === c ? <span className="inline-flex items-center gap-1.5 font-semibold text-green"><Icon name="ch" />Current</span>
                     : f.status === "confirmed" ? <span className="inline-flex items-center gap-1.5"><Icon name="ch" />Applied</span>
-                    : <span className="inline-flex items-center gap-1.5 text-muted-foreground"><Icon name="ns" />Staged, not applied</span>}</td>
+                    : <span className="inline-flex items-center gap-1.5 text-muted-foreground"><Icon name="ns" />Staged</span>}</td>
                   <td className="num">{n(f, "sites")}</td>
                   <td className="num">{n(f, "dcs")}</td>
+                  <td aria-hidden />
                 </tr>
               ))}
             </tbody>
@@ -84,7 +99,9 @@ function RowDetail({ r, group }: { r: Row; group: Group }) {
   );
 }
 
-function SheetPanel({ uploadId, s, override, onOverride }: { uploadId: number; s: Sheet; override: boolean; onOverride: (on: boolean) => void }) {
+function SheetPanel({ uploadId, s, override, onOverride, applied, children }: {
+  uploadId: number; s: Sheet; override: boolean; onOverride: (on: boolean) => void; applied: boolean; children?: React.ReactNode;
+}) {
   const first = GROUPS.find((x) => s.counts[x.g] > 0)?.g ?? "added";
   const [group, setGroup] = useState<Group>(first);
   const [page, setPage] = useState(1);
@@ -107,13 +124,14 @@ function SheetPanel({ uploadId, s, override, onOverride }: { uploadId: number; s
         <span className="text-body text-muted-foreground">
           {s.found ? <>found as worksheet <b className="font-semibold text-foreground">“{s.sheet_name}”</b>, {s.counts.rows.toLocaleString("en-GB")} rows</> : "worksheet not found"}
         </span>
+        {applied && <span className="pill h-green"><Icon name="ch" />Applied</span>}
       </div>
-      {s.blocked && !s.needs_override && (
+      {!applied && s.blocked && !s.needs_override && (
         <div className="mb-3"><Note tone="red" role="alert" title="This sheet will not be applied">
           <ul className="list-disc pl-4">{s.block_reasons.map((b) => <li key={b}>{b}</li>)}</ul>
         </Note></div>
       )}
-      {s.needs_override && (
+      {!applied && s.needs_override && (
         <div className="mb-3"><Note tone="amber" title={override ? "Override chosen: this sheet will be applied" : "Blocked: this sheet will not be applied unless you override"}>
           <ul className="list-disc pl-4">{s.block_reasons.map((b) => <li key={b}>{b}</li>)}</ul>
           <label className="mt-2 flex items-center gap-2 font-medium">
@@ -131,17 +149,34 @@ function SheetPanel({ uploadId, s, override, onOverride }: { uploadId: number; s
           {data && (data.total === 0 ? <p className="text-body text-muted-foreground">No {g.label.toLowerCase()} rows.</p> : (
             <>
               <div className="tbox">
-              <table className="tbl band" aria-label={`${SHEET_LABEL[s.kind]}: ${g.label} rows`}>
-                <thead><tr><th className="num w-px">Row</th><th className="w-[28%]">Name</th><th className="w-px">Status</th><th>Details</th></tr></thead>
+              <table className="tbl band table-fixed" aria-label={`${SHEET_LABEL[s.kind]}: ${g.label} rows`}>
+                <thead><tr>
+                  <th scope="col" className="num w-16">Row</th>
+                  <th scope="col" className="w-[22%]">{s.kind === "sites" ? "Site name" : "DC name"}</th>
+                  {s.kind === "dcs" && <><th scope="col" className="w-[16%]">LRD</th><th scope="col" className="w-[10%]">State</th></>}
+                  <th scope="col" className="num w-24">Latitude</th>
+                  <th scope="col" className="num w-24">Longitude</th>
+                  {s.kind === "sites" && <th scope="col" className="w-[12%]">Region</th>}
+                  <th scope="col">Status or reason</th>
+                </tr></thead>
                 <tbody>
-                  {data.items.map((r) => (
-                    <tr key={r.id}>
-                      <td className="num text-muted-foreground">{r.row_number ?? "—"}</td>
-                      <th scope="row" className="text-left font-semibold">{r.key || <i className="font-normal text-muted-foreground">blank</i>}</th>
-                      <td><span className={`inline-flex items-center gap-1.5 ${g.cls === "h-amber" ? "font-semibold text-amber" : ""}`}><Icon name={g.icon} />{group === "problem" ? "Needs review" : g.label}</span></td>
-                      <td className="whitespace-normal! [&:has(*)]:h-auto! [&:has(*)]:py-1.5!"><RowDetail r={r} group={group} /></td>
-                    </tr>
-                  ))}
+                  {data.items.map((r) => {
+                    const tx = (v: string) => <td className="truncate" title={v === "—" ? undefined : v}>{v}</td>;
+                    return (
+                      <tr key={r.id}>
+                        <td className="num text-muted-foreground">{r.row_number ?? "—"}</td>
+                        <th scope="row" className="truncate text-left font-semibold" title={r.key || undefined}>{r.key || <i className="font-normal text-muted-foreground">blank</i>}</th>
+                        {s.kind === "dcs" && <>{tx(cell(r.parsed?.lrd, field(r.raw, /^lrd$/i)))}{tx(cell(field(r.parsed?.details, /^(state|city)$/i), null))}</>}
+                        <td className="num truncate">{cell(r.parsed?.lat, field(r.raw, /^lat/i))}</td>
+                        <td className="num truncate">{cell(r.parsed?.lon, field(r.raw, /^lon/i))}</td>
+                        {s.kind === "sites" && tx(cell(r.parsed?.region, field(r.raw, /^region$/i)))}
+                        <td className="whitespace-normal! [&:has(*)]:h-auto! [&:has(*)]:py-1.5!">
+                          <span className={`inline-flex items-center gap-1.5 ${g.cls === "h-amber" ? "font-semibold text-amber" : ""}`}><Icon name={g.icon} />{group === "problem" ? "Needs review" : g.label}</span>
+                          <RowDetail r={r} group={group} />
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
               </div>
@@ -150,6 +185,7 @@ function SheetPanel({ uploadId, s, override, onOverride }: { uploadId: number; s
           ))}
         </>
       )}
+      {children}
     </section>
   );
 }
@@ -187,9 +223,10 @@ export function SiteMasterUpload() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [override, setOverride] = useState<Record<Kind, boolean>>({ sites: false, dcs: false });
-  const [reason, setReason] = useState("");
+  const [reason, setReason] = useState<Record<Kind, string>>({ sites: "", dcs: "" });
   const [decisions, setDecisions] = useState<Record<number, "rename" | "separate">>({});
-  const [confirming, setConfirming] = useState(false);
+  const [confirming, setConfirming] = useState<Kind | null>(null);
+  const [done, setDone] = useState<Partial<Record<Kind, Applied>>>({}); // sheets applied from this upload while others remain
   const [result, setResult] = useState<Applied | null>(null);
 
   const loadCurrent = useCallback(() => {
@@ -198,8 +235,8 @@ export function SiteMasterUpload() {
   useEffect(loadCurrent, [loadCurrent]);
 
   const pick = async (f: File) => {
-    setBusy(true); setError(null); setResult(null); setStaged(null);
-    setOverride({ sites: false, dcs: false }); setReason(""); setDecisions({});
+    setBusy(true); setError(null); setResult(null); setStaged(null); setDone({}); setConfirming(null);
+    setOverride({ sites: false, dcs: false }); setReason({ sites: "", dcs: "" }); setDecisions({});
     try {
       setStaged((await api.postFile("/api/admin/site-master/uploads", f)) as Staged);
       loadCurrent();
@@ -212,34 +249,77 @@ export function SiteMasterUpload() {
 
   const sheets = staged?.sheets ?? [];
   const renames = (staged?.possible_renames ?? []) as Rename[];
-  const applying = sheets.filter((s) => willApply(s, override[s.kind]));
-  const anyOverride = sheets.some((s) => s.needs_override && override[s.kind]);
-  const dcsApplied = applying.some((s) => s.kind === "dcs");
-  const undecided = dcsApplied ? renames.filter((r) => !decisions[r.missing_dc_id]).length : 0;
-  const why = !applying.length ? "No sheet can be applied: every sheet is blocked."
-    : undecided ? `Choose Rename or Keep separate for ${undecided} possible ${undecided === 1 ? "rename" : "renames"}.`
-    : anyOverride && !reason.trim() ? "Enter a reason for the override."
+  const undecided = renames.filter((r) => !decisions[r.missing_dc_id]).length;
+  const overriding = (s: Sheet) => s.needs_override && override[s.kind];
+  const why = (s: Sheet) => !willApply(s, override[s.kind]) ? "Tick Override to apply this sheet."
+    : s.kind === "dcs" && undecided ? `Choose Rename or Keep separate for ${undecided} possible ${undecided === 1 ? "rename" : "renames"}.`
+    : overriding(s) && !reason[s.kind].trim() ? "Enter a reason for the override."
     : null;
+  // DC rows find their LRD among sites already saved, so a new Site Location sheet should go first.
+  const sitesPending = sheets.some((s) => s.kind === "sites" && s.found) && !done.sites;
 
-  const apply = async () => {
-    if (!staged) return;
+  const apply = async (k: Kind) => {
+    const s = sheets.find((x) => x.kind === k);
+    if (!staged || !s) return;
+    setError(null);
     try {
       const r = await api.post("/api/admin/site-master/uploads/{upload_id}/apply", {
         path: { upload_id: staged.upload_id },
         body: {
-          override_drop: { sites: override.sites, dcs: override.dcs },
-          reason: anyOverride ? reason.trim() : null,
-          renames: dcsApplied ? renames.map((x) => ({ missing_dc_id: x.missing_dc_id, new_row_id: x.new_row_id, decision: decisions[x.missing_dc_id] })) : [],
+          sheets: [k],
+          override_drop: { sites: k === "sites" && override.sites, dcs: k === "dcs" && override.dcs },
+          reason: overriding(s) ? reason[k].trim() : null,
+          renames: k === "dcs" ? renames.map((x) => ({ missing_dc_id: x.missing_dc_id, new_row_id: x.new_row_id, decision: decisions[x.missing_dc_id] })) : [],
         },
       });
-      setConfirming(false); setStaged(null); setResult(r);
+      setConfirming(null);
+      if (r.complete) {
+        setStaged(null); setDone({});
+        setResult({ ...r, warnings: [...Object.values(done).flatMap((d) => d.warnings), ...r.warnings] });
+      } else {
+        setDone((d) => ({ ...d, [k]: r }));
+        requestAnimationFrame(() => document.getElementById(`sm-${k}-done`)?.focus()); // the Apply button is gone
+      }
       loadCurrent();
     } catch (e) {
-      setConfirming(false);
+      setConfirming(null);
       setError(errorText(e, "Apply failed. Nothing was changed. Try again."));
     }
   };
 
+  const footer = (s: Sheet) => {
+    const k = s.kind;
+    const d = done[k];
+    if (d) return (
+      <div id={`sm-${k}-done`} tabIndex={-1} className="mt-4 outline-none">
+        <Note tone="green" role="status" title={`${SHEET_LABEL[k]} applied`}>
+          <p>{resultLine(d.sheets[k])}</p>
+          {d.warnings.length > 0 && <ul className="mt-1 list-disc pl-4">{d.warnings.map((w) => <li key={w}>{w}</li>)}</ul>}
+        </Note>
+      </div>
+    );
+    if (!s.found || (s.blocked && !s.needs_override)) return null; // the red note already says it will not be applied
+    const w = why(s);
+    return (
+      <>
+        {k === "dcs" && renames.length > 0 && <div className="mt-4"><Renames list={renames} decisions={decisions} onDecide={(id, x) => setDecisions((o) => ({ ...o, [id]: x }))} /></div>}
+        <div className="mt-4 flex flex-wrap items-end gap-4 border-t pt-4">
+          {overriding(s) && (
+            <label className="w-[420px]"><span className="lbl mb-1 block text-body! text-foreground!">Reason for the override (required)</span>
+              <input className="field" value={reason[k]} onChange={(e) => setReason((o) => ({ ...o, [k]: e.target.value }))} />
+            </label>
+          )}
+          <button type="button" className="btn btn-p" disabled={!!w} aria-describedby={`sm-${k}-why`} onClick={() => setConfirming(k)}>Apply {SHEET_LABEL[k]}…</button>
+          <div id={`sm-${k}-why`} className="text-body text-muted-foreground">
+            <p>{w ?? "Ready to apply."}</p>
+            {k === "dcs" && sitesPending && <p>Apply Site Location first: DCs whose LRD site is not saved yet are skipped.</p>}
+          </div>
+        </div>
+      </>
+    );
+  };
+
+  const c = sheets.find((s) => s.kind === confirming);
   return (
     <div className="space-y-4">
     <section className="card" aria-labelledby="sm-h">
@@ -254,12 +334,7 @@ export function SiteMasterUpload() {
           {result && (
             <Note tone="green" title="Site master applied">
               <ul className="space-y-0.5">
-                {(["sites", "dcs"] as Kind[]).map((k) => {
-                  const s = result.sheets[k] as Record<string, number | boolean | string[]>;
-                  return <li key={k}><b className="font-semibold">{SHEET_LABEL[k]}:</b> {s.applied
-                    ? `${s.added} added, ${s.changed} changed, ${s.renamed} renamed, ${s.deactivated} set inactive, ${s.kept_active} missing but kept active, ${s.protected_kept} dashboard edits kept${s.skipped ? `, ${s.skipped} skipped` : ""}.`
-                    : `not applied (${(s.block_reasons as string[]).join("; ")}).`}</li>;
-                })}
+                {(["sites", "dcs"] as Kind[]).map((k) => <li key={k}><b className="font-semibold">{SHEET_LABEL[k]}:</b> {resultLine(result.sheets[k] ?? {})}</li>)}
               </ul>
               {result.warnings.length > 0 && (
                 <><p className="mt-2 font-semibold">Warnings</p><ul className="list-disc pl-4">{result.warnings.map((w) => <li key={w}>{w}</li>)}</ul></>
@@ -274,42 +349,34 @@ export function SiteMasterUpload() {
       <section aria-labelledby="sm-prev-title" className="card" data-testid="sm-preview">
         <div className="card-h">
           <h2 id="sm-prev-title" className="truncate">Preview of {staged.filename}</h2>
-          <small className="hint flex-none">Nothing is saved until you apply.</small>
+          <small className="hint flex-none">Each sheet is applied on its own. Nothing is saved until you apply it.</small>
         </div>
         <div className="space-y-6">
-          {sheets.map((s) => <SheetPanel key={`${staged.upload_id}-${s.kind}`} uploadId={staged.upload_id} s={s} override={override[s.kind]} onOverride={(on) => setOverride((o) => ({ ...o, [s.kind]: on }))} />)}
-          {renames.length > 0 && <Renames list={renames} decisions={decisions} onDecide={(id, d) => setDecisions((x) => ({ ...x, [id]: d }))} />}
-          <div className="flex flex-wrap items-end gap-4 border-t pt-4">
-            {anyOverride && (
-              <label className="w-[420px]"><span className="lbl mb-1 block text-body! text-foreground!">Reason for the override (required)</span>
-                <input className="field" value={reason} onChange={(e) => setReason(e.target.value)} />
-              </label>
-            )}
-            <button type="button" className="btn btn-p" disabled={!!why} aria-describedby="sm-why" onClick={() => setConfirming(true)}>Apply…</button>
-            <button type="button" className="btn" onClick={() => setStaged(null)}>Discard preview</button>
-            <p id="sm-why" className="text-body text-muted-foreground">{why ?? `Ready: ${applying.map((s) => SHEET_LABEL[s.kind]).join(" and ")} will be applied.`}</p>
+          {sheets.map((s) => (
+            <SheetPanel key={`${staged.upload_id}-${s.kind}`} uploadId={staged.upload_id} s={s} applied={!!done[s.kind]}
+              override={override[s.kind]} onOverride={(on) => setOverride((o) => ({ ...o, [s.kind]: on }))}>
+              {footer(s)}
+            </SheetPanel>
+          ))}
+          <div className="border-t pt-4">
+            <button type="button" className="btn" onClick={() => { setStaged(null); setDone({}); }}>Discard preview</button>
           </div>
         </div>
       </section>
     )}
-      {confirming && staged && (
-        <Dialog title="Apply this site master file?" onClose={() => setConfirming(false)} wide>
+      {c && staged && (
+        <Dialog title={`Apply ${SHEET_LABEL[c.kind]}?`} onClose={() => setConfirming(null)} wide>
           <ul className="mt-3 space-y-2 text-body">
-            {sheets.map((s) => (
-              <li key={s.kind}><b className="font-semibold">{SHEET_LABEL[s.kind]}:</b>{" "}
-                {willApply(s, override[s.kind])
-                  ? `add ${s.counts.added}, update ${s.counts.changed}; ${s.counts.missing} missing are set inactive unless a span or reservation uses them (those stay active with a warning); ${s.counts.problem} problem rows are not applied.${s.needs_override ? " Row-count block overridden." : ""}`
-                  : "not applied."}
-              </li>
-            ))}
-            {dcsApplied && renames.length > 0 && (
+            <li>Add {c.counts.added}, update {c.counts.changed}; {c.counts.missing} missing are set inactive unless a span or reservation uses them (those stay active with a warning); {c.counts.problem} problem rows are not applied.{c.needs_override ? " Row-count block overridden." : ""}</li>
+            {c.kind === "dcs" && renames.length > 0 && (
               <li><b className="font-semibold">Possible renames:</b> {renames.filter((r) => decisions[r.missing_dc_id] === "rename").length} renamed, {renames.filter((r) => decisions[r.missing_dc_id] === "separate").length} kept separate.</li>
             )}
+            {c.kind === "dcs" && sitesPending && <li>Site Location is not applied yet: DCs whose LRD site is not saved are skipped.</li>}
           </ul>
           <p className="mt-3 text-body text-muted-foreground">Changes are saved in one step with a history record per field. There is no undo.</p>
           <div className="mt-5 flex justify-end gap-2">
-            <button type="button" className="btn" onClick={() => setConfirming(false)}>Cancel</button>
-            <button type="button" className="btn btn-p" onClick={apply} autoFocus>Apply</button>
+            <button type="button" className="btn" onClick={() => setConfirming(null)}>Cancel</button>
+            <button type="button" className="btn btn-p" onClick={() => apply(c.kind)} autoFocus>Apply</button>
           </div>
         </Dialog>
       )}

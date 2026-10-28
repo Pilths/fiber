@@ -118,24 +118,19 @@ def _reservation(r: RowResult, f: dict[str, Any], label: str | None, known: set[
             reasons.append(why)
     else:
         reasons.append("Nodes is not in the form AABB-BBCC")
+    # every row is a count-only reservation; Core assignment and Port info stay raw (ports are added by hand later)
     count = f.get("no of core requested")
-    blocks, why = checks.pair_ports(f.get("core assignment"))
     p["unassigned_cores"] = 0
-    if blank(f.get("core assignment")) and not blank(count):
-        # count-only reservation: cores wanted, ports not assigned yet
-        try:
-            p["unassigned_cores"] = int(float(str(count).strip()))
-            if p["unassigned_cores"] < 1 or p["unassigned_cores"] != float(str(count).strip()):
-                raise ValueError
-        except ValueError:
-            p["unassigned_cores"] = 0
-            reasons.append(f"cannot read no of core requested '{count}'")
-    elif why:
-        reasons.append(why)
-    elif blocks and nodes and {b[0] for b in blocks} != set(nodes[:2]):
-        reasons.append("core assignment sites do not match Nodes")
+    if blank(count):
+        reasons.append("No of core requested is blank")
     else:
-        p["ports"] = blocks
+        try:
+            n = float(str(count).strip())
+            if n < 1 or n != int(n):
+                raise ValueError
+            p["unassigned_cores"] = int(n)
+        except ValueError:
+            reasons.append(f"No of core requested '{count}' is not a whole number of 1 or more")
     p["customer"] = _text(f.get("fiber core requestor"))
     p["contractor"], p["remark"] = _text(f.get("contractor")), _text(f.get("remark"))
     p["port_info_raw"] = _text(f.get("port info"))

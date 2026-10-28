@@ -17,7 +17,9 @@ const line = (h: Item) =>
 
 // Core detail: right-side drawer on the native <dialog> (Esc closes, focus returns to the cell or row that opened it).
 // The holder comes from GET /api/cores/{id}: everyone sees who holds a core; actions follow holder.is_mine or admin.
-export function CoreDrawer({ core, span, me, onClose, onChanged }: { core: Core; span: string; me: Me; onClose: () => void; onChanged: () => void }) {
+export function CoreDrawer({ core, span, ends, me, onClose, onChanged }: {
+  core: Core; span: string; ends: [string, string]; me: Me; onClose: () => void; onChanged: () => void;
+}) {
   const [items, setItems] = useState<Item[] | null>(null);
   const [res, setRes] = useState<Holder | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -25,6 +27,7 @@ export function CoreDrawer({ core, span, me, onClose, onChanged }: { core: Core;
   const [mode, setMode] = useState<"status" | null>(null);
   const [reason, setReason] = useState("");
   const [tried, setTried] = useState(false);
+  const [ports, setPorts] = useState(false);
   const admin = me.role === "admin";
 
   const load = useCallback(() => {
@@ -85,6 +88,8 @@ export function CoreDrawer({ core, span, me, onClose, onChanged }: { core: Core;
       <dl className="mt-4 grid grid-cols-[110px_1fr] gap-x-3 gap-y-1.5 border-t pt-4 text-body">
         {facts.map(([k, v]) => <div key={k} className="contents"><dt className="text-muted-foreground">{k}</dt><dd className="min-w-0 break-words">{v}</dd></div>)}
       </dl>
+      {admin && <button type="button" className="btn btn-sm mt-3" onClick={() => setPorts(true)}>{core.port_a || core.port_b ? "Edit ports" : "Add ports"}</button>}
+      {ports && <PortsDialog core={core} ends={ends} onClose={() => setPorts(false)} onSaved={() => { onChanged(); load(); }} />}
       {res?.stale && <p className="mt-3 text-body text-amber">Stale: no approval or keep for over 3 months. Keep it or request release.</p>}
 
       {error && <p role="alert" className="mt-4 rounded-md border border-red bg-red-bg px-3 py-2 text-body font-semibold text-red">{error}</p>}
@@ -138,6 +143,50 @@ export function CoreDrawer({ core, span, me, onClose, onChanged }: { core: Core;
             ))}
           </ol>
         )}
+    </Dialog>
+  );
+}
+
+// Ports are typed by hand (the reservation upload does not import them). An empty field clears that end.
+function PortsDialog({ core, ends, onClose, onSaved }: { core: Core; ends: [string, string]; onClose: () => void; onSaved: () => void }) {
+  const [a, setA] = useState(core.port_a ?? "");
+  const [b, setB] = useState(core.port_b ?? "");
+  const [reason, setReason] = useState("");
+  const [tried, setTried] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const lbl = "lbl mb-1 block text-body! text-foreground!";
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setTried(true);
+    if (!reason.trim()) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await api.post("/api/admin/cores/{core_id}/ports", { path: { core_id: core.id }, body: { port_a: a.trim() || null, port_b: b.trim() || null, reason: reason.trim() } });
+      onSaved();
+      onClose();
+    } catch (err) {
+      setError(errorText(err, "Could not save. Try again."));
+      setBusy(false);
+    }
+  };
+  return (
+    <Dialog title={`Ports of core ${core.number}`} onClose={onClose}>
+      {error && <p role="alert" className="mt-3 rounded-md border border-red bg-red-bg px-3 py-2 text-body font-semibold text-red">{error}</p>}
+      <form onSubmit={submit} noValidate aria-label={`Ports of core ${core.number}`} className="mt-4 space-y-3">
+        <label className="block"><span className={lbl}>Port at {ends[0]}</span><input className="field" value={a} onChange={(e) => setA(e.target.value)} autoFocus /></label>
+        <label className="block"><span className={lbl}>Port at {ends[1]}</span><input className="field" value={b} onChange={(e) => setB(e.target.value)} /></label>
+        <p className="text-body text-muted-foreground">Leave a field empty to clear that end.</p>
+        <label className="block"><span className={lbl}>Reason (required)</span>
+          <input className="field" value={reason} onChange={(e) => setReason(e.target.value)} aria-invalid={tried && !reason.trim()} />
+          {tried && !reason.trim() && <span role="alert" className="mt-1 block text-body font-semibold text-red">Enter a reason: every edit is kept as history.</span>}
+        </label>
+        <div className="mt-5 flex justify-end gap-2">
+          <button type="button" className="btn" onClick={onClose}>Cancel</button>
+          <button type="submit" className="btn btn-p" disabled={busy}>{busy ? "Saving…" : "Save"}</button>
+        </div>
+      </form>
     </Dialog>
   );
 }

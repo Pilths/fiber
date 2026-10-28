@@ -88,6 +88,9 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
   const [filter, setFilter] = useState<SpanFilter>(NO_FILTER);
   const [mode, setModeState] = useState<"span" | "route">(location.hash.startsWith("#route=") ? "route" : "span");
   const rp = useRoutePlanner(mode === "route" && view === "map", version);
+  // Upload stays mounted once opened (hidden on other views) so a staged preview and its choices survive tab changes.
+  const [uploadSeen, setUploadSeen] = useState(false);
+  if (view === "upload" && !uploadSeen) setUploadSeen(true);
   // Switching modes clears the other mode's selection and hash.
   const setMode = useCallback((m: "span" | "route") => {
     setModeState(m);
@@ -208,7 +211,7 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
       <Header onPick={(r) => r.span_id != null && open(r.span_id, r.core_id ?? null)} view={view} onView={setView} me={me}
         approvals={me.role === "admin" ? bell?.approvals ?? null : null} stale={stale} onSignOut={onSignOut} onChangePassword={onChangePassword} />
       {error && <p role="alert" className="mx-6 mt-4 rounded-md border border-red bg-red-bg px-4 py-2 font-semibold text-red">{error}</p>}
-      {view !== "map" && (
+      {view !== "map" && view !== "upload" && (
         <main className="space-y-4 px-6 pt-6 pb-10">
           {view === "mine" && (
             <>
@@ -217,9 +220,11 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
             </>
           )}
           {view === "approvals" && <Approvals me={me} onChanged={refreshBell} />}
-          {view === "upload" && me.role === "admin" && <Upload />}
           {view === "users" && <Users me={me} />}
         </main>
+      )}
+      {me.role === "admin" && (uploadSeen || view === "upload") && (
+        <main hidden={view !== "upload"} className="space-y-4 px-6 pt-6 pb-10"><Upload /></main>
       )}
       {view === "map" && (
         <main className="grid grid-cols-12 gap-4 px-6 pt-6 pb-10">
@@ -268,11 +273,11 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
                       onClear={() => setSelected(new Set())}
                       onDone={() => { setSelected(new Set()); setVersion((v) => v + 1); refreshBell(); }} />}
               </section>
-              <HeldTable d={detail} onOpen={(c) => setDrawerCore(c.id)} />
+              <HeldTable d={detail} admin={me.role === "admin"} onOpen={(c) => setDrawerCore(c.id)} onChanged={changed} />
               <LossCard key={detail.id} loss={loss?.span_id === detail.id ? loss : null} />
             </div>
           )}
-          {detail && drawn && <CoreDrawer key={drawn.id} core={drawn} span={spanName(detail)} me={me} onClose={() => setDrawerCore(null)} onChanged={changed} />}
+          {detail && drawn && <CoreDrawer key={drawn.id} core={drawn} span={spanName(detail)} ends={[detail.site_a, detail.site_b]} me={me} onClose={() => setDrawerCore(null)} onChanged={changed} />}
           {editSpan && spanId != null && <EditSpanDialog spanId={spanId} focus={editSpan.focus} onClose={() => setEditSpan(null)} onSaved={changed} />}
           {editSite != null && <EditSiteDialog siteId={editSite} onClose={() => setEditSite(null)} onSaved={changed} />}
         </main>

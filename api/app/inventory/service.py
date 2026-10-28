@@ -12,6 +12,7 @@ from app.inventory.schemas import (
     SearchResult,
     SpanDetail,
     SpanSummary,
+    UnassignedHold,
 )
 
 PER_TYPE = 20
@@ -72,6 +73,27 @@ ORDER BY c.number
 CORE_ONE_SQL = CORE_SQL.replace("SELECT c.id, c.number,", "SELECT c.span_id, a.name || ' - ' || b.name AS span_name, c.id, c.number,", 1) \
     .replace("JOIN spans sp ON sp.id = c.span_id\n", "JOIN spans sp ON sp.id = c.span_id\nJOIN sites a ON a.id = sp.site_a_id JOIN sites b ON b.id = sp.site_b_id\n") \
     .replace("WHERE c.span_id = :id AND", "WHERE c.id = :id AND").replace("ORDER BY c.number", "")
+# Count-only holds with cores still to assign; customer and date take the latest correction like CORE_SQL.
+UNASSIGNED_SQL = """
+SELECT u.reservation_id, COALESCE(cust.name, hc.name) AS customer, u.remaining,
+       COALESCE(corr_date.planned_date, r.planned_date) AS planned_date
+FROM reservation_unassigned_v u
+JOIN reservations r ON r.id = u.reservation_id
+JOIN customers hc ON hc.id = r.customer_id
+LEFT JOIN LATERAL (
+  SELECT e.customer_id FROM reservation_events e
+  WHERE e.reservation_id = r.id AND e.type = 'corrected' AND e.customer_id IS NOT NULL
+  ORDER BY e.created_at DESC, e.id DESC LIMIT 1
+) corr_cust ON true
+LEFT JOIN customers cust ON cust.id = corr_cust.customer_id
+LEFT JOIN LATERAL (
+  SELECT e.planned_date FROM reservation_events e
+  WHERE e.reservation_id = r.id AND e.type = 'corrected' AND e.planned_date IS NOT NULL
+  ORDER BY e.created_at DESC, e.id DESC LIMIT 1
+) corr_date ON true
+WHERE u.span_id = :id AND u.remaining > 0
+ORDER BY u.reservation_id
+"""
 HOLDER_SQL = """
 SELECT r.planner_id AS id, u.username, u.display_name FROM reservations r JOIN users u ON u.id = r.planner_id WHERE r.id = :rid
 """
@@ -97,7 +119,8 @@ def get_span(db: Session, span_id: int) -> SpanDetail | None:
     if not spans:
         return None
     cores = db.execute(text(CORE_SQL), {"id": span_id}).mappings()
-    return SpanDetail(**spans[0], cores=[CoreDetail(**c) for c in cores])
+    held = db.execute(text(UNASSIGNED_SQL), {"id": span_id}).mappings()
+    return SpanDetail(**spans[0], cores=[CoreDetail(**c) for c in cores], unassigned=[UnassignedHold(**h) for h in held])
 
 
 def get_core(db: Session, core_id: int, user_id: int) -> CoreHolderDetail | None:

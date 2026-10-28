@@ -16,7 +16,9 @@ from sqlalchemy.orm import Session
 from app.auth.deps import CurrentUser, require_admin
 from app.db import get_db
 from app.ingest import checks
-from app.ingest.reservation_import import add_cores
+from app.ingest.reservation_import import add_cores, port
+from app.inventory import service as inventory
+from app.inventory.schemas import CoreHolderDetail
 from app.reservations.schemas import Reason
 from app.reservations.service import conflict
 from app.routing.graph import invalidate as invalidate_routes
@@ -90,6 +92,47 @@ def set_core_status(db: DB, admin: Admin, cid: int, body: CoreStatusBody) -> dic
     _log(db, admin, "core", cid, [("status", old, body.status)], body.reason)
     db.commit()
     return {"core_id": cid, "status": db.execute(text("SELECT status FROM core_status_v WHERE core_id = :c"), {"c": cid}).scalar_one()}
+
+
+# ---------- core ports (typed by hand; the reservation upload does not import ports) ----------
+
+class CorePortsBody(BaseModel):
+    port_a: str | None = None  # label at the span's first site; null or empty clears it
+    port_b: str | None = None  # label at the span's second site
+    reason: Reason
+
+
+@router.post("/cores/{core_id}/ports")
+def set_core_ports(db: DB, admin: Admin, core_id: int, body: CorePortsBody) -> CoreHolderDetail:
+    found = db.execute(text("SELECT c.span_id, c.port_a_id, c.port_b_id, s.site_a_id, s.site_b_id FROM cores c "
+                            "JOIN spans s ON s.id = c.span_id WHERE c.id = :c"), {"c": core_id}).first()
+    if found is None:
+        raise HTTPException(404, "Core not found")
+    span, cur_a, cur_b, site_a, site_b = found
+    db.execute(text("SELECT id FROM spans WHERE id = :s FOR UPDATE"), {"s": span})
+    edits: list[tuple[str, Any, Any]] = []
+    new_ids = {}
+    for fld, label, cur, site in (("port_a", body.port_a, cur_a, site_a), ("port_b", body.port_b, cur_b, site_b)):
+        label = (label or "").strip() or None
+        old = db.execute(text("SELECT port_id FROM ports WHERE id = :i"), {"i": cur}).scalar_one_or_none() if cur else None
+        if label == old:
+            continue
+        if label is not None:
+            at = db.execute(text("SELECT site_id FROM ports WHERE port_id = :p"), {"p": label}).scalar_one_or_none()
+            if at is not None and at != site:
+                raise conflict(f"Port '{label}' already belongs to another site.")
+            new_ids[fld] = port(db, {}, label, site)
+        else:
+            new_ids[fld] = None
+        edits.append((fld, old, label))
+    if edits:
+        for fld, pid in new_ids.items():
+            db.execute(text(f"UPDATE cores SET {fld}_id = :p WHERE id = :c"), {"p": pid, "c": core_id})
+        _log(db, admin, "core", core_id, edits, body.reason)
+        db.commit()
+    core = inventory.get_core(db, core_id, admin.id)
+    assert core is not None
+    return core
 
 
 # ---------- spans ----------

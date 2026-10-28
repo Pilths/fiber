@@ -74,8 +74,16 @@ class CoreHolderDetail(BaseModel):
     holder: Holder | None
 
 
+class UnassignedHold(BaseModel):
+    reservation_id: int
+    customer: str | None
+    remaining: int
+    planned_date: date | None
+
+
 class SpanDetail(SpanSummary):
     cores: list[CoreDetail]
+    unassigned: list[UnassignedHold] = []
 
 
 class Customer(BaseModel):

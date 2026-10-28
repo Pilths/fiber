@@ -23,7 +23,6 @@ from app.ingest.reservation_import import (
     ensure_span,
     find_span,
     place_reservation,
-    port_pairs,
 )
 from app.inventory import service as inventory
 from app.routing.graph import invalidate as invalidate_routes
@@ -205,11 +204,6 @@ def _matches(db: Session, where: str, **p: Any) -> tuple[list[int], list[int]]:
     return [r[0] for r in rows if all(r[1:])], [r[0] for r in rows]
 
 
-def _core_for(db: Session, span_id: int, la: str, lb: str) -> int | None:
-    return db.execute(text("SELECT c.id FROM cores c JOIN ports pa ON pa.id = c.port_a_id JOIN ports pb ON pb.id = c.port_b_id "
-                           "WHERE c.span_id = :s AND pa.port_id = :a AND pb.port_id = :b"), {"s": span_id, "a": la, "b": lb}).scalar_one_or_none()
-
-
 def _set(r: Row, group: str, reason: str | None = None) -> None:
     r.group, r.reason = group, reason or r.reason
     r.status = {"needs_review": "needs_review", "rejected": "rejected"}.get(group, "ready")
@@ -219,46 +213,12 @@ def _reservation_row(db: Session, r: Row, sp: SpanItem, sites: dict[str, int], c
                      count_rows: dict[tuple, int]) -> None:
     p = r.p
     if p.get("core_status") == "Faulty":
-        return _faulty_row(db, r, sp, sites)
+        return _faulty_row(r)
     if closed:
         return _set(r, "ignored", "reservation import is closed; reservation rows are ignored")
-    a, b = sites[p["site_a"]], sites[p["site_b"]]
-    span_a = db.execute(text("SELECT site_a_id FROM spans WHERE id = :i"), {"i": sp.span_id}).scalar_one() if sp.span_id else a
-    span_b = b if span_a == a else a
-    pairs = port_pairs(p, sites, span_a, span_b)
-    r.extra["cores"] = len(pairs)
+    r.extra["cores"] = 0
     if p["planned_date"] is None:
         r.warnings.append("no reserved date: the import date starts the stale clock")
-    if pairs:
-        cores = [_core_for(db, sp.span_id, la, lb) if sp.span_id else None for la, lb in pairs]
-        found = [c for c in cores if c is not None]
-        if len(found) == len(cores):
-            full, partial = _matches(db, "(SELECT coalesce(array_agg(core_id ORDER BY core_id), '{}') FROM reservation_cores "
-                                         "WHERE reservation_id = r.id) = CAST(:ids AS bigint[])", ids=sorted(found), **_flags(p))
-            if full:
-                r.extra["matched_reservation_id"] = full[0]
-                return _set(r, "already_imported", f"already imported as reservation #{full[0]}")
-            if partial:
-                return _set(r, "needs_review", f"same cores as reservation #{partial[0]} but customer, date or label differ")
-        held = db.execute(text("SELECT core_id, reservation_id FROM core_holds WHERE core_id = ANY(CAST(:i AS bigint[]))"),
-                          {"i": found}).all() if found else []
-        if held:
-            r.extra["held_by"] = sorted({h[1] for h in held})
-            return _set(r, "conflicts", "core already taken by reservation " + ", ".join(f"#{i}" for i in r.extra["held_by"])
-                        + "; this row will be skipped")
-        used = db.execute(text("SELECT DISTINCT reservation_id FROM reservation_cores WHERE core_id = ANY(CAST(:i AS bigint[]))"),
-                          {"i": found}).scalars().all() if found else []
-        if used:
-            return _set(r, "needs_review", f"its cores were used by reservation #{used[0]} before; cannot tell if this row is new")
-        for la, lb in pairs:
-            if (sp.key, la, lb) in claims:
-                return _set(r, "conflicts", f"core also in row {claims[(sp.key, la, lb)]}; this row will be skipped")
-        if sp.survey is not None and len(pairs) > (sp.db_free if sp.span_id else sp.survey) - sp.used:
-            r.warnings.append("more cores than the surveyed count has free")
-        for la, lb in pairs:
-            claims[(sp.key, la, lb)] = r.n
-        sp.used += len(pairs)
-        return _set(r, "reservations")
     n = p["unassigned_cores"]
     if n < 1:  # parser left it Needs review already; defensive
         return _set(r, "needs_review", "no core count")
@@ -280,25 +240,9 @@ def _reservation_row(db: Session, r: Row, sp: SpanItem, sites: dict[str, int], c
     _set(r, "reservations")
 
 
-def _faulty_row(db: Session, r: Row, sp: SpanItem, sites: dict[str, int]) -> None:
-    p = r.p
-    if not sp.span_id or not p.get("ports"):
-        return _set(r, "needs_review", "marks cores Faulty but names no existing cores")
-    a, b = sites[p["site_a"]], sites[p["site_b"]]
-    span_a = db.execute(text("SELECT site_a_id FROM spans WHERE id = :i"), {"i": sp.span_id}).scalar_one()
-    pairs = port_pairs(p, sites, span_a, b if span_a == a else a)
-    cores = [_core_for(db, sp.span_id, la, lb) for la, lb in pairs]
-    if None in cores:
-        return _set(r, "needs_review", "marks cores Faulty but some are not in the database")
-    status = dict(db.execute(text("SELECT core_id, status FROM core_status_v WHERE core_id = ANY(CAST(:i AS bigint[]))"), {"i": cores}).all())
-    todo = [c for c in cores if status[c] != "Faulty"]
-    if not todo:
-        return _set(r, "already_imported", "cores already marked Faulty")
-    held = db.execute(text("SELECT DISTINCT reservation_id FROM core_holds WHERE core_id = ANY(CAST(:i AS bigint[]))"), {"i": todo}).scalars().all()
-    r.extra.update(core_ids=todo, old_status={str(c): status[c] for c in todo}, held_by=sorted(held))
-    if held:
-        r.warnings.append("marks taken core(s) Faulty: reservation " + ", ".join(f"#{i}" for i in sorted(held)) + " goes to the Action needed list")
-    _set(r, "faulty")
+def _faulty_row(r: Row) -> None:
+    # Core assignment is not imported, so a Faulty mark cannot name cores; an admin marks them in the dashboard.
+    _set(r, "needs_review", "marks cores Faulty but Core assignment is not imported; mark them in the dashboard")
 
 
 def evaluate(db: Session, rows: list[Row], wins: set[tuple[str, str]] = frozenset()) -> Eval:  # type: ignore[assignment]
@@ -332,15 +276,6 @@ def _warnings(rows: list[Row], spans: dict[str, SpanItem], closed: bool, warns: 
     if closed:
         n = [r.n for r in rows if r.group == "ignored"]
         add("import_closed", f"Reservation import is closed: {len(n)} reservation rows are ignored.", n)
-    ports: dict[str, list[int]] = {}
-    for r in rows:
-        if r.group != "rejected":
-            for _, labels in r.p.get("ports") or []:
-                for lbl in labels:
-                    ports.setdefault(lbl, []).append(r.n)
-    for lbl, nums in ports.items():
-        if len(nums) > 1:
-            add("duplicate_port_id", f"Port ID '{lbl}' appears in rows {', '.join(map(str, nums))}.", nums)
     for sp in spans.values():
         firsts = [r.n for r in rows if r.extra.get("span_key") == sp.key and not r.p.get("additional")]
         if len(firsts) > 1:
@@ -366,7 +301,7 @@ def _row_payload(r: Row) -> dict[str, Any]:
     if p.get("site_a"):
         shown = {"customer": p.get("customer"), "span": f"{p['site_a']}-{p['site_b']}", "cores": r.extra.get("cores", 0),
                  "count_only": p.get("unassigned_cores") or None, "planned_date": p.get("planned_date"),
-                 "group_label": p.get("group_label"), "additional": p.get("additional"), "ports": p.get("ports")}
+                 "group_label": p.get("group_label"), "additional": p.get("additional")}
     return _dump({"group": r.group, "parse_status": r.parse_status, "parse_reason": r.parse_reason, "parsed": p,
                   "reservation": shown, **{k: v for k, v in r.extra.items() if k != "cores"}})
 
@@ -408,7 +343,6 @@ def _unjson(p: dict[str, Any]) -> dict[str, Any]:
     for k in ("planned_date", "cv_ready_date", "tested_on"):
         if p.get(k):
             p[k] = date.fromisoformat(p[k])
-    p["ports"] = [(code, labels) for code, labels in p["ports"]] if p.get("ports") else p.get("ports")
     return p
 
 
@@ -465,13 +399,7 @@ def confirm(db: Session, admin_id: int, upload_id: int, excel_wins: list[dict[st
                            {"s": sid, "l": m["loss_db"], "t": m["tested_on"], "u": upload_id})
                 counts["measurements"] += 1
         for r in ev.rows:
-            if r.group == "faulty":
-                for c in r.extra["core_ids"]:
-                    db.execute(text("INSERT INTO data_edits (entity, entity_id, field, old_value, new_value, reason, user_id) "
-                                    "VALUES ('core', :c, 'status', :o, 'Faulty', :r, :u)"),
-                               {"c": c, "o": r.extra["old_status"][str(c)], "r": f"{why} row {r.n}", "u": admin_id})
-                    counts["faulty_cores"] += 1
-            elif r.group == "reservations":
+            if r.group == "reservations":
                 try:
                     with db.begin_nested():
                         place_reservation(db, counts, r.p, sites, admin_id, admin_id)
