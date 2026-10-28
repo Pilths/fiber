@@ -19,7 +19,7 @@ PER_TYPE = 20
 
 # Span list with free cores and status mix; status always comes from core_status_v.
 SPAN_SQL = """
-SELECT s.id, a.name AS site_a, b.name AS site_b, s.route_type, s.region, s.distance_km,
+SELECT s.id, a.name AS site_a, b.name AS site_b, s.route_type, s.region, s.route, s.section, s.distance_km,
        s.survey_cores, s.cable_size, COALESCE(mix.m, '{}'::jsonb) AS status_mix,
        COALESCE((SELECT sum(u.remaining) FROM reservation_unassigned_v u WHERE u.span_id = s.id), 0)::int AS unassigned_reserved
 FROM spans s
@@ -34,6 +34,7 @@ LEFT JOIN LATERAL (
 ) mix ON true
 WHERE (CAST(:region AS text) IS NULL OR s.region = :region)
   AND (CAST(:route_type AS text) IS NULL OR s.route_type = :route_type)
+  AND (CAST(:route AS text) IS NULL OR lower(s.route) = lower(:route))
   AND (CAST(:q AS text) IS NULL OR a.name ILIKE '%' || :q || '%' OR b.name ILIKE '%' || :q || '%')
   AND (CAST(:id AS bigint) IS NULL OR s.id = :id)
 ORDER BY s.id
@@ -108,8 +109,8 @@ def _summary(row: dict[str, Any]) -> dict[str, Any]:
 
 
 def list_spans(db: Session, region: str | None, route_type: str | None, q: str | None,
-               span_id: int | None = None) -> list[dict[str, Any]]:
-    rows = db.execute(text(SPAN_SQL), {"region": region, "route_type": route_type,
+               span_id: int | None = None, route: str | None = None) -> list[dict[str, Any]]:
+    rows = db.execute(text(SPAN_SQL), {"region": region, "route_type": route_type, "route": (route or "").strip() or None,
                                       "q": q or None, "id": span_id}).mappings()
     return [_summary(dict(r)) for r in rows]
 
@@ -144,8 +145,8 @@ def get_core(db: Session, core_id: int, user_id: int) -> CoreHolderDetail | None
 
 
 def list_span_summaries(db: Session, region: str | None, route_type: str | None,
-                        q: str | None) -> list[SpanSummary]:
-    return [SpanSummary(**s) for s in list_spans(db, region, route_type, q)]
+                        q: str | None, route: str | None = None) -> list[SpanSummary]:
+    return [SpanSummary(**s) for s in list_spans(db, region, route_type, q, route=route)]
 
 
 def list_customers(db: Session, q: str | None) -> list[Customer]:

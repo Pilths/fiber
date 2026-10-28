@@ -102,6 +102,8 @@ class Span(Base):
     site_b_id: Mapped[int] = _fk("sites")
     route_type: Mapped[str | None] = mapped_column(Text)
     region: Mapped[str | None] = mapped_column(Text)
+    route: Mapped[str | None] = mapped_column(Text)
+    section: Mapped[str | None] = mapped_column(Text)
     distance_km: Mapped[Decimal | None] = mapped_column(Numeric(10, 3))
     survey_cores: Mapped[int | None] = mapped_column(Integer)
     cable_size: Mapped[int] = mapped_column(Integer, server_default=text("144"))

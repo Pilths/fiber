@@ -591,6 +591,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/span-list/uploads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Upload */
+        post: operations["upload_api_admin_span_list_uploads_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/span-list/uploads/{upload_id}/rows": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Rows */
+        get: operations["rows_api_admin_span_list_uploads__upload_id__rows_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/span-list/uploads/{upload_id}/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Apply */
+        post: operations["apply_api_admin_span_list_uploads__upload_id__apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/uploads": {
         parameters: {
             query?: never;
@@ -962,24 +1013,6 @@ export interface components {
              */
             renames: components["schemas"]["RenameIn"][];
         };
-        /** ApplyOut */
-        ApplyOut: {
-            /** Upload Id */
-            upload_id: number;
-            /** Sheets */
-            sheets: {
-                [key: string]: {
-                    [key: string]: unknown;
-                };
-            };
-            /** Warnings */
-            warnings: string[];
-            /**
-             * Complete
-             * @default true
-             */
-            complete: boolean;
-        };
         /** Bell */
         Bell: {
             /** Approvals */
@@ -999,10 +1032,31 @@ export interface components {
              */
             add_only: boolean;
         };
+        /** Body_upload_api_admin_span_list_uploads_post */
+        Body_upload_api_admin_span_list_uploads_post: {
+            /** File */
+            file: string;
+        };
         /** Body_upload_api_admin_uploads_post */
         Body_upload_api_admin_uploads_post: {
             /** File */
             file: string;
+        };
+        /** Change */
+        Change: {
+            /**
+             * Field
+             * @enum {string}
+             */
+            field: "distance_km" | "route_type" | "route" | "section";
+            /** Old */
+            old: string | null;
+            /** New */
+            new: string | null;
+            /** Protected */
+            protected: boolean;
+            /** Note */
+            note?: string | null;
         };
         /** ChangePasswordBody */
         ChangePasswordBody: {
@@ -1158,21 +1212,6 @@ export interface components {
             measured: number;
             /** Total */
             total: number;
-        };
-        /** Counts */
-        Counts: {
-            /** Rows */
-            rows: number;
-            /** Added */
-            added: number;
-            /** Changed */
-            changed: number;
-            /** Missing */
-            missing: number;
-            /** Problem */
-            problem: number;
-            /** Unchanged */
-            unchanged: number;
         };
         /** Coverage */
         Coverage: {
@@ -1367,6 +1406,23 @@ export interface components {
             /** Display Name */
             display_name: string;
         };
+        /** Parsed */
+        Parsed: {
+            /** Link */
+            link: string | null;
+            /** Site A */
+            site_a: string | null;
+            /** Site B */
+            site_b: string | null;
+            /** Distance Km */
+            distance_km: string | null;
+            /** Route */
+            route: string | null;
+            /** Section */
+            section: string | null;
+            /** Type */
+            type: string | null;
+        };
         /** RenameIn */
         RenameIn: {
             /** Missing Dc Id */
@@ -1460,18 +1516,37 @@ export interface components {
             /** Level */
             level: ("green" | "amber" | "red" | "off_scale") | null;
         };
-        /** RowsOut */
-        RowsOut: {
-            /** Total */
-            total: number;
-            /** Page */
-            page: number;
-            /** Page Size */
-            page_size: number;
-            /** Items */
-            items: {
+        /** RowOut */
+        RowOut: {
+            /** Id */
+            id: number;
+            /** Row Number */
+            row_number: number;
+            /** Sheet Name */
+            sheet_name: string | null;
+            /**
+             * Group
+             * @enum {string}
+             */
+            group: "new" | "changed" | "unchanged" | "problem";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ready" | "needs_review" | "rejected";
+            /** Reason */
+            reason: string | null;
+            /** Raw */
+            raw: {
                 [key: string]: unknown;
-            }[];
+            };
+            parsed: components["schemas"]["Parsed"];
+            /** Changes */
+            changes: components["schemas"]["Change"][];
+            /** Edited In Dashboard */
+            edited_in_dashboard: boolean;
+            /** Span Id */
+            span_id: number | null;
         };
         /** SearchResult */
         SearchResult: {
@@ -1513,7 +1588,7 @@ export interface components {
             blocked: boolean;
             /** Block Reasons */
             block_reasons: string[];
-            counts: components["schemas"]["Counts"];
+            counts: components["schemas"]["app__ingest__site_master_router__Counts"];
             /** Needs Override */
             needs_override: boolean;
         };
@@ -1582,6 +1657,10 @@ export interface components {
             route_type: string | null;
             /** Region */
             region: string | null;
+            /** Route */
+            route: string | null;
+            /** Section */
+            section: string | null;
             /** Distance Km */
             distance_km: string | null;
             /** Free Cores */
@@ -1715,6 +1794,10 @@ export interface components {
             route_type: string | null;
             /** Region */
             region: string | null;
+            /** Route */
+            route: string | null;
+            /** Section */
+            section: string | null;
             /** Distance Km */
             distance_km: string | null;
             /** Free Cores */
@@ -1744,24 +1827,6 @@ export interface components {
             remaining: number;
             /** Planned Date */
             planned_date: string | null;
-        };
-        /** UploadOut */
-        UploadOut: {
-            /** Upload Id */
-            upload_id: number;
-            /** Filename */
-            filename: string;
-            /** Sheets */
-            sheets: components["schemas"]["SheetOut"][];
-            /** Possible Renames */
-            possible_renames: {
-                [key: string]: unknown;
-            }[];
-            /**
-             * Add Only
-             * @default false
-             */
-            add_only: boolean;
         };
         /** UserCreate */
         UserCreate: {
@@ -1852,6 +1917,123 @@ export interface components {
              * @default admin action
              */
             reason: string;
+        };
+        /** ApplyOut */
+        app__ingest__site_master_router__ApplyOut: {
+            /** Upload Id */
+            upload_id: number;
+            /** Sheets */
+            sheets: {
+                [key: string]: {
+                    [key: string]: unknown;
+                };
+            };
+            /** Warnings */
+            warnings: string[];
+            /**
+             * Complete
+             * @default true
+             */
+            complete: boolean;
+        };
+        /** Counts */
+        app__ingest__site_master_router__Counts: {
+            /** Rows */
+            rows: number;
+            /** Added */
+            added: number;
+            /** Changed */
+            changed: number;
+            /** Missing */
+            missing: number;
+            /** Problem */
+            problem: number;
+            /** Unchanged */
+            unchanged: number;
+        };
+        /** RowsOut */
+        app__ingest__site_master_router__RowsOut: {
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Items */
+            items: {
+                [key: string]: unknown;
+            }[];
+        };
+        /** UploadOut */
+        app__ingest__site_master_router__UploadOut: {
+            /** Upload Id */
+            upload_id: number;
+            /** Filename */
+            filename: string;
+            /** Sheets */
+            sheets: components["schemas"]["SheetOut"][];
+            /** Possible Renames */
+            possible_renames: {
+                [key: string]: unknown;
+            }[];
+            /**
+             * Add Only
+             * @default false
+             */
+            add_only: boolean;
+        };
+        /** ApplyOut */
+        app__ingest__span_list_router__ApplyOut: {
+            /** Upload Id */
+            upload_id: number;
+            /** Created */
+            created: number;
+            /** Changed */
+            changed: number;
+            /** Protected Kept */
+            protected_kept: number;
+            /** Skipped */
+            skipped: number;
+            /** Warnings */
+            warnings: string[];
+        };
+        /** Counts */
+        app__ingest__span_list_router__Counts: {
+            /** Rows */
+            rows: number;
+            /** New */
+            new: number;
+            /** Changed */
+            changed: number;
+            /** Unchanged */
+            unchanged: number;
+            /** Problem */
+            problem: number;
+        };
+        /** RowsOut */
+        app__ingest__span_list_router__RowsOut: {
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Items */
+            items: components["schemas"]["RowOut"][];
+        };
+        /** UploadOut */
+        app__ingest__span_list_router__UploadOut: {
+            /** Upload Id */
+            upload_id: number;
+            /** Filename */
+            filename: string;
+            /** Sheet Name */
+            sheet_name: string | null;
+            /** Found */
+            found: boolean;
+            /** Block Reason */
+            block_reason: string | null;
+            counts: components["schemas"]["app__ingest__span_list_router__Counts"];
         };
         /** ReasonBody */
         app__reservations__schemas__ReasonBody: {
@@ -2225,6 +2407,7 @@ export interface operations {
                 region?: string | null;
                 route_type?: string | null;
                 q?: string | null;
+                route?: string | null;
             };
             header?: {
                 "x-dev-user"?: string | null;
@@ -3073,7 +3256,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["UploadOut"];
+                    "application/json": components["schemas"]["app__ingest__site_master_router__UploadOut"];
                 };
             };
             /** @description Validation Error */
@@ -3113,7 +3296,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["RowsOut"];
+                    "application/json": components["schemas"]["app__ingest__site_master_router__RowsOut"];
                 };
             };
             /** @description Validation Error */
@@ -3152,7 +3335,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ApplyOut"];
+                    "application/json": components["schemas"]["app__ingest__site_master_router__ApplyOut"];
                 };
             };
             /** @description Validation Error */
@@ -3188,6 +3371,117 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_api_admin_span_list_uploads_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-dev-user"?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                fiber_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_api_admin_span_list_uploads_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["app__ingest__span_list_router__UploadOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rows_api_admin_span_list_uploads__upload_id__rows_get: {
+        parameters: {
+            query: {
+                group: "new" | "changed" | "unchanged" | "problem";
+                page?: number;
+                page_size?: number;
+            };
+            header?: {
+                "x-dev-user"?: string | null;
+            };
+            path: {
+                upload_id: number;
+            };
+            cookie?: {
+                fiber_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["app__ingest__span_list_router__RowsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    apply_api_admin_span_list_uploads__upload_id__apply_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-dev-user"?: string | null;
+            };
+            path: {
+                upload_id: number;
+            };
+            cookie?: {
+                fiber_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["app__ingest__span_list_router__ApplyOut"];
                 };
             };
             /** @description Validation Error */

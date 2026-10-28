@@ -113,6 +113,25 @@ test("Find filters dim the other spans on the map", async ({ page }) => {
   await expect(chips(page)).toHaveCount(5);
 });
 
+test("Route filter lists the routes of the loaded spans and dims the others (routes mocked)", async ({ page }) => {
+  // Dev spans have no route yet: give the two drawn Trunk spans route R1 in the list and in the span detail.
+  const withRoute = (s: { id: number }) => ({ ...s, route: [4, 5].includes(s.id) ? "R1" : null, section: s.id === 4 ? "N-C" : null });
+  await page.route("**/api/spans", async (r) => r.fulfill({ json: ((await (await r.fetch()).json()) as { id: number }[]).map(withRoute) }));
+  await page.route("**/api/spans/*", async (r) => r.fulfill({ json: withRoute(await (await r.fetch()).json()) }));
+  await signIn(page);
+  const route = page.getByRole("combobox", { name: "Route", exact: true });
+  await expect(route.getByRole("option")).toHaveText(["All routes", "R1"]);
+  await route.selectOption("R1");
+  await expect(page.getByRole("list", { name: "Spans" }).getByRole("button")).toHaveCount(2);
+  await expect(chips(page)).toHaveCount(2);
+  await expect(map(page).locator("[data-testid=map-line][data-state=hidden]")).toHaveCount(3);
+  await page.getByRole("list", { name: "Spans" }).getByRole("button", { name: /DEV Kuala Lumpur DC - DEV Ipoh Exchange/ }).click();
+  await expect(page.getByRole("region", { name: "Inspector" })).toContainText("Route R1");
+  await expect(page.getByRole("region", { name: "Inspector" })).toContainText("Section N-C");
+  await route.selectOption("");
+  await expect(chips(page)).toHaveCount(5);
+});
+
 test("a route highlights its spans in blue, the shaped KL-CJ-BJ curve included", async ({ page }) => {
   await signIn(page);
   await page.getByRole("radio", { name: "Route A to B" }).check({ force: true });

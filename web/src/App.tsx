@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, ApiError, authEvents, setDevUser } from "@/api/client";
 import { ChangePassword, Login } from "@/components/Auth";
 import type { components } from "@/api/schema";
@@ -86,6 +86,7 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
   const [editSpan, setEditSpan] = useState<{ focus?: "survey" } | null>(null);
   const [editSite, setEditSite] = useState<number | null>(null);
   const [filter, setFilter] = useState<SpanFilter>(NO_FILTER);
+  const routeOf = useMemo(() => new Map(spans?.map((s) => [s.id, s.route])), [spans]); // map features carry no route
   const [mode, setModeState] = useState<"span" | "route">(location.hash.startsWith("#route=") ? "route" : "span");
   const rp = useRoutePlanner(mode === "route" && view === "map", version);
   // Upload stays mounted once opened (hidden on other views) so a staged preview and its choices survive tab changes.
@@ -236,7 +237,7 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
             {!mapMin && (
               <NetworkMap version={version} onSelectSpan={(id) => open(id)} onSite={mapSite} onClear={clearSelection}
                 selectedIds={mode === "route" ? rp.option?.spans.map((s) => s.span_id) ?? [] : spanId != null ? [spanId] : []}
-                routeKey={mode === "route" && rp.option ? `${rp.idx}-${routeName}` : null} visible={(p) => inFilter(p, filter)} />
+                routeKey={mode === "route" && rp.option ? `${rp.idx}-${routeName}` : null} visible={(p) => inFilter({ ...p, route: routeOf.get(p.span_id) }, filter)} />
             )}
           </section>
           <div className="col-span-4 flex min-w-0 flex-col gap-4">

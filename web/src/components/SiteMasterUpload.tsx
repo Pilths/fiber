@@ -3,11 +3,11 @@ import { api, errorText } from "@/api/client";
 import type { components } from "@/api/schema";
 import { Icon, type IconName } from "@/components/Icon";
 import { Changes, Chip, Dialog, FilePick, Note, PAGE_SIZE, Pager } from "@/components/upload-parts";
-import { uploadError, when } from "@/lib/utils";
+import { cell, field, uploadError, when } from "@/lib/utils";
 
-type Staged = components["schemas"]["UploadOut"];
+type Staged = components["schemas"]["app__ingest__site_master_router__UploadOut"];
 type Sheet = components["schemas"]["SheetOut"];
-type Applied = components["schemas"]["ApplyOut"];
+type Applied = components["schemas"]["app__ingest__site_master_router__ApplyOut"];
 type Kind = Sheet["kind"];
 type Group = "added" | "changed" | "missing" | "problem" | "unchanged";
 type Rename = { missing_dc_id: number; missing_dc_name: string; new_dc_name: string; new_row_number: number; new_row_id: number; lrd: string | null };
@@ -17,15 +17,6 @@ type Row = {
   location_note: string | null; in_use: boolean | null; possible_rename: Rename | null;
   raw: Record<string, unknown> | null;
   parsed: { lat?: number | null; lon?: number | null; lrd?: string | null; details?: Record<string, unknown> } | null;
-};
-// Parsed value first; a value the parser could not read (e.g. "TBA") shows as typed in the file.
-const field = (o: Record<string, unknown> | null | undefined, re: RegExp) => {
-  const k = o && Object.keys(o).find((x) => re.test(x.trim()));
-  return k ? o[k] : null;
-};
-const cell = (parsed: unknown, raw: unknown) => {
-  const v = parsed ?? raw;
-  return v == null || v === "" ? "—" : String(v);
 };
 type FileInfo = {
   upload_id: number; filename: string; status: string; uploaded_at: string; applied_at: string | null; uploaded_by: string;

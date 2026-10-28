@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { Icon, type IconName } from "@/components/Icon";
 
-// Shared pieces of the two upload flows (site master and Reservation workbook).
+// Shared pieces of the upload flows (site master, span list and Reservation workbook).
 
 export const PAGE_SIZE = 100;
 

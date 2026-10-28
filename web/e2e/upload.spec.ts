@@ -24,7 +24,7 @@ const resRow = (customer: string | null) => ["East Coast", SPAN, null, null, nul
 const file = (name: string, sheets: Sheet[]) => ({ name, mimeType: XLSX, buffer: xlsx(sheets) });
 const nav = (page: Page) => page.getByRole("navigation", { name: "Main" });
 
-async function openUpload(page: Page, tab: "Site master workbook" | "Reservation workbook") {
+async function openUpload(page: Page, tab: "Site master workbook" | "Span list" | "Reservation workbook") {
   await signIn(page, "admin1");
   await nav(page).getByRole("button", { name: "Upload" }).click();
   await page.getByRole("tab", { name: tab }).click();
@@ -192,6 +192,92 @@ test("site master sheets apply one at a time; the preview survives a tab change 
     { sheets: ["sites"], override_drop: { sites: true, dcs: false }, reason: "E2E: smaller test file", renames: [] },
     { sheets: ["dcs"], override_drop: { sites: false, dcs: false }, reason: null, renames: [] },
   ]);
+});
+
+const SL_HEAD = ["Link", "Distance", "Route", "Section", "Type"];
+
+test("span list preview: header found, problem rows in the table, nothing to apply", async ({ page }) => {
+  await openUpload(page, "Span list");
+  await expect(page.getByRole("tabpanel", { name: "Span list" })).toContainText("Columns: Link, Distance (required); Site A, Route, Section, Type (optional).");
+  await page.getByLabel("Upload a span list").setInputFiles(file(`e2e-spans-${stamp}.xlsx`, [
+    { name: "Cover", rows: [["synthetic test file"]] },
+    { name: "Links", rows: [["title row"], SL_HEAD, ["ZZQA-ZZQB", 12.5, "R1", "N-C", "Trunk"], ["bad link", "x", null, null, "Ring"]] },
+  ]));
+  const preview = page.getByTestId("sl-preview");
+  await expect(preview).toContainText(`Preview of e2e-spans-${stamp}.xlsx`);
+  await expect(preview).toContainText("Found as worksheet “Links”, 2 rows");
+  await expect(preview.getByRole("button", { name: "New 0" })).toBeVisible();
+  await expect(preview.getByRole("button", { name: "Problem 2", pressed: true })).toBeVisible();
+  const table = preview.getByRole("table", { name: "Span list: Problem rows" });
+  await expect(table.getByRole("columnheader")).toHaveText(["Row", "Link", "Distance (km)", "Route", "Section", "Type", "Status or reason"]);
+  const one = table.getByRole("row", { name: /ZZQA-ZZQB/ });
+  await expect(one.getByRole("cell")).toHaveText(["3", "12.500", "R1", "N-C", "Trunk", /^Needs review.*site ZZQA is not in the dashboard/]);
+  await expect(table.getByRole("row", { name: /bad link/ })).toContainText("distance is not a number");
+  await expect(preview.getByRole("button", { name: "Apply span list…" })).toBeDisabled();
+  await expect(preview).toContainText("Nothing new or changed to apply.");
+  await page.evaluate(() => scrollTo(0, 0));
+  await page.screenshot({ path: "e2e/screenshots/upload-span-list-preview.png", fullPage: true });
+  await preview.getByRole("button", { name: "Discard preview" }).click();
+  await expect(preview).toHaveCount(0);
+});
+
+test("span list without the Link and Distance headers is blocked: no Apply", async ({ page }) => {
+  await openUpload(page, "Span list");
+  await page.getByLabel("Upload a span list").setInputFiles(file(`e2e-spans-bad-${stamp}.xlsx`, [{ name: "Sheet1", rows: [["Nodes", "km?"], ["A-B", 1]] }]));
+  const preview = page.getByTestId("sl-preview");
+  await expect(preview.getByRole("alert")).toContainText("This file will not be applied");
+  await expect(preview.getByRole("alert")).toContainText("No worksheet has the expected headers: Link, Distance");
+  await expect(preview.getByRole("button", { name: /^Apply/ })).toHaveCount(0);
+  await preview.getByRole("button", { name: "Discard preview" }).click();
+});
+
+test("span list apply: confirm counts, result note, preview survives a tab change (calls mocked)", async ({ page }) => {
+  // Dev sites have spaces in their names, so no real link can be New or Changed: the upload, rows and apply are mocked.
+  await openUpload(page, "Span list");
+  const id = 987654;
+  await page.route("**/api/admin/span-list/uploads", (r) => r.fulfill({ status: 201, json: {
+    upload_id: id, filename: "e2e-mock.xlsx", sheet_name: "Links", found: true, block_reason: null,
+    counts: { rows: 3, new: 1, changed: 1, unchanged: 0, problem: 1 } } }));
+  const row = (n: number, group: string, link: string, extra: object = {}) => ({ id: n, row_number: n, sheet_name: "Links", group, status: "ready", reason: null, raw: {},
+    parsed: { link, site_a: link.slice(0, 4), site_b: link.slice(5), distance_km: "10.000", route: "R2", section: null, type: "Metro" },
+    changes: [], edited_in_dashboard: false, span_id: null, ...extra });
+  await page.route(`**/api/admin/span-list/uploads/${id}/rows*`, (r) => {
+    const g = new URL(r.request().url()).searchParams.get("group");
+    const items = g === "new" ? [row(2, "new", "AAAA-BBBB")] : g === "changed" ? [row(3, "changed", "CCCC-DDDD", { span_id: 9, edited_in_dashboard: true,
+      changes: [{ field: "distance_km", old: "9.000", new: "10.000", protected: false, note: null }, { field: "route", old: "R1", new: "R2", protected: true, note: "edited in dashboard, file differs" }] })] : [];
+    return r.fulfill({ json: { total: items.length, page: 1, page_size: 100, items } });
+  });
+  let body: string | null = "unset";
+  await page.route(`**/api/admin/span-list/uploads/${id}/apply`, (r) => {
+    body = r.request().postData();
+    return r.fulfill({ json: { upload_id: id, created: 1, changed: 1, protected_kept: 1, skipped: 1, warnings: ["E2E span warning"] } });
+  });
+  await page.getByLabel("Upload a span list").setInputFiles(file("e2e-mock.xlsx", [{ name: "Links", rows: [SL_HEAD] }]));
+  const preview = page.getByTestId("sl-preview");
+  await expect(preview.getByRole("button", { name: "New 1", pressed: true })).toBeVisible();
+  await expect(preview.getByRole("table")).toContainText("AAAA-BBBB");
+  await preview.getByRole("button", { name: "Changed 1" }).click();
+  const changed = preview.getByRole("row", { name: /CCCC-DDDD/ });
+  await expect(changed).toContainText("Distance (km): 9.000 → 10.000");
+  await expect(changed).toContainText("Route: R1 → R2");
+  await expect(changed).toContainText("kept: edited in dashboard");
+
+  await page.getByRole("tab", { name: "Reservation workbook" }).click();
+  await expect(preview).toBeHidden();
+  await page.getByRole("tab", { name: "Span list" }).click();
+  await expect(preview).toContainText("Preview of e2e-mock.xlsx");
+
+  await preview.getByRole("button", { name: "Apply span list…" }).click();
+  const dialog = page.getByRole("dialog", { name: "Apply span list?" });
+  await expect(dialog).toContainText("1 new, 1 changed, 1 need review and are skipped.");
+  await dialog.getByRole("button", { name: "Apply", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  const result = page.getByTestId("sl-result");
+  await expect(result).toContainText("Span list applied");
+  await expect(result).toContainText("1 created, 1 changed, 1 dashboard edits kept, 1 skipped.");
+  await expect(result).toContainText("E2E span warning");
+  await expect(preview).toHaveCount(0);
+  expect(body).toBeNull();
 });
 
 test("reservation workbook: preview, confirm, re-upload shows Already imported", async ({ page }) => {

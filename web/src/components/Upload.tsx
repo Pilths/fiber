@@ -1,18 +1,19 @@
 import { useRef, useState } from "react";
 import { ReservationUpload } from "@/components/ReservationUpload";
 import { SiteMasterUpload } from "@/components/SiteMasterUpload";
+import { SpanListUpload } from "@/components/SpanListUpload";
 
-const TABS = [["site-master", "Site master workbook"], ["reservations", "Reservation workbook"]] as const;
+const TABS = [["site-master", "Site master workbook"], ["span-list", "Span list"], ["reservations", "Reservation workbook"]] as const;
 type Tab = (typeof TABS)[number][0];
 
-// Admin Upload page: two separate files, each Upload -> Preview -> Apply/Confirm. Both panels stay mounted so a
+// Admin Upload page: three separate files, each Upload -> Preview -> Apply/Confirm. All panels stay mounted so a
 // preview survives switching tabs.
 export function Upload() {
   const [tab, setTab] = useState<Tab>("site-master");
   const refs = useRef<Record<string, HTMLButtonElement | null>>({});
   const onKey = (e: React.KeyboardEvent) => {
     if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
-    const next = TABS[(TABS.findIndex(([t]) => t === tab) + 1) % TABS.length][0];
+    const next = TABS[(TABS.findIndex(([t]) => t === tab) + (e.key === "ArrowRight" ? 1 : TABS.length - 1)) % TABS.length][0];
     setTab(next);
     refs.current[next]?.focus();
   };
@@ -29,7 +30,7 @@ export function Upload() {
       </div>
       {TABS.map(([t]) => (
         <div key={t} role="tabpanel" id={`up-panel-${t}`} aria-labelledby={`up-tab-${t}`} hidden={tab !== t}>
-          {t === "site-master" ? <SiteMasterUpload /> : <ReservationUpload />}
+          {t === "site-master" ? <SiteMasterUpload /> : t === "span-list" ? <SpanListUpload /> : <ReservationUpload />}
         </div>
       ))}
     </div>

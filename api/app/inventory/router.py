@@ -27,8 +27,8 @@ def search(db: DB, q: Annotated[str, Query(min_length=1)]) -> list[SearchResult]
 
 @router.get("/spans")
 def list_spans(db: DB, region: str | None = None, route_type: str | None = None,
-               q: str | None = None) -> list[SpanSummary]:
-    return service.list_span_summaries(db, region, route_type, q)
+               q: str | None = None, route: str | None = None) -> list[SpanSummary]:
+    return service.list_span_summaries(db, region, route_type, q, route)
 
 
 @router.get("/spans/{span_id}")

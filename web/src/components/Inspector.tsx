@@ -11,6 +11,8 @@ export const Facts = ({ d }: { d: Detail }) => (
     {d.region && <b className="font-semibold text-foreground">{d.region}</b>}
     {d.route_type && <b className="font-semibold text-foreground">{d.route_type}</b>}
     {d.distance_km && <span><b className="font-semibold text-foreground">{Number(d.distance_km)}</b> km</span>}
+    {d.route && <span>Route <b className="font-semibold text-foreground">{d.route}</b></span>}
+    {d.section && <span>Section <b className="font-semibold text-foreground">{d.section}</b></span>}
   </>
 );
 
