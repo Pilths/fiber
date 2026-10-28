@@ -37,6 +37,16 @@ Read before working: `docs/PRD.md` (requirements), `docs/architecture.md` (desig
 - Site is the general term for a site, building or equipment location.
 - The same Docker Compose setup runs unchanged on the personal laptop, work laptop, dev server and production server. Anything machine-specific lives only in `.env`.
 
+## UI rules (owner decisions, apply to every screen and every mock)
+
+- No eyebrow labels: no small label above a title or a number ("Selected span", "Free to reserve" as a tiny line).
+- No subtext: no muted explanation or restating line under or beside a title, number or control. Keep only labels, table headers, empty states, validation and error messages, confirmation counts, and a fact that appears nowhere else. Screen-reader text may stay as sr-only.
+- No check-mark or "healthy" chip beside a title. Status shows in the number's colour; a state such as Cut keeps its chip.
+- Core status words are Available, Reserved, In service (data value `In use`), Faulty. Spans have a fiber cut (not Faulty). The section is "Allocations", not "Held" or "Taken".
+- Map chips show only the free-core number on the line, no icons. Status is never colour alone: symbol, pattern or word somewhere on the screen.
+- Do not add Collapse map, Site/Services "Later" tabs, a Circuit column in Allocations, or helper lines like "Reserve is off: ...".
+- The Inspector is a fixed 420px card above Find, the same height in every state.
+
 ## Delegating to subagents
 
 The main chat stays on one model so its cache is kept. Hand work to a subagent by setting `model` on the Agent call:
