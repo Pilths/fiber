@@ -174,3 +174,58 @@ test("reservation History disclosure lists events in order", async ({ page }) =>
   await expect(items.first()).toContainText("Requested by DEV planner1");
   await expect(items.nth(1)).toContainText("Approved by DEV admin1");
 });
+
+test("admin edits a core's ports with a reason, then puts them back", async ({ page }) => {
+  await signIn(page, "admin1");
+  await pick(page, KLBJ);
+  await cell(page, 21).focus();
+  await page.getByRole("button", { name: "Core 21 details" }).click();
+  const d = drawer(page);
+  const dlg = page.getByRole("dialog", { name: "Ports of core 21" });
+  const a = dlg.getByLabel("Port at DEV Kuala Lumpur DC");
+  const b = dlg.getByLabel(/^Port at DEV Bukit Jalil/);
+  await d.getByRole("button", { name: /^(Add|Edit) ports$/ }).click();
+  const [oldA, oldB] = [await a.inputValue(), await b.inputValue()]; // prefilled with the current labels
+  await a.fill("E2E-KL-21");
+  await b.fill("");
+  await dlg.getByRole("button", { name: "Save" }).click();
+  await expect(dlg.getByRole("alert")).toContainText("Enter a reason");
+  await dlg.getByLabel("Reason (required)").fill("E2E: ports from site survey");
+  await dlg.getByRole("button", { name: "Save" }).click();
+  await expect(dlg).toBeHidden();
+  await expect(d).toBeVisible(); // closing the nested dialog leaves the drawer open
+  await expect(d).toContainText("E2E-KL-21 to -");
+  await expect(d.getByRole("list", { name: "Core history, newest first" })).toContainText("port_a changed to E2E-KL-21");
+
+  await d.getByRole("button", { name: "Edit ports" }).click();
+  await a.fill(oldA);
+  await b.fill(oldB);
+  await dlg.getByLabel("Reason (required)").fill("E2E: undo");
+  await dlg.getByRole("button", { name: "Save" }).click();
+  await expect(dlg).toBeHidden();
+  await expect(d).toContainText(oldA || oldB ? `${oldA || "-"} to ${oldB || "-"}` : "Add ports");
+});
+
+test("one Unassigned row per reservation; admin assign dialog limits the choice", async ({ page }) => {
+  await signIn(page, "admin1");
+  await pick(page, CJBJ);
+  const table = page.getByRole("table", { name: "Taken cores on this span" });
+  const rows = table.getByTestId("unassigned-row");
+  const n = await rows.count();
+  expect(n).toBeGreaterThan(0);
+  await expect(page.getByRole("group", { name: "Filter taken cores by status" }).getByRole("button", { name: /^Unassigned/ })).toHaveText(`Unassigned ${n}`);
+  const remaining = Number(await rows.first().getByRole("rowheader").innerText());
+  let posted: unknown = null;
+  await page.route("**/api/reservations/*/assign", (r) => { posted = r.request().postDataJSON(); return r.fulfill({ json: {} }); });
+  await rows.first().getByRole("button", { name: "Assign cores" }).click();
+  const dlg = page.getByRole("dialog", { name: /^Assign cores to / });
+  await expect(dlg).toContainText(`Choose up to ${remaining}`);
+  const cores = dlg.getByRole("group", { name: "Available cores" }).getByRole("button");
+  test.skip(await cores.count() <= remaining, "Not enough Available cores on this span to test the limit.");
+  for (let i = 0; i < remaining; i++) await cores.nth(i).click();
+  await expect(cores.nth(remaining)).toBeDisabled();
+  await expect(cores.nth(0)).toHaveAttribute("aria-pressed", "true");
+  await dlg.getByRole("button", { name: new RegExp(`^Assign ${remaining} cores?$`) }).click();
+  await expect(dlg).toBeHidden();
+  expect((posted as { cores: number[] }).cores).toHaveLength(remaining);
+});

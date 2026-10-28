@@ -37,7 +37,7 @@ test("site master preview: counts per sheet, 10% drop override, blocked DC sheet
     { name: "Site Location", rows: [SITE_HEAD, ["E2E Site One", 3.2, 101.5, "Central", "Tower"], ["E2E Site Two", "TBA", "TBA", "Central", "Tower"]] },
   ]));
   const preview = page.getByTestId("sm-preview");
-  await expect(preview).toContainText("Nothing is saved until you apply.");
+  await expect(preview).toContainText("Nothing is saved until you apply it.");
   const sites = page.getByTestId("sheet-sites");
   await expect(sites).toContainText("found as worksheet “Site Location”, 2 rows");
   await expect(sites.getByRole("button", { name: "Added 1" })).toBeVisible();
@@ -55,16 +55,20 @@ test("site master preview: counts per sheet, 10% drop override, blocked DC sheet
   await expect(sites.getByRole("table")).toContainText("E2E Site Two");
   await expect(sites.getByRole("table")).toContainText("missing coordinates");
   await expect(sites.getByRole("table")).toContainText("Needs review");
+  await expect(sites.getByRole("columnheader")).toHaveText(["Row", "Site name", "Latitude", "Longitude", "Region", "Status or reason"]);
+  const two = sites.getByRole("row", { name: /E2E Site Two/ });
+  await expect(two.getByRole("cell")).toHaveText(["3", "TBA", "TBA", "Central", /^Needs review.*missing coordinates/]);
   await sites.getByRole("button", { name: "Missing 4" }).click();
   await expect(sites.getByRole("table")).toContainText("in use, stays active");
 
-  const apply = preview.getByRole("button", { name: "Apply…" });
+  await expect(dcs.getByRole("button", { name: /^Apply/ })).toHaveCount(0);
+  const apply = sites.getByRole("button", { name: "Apply Site Location…" });
   await expect(apply).toBeDisabled();
-  await expect(preview).toContainText("No sheet can be applied");
+  await expect(sites).toContainText("Tick Override to apply this sheet.");
   await sites.getByLabel(/^Override/).check();
   await expect(apply).toBeDisabled();
-  await expect(preview).toContainText("Enter a reason for the override.");
-  await preview.getByLabel("Reason for the override (required)").fill("E2E: smaller test file");
+  await expect(sites).toContainText("Enter a reason for the override.");
+  await sites.getByLabel("Reason for the override (required)").fill("E2E: smaller test file");
   await expect(apply).toBeEnabled();
   await sites.getByLabel(/^Override/).uncheck();
   await sites.getByRole("button", { name: "Added 1" }).click();
@@ -83,18 +87,20 @@ test("site master apply: DC sheet applies, result shown, current file updates", 
   await expect(page.getByTestId("sheet-sites").getByRole("alert")).toContainText("This sheet will not be applied");
   const dcs = page.getByTestId("sheet-dcs");
   await expect(dcs.getByRole("button", { name: "Problem 2" })).toBeVisible();
-  const preview = page.getByTestId("sm-preview");
-  await expect(preview).toContainText("Ready: DC sheet will be applied.");
-  await preview.getByRole("button", { name: "Apply…" }).click();
-  const dialog = page.getByRole("dialog", { name: "Apply this site master file?" });
-  await expect(dialog).toContainText("Sites sheet: not applied.");
+  await expect(dcs.getByRole("columnheader")).toHaveText(["Row", "DC name", "LRD", "State", "Latitude", "Longitude", "Status or reason"]);
+  await expect(dcs).toContainText("Ready to apply.");
+  await expect(dcs).not.toContainText("Apply Site Location first");
+  await dcs.getByRole("button", { name: "Apply DC List…" }).click();
+  const dialog = page.getByRole("dialog", { name: "Apply DC List?" });
   await dialog.getByRole("button", { name: "Apply", exact: true }).click();
   await expect(dialog).toHaveCount(0);
   const result = page.getByTestId("sm-result");
   await expect(result).toContainText("Site master applied");
-  await expect(result).toContainText(/DC sheet: \d+ added, \d+ changed/);
-  await expect(result).toContainText("Sites sheet: not applied");
+  await expect(result).toContainText(/DC List: \d+ added, \d+ changed/);
+  await expect(result).toContainText("Site Location: not applied");
+  await expect(page.getByTestId("sm-preview")).toHaveCount(0);
   await expect(page.getByTestId("sm-current")).toContainText(name);
+  await expect(page.getByTestId("sm-current")).toContainText("Current");
 });
 
 test("site master possible rename must be decided before Apply", async ({ page }) => {
@@ -105,7 +111,7 @@ test("site master possible rename must be decided before Apply", async ({ page }
   const renames = page.getByRole("region", { name: /Possible renames/ });
   await expect(renames).toContainText("E2E DC Beta → E2E DC Beta Renamed");
   const preview = page.getByTestId("sm-preview");
-  const apply = preview.getByRole("button", { name: "Apply…" });
+  const apply = page.getByTestId("sheet-dcs").getByRole("button", { name: "Apply DC List…" });
   await expect(apply).toBeDisabled();
   await expect(preview).toContainText("Choose Rename or Keep separate for 1 possible rename.");
   await page.evaluate(() => scrollTo(0, 0));
@@ -113,11 +119,60 @@ test("site master possible rename must be decided before Apply", async ({ page }
   await renames.getByRole("radio", { name: "Rename" }).check();
   await expect(apply).toBeEnabled();
   await apply.click();
-  const dialog = page.getByRole("dialog", { name: "Apply this site master file?" });
+  const dialog = page.getByRole("dialog", { name: "Apply DC List?" });
   await expect(dialog).toContainText("Possible renames: 1 renamed, 0 kept separate.");
   await page.keyboard.press("Escape"); // not applied: the next run needs E2E DC Beta as it is
   await expect(dialog).toHaveCount(0);
   await expect(apply).toBeFocused();
+});
+
+test("site master sheets apply one at a time; the preview survives a tab change (apply calls mocked)", async ({ page }) => {
+  await openUpload(page, "Site master workbook");
+  await page.getByLabel("Upload a site master workbook").setInputFiles(file(`e2e-both-${stamp}.xlsx`, [
+    { name: "Site Location", rows: [SITE_HEAD, ["E2E Site One", 3.2, 101.5, "Central", "Tower"], ["E2E Site Two", "TBA", "TBA", "Central", "Tower"]] },
+    { name: "DC List", rows: [DC_HEAD, ...DEV_DCS, ALPHA, [4, "Penang", "E2E DC Beta", "DEV Penang Tower", 5.41, 100.33]] },
+  ]));
+  const sites = page.getByTestId("sheet-sites");
+  const dcs = page.getByTestId("sheet-dcs");
+  await sites.getByLabel(/^Override/).check();
+  await sites.getByLabel("Reason for the override (required)").fill("E2E: smaller test file");
+  await expect(dcs).toContainText("Apply Site Location first");
+
+  // Switching the top tab keeps the staged preview and its choices.
+  await nav(page).getByRole("button", { name: "Map" }).click();
+  await expect(page.getByTestId("sm-preview")).toBeHidden();
+  await nav(page).getByRole("button", { name: "Upload" }).click();
+  await expect(sites.getByLabel(/^Override/)).toBeChecked();
+  await expect(sites.getByLabel("Reason for the override (required)")).toHaveValue("E2E: smaller test file");
+
+  // The dev site list must stay as seeded, so the apply calls are mocked; the request bodies are checked.
+  const bodies: unknown[] = [];
+  const counts = { added: 1, changed: 0, renamed: 0, deactivated: 0, kept_active: 4, protected_kept: 0, skipped: 0 };
+  await page.route("**/api/admin/site-master/uploads/*/apply", async (route) => {
+    const b = route.request().postDataJSON() as { sheets: string[] };
+    bodies.push(b);
+    const first = b.sheets[0] === "sites";
+    await route.fulfill({ json: { upload_id: 1, warnings: first ? [] : ["E2E warning"], complete: !first,
+      sheets: { sites: { applied: true, ...counts }, dcs: first ? { applied: false, block_reasons: [] } : { applied: true, ...counts, added: 2 } } } });
+  });
+  await sites.getByRole("button", { name: "Apply Site Location…" }).click();
+  await page.getByRole("dialog", { name: "Apply Site Location?" }).getByRole("button", { name: "Apply", exact: true }).click();
+  await expect(sites).toContainText("Site Location applied");
+  await expect(sites).toContainText("1 added, 0 changed");
+  await expect(sites.getByRole("button", { name: /^Apply/ })).toHaveCount(0);
+  await expect(dcs).not.toContainText("Apply Site Location first");
+  await dcs.getByRole("button", { name: "Apply DC List…" }).click();
+  await page.getByRole("dialog", { name: "Apply DC List?" }).getByRole("button", { name: "Apply", exact: true }).click();
+  const result = page.getByTestId("sm-result");
+  await expect(result).toContainText("Site master applied");
+  await expect(result).toContainText("Site Location: 1 added");
+  await expect(result).toContainText("DC List: 2 added");
+  await expect(result).toContainText("E2E warning");
+  await expect(page.getByTestId("sm-preview")).toHaveCount(0);
+  expect(bodies).toEqual([
+    { sheets: ["sites"], override_drop: { sites: true, dcs: false }, reason: "E2E: smaller test file", renames: [] },
+    { sheets: ["dcs"], override_drop: { sites: false, dcs: false }, reason: null, renames: [] },
+  ]);
 });
 
 test("reservation workbook: preview, confirm, re-upload shows Already imported", async ({ page }) => {

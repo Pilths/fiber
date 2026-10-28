@@ -1,27 +1,31 @@
 import { useState } from "react";
+import { api, errorText } from "@/api/client";
 import type { components } from "@/api/schema";
 import { Icon } from "@/components/Icon";
+import { Dialog } from "@/components/upload-parts";
 import { STATUS, type CoreStatus } from "@/lib/status";
 
 type Detail = components["schemas"]["SpanDetail"];
+type Hold = components["schemas"]["UnassignedHold"];
 type Filter = "All" | Exclude<CoreStatus, "Available"> | "Unassigned";
 
-// One row per held core from GET /api/spans/{id}, plus one count-only row. Age and the reservation's planner
-// are not on the span endpoint (history is TASK-077), so those columns are left out.
-export function HeldTable({ d, onOpen }: { d: Detail; onOpen: (c: Detail["cores"][number]) => void }) {
+// One row per held core from GET /api/spans/{id}, plus one count-only row per reservation with unassigned cores.
+// Age and the reservation's planner are not on the span endpoint (history is TASK-077), so those columns are left out.
+export function HeldTable({ d, admin, onOpen, onChanged }: { d: Detail; admin: boolean; onOpen: (c: Detail["cores"][number]) => void; onChanged: () => void }) {
   const [filter, setFilter] = useState<Filter>("All");
+  const [assign, setAssign] = useState<Hold | null>(null);
   const held = d.cores.filter((c) => c.status !== "Available");
-  const count = (f: Filter) => (f === "All" ? held.length + (d.unassigned_reserved ? 1 : 0) : f === "Unassigned" ? (d.unassigned_reserved ? 1 : 0) : held.filter((c) => c.status === f).length);
+  const count = (f: Filter) => (f === "All" ? held.length + d.unassigned.length : f === "Unassigned" ? d.unassigned.length : held.filter((c) => c.status === f).length);
   const filters = (["All", "Reserved", "Requested", "In use", "Faulty", "Unassigned"] as Filter[]).filter((f) => f === "All" || count(f) > 0);
   const rows = held.filter((c) => filter === "All" || c.status === filter);
-  const showCount = d.unassigned_reserved > 0 && (filter === "All" || filter === "Unassigned");
+  const holds = filter === "All" || filter === "Unassigned" ? d.unassigned : [];
 
   return (
     <section className="card" aria-labelledby="held-h">
       <div className="card-h">
         <h2 id="held-h" tabIndex={-1} className="outline-offset-4">Taken cores</h2>
       </div>
-      {held.length === 0 && !d.unassigned_reserved ? <p className="text-body text-muted-foreground">No cores taken.</p> : (
+      {held.length === 0 && !d.unassigned.length ? <p className="text-body text-muted-foreground">No cores taken.</p> : (
         <>
           <div role="group" aria-label="Filter taken cores by status" className="mb-2 flex flex-wrap gap-2">
             {filters.map((f) => (
@@ -50,20 +54,69 @@ export function HeldTable({ d, onOpen }: { d: Detail; onOpen: (c: Detail["cores"
                   <td className="pr-0 whitespace-nowrap">{c.planned_date ?? "-"}</td>
                 </tr>
               ))}
-              {showCount && (
-                <tr>
-                  <th scope="row" className="text-left font-semibold">{d.unassigned_reserved}</th>
+              {holds.map((h) => (
+                <tr key={`u${h.reservation_id}`} data-testid="unassigned-row">
+                  <th scope="row" className="text-left font-semibold">{h.remaining}</th>
                   <td><span className="inline-flex items-center gap-2 font-semibold whitespace-nowrap text-use"><Icon name="co" />Unassigned</span></td>
+                  <td className="truncate" title={h.customer ?? undefined}>{h.customer ?? "-"}</td>
+                  <td className="py-2 leading-snug">{admin ? <button type="button" className="btn btn-sm" onClick={() => setAssign(h)}>Assign cores</button> : "-"}</td>
                   <td>-</td>
-                  <td className="py-2 leading-snug">-</td>
-                  <td>-</td>
-                  <td className="pr-0">-</td>
+                  <td className="pr-0 whitespace-nowrap">{h.planned_date ?? "-"}</td>
                 </tr>
-              )}
+              ))}
             </tbody>
           </table>
         </>
       )}
+      {assign && <AssignDialog d={d} hold={assign} onClose={() => setAssign(null)} onSaved={onChanged} />}
     </section>
+  );
+}
+
+// Admin names specific Available cores for part or all of a count-only reservation (an 'assigned' event).
+function AssignDialog({ d, hold, onClose, onSaved }: { d: Detail; hold: Hold; onClose: () => void; onSaved: () => void }) {
+  const [picked, setPicked] = useState<Set<number>>(new Set());
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const free = d.cores.filter((c) => c.status === "Available");
+  const full = picked.size >= hold.remaining;
+  const toggle = (id: number) => setPicked((s) => { const n = new Set(s); if (!n.delete(id)) n.add(id); return n; });
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      await api.post("/api/reservations/{rid}/assign", { path: { rid: hold.reservation_id }, body: { cores: [...picked] } });
+      onSaved();
+      onClose();
+    } catch (err) {
+      setError(errorText(err, "Could not assign. Try again."));
+      setBusy(false);
+    }
+  };
+  return (
+    <Dialog title={`Assign cores to ${hold.customer ?? `reservation #${hold.reservation_id}`}`} onClose={onClose} wide>
+      <p className="mt-2 text-body text-muted-foreground">Reservation #{hold.reservation_id}, {hold.remaining} unassigned. Choose up to {hold.remaining}. <b className="font-semibold text-foreground">{picked.size} chosen</b>.</p>
+      {error && <p role="alert" className="mt-3 rounded-md border border-red bg-red-bg px-3 py-2 text-body font-semibold text-red">{error}</p>}
+      <form onSubmit={submit} noValidate aria-label="Assign cores">
+        {free.length === 0 ? <p className="mt-4 text-body text-muted-foreground">No Available cores on this span.</p> : (
+          <div role="group" aria-label="Available cores" className="mt-4 grid max-h-[50vh] grid-cols-12 gap-1 overflow-y-auto">
+            {free.map((c) => {
+              const on = picked.has(c.id);
+              return (
+                <button key={c.id} type="button" aria-pressed={on} aria-label={`Core ${c.number}`} disabled={!on && full} onClick={() => toggle(c.id)}
+                  className={`flex h-9 items-center justify-center gap-0.5 rounded-md border text-sm font-semibold focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-blue disabled:cursor-not-allowed disabled:opacity-40 ${on ? "border-[#0f3a78] bg-blue text-white" : "border-line bg-white hover:border-foreground"}`}>
+                  {on && <Icon name="ch" />}{c.number}
+                </button>
+              );
+            })}
+          </div>
+        )}
+        <div className="mt-5 flex justify-end gap-2">
+          <button type="button" className="btn" onClick={onClose}>Cancel</button>
+          <button type="submit" className="btn btn-p" disabled={busy || !picked.size}>{busy ? "Assigning…" : picked.size ? `Assign ${picked.size} ${picked.size === 1 ? "core" : "cores"}` : "Assign cores"}</button>
+        </div>
+      </form>
+    </Dialog>
   );
 }
