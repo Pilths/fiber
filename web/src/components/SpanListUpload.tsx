@@ -124,7 +124,7 @@ export function SpanListUpload() {
         <div className="space-y-4">
           <div>
             <FilePick label="Upload a span list" busy={busy} onFile={pick} />
-            <p className="mt-1.5 text-xs text-muted-foreground">Columns: Link, Distance (required); Site A, Route, Section, Type (optional).</p>
+            <p className="mt-1.5 text-xs text-muted-foreground">Columns: Link, Distance (required); Route, Section, Type (optional). Other columns are ignored.</p>
           </div>
           {error && <Note tone="red" role="alert" title={error} />}
           <div aria-live="polite" data-testid="sl-result">

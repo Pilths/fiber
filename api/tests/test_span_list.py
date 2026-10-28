@@ -132,7 +132,7 @@ def test_row_rules(client, admin, sites):
         row("CCCC-DDDD", a="CCCC"), row("DDDD-CCCC")])
     uid = post(client, data).json()["upload_id"]
     p = problems(client, uid)
-    assert p[2] == "Site A does not match the first site in Link"
+    assert 2 not in p  # Site A is not checked, so a different Site A is fine
     assert p[3] == p[4] == p[5] == "distance is not a number"
     assert p[6] == "type must be Trunk, Metro or Bespoke"
     assert all("Link" in p[n] for n in (7, 8, 10, 11))

@@ -87,9 +87,6 @@ def _parse_row(headers: list[str], values: tuple[Any, ...]) -> Item:
             reasons.append("Link must be two different site names joined by a dash, like AAAA-BBBB, with no spaces")
         else:
             a, b = pair[0], pair[1]
-    site_a = _cell(f.get("site_a"))
-    if site_a is not None and a is not None and site_a != a:
-        reasons.append("Site A does not match the first site in Link")
     dist, why = _distance(f.get("distance"))
     if why:
         reasons.append(why)

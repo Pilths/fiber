@@ -82,7 +82,7 @@ function Body({ d, onGoToCores, loss, onSeeLoss, onSeeHeld, admin, onPlanRoute }
         <div className="lbl">Free to reserve</div>
         <div className={`mt-0.5 flex items-center gap-2.5 text-[40px] leading-[46px] font-bold tracking-tight ${surveyed ? h.cls.replace("h-", "v-") : "text-muted-foreground"}`}>
           {surveyed ? d.free_to_reserve : "-"}
-          <span className={`pill tracking-normal ${h.cls}`}><Icon name={h.icon} />{h.word}</span>
+          <span className={`pill tracking-normal ${h.cls}`} title={h.word}><Icon name={h.icon} /><span className="sr-only">{h.word}</span></span>
         </div>
         {surveyed ? (
           <>
@@ -110,7 +110,7 @@ function Body({ d, onGoToCores, loss, onSeeLoss, onSeeHeld, admin, onPlanRoute }
         <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
           {!loss ? <span className="text-muted-foreground">Loading...</span>
             : loss.measured_db != null ? (
-              <><span><b className="font-semibold">{db(loss.measured_db)}</b> measured{loss.deviation_pct != null && `, ${pct(loss.deviation_pct)}`}</span><LossPill l={loss} /></>
+              <><span><b className="font-semibold">{db(loss.measured_db)}</b> measured{loss.deviation_pct != null && `, ${pct(loss.deviation_pct)}`}</span><LossPill l={loss} compact /></>
             ) : <span className="text-muted-foreground">{loss.status === "no_distance" ? "Not measured, no distance" : "Not measured"}</span>}
         </span>
         <button type="button" className="flex-none font-semibold link" onClick={onSeeLoss}>See loss</button>

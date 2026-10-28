@@ -171,3 +171,11 @@ def test_pick_respects_count_only_holds_and_409_names_short_span(client, g, db):
     # not surveyed
     r = client.get(f"/api/routes/pick?span_ids={g['AD']}&cores_needed=1", headers=H())
     assert r.status_code == 409 and "not surveyed" in r.json()["detail"]["message"]
+
+
+def test_endpoints_ordered_by_section(client, g, db):
+    for k, sec in (("AB", "C-C"), ("BD", "N-C"), ("AC", "north to north"), ("CD", "N-C")):
+        db.execute(text("UPDATE spans SET section = :s WHERE id = :i"), {"s": sec, "i": g[k]})
+    names = [s["name"] for s in client.get("/api/routes/endpoints", headers=H()).json()]
+    # A and C touch N-N, then B and D touch N-C, E has no section and goes last
+    assert names == ["A", "C", "B", "D", "E"]

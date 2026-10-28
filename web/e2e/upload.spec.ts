@@ -198,7 +198,7 @@ const SL_HEAD = ["Link", "Distance", "Route", "Section", "Type"];
 
 test("span list preview: header found, problem rows in the table, nothing to apply", async ({ page }) => {
   await openUpload(page, "Span list");
-  await expect(page.getByRole("tabpanel", { name: "Span list" })).toContainText("Columns: Link, Distance (required); Site A, Route, Section, Type (optional).");
+  await expect(page.getByRole("tabpanel", { name: "Span list" })).toContainText("Columns: Link, Distance (required); Route, Section, Type (optional). Other columns are ignored.");
   await page.getByLabel("Upload a span list").setInputFiles(file(`e2e-spans-${stamp}.xlsx`, [
     { name: "Cover", rows: [["synthetic test file"]] },
     { name: "Links", rows: [["title row"], SL_HEAD, ["ZZQA-ZZQB", 12.5, "R1", "N-C", "Trunk"], ["bad link", "x", null, null, "Ring"]] },

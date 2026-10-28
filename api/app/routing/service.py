@@ -1,4 +1,5 @@
 """Route options over the span graph. Free cores use inventory.list_spans (free_to_reserve), loss uses loss.span_rows."""
+import re
 import time
 from itertools import islice, pairwise
 from typing import Any
@@ -21,10 +22,23 @@ def _bad(field: str, msg: str) -> HTTPException:
     return HTTPException(422, [{"loc": ["query", field], "msg": msg, "type": "value_error"}])
 
 
+_LETTER = {"n": 0, "c": 1, "e": 2, "s": 3}  # north, central, east coast, south
+_SECTION = re.compile(r"^\s*([A-Za-z])\w*\s*(?:-|to)\s*([A-Za-z])", re.I)
+
+
+def _section_rank(section: str | None) -> tuple[int, int]:
+    """'N-N' -> (0, 0), 'N-C' -> (0, 1), 'north to south' -> (0, 3); no or unknown section sorts last."""
+    m = _SECTION.match(section or "")
+    return (_LETTER.get(m[1].lower(), 9), _LETTER.get(m[2].lower(), 9)) if m else (9, 9)
+
+
 def endpoints(db: Session) -> list[dict[str, Any]]:
-    return [dict(r) for r in db.execute(text(
-        "SELECT id, name, kind FROM sites s WHERE EXISTS (SELECT 1 FROM spans p WHERE s.id IN (p.site_a_id, p.site_b_id)) "
-        "ORDER BY name, id")).mappings()]
+    """Sites that have a span, ordered by the best section of their spans (N-N, N-C, ... then no section), then name."""
+    rows = db.execute(text(
+        "SELECT s.id, s.name, s.kind, array_remove(array_agg(DISTINCT p.section), NULL) AS sections FROM sites s "
+        "JOIN spans p ON s.id IN (p.site_a_id, p.site_b_id) GROUP BY s.id, s.name, s.kind")).mappings().all()
+    rows = sorted(rows, key=lambda r: (min(map(_section_rank, r["sections"]), default=(9, 9)), r["name"], r["id"]))
+    return [{"id": r["id"], "name": r["name"], "kind": r["kind"]} for r in rows]
 
 
 def _candidates(g: nx.Graph, a: int, b: int) -> list[list[int]]:
