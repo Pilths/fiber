@@ -267,3 +267,18 @@ def test_site_master_kind_not_visible(client, db, admin):
     uid = db.execute(text("INSERT INTO uploads (user_id, filename, kind) VALUES ((SELECT id FROM users WHERE username='boss'), 'x', 'site_master') RETURNING id")).scalar_one()
     assert client.get(f"{URL}/{uid}", headers=ADMIN).status_code == 404
     assert confirm(client, uid).status_code == 404
+
+
+def test_header_row_and_sheet_name_found_by_scanning(client, db, admin):
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Fiber requests"  # not called Reservation
+    ws.append(["Report as at 2026-10-27"])
+    ws.append([])
+    ws.append([None, None, *HEAD])  # headers start below row 1 and right of column A
+    ws.append([None, None, *row()])
+    out = io.BytesIO()
+    wb.save(out)
+    r = up(client, out.getvalue())
+    assert r.status_code == 201, r.text
+    assert r.json()["counts"]["reservations"] == 1
