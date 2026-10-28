@@ -162,9 +162,6 @@ def _parse_row(kind: str, headers: list[str], values: tuple[Any, ...]) -> Item:
     if kind == "sites":
         if coord_why:
             reasons.append(coord_why)
-        p["region"], why = checks.map_region(None if isblank(f.get("region")) else f.get("region"))
-        if why:
-            reasons.append(why)
     else:
         p["lrd"] = None if isblank(f.get("lrd")) else str(f["lrd"]).strip()
         p["own_coords_note"] = coord_why  # not a problem by itself: the DC falls back to its site
@@ -235,7 +232,8 @@ def _same(a: Any, b: Any) -> bool:
 
 def _new_fields(kind: str, p: dict[str, Any]) -> dict[str, Any]:
     f: dict[str, Any] = {"location": _fmt(p["lat"], p["lon"])}
-    f.update({"region": p["region"]} if kind == "sites" else {"lrd": p["lrd"]})
+    if kind == "dcs":  # Site Location has no region: it is neither checked nor compared nor written
+        f["lrd"] = p["lrd"]
     f.update({"details." + k: v for k, v in p["details"].items()})
     return f
 
@@ -244,9 +242,7 @@ def _old_fields(kind: str, row: DbSite) -> dict[str, Any]:
     details = dict(row.details)
     f: dict[str, Any] = {"location": _fmt(row.lat, row.lon)}
     if kind == "sites":
-        rk = next((k for k in details if norm(k) == "region"), None)
-        raw = details.pop(rk, None) if rk else None
-        f["region"] = (checks.map_region(raw)[0] or raw) if raw is not None else None
+        details.pop(next((k for k in details if norm(k) == "region"), ""), None)  # an old region stays as it is
     else:
         f["lrd"] = row.lrd
     f.update({"details." + k: v for k, v in details.items()})
@@ -281,7 +277,6 @@ def _eval_sheet(kind: str, ps: ParsedSheet, snap: dict[str, DbSite], prot: dict[
         return res
     label = "site_name" if kind == "sites" else "DC Name / Link"
     counts = Counter(i.p["key"] for i in ps.items if i.p["key"])
-    dup = sorted(k for k, n in counts.items() if n > 1)
     for it in ps.items:
         p, reasons = it.p, list(it.p["reasons"])
         key = p["key"]
@@ -316,9 +311,6 @@ def _eval_sheet(kind: str, ps: ParsedSheet, snap: dict[str, DbSite], prot: dict[
     # whole-file checks
     if not ps.items:
         res.block_reasons.append("sheet is empty")
-        res.hard = True
-    if dup:
-        res.block_reasons.append(f"duplicate keys in file: {', '.join(dup[:5])}{' ...' if len(dup) > 5 else ''}")
         res.hard = True
     active = sum(1 for r in snap.values() if r.cls == kind and r.active)
     if ps.items and len(counts) * DROP_LIMIT[1] <= active * DROP_LIMIT[0]:
@@ -447,8 +439,6 @@ def _apply_changes(kind: str, row: DbSite, it: Item, lrd_ids: dict[str, int], wa
         f, new = c["field"], c["new"]
         if f == "location":
             fin["lat"], fin["lon"] = it.p["lat"], it.p["lon"]
-        elif f == "region":
-            setd("region", new)
         elif f == "lrd":
             if new not in lrd_ids:
                 warnings.append(f"{it.p['key']}: LRD site {new} was not found; link kept")
@@ -481,8 +471,6 @@ def apply_sheet(db: Session, admin_id: int, kind: str, r: SheetResult, reason: s
                 out["skipped"] += 1
                 continue
             d = dict(it.p["details"])
-            if kind == "sites":
-                d["region"] = it.p["region"]
             inserts.append({"n": it.p["key"], "k": "site" if kind == "sites" else "data_center", "lat": it.p["lat"],
                             "lon": it.p["lon"], "d": json.dumps(d), "l": lid})
         elif it.group == "changed":

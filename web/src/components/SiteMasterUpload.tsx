@@ -16,7 +16,7 @@ type Row = {
   changes: { field: string; old: unknown; new: unknown; protected?: boolean; note?: string }[];
   location_note: string | null; in_use: boolean | null; possible_rename: Rename | null;
   raw: Record<string, unknown> | null;
-  parsed: { lat?: number | null; lon?: number | null; region?: string | null; lrd?: string | null; details?: Record<string, unknown> } | null;
+  parsed: { lat?: number | null; lon?: number | null; lrd?: string | null; details?: Record<string, unknown> } | null;
 };
 // Parsed value first; a value the parser could not read (e.g. "TBA") shows as typed in the file.
 const field = (o: Record<string, unknown> | null | undefined, re: RegExp) => {
@@ -156,7 +156,6 @@ function SheetPanel({ uploadId, s, override, onOverride, applied, children }: {
                   {s.kind === "dcs" && <><th scope="col" className="w-[16%]">LRD</th><th scope="col" className="w-[10%]">State</th></>}
                   <th scope="col" className="num w-24">Latitude</th>
                   <th scope="col" className="num w-24">Longitude</th>
-                  {s.kind === "sites" && <th scope="col" className="w-[12%]">Region</th>}
                   <th scope="col">Status or reason</th>
                 </tr></thead>
                 <tbody>
@@ -169,7 +168,6 @@ function SheetPanel({ uploadId, s, override, onOverride, applied, children }: {
                         {s.kind === "dcs" && <>{tx(cell(r.parsed?.lrd, field(r.raw, /^lrd$/i)))}{tx(cell(field(r.parsed?.details, /^(state|city)$/i), null))}</>}
                         <td className="num truncate">{cell(r.parsed?.lat, field(r.raw, /^lat/i))}</td>
                         <td className="num truncate">{cell(r.parsed?.lon, field(r.raw, /^lon/i))}</td>
-                        {s.kind === "sites" && tx(cell(r.parsed?.region, field(r.raw, /^region$/i)))}
                         <td className="whitespace-normal! [&:has(*)]:h-auto! [&:has(*)]:py-1.5!">
                           <span className={`inline-flex items-center gap-1.5 ${g.cls === "h-amber" ? "font-semibold text-amber" : ""}`}><Icon name={g.icon} />{group === "problem" ? "Needs review" : g.label}</span>
                           <RowDetail r={r} group={group} />
