@@ -541,17 +541,22 @@ class ApplyError(Exception):
 
 
 def apply_upload(db: Session, admin_id: int, upload_id: int, override: dict[str, bool], reason: str | None,
-                 renames: list[dict[str, Any]]) -> dict[str, Any]:
+                 renames: list[dict[str, Any]], only: list[str] | None = None) -> dict[str, Any]:
+    """Apply the named sheets (all when only is None). The upload stays staged until no sheet is left that can still be applied."""
     up = db.execute(text("SELECT id, filename, status, summary FROM uploads WHERE id = :i AND kind = 'site_master'"),
                     {"i": upload_id}).mappings().first()
     if not up:
         raise ApplyError(404, "Upload not found")
-    if up["status"] != "staged":
+    before = (up["summary"].get("applied") or {}).get("sheets", {})
+    done = {k for k, v in before.items() if v.get("applied")}
+    if up["status"] != "staged" and not only:
         raise ApplyError(409, "This upload was already applied")
+    if again := [k for k in (only or ()) if k in done]:
+        raise ApplyError(409, f"{', '.join(again)} was already applied from this upload")
     if any(override.values()) and not (reason or "").strip():
         raise ApplyError(422, "A reason is required to override the row-count check")
     res = evaluate(db, load_staged(db, upload_id, up["summary"]))
-    todo = [k for k in SHEETS if res[k].found and (not res[k].blocked or (not res[k].hard and override.get(k)))]
+    todo = [k for k in (only or SHEETS) if k not in done and res[k].found and (not res[k].blocked or (not res[k].hard and override.get(k)))]
     if not todo:
         raise ApplyError(409, "Nothing can be applied: " + "; ".join(
             f"{k}: {', '.join(r.block_reasons)}" for k, r in res.items() if r.blocked))
@@ -576,18 +581,23 @@ def apply_upload(db: Session, admin_id: int, upload_id: int, override: dict[str,
             if k == "dcs":
                 pairs = {m: next(i for i in res["dcs"].items if i.id == x["new_row_id"]) for m, x in chosen.items()}
             summary[k] = apply_sheet(db, admin_id, k, res[k], why, pairs, warnings, prot, snap)
-        sheets = {k: {**summary[k], "applied": True} if k in summary else {"applied": False, "block_reasons": res[k].block_reasons}
-                  for k in SHEETS}
-        applied = {"by": admin_id, "at": datetime.now(UTC).isoformat(), "sheets": sheets, "warnings": warnings,
-                   "override_drop": {k: bool(override.get(k)) for k in SHEETS}, "override_reason": reason}
+        sheets = {k: {**summary[k], "applied": True} if k in summary else before[k] if k in done
+                  else {"applied": False, "block_reasons": res[k].block_reasons} for k in SHEETS}
+        earlier = up["summary"].get("applied") or {}
+        applied = {"by": admin_id, "at": datetime.now(UTC).isoformat(), "sheets": sheets,
+                   "warnings": earlier.get("warnings", []) + warnings,
+                   "override_drop": {k: bool(override.get(k)) or bool((earlier.get("override_drop") or {}).get(k)) for k in SHEETS},
+                   "override_reason": reason or earlier.get("override_reason")}
+        left = [k for k in SHEETS if res[k].found and not sheets[k]["applied"] and (not res[k].blocked or not res[k].hard)]
         for k, on in override.items():
             if on and k in summary:
                 db.execute(text("INSERT INTO data_edits (entity, entity_id, field, old_value, new_value, reason, user_id) "
                                 "VALUES ('upload', :i, 'override_drop', NULL, :k, :r, :u)"),
                            {"i": upload_id, "k": k, "r": reason.strip(), "u": admin_id})  # type: ignore[union-attr]
         s = dict(up["summary"], applied=applied)
-        db.execute(text("UPDATE uploads SET status = 'confirmed', confirmed_at = now(), summary = CAST(:s AS jsonb) WHERE id = :i"),
-                   {"s": json.dumps(s), "i": upload_id})
+        db.execute(text("UPDATE uploads SET status = :t, confirmed_at = CASE WHEN :t = 'confirmed' THEN now() ELSE confirmed_at END, "
+                        "summary = CAST(:s AS jsonb) WHERE id = :i"),
+                   {"s": json.dumps(s), "i": upload_id, "t": "staged" if only and left else "confirmed"})
     db.commit()
     invalidate_routes()
-    return {"upload_id": upload_id, "sheets": sheets, "warnings": warnings}
+    return {"upload_id": upload_id, "sheets": sheets, "warnings": warnings, "complete": not (only and left)}

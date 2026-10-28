@@ -315,3 +315,61 @@ def test_lowered_cores_are_hidden_everywhere_and_raise_reuses_rows(client, w, db
     assert one(db, "SELECT count(*) FROM (SELECT number FROM cores WHERE span_id = :s GROUP BY number HAVING count(*) > 1) t", s=s) == 0
     assert client.get(f"/api/spans/{s}", headers=H("planner1")).json()["free_cores"] == 5
     assert book(client, w, [ids[3]]).status_code == 200
+
+
+# ---------- ports typed by hand ----------
+
+def test_core_ports_set_change_clear_with_history(client, w, db):
+    c = w["c1"][1]
+    path = f"cores/{c}/ports"
+    r = post(client, path, port_a=" A Tray 1 P1 ", port_b="B Tray 1 P1", reason="from the patch panel")
+    assert r.status_code == 200 and (r.json()["port_a"], r.json()["port_b"], r.json()["core_id"]) == ("A Tray 1 P1", "B Tray 1 P1", c)
+    assert one(db, "SELECT site_id FROM ports WHERE port_id = 'A Tray 1 P1'") == one(db, "SELECT site_a_id FROM spans WHERE id = :s", s=w["s1"])
+    assert one(db, "SELECT site_id FROM ports WHERE port_id = 'B Tray 1 P1'") == one(db, "SELECT site_b_id FROM spans WHERE id = :s", s=w["s1"])
+    assert edits(db, "core", c) == [("port_a", None, "A Tray 1 P1", "from the patch panel"), ("port_b", None, "B Tray 1 P1", "from the patch panel")]
+    assert one(db, "SELECT user_id FROM data_edits WHERE entity = 'core' AND field = 'port_a'") == w["admin1"]
+    # nothing changed: 200 and no history
+    assert post(client, path, port_a="A Tray 1 P1", port_b="B Tray 1 P1", reason="same").status_code == 200
+    assert len(edits(db, "core", c)) == 2
+    # change one end only
+    assert post(client, path, port_a="A Tray 1 P2", port_b="B Tray 1 P1", reason="moved").json()["port_a"] == "A Tray 1 P2"
+    assert edits(db, "core", c)[2:] == [("port_a", "A Tray 1 P1", "A Tray 1 P2", "moved")]
+    # clear: null and empty string; the ports rows stay
+    r = post(client, path, port_a=None, port_b="  ", reason="wrong core")
+    assert (r.json()["port_a"], r.json()["port_b"]) == (None, None)
+    assert edits(db, "core", c)[3:] == [("port_a", "A Tray 1 P2", None, "wrong core"), ("port_b", "B Tray 1 P1", None, "wrong core")]
+    assert one(db, "SELECT count(*) FROM ports") == 3
+    assert one(db, "SELECT port_a_id IS NULL AND port_b_id IS NULL FROM cores WHERE id = :c", c=c)
+
+
+def test_core_ports_label_at_another_site_is_409(client, w, db):
+    assert post(client, f"cores/{w['c1'][1]}/ports", port_b="X1", reason="r").status_code == 200  # X1 at site B
+    assert post(client, f"cores/{w['c2'][1]}/ports", port_a="X1", reason="r").status_code == 200  # s2 first site is B too: fine
+    r = post(client, f"cores/{w['c1'][2]}/ports", port_a="X1", reason="r")  # s1 first site is A
+    assert r.status_code == 409 and "another site" in r.json()["detail"]["message"]
+    assert not edits(db, "core", w["c1"][2])
+
+
+def test_core_ports_validation_and_permissions(client, w, db):
+    c = w["c1"][1]
+    for body in ({"port_a": "P1"}, {"port_a": "P1", "reason": " "}):
+        assert post(client, f"cores/{c}/ports", **body).status_code == 422
+    assert post(client, f"cores/{c}/ports", port_a="P1", reason="x", user="planner1").status_code == 403
+    assert post(client, "cores/999999/ports", port_a="P1", reason="x").status_code == 404
+    assert one(db, "SELECT count(*) FROM ports") == 0 and not edits(db, "core", c)
+
+
+# ---------- count-only holds listed on the span ----------
+
+def test_span_detail_lists_unassigned_holds(client, w, db):
+    from test_reservations import count_only
+    r1 = count_only(db, w, 2, span="s2")
+    r2 = count_only(db, w, 1, span="s2")
+    d = client.get(f"/api/spans/{w['s2']}", headers=H("planner1")).json()
+    assert [(u["reservation_id"], u["remaining"], u["customer"]) for u in d["unassigned"]] == [(r1, 2, "Beta"), (r2, 1, "Beta")]
+    assert d["unassigned_reserved"] == sum(u["remaining"] for u in d["unassigned"]) == 3
+    assert "planned_date" in d["unassigned"][0]
+    assert act(client, r1, "assign", cores=[w["c2"][1], w["c2"][2]]).status_code == 200  # fully assigned: drops out
+    d = client.get(f"/api/spans/{w['s2']}", headers=H("planner1")).json()
+    assert [(u["reservation_id"], u["remaining"]) for u in d["unassigned"]] == [(r2, 1)] and d["unassigned_reserved"] == 1
+    assert client.get(f"/api/spans/{w['s1']}", headers=H("planner1")).json()["unassigned"] == []

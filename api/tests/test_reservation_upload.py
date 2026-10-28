@@ -21,7 +21,7 @@ def ports(a, b, ra="P1-P2", rb="P23-24"):
     return f"{a}\nTray 1\n{ra}\n\n{b}\nMOD B\n{rb}"
 
 
-def row(nodes="AABB-BBCC", who="Acme", cores="ports", count=None, km=3, survey=4, region="Central", date=datetime(2025, 10, 10),
+def row(nodes="AABB-BBCC", who="Acme", cores="ports", count=2, km=3, survey=4, region="Central", date=datetime(2025, 10, 10),
         status=None, loss=None, tested=None, ra="P1-P2", rb="P23-24"):
     a, b = nodes[:4], nodes[5:9]
     asg = ports(a, b, ra, rb) if cores == "ports" else None
@@ -83,9 +83,9 @@ def test_009_validation_and_nothing_saved(client, db, admin):
     assert r.status_code == 201
     j = r.json()
     uid = j["upload_id"]
-    assert j["counts"]["rejected"] == 2 and j["counts"]["reservations"] == 1 and j["counts"]["conflicts"] == 1
+    assert j["counts"]["rejected"] == 2 and j["counts"]["reservations"] == 1 and j["counts"]["needs_review"] == 1
     assert j["counts"]["new"] == 1
-    assert {"duplicate_port_id", "duplicate_cable", "core_held", "ignored_sheet"} <= kinds(j)
+    assert {"duplicate_cable", "ignored_sheet"} <= kinds(j) and not {"duplicate_port_id", "core_held"} & kinds(j)
     reasons = {i["row_number"]: i["reason"] for i in rows_of(client, uid, "rejected")}
     assert "blank requestor" in reasons[3] and "unknown site ZZZZ" in reasons[4]
     assert rows_of(client, uid, "rejected")[0]["raw"]["Fiber core requestor"] == " "
@@ -108,7 +108,9 @@ def test_confirm_imports_then_reupload_is_idempotent(client, db, admin):
     out = run(client, row(), row("BBCC-CCDD", who="Beta", cores=None, count=2, survey=4), row("AABB-BBCC (additional core)", ra="P3-P4", rb="P25-26", survey=None, km=None))
     assert out["counts"]["reservations"] == 3 and out["counts"]["spans"] == 2
     assert n(db, "SELECT count(*) FROM reservations WHERE imported") == 3
-    assert n(db, "SELECT unassigned_cores FROM reservations WHERE unassigned_span_id IS NOT NULL") == 2
+    assert n(db, "SELECT count(*) FROM reservations WHERE unassigned_span_id IS NOT NULL") == 3
+    assert n(db, "SELECT sum(unassigned_cores) FROM reservations") == 6
+    assert n(db, "SELECT count(*) FROM ports") == 0 and n(db, "SELECT count(*) FROM core_holds") == 0
     assert n(db, "SELECT count(DISTINCT user_id) FROM reservation_events") == 1  # the uploading admin
     assert n(db, "SELECT count(*) FROM reservation_events WHERE type IN ('requested','approved')") == 6
     before = {t: n(db, f"SELECT count(*) FROM {t}") for t in ("spans", "ports", "cores", "reservations", "customers", "core_holds")}
@@ -168,19 +170,14 @@ def test_measurements_appended_once(client, db, admin):
     assert n(db, "SELECT count(*) FROM measurements WHERE upload_id IS NOT NULL") == 2
 
 
-def test_faulty_row_sends_held_reservation_to_action_needed(client, db, admin):
+def test_faulty_row_is_needs_review_because_ports_are_not_imported(client, db, admin):
     run(client, row())
     j = up(client, workbook(row(status="Faulty"))).json()
-    assert j["counts"]["faulty"] == 1 and j["counts"]["reservations"] == 0
-    assert any("Faulty" in w["message"] and "Action needed" in w["message"] for w in j["warnings"])
-    assert "faulty_held" not in [i["kind"] for i in client.get("/api/needs-review", headers=ADMIN).json()]
+    assert j["counts"]["faulty"] == 0 and j["counts"]["needs_review"] == 1 and j["counts"]["reservations"] == 0
+    assert "not imported" in rows_of(client, j["upload_id"], "needs_review")[0]["reason"]
     out = confirm(client, j["upload_id"]).json()
-    assert out["counts"]["faulty_cores"] == 2 and out["counts"]["reservations"] == 0
-    items = client.get("/api/needs-review", headers=ADMIN).json()
-    assert "faulty_held" in [i["kind"] for i in items]
-    assert n(db, "SELECT count(*) FROM reservations") == 1 and n(db, "SELECT count(*) FROM reservation_events WHERE type NOT IN ('requested','approved')") == 0
-    again = up(client, workbook(row(status="Faulty"))).json()  # already marked: nothing more to do
-    assert again["counts"]["faulty"] == 0 and again["counts"]["already_imported"] == 1
+    assert out["counts"]["faulty_cores"] == 0 and out["counts"]["reservations"] == 0
+    assert n(db, "SELECT count(*) FROM reservations") == 1 and n(db, "SELECT count(*) FROM data_edits WHERE entity = 'core'") == 0
 
 
 def test_switch_closed(client, db, admin):
@@ -226,21 +223,36 @@ def test_count_only_and_capacity(client, db, admin):
     assert dup["counts"]["reservations"] == 1 and dup["counts"]["needs_review"] == 1
 
 
-def test_held_core_conflict_skipped_at_confirm(client, db, admin):
-    a = up(client, workbook(row(who="Acme"))).json()["upload_id"]
-    b = up(client, workbook(row(who="Beta", ra="P2-P3", rb="P24-25"))).json()["upload_id"]
+def test_capacity_rechecked_at_confirm(client, db, admin):
+    a = up(client, workbook(row(count=3, survey=4))).json()["upload_id"]
+    b = up(client, workbook(row(who="Beta", count=2, survey=4))).json()["upload_id"]  # staged while all 4 cores are free
     assert confirm(client, a).json()["counts"]["reservations"] == 1
-    out = confirm(client, b).json()
-    assert out["counts"]["reservations"] == 0 and out["skipped"][0]["row_number"] == 2
-    assert "already taken" in out["skipped"][0]["reason"]
-    assert n(db, "SELECT count(*) FROM reservations") == 1 and n(db, "SELECT count(*) FROM core_holds") == 2
+    assert confirm(client, b).json()["counts"]["reservations"] == 0  # only 1 free now: nobody can book more
+    assert n(db, "SELECT count(*) FROM reservations") == 1 and n(db, "SELECT sum(unassigned_cores) FROM reservations") == 3
 
 
-def test_same_cores_different_details_needs_review(client, db, admin):
-    run(client, row(who="Acme"))
-    j = up(client, workbook(row(who="Beta"))).json()
-    assert j["counts"]["conflicts"] == 0 and j["counts"]["needs_review"] == 1
-    assert "differ" in rows_of(client, j["upload_id"], "needs_review")[0]["reason"]
+def test_core_assignment_text_is_not_imported(client, db, admin):
+    out = run(client, row(cores="ports", count=2))  # the Core assignment cell has two port blocks
+    assert out["counts"]["reservations"] == 1
+    assert n(db, "SELECT unassigned_cores FROM reservations") == 2
+    assert n(db, "SELECT count(*) FROM reservation_cores") == 0 and n(db, "SELECT count(*) FROM core_holds") == 0
+    assert n(db, "SELECT count(*) FROM ports") == 0
+    assert n(db, "SELECT count(*) FROM cores WHERE port_a_id IS NOT NULL OR port_b_id IS NOT NULL") == 0
+    assert n(db, "SELECT port_info_raw FROM reservations") == "raw"
+    uid = n(db, "SELECT max(id) FROM uploads")
+    assert "Tray 1" in n(db, f"SELECT raw->>'Core assignment' FROM upload_rows WHERE upload_id = {uid} AND entity = 'reservation'")
+
+
+@pytest.mark.parametrize("count", [None, " ", 0, -1, 1.5, "two"])
+def test_blank_or_bad_count_is_needs_review(client, db, admin, count):
+    j = up(client, workbook(row(count=count))).json()
+    assert j["counts"]["needs_review"] == 1 and j["counts"]["reservations"] == 0
+    reason = rows_of(client, j["upload_id"], "needs_review")[0]["reason"]
+    assert "No of core requested" in reason
+    if count in (None, " "):
+        assert "is blank" in reason
+    assert confirm(client, j["upload_id"]).json()["counts"]["reservations"] == 0
+    assert n(db, "SELECT count(*) FROM reservations") == 0
 
 
 def test_confirm_is_atomic(client, db, admin, monkeypatch):

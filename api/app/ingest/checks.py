@@ -4,7 +4,6 @@ from collections.abc import Iterable
 
 LAT_RANGE = (-11.0, 21.0)
 LON_RANGE = (92.0, 141.0)
-MAX_PORT_SPAN = 288
 
 REGIONS = {
     "north": "North", "nothern": "North", "northern": "North", "nothern region": "North",
@@ -73,32 +72,3 @@ def duplicate_names(names: Iterable[str]) -> set[str]:
     for n in names:
         (dup if n in seen else seen).add(n)
     return dup
-
-
-Blocks = list[tuple[str, list[str]]]  # (site code, port labels in order)
-
-
-def pair_ports(cell: object) -> tuple[Blocks | None, str | None]:
-    """Core assignment cell -> two (site code, port labels) blocks of equal length, or a reason.
-
-    A block is the lines before its last range, e.g. 'AABB / Tray 1 / P1-P2' gives AABB and 'AABB Tray 1 P1', 'AABB Tray 1 P2'.
-    """
-    if blank(cell):
-        return None, "core assignment is blank"
-    chunks = [c for c in re.split(r"\n\s*\n", str(cell).strip()) if c.strip()]
-    if len(chunks) != 2:
-        return None, f"core assignment has {len(chunks)} site blocks, expected 2"
-    blocks: Blocks = []
-    for chunk in chunks:
-        lines = [ln.strip() for ln in chunk.splitlines() if ln.strip()]
-        ranges = list(re.finditer(r"P(\d+)\s*-\s*P?(\d+)\s*$", lines[-1], flags=re.IGNORECASE))
-        if not ranges:
-            return None, f"no port range (P<n>-P<m>) for '{lines[0]}'"
-        start, end = int(ranges[-1].group(1)), int(ranges[-1].group(2))
-        if end < start or end - start > MAX_PORT_SPAN:
-            return None, f"malformed port range {ranges[-1].group(0)} for '{lines[0]}'"
-        prefix = " ".join(lines[:-1] + [lines[-1][:ranges[-1].start()].strip()]).strip()
-        blocks.append((lines[0].split()[0], [f"{prefix} P{n}" for n in range(start, end + 1)]))
-    if len(blocks[0][1]) != len(blocks[1][1]):
-        return None, f"port ranges differ in length ({len(blocks[0][1])} vs {len(blocks[1][1])})"
-    return blocks, None

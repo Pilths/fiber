@@ -382,3 +382,21 @@ def test_timing_36k_sites(client, admin, db):
     t3 = time.time() - t
     print(f"TIMING upload={t1:.1f}s rows_page={t2:.2f}s apply={t3:.1f}s")
     assert res.status_code == 200 and page["total"] == 36000 and count(db) == 36100
+
+
+def test_sheets_apply_one_at_a_time(client, admin, db):
+    seed_sites(db, ["AAAA"])
+    uid = post(client, workbook([site("AAAA"), site("NEWW")], [dc("DC One", "AAAA")])).json()["upload_id"]
+    first = apply(client, uid, sheets=["sites"])
+    assert first.status_code == 200 and first.json()["complete"] is False
+    assert first.json()["sheets"]["sites"]["applied"] is True and first.json()["sheets"]["dcs"]["applied"] is False
+    assert count(db, "SELECT count(*) FROM sites WHERE name = 'NEWW'") == 1
+    assert count(db, "SELECT count(*) FROM sites WHERE kind = 'data_center'") == 0
+    assert client.get(f"{URL}/current").json()["current"] is None  # still staged: a sheet is left
+    assert apply(client, uid, sheets=["sites"]).status_code == 409  # that sheet is done
+    second = apply(client, uid, sheets=["dcs"])
+    assert second.status_code == 200 and second.json()["complete"] is True
+    assert second.json()["sheets"]["sites"]["applied"] is True and second.json()["sheets"]["dcs"]["applied"] is True
+    assert count(db, "SELECT count(*) FROM sites WHERE kind = 'data_center'") == 1
+    assert client.get(f"{URL}/current").json()["current"]["upload_id"] == uid
+    assert apply(client, uid).status_code == 409

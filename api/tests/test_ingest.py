@@ -79,15 +79,6 @@ def test_checks():
     assert checks.check_known_sites(["A", "B"], {"A"}) and not checks.check_known_sites(["A"], None)
 
 
-def test_pair_ports():
-    blocks, why = checks.pair_ports(PORTS.format(a="AABB", b="BBCC"))
-    assert why is None and blocks == [("AABB", ["AABB Tray 1 P1", "AABB Tray 1 P2"]), ("BBCC", ["BBCC MOD B P23", "BBCC MOD B P24"])]
-    assert "differ in length" in checks.pair_ports("AABB\nP1-P4\n\nBBCC\nP23-24")[1]
-    assert "malformed" in checks.pair_ports("AABB\nP9-P1\n\nBBCC\nP1-P2")[1]
-    assert "malformed" in checks.pair_ports("AABB\nP1-P999\n\nBBCC\nP1-P2")[1]
-    assert checks.pair_ports("AABB\nP1-P2")[1] and checks.pair_ports(None)[1]
-
-
 def test_reservation_sheet(workbook):
     rows = by_row(parse_workbook(workbook), "Reservation")
     assert sorted(rows) == [3, 4, 5, 7, 8, 9, 10, 12, 13]  # title and blank rows are not data rows
@@ -95,7 +86,8 @@ def test_reservation_sheet(workbook):
     assert r3.parsed["region"] == r4.parsed["region"] == r5.parsed["region"] == "North"  # merged + Nothern
     assert r3.parsed["group_label"] == "DWDM Trunk Route 1" and rows[13].parsed["group_label"] == "Company A project"
     assert (r3.status, r3.reason) == ("ready", None)
-    assert r3.parsed["ports"] == [("AABB", ["AABB Tray 1 P1", "AABB Tray 1 P2"]), ("BBCC", ["BBCC MOD B P23", "BBCC MOD B P24"])]
+    assert "ports" not in r3.parsed and r3.parsed["unassigned_cores"] == 2  # Core assignment is kept raw, not parsed
+    assert "Tray 1" in r3.raw["Core assignment"]
     assert r3.parsed["cv_ready_date"] == date(2025, 10, 10) and r3.parsed["planned_date"] == date(2025, 10, 10)
     assert r3.parsed["distance_km"] == 3 and r3.parsed["survey_cores"] == 4
     assert r3.parsed["port_info_raw"] == "raw port info" and r3.parsed["contractor"] == "Vendor" and r3.parsed["monitoring_code"] == "ABC"
@@ -103,7 +95,7 @@ def test_reservation_sheet(workbook):
     assert r3.raw["Fiber montiored Y/N/WIP"] == "Y" and r3.raw["Fiber core request date"] == "2025-10-10T00:00:00"
     assert (r4.parsed["site_a"], r4.parsed["site_b"]) == ("BBCC", "AABB")
     assert r5.parsed["additional"] is True and r5.parsed["site_b"] == "BBCC" and r5.status == "ready"
-    assert rows[7].status == "needs_review" and "differ in length" in rows[7].reason
+    assert rows[7].status == "ready"  # a malformed port range no longer matters: ports are not parsed
     assert rows[8].status == "needs_review" and "Atlantis" in rows[8].reason
     assert rows[9].status == "rejected" and "blank requestor" in rows[9].reason
     assert rows[10].status == "needs_review" and "ZZZZ" in rows[10].reason
@@ -151,17 +143,17 @@ def test_excel_check_reports_and_writes_nothing(workbook, capsys, monkeypatch):
     excel_check.main()
     out = capsys.readouterr().out
     assert "Reservation: 9 rows" in out and "row 9 [rejected] blank requestor" in out and "row 7 [needs_review] latitude and longitude look swapped" in out
-    assert "ready: 4, needs_review: 4, rejected: 1" in out  # reservations
+    assert "ready: 5, needs_review: 3, rejected: 1" in out  # reservations
 
 
 def test_seed_loads_ready_rows(db, workbook):
     counts, skipped = seed.load(db, str(workbook))
-    assert counts == {"sites": 3, "data_centers": 1, "spans": 1, "customers": 1, "reservations": 3, "cores": 6, "ports": 12}
-    assert len(skipped) == 9  # 3 sites + 5 reservation rows not ready, and row 13 whose site CCDD was not loaded
+    assert counts == {"sites": 3, "data_centers": 1, "spans": 1, "customers": 1, "reservations": 4, "cores": 4, "ports": 0}
+    assert len(skipped) == 8  # 3 sites + 4 reservation rows not ready, and row 13 whose site CCDD was not loaded
     assert any("row 13 [skipped]" in s for s in skipped)
     n = lambda sql: db.execute(text(sql)).scalar_one()
-    assert n("SELECT count(*) FROM core_holds") == 6 == n("SELECT count(*) FROM reservation_cores")
-    assert n("SELECT count(*) FROM reservation_events WHERE type = 'approved'") == 3
+    assert n("SELECT count(*) FROM core_holds") == 0 == n("SELECT count(*) FROM reservation_cores")  # all count-only
+    assert n("SELECT count(*) FROM reservation_events WHERE type = 'approved'") == 4
     assert n("SELECT s.name FROM sites d JOIN sites s ON s.id = d.lrd_site_id WHERE d.kind = 'data_center'") == "AABB"
     assert n("SELECT details->>'SITE_TYPE' FROM sites WHERE name = 'AABB'") == "Tower"
     assert n("SELECT survey_cores FROM spans") == 4 and n("SELECT region FROM spans") == "North"
@@ -191,27 +183,25 @@ def count_workbook(workbook):
     return workbook
 
 
-def test_blank_assignment_with_count_is_ready(count_workbook):
+def test_count_is_read_and_blank_count_is_needs_review(count_workbook):
     rows = by_row(parse_workbook(count_workbook), "Reservation")
     assert (rows[14].status, rows[14].reason) == ("ready", None)
     assert rows[14].parsed["unassigned_cores"] == 3 and not rows[14].parsed.get("ports")
-    assert rows[15].status == "needs_review" and "core assignment is blank" in rows[15].reason
-    assert rows[3].parsed["unassigned_cores"] == 0  # a row with ports is not count-only
+    assert rows[15].status == "needs_review" and "No of core requested is blank" in rows[15].reason
+    assert rows[15].parsed["unassigned_cores"] == 0
 
 
 def test_seed_surveyed_cores_and_count_only(db, count_workbook):
     counts, skipped = seed.load(db, str(count_workbook))
     n = lambda sql: db.execute(text(sql)).scalar_one()
-    assert counts["reservations"] == 4 and any("row 15 [needs_review]" in s for s in skipped)
+    assert counts["reservations"] == 5 and any("row 15 [needs_review]" in s for s in skipped)
     assert n("SELECT survey_cores FROM spans") == 4 == n("SELECT count(*) FILTER (WHERE number <= 4) FROM cores")
-    assert n("SELECT count(*) FROM cores") == 6  # 4 surveyed + 2 beyond the survey that named ports
-    assert n("SELECT min(number) FROM cores WHERE port_a_id IS NOT NULL") == 1  # ports take numbers in order
-    assert n("SELECT count(*) FROM cores WHERE port_a_id IS NULL") == 0
+    assert n("SELECT count(*) FROM cores") == 4 and n("SELECT count(*) FROM cores WHERE port_a_id IS NOT NULL") == 0
     row = db.execute(text("SELECT unassigned_cores, unassigned_span_id = (SELECT id FROM spans) FROM reservations "
-                          "WHERE unassigned_cores > 0")).one()
+                          "WHERE unassigned_cores = 3")).one()
     assert tuple(row) == (3, True)
     rid = n("SELECT id FROM reservations WHERE unassigned_cores = 3")
     assert db.execute(text("SELECT type FROM reservation_events WHERE reservation_id = :r ORDER BY id"), {"r": rid}).scalars().all() == ["requested", "approved"]
     assert n(f"SELECT count(*) FROM reservation_cores WHERE reservation_id = {rid}") == 0
     assert n(f"SELECT count(*) FROM core_holds WHERE reservation_id = {rid}") == 0
-    assert n("SELECT remaining FROM reservation_unassigned_v") == 3
+    assert n(f"SELECT remaining FROM reservation_unassigned_v WHERE reservation_id = {rid}") == 3
