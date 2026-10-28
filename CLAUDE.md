@@ -8,6 +8,7 @@ Read before working: `docs/PRD.md` (requirements), `docs/architecture.md` (desig
 - `docker compose exec api pytest`: backend tests.
 - Lint: `docker compose exec web npm run lint` (oxlint, TypeScript).
 - `docker compose exec api alembic upgrade head`: apply migrations.
+- `docker compose exec api python -m app.create_admin USERNAME "Display name"`: first admin on an empty database; asks for the password (hidden). The dev seeds are for DEV data only.
 - Python dependencies: edit `api/requirements.in`, then regenerate `api/requirements.lock` with `pip freeze` inside a `python:3.14.8-slim` container. npm dependencies: `npm install --save-exact` inside the web container so `web/package-lock.json` updates.
 - Host venv for the editor and pyright only (the app runs in Docker): `python3 -m venv --without-pip api/.venv && python3 -m pip --python api/.venv/bin/python install -r api/requirements.lock`.
 - UI tests: `docker compose exec web npx playwright install --with-deps chromium` once after each web image rebuild, then `docker compose exec web npm run test:e2e`.
