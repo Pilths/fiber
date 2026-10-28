@@ -65,7 +65,6 @@ function ImportSwitch({ state, onClosed }: { state: Switch | null; onClosed: (s:
     return (
       <p data-testid="import-switch" role="status" className="text-body">
         <span className="inline-flex items-center gap-1.5 font-semibold text-amber"><Icon name="lo" />Reservation import closed on {when(state.closed_at)} by {state.closed_by}: {state.reason}</span>
-        <span className="text-muted-foreground"> · Reservation rows in uploads are ignored with a warning; new reservations are made only in the dashboard. This cannot be reopened.</span>
       </p>
     );
   }
@@ -82,8 +81,7 @@ function ImportSwitch({ state, onClosed }: { state: Switch | null; onClosed: (s:
   return (
     <div data-testid="import-switch" className="flex items-center gap-3 text-body">
       <span className="inline-flex items-center gap-1.5 font-semibold text-green"><Icon name="ch" />Import open</span>
-      <p className="flex-1 text-muted-foreground">Uploads import approved reservation rows whose cores are free. Closing is optional and one-time.</p>
-      <button type="button" className="btn btn-sm" onClick={() => { setOpen(true); setReason(""); setError(null); }}>Close reservation import…</button>
+      <button type="button" className="btn btn-sm ml-auto" onClick={() => { setOpen(true); setReason(""); setError(null); }}>Close reservation import…</button>
       {open && (
         <Dialog title="Close reservation import?" onClose={() => setOpen(false)}>
           <form onSubmit={submit} noValidate>
@@ -110,7 +108,6 @@ function Reservations({ uploadId, total }: { uploadId: number; total: number }) 
     <section aria-labelledby="ru-res-h" data-testid="ru-reservations">
       <div className="mb-2 flex flex-wrap items-baseline gap-x-3">
         <h3 id="ru-res-h" className="text-[15px] font-semibold">Reservations to import <span className="font-normal text-muted-foreground">({total.toLocaleString("en-GB")})</span></h3>
-        <span className="text-body text-muted-foreground">Imported as approved. Existing reservations are never changed; a row whose core is already allocated is skipped.</span>
       </div>
       {error && <p role="alert" className="text-body font-semibold text-red">{error}</p>}
       {data && (data.total === 0 ? <p className="text-body text-muted-foreground">No reservation rows will be imported.</p> : (
@@ -254,7 +251,6 @@ export function ReservationUpload() {
     <section className="card" aria-labelledby="ru-h">
       <div className="card-h">
         <h2 id="ru-h">Reservation workbook</h2>
-        <small className="hint">Spans, survey counts, loss results and reservations. Rows missing from the file are left untouched.</small>
       </div>
       <div className="space-y-4">
         <FilePick label="Upload a Reservation workbook" busy={busy} onFile={pick} />
@@ -284,7 +280,6 @@ export function ReservationUpload() {
       <section aria-labelledby="ru-prev-h" className="card" data-testid="ru-preview">
         <div className="card-h">
           <h2 id="ru-prev-h" className="truncate">Preview of {preview.filename}</h2>
-          <small className="hint flex-none">Nothing is saved until you confirm.</small>
         </div>
         <div className="space-y-6">
           <p className="-mt-2 text-body">

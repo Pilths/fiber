@@ -231,7 +231,6 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
           <section className="card col-span-8 flex flex-col" aria-labelledby="map-h">
             <div className="card-h">
               <h2 id="map-h">Network map</h2>
-              <small className="hint">{mode === "route" ? (routeName ? `Route ${routeName} selected` : "No route selected") : detail ? `${spanName(detail)} selected` : "Nothing selected"}</small>
             </div>
             <NetworkMap version={version} onSelectSpan={(id) => open(id)} onSite={mapSite} onClear={clearSelection}
               selectedIds={mode === "route" ? rp.option?.spans.map((s) => s.span_id) ?? [] : spanId != null ? [spanId] : []}
@@ -299,11 +298,14 @@ function Cores({ d, selected, chosen, toggle, focusCoreId, onOpen, onClear, onDo
         })}
       </ul>
       <PortGrid cores={d.cores} selected={selected} onToggle={toggle} onOpen={onOpen} focusCoreId={focusCoreId} />
-      <ChosenBar key={d.id} cores={chosen.map((c) => ({ id: c.id, number: c.number }))} free={d.free_to_reserve} onClear={onClear} onDone={onDone} />
-      {chosen.length > 0 && <p className="mt-3 flex items-center gap-2 note px-3 py-2 text-body">
-        <Icon name="lo" className="ic flex-none text-amber" />
-        <span><b className="font-semibold text-amber">Stale after 3 months.</b> An approved reservation not kept for 3 months is flagged Stale. Keep or release it in My reservations.</span>
-      </p>}
+      {/* The stale note sticks with the chosen bar, directly above it, so the bar never covers it. */}
+      <div className="cstick">
+        {chosen.length > 0 && <p className="mx-5 mb-3 flex items-center gap-2 note px-3 py-2 text-body" data-testid="stale-note">
+          <Icon name="lo" className="ic flex-none text-amber" />
+          <span><b className="font-semibold text-amber">Stale after 3 months.</b> An approved reservation not kept for 3 months is flagged Stale. Keep or release it in My reservations.</span>
+        </p>}
+        <ChosenBar key={d.id} cores={chosen.map((c) => ({ id: c.id, number: c.number }))} free={d.free_to_reserve} onClear={onClear} onDone={onDone} />
+      </div>
     </>
   );
 }

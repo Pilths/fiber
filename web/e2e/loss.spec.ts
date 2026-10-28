@@ -42,15 +42,14 @@ test("amber span: metrics and history newest first", async ({ page }) => {
   await pick(page, SPANS.amber);
   const c = card(page);
   await expect(c).toContainText("3.60 dB");
-  await expect(c).toContainText("12 km × 0.3 dB/km");
   await expect(c).toContainText("3.78 dB");
-  await expect(c).toContainText("+5.0% of calculated");
+  await expect(c.getByRole("heading", { name: "History" })).toBeVisible();
   const rows = c.getByTestId("loss-history").locator("tbody tr");
   expect(await rows.count()).toBeGreaterThan(0);
   expect(await rows.count()).toBeLessThanOrEqual(5);
   // the first history row is the latest measurement shown above it
   await expect(rows.first()).toContainText("3.78 dB");
-  await expect(rows.first().locator("th")).toHaveText((await c.getByText(/^\d{4}-\d{2}-\d{2}, /).textContent())!.slice(0, 10));
+  await expect(rows.first().locator("td").nth(1)).toHaveText("+5.0%");
   await c.locator(".card-h").scrollIntoViewIfNeeded();
   await page.screenshot({ path: "e2e/screenshots/loss-amber.png" });
 });

@@ -40,7 +40,7 @@ export function EditHistory({ rows }: { rows: Row[] }) {
 function editError(e: unknown) {
   const d = e instanceof ApiError ? (e.detail as { detail?: { blocking_core_numbers?: number[] } } | null)?.detail : null;
   const ns = d && typeof d === "object" ? d.blocking_core_numbers : undefined;
-  if (ns?.length) return `Cores ${ns.join(", ")} are in use or have history and cannot be removed. The survey count stays as it is.`;
+  if (ns?.length) return `Cores ${ns.join(", ")} are allocated or have history and cannot be removed. The survey count stays as it is.`;
   if (e instanceof ApiError && e.status === 400) return "Nothing changed.";
   return errorText(e, "Could not save. Try again.");
 }
@@ -168,12 +168,9 @@ export function EditSpanDialog({ spanId, focus, onClose, onSaved }: { spanId: nu
               <input ref={survey} className="field" type="number" min="0" step="1" value={f.survey} onChange={set("survey")} placeholder="Not surveyed" />
             </label>
             <label><span className={lbl}>Cable size</span><input className="field" type="number" min="1" step="1" value={f.cable} onChange={set("cable")} /></label>
-            <p className="col-span-2 -mt-1 text-body text-muted-foreground">
-              Survey count sets how many cores can be booked. Cable size is information only. Lowering the survey count is refused while a removed core is reserved, in use, faulty or has history. Changing sites is refused while the span has active reservations.
-            </p>
             <label className="col-span-2 flex items-start gap-2 text-body">
               <input type="checkbox" className="mt-0.5 size-4" checked={f.cut} onChange={(e) => setF((o) => ({ ...o, cut: e.target.checked }))} />
-              <span><span className="font-semibold">Fiber cut</span><span className="block text-muted-foreground">Marks every core on this span unavailable. Needs a reason.</span></span>
+              <span className="font-semibold">Fiber cut</span>
             </label>
             <Reason value={f.reason} onChange={(v) => setF((o) => ({ ...o, reason: v }))} missing={tried && !f.reason.trim()} autoFocus={focus === "restore"} />
           </div>

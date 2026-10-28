@@ -2,6 +2,9 @@ import { useState, type ReactNode } from "react";
 import { Icon } from "@/components/Icon";
 import { db, LEVEL, pct, signedDb, type LossDetail, type SpanLoss } from "@/lib/status";
 
+// A blank table value with its meaning, muted: "Not recorded" (should exist, missing), "Not applicable", "No ports yet".
+export const Blank = ({ children = "Not recorded" }: { children?: string }) => <span className="font-normal text-muted-foreground">{children}</span>;
+
 export function LossPill({ l, compact }: { l: Pick<SpanLoss, "level" | "deviation_pct">; compact?: boolean }) {
   if (!l.level) return null;
   const v = LEVEL[l.level];
@@ -16,13 +19,12 @@ const NOTE: Record<SpanLoss["status"], string | null> = {
   no_distance: "No distance in the Excel, so no calculated loss.",
 };
 
-function Metric({ label, value, sub, children }: { label: string; value?: string; sub?: string; children?: ReactNode }) {
+function Metric({ label, value, children }: { label: string; value?: string; children?: ReactNode }) {
   return (
     <div className="min-w-0 border-l border-rule pl-4 first:border-l-0 first:pl-0">
       <dt className="lbl">{label}</dt>
       <dd className="mt-0.5">
         {children ?? <span className="block text-2xl leading-8 font-bold tracking-tight">{value}</span>}
-        {sub && <span className="mt-0.5 block text-body text-muted-foreground">{sub}</span>}
       </dd>
     </div>
   );
@@ -41,12 +43,9 @@ export function LossCard({ loss }: { loss: LossDetail | null }) {
       {!loss ? <p className="text-body text-muted-foreground">Loading loss...</p> : (
         <>
           <dl className="grid grid-cols-4 gap-4">
-            <Metric label="Calculated" value={calc == null ? "No distance" : db(calc)}
-              sub={calc == null ? "No calculated loss" : `${Number(loss.distance_km)} km × 0.3 dB/km`} />
-            <Metric label="Latest measured" value={loss.measured_db == null ? "Not measured" : db(loss.measured_db)}
-              sub={loss.measured_db == null ? undefined : [loss.last_test_date, loss.test_method, loss.field_team].filter(Boolean).join(", ")} />
-            <Metric label="Difference" value={loss.difference_db == null ? "-" : signedDb(loss.difference_db)}
-              sub={loss.deviation_pct == null ? undefined : `${pct(loss.deviation_pct)} of calculated`} />
+            <Metric label="Calculated" value={calc == null ? "No distance" : db(calc)} />
+            <Metric label="Latest measured" value={loss.measured_db == null ? "Not measured" : db(loss.measured_db)} />
+            <Metric label="Difference" value={loss.difference_db == null ? "-" : signedDb(loss.difference_db)} />
             <Metric label="Level">
               {loss.level ? <span className="mt-1.5 block"><LossPill l={loss} /></span> : <span className="block text-2xl leading-8 font-bold text-muted-foreground">-</span>}
             </Metric>
@@ -58,6 +57,7 @@ export function LossCard({ loss }: { loss: LossDetail | null }) {
           )}
           {loss.history.length > 0 && (
             <div className="mt-4 border-t pt-3">
+              <h3 className="lbl mb-1">History</h3>
               <table className="tbl table-fixed" data-testid="loss-history">
                 <caption className="sr-only">Loss tests on this span, newest first</caption>
                 <thead><tr>
@@ -69,9 +69,9 @@ export function LossCard({ loss }: { loss: LossDetail | null }) {
                     <tr key={i}>
                       <th scope="row" className="text-left font-semibold">{h.tested_on}</th>
                       <td>{db(h.loss_db)}</td>
-                      <td>{calc ? pct(((h.loss_db - calc) / calc) * 100) : "-"}</td>
-                      <td className="truncate">{h.test_method ?? "-"}</td>
-                      <td className="truncate pr-0">{h.field_team ?? "-"}</td>
+                      <td>{calc ? pct(((h.loss_db - calc) / calc) * 100) : <Blank>Not applicable</Blank>}</td>
+                      <td className="truncate">{h.test_method ?? <Blank />}</td>
+                      <td className="truncate pr-0">{h.field_team ?? <Blank />}</td>
                     </tr>
                   ))}
                 </tbody>

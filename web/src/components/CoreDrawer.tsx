@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api, errorText, resAction } from "@/api/client";
 import type { components } from "@/api/schema";
 import { Icon } from "@/components/Icon";
+import { Blank } from "@/components/LossCard";
 import { Dialog } from "@/components/upload-parts";
 import { EVENT_WORD, STATUS, statusLabel, when } from "@/lib/status";
 
@@ -12,7 +13,7 @@ type Me = components["schemas"]["CurrentUser"];
 
 const line = (h: Item) =>
   h.kind === "data_edit"
-    ? `${h.type === "status" ? `Marked ${h.new_value ?? "-"}` : `${h.type} changed to ${h.new_value ?? "blank"}`} by ${h.user}`
+    ? `${h.type === "status" ? `Marked ${h.new_value == null ? "-" : statusLabel(h.new_value)}` : `${h.type} changed to ${h.new_value ?? "blank"}`} by ${h.user}`
     : `${EVENT_WORD[h.type] ?? h.type} by ${h.user}`;
 
 // Core detail: right-side drawer on the native <dialog> (Esc closes, focus returns to the cell or row that opened it).
@@ -68,12 +69,13 @@ export function CoreDrawer({ core, span, ends, me, onClose, onChanged }: {
     const r = (await api.get("/api/reservations")).find((x) => x.id === rid);
     return resAction(rid, "release", { cores: r?.release_requested_cores ?? [] });
   };
+  const na = core.status === "Available" || core.status === "Faulty" ? <Blank>Not applicable</Blank> : <Blank />;
   const facts: [string, React.ReactNode][] = [
-    ["Customer", core.customer ?? "-"],
-    ["Reserved by", res ? `${res.owner.display_name}, reservation #${res.reservation_id}` : "-"],
-    ["Ports", core.port_a || core.port_b ? `${core.port_a ?? "-"} to ${core.port_b ?? "-"}` : "-"],
-    ["Circuit", core.circuit_id ? <span key="c" className="font-mono">{core.circuit_id}</span> : "-"],
-    ["Planned date", core.planned_date ?? "-"],
+    ["Customer", core.customer ?? na],
+    ["Reserved by", res ? `${res.owner.display_name}, reservation #${res.reservation_id}` : <Blank key="r">Not applicable</Blank>],
+    ["Ports", core.port_a || core.port_b ? <span key="p">{core.port_a ?? <Blank />} to {core.port_b ?? <Blank />}</span> : <Blank key="p">No ports yet</Blank>],
+    ["Circuit", core.circuit_id ? <span key="c" className="font-mono">{core.circuit_id}</span> : <Blank key="c">{core.status === "Available" ? "Not applicable" : "Not recorded"}</Blank>],
+    ["Planned date", core.planned_date ?? na],
   ];
 
   return (
@@ -90,7 +92,6 @@ export function CoreDrawer({ core, span, ends, me, onClose, onChanged }: {
       </dl>
       {admin && <button type="button" className="btn btn-sm mt-3" onClick={() => setPorts(true)}>{core.port_a || core.port_b ? "Edit ports" : "Add ports"}</button>}
       {ports && <PortsDialog core={core} ends={ends} onClose={() => setPorts(false)} onSaved={() => { onChanged(); load(); }} />}
-      {res?.stale && <p className="mt-3 text-body text-amber">Stale: no approval or keep for over 3 months. Keep it or request release.</p>}
 
       {error && <p role="alert" className="mt-4 rounded-md border border-red bg-red-bg px-3 py-2 text-body font-semibold text-red">{error}</p>}
 
@@ -107,11 +108,6 @@ export function CoreDrawer({ core, span, ends, me, onClose, onChanged }: {
           {mode !== "status" ? (
             <>
               <button type="button" className="btn" onClick={() => setMode("status")}>Mark {target}</button>
-              <p className="mt-1.5 text-body text-muted-foreground">
-                {target === "Faulty"
-                  ? core.status === "Available" ? "Faulty cores cannot be booked." : "Its reservation goes to Action needed. In service and Reserved are not set here: they come from the Excel and the reservation flow."
-                  : "Only a Faulty core can be marked Available here."}
-              </p>
             </>
           ) : (
             <form onSubmit={setStatus} noValidate aria-label={`Mark core ${core.number} ${target}`}>

@@ -88,7 +88,7 @@ export function PortGrid({ cores, selected, onToggle, onOpen, focusCoreId }: {
         <p className="min-h-5 flex-1 text-body text-muted-foreground" data-testid="grid-caption">
           {caption
             ? `${label(caption)}${caption.circuit_id ? `, circuit ${caption.circuit_id}` : ""}${caption.status !== "Available" ? " (not selectable; click or Enter for its detail)" : ""}`
-            : "Hover or focus a core for details. Space or Enter chooses an Available core, or opens the detail of an allocated one."}
+            : ""}
         </p>
         {cores[idx] && <button type="button" className="btn btn-sm flex-none" onClick={() => onOpen(cores[idx])}>Core {cores[idx].number} details</button>}
       </div>

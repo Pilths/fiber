@@ -37,7 +37,7 @@ test("site master preview: counts per sheet, 10% drop override, blocked DC sheet
     { name: "Site Location", rows: [SITE_HEAD, ["E2E Site One", 3.2, 101.5, "Central", "Tower"], ["E2E Site Two", "TBA", "TBA", "Central", "Tower"]] },
   ]));
   const preview = page.getByTestId("sm-preview");
-  await expect(preview).toContainText("Nothing is saved until you apply it.");
+  await expect(preview).toBeVisible();
   const sites = page.getByTestId("sheet-sites");
   await expect(sites).toContainText("found as worksheet “Site Location”, 2 rows");
   await expect(sites.getByRole("button", { name: "Added 1" })).toBeVisible();
@@ -107,7 +107,7 @@ test("site master apply: DC sheet applies, result shown, current file updates", 
   const dcs = page.getByTestId("sheet-dcs");
   await expect(dcs.getByRole("button", { name: "Problem 2" })).toBeVisible();
   await expect(dcs.getByRole("columnheader")).toHaveText(["Row", "DC name", "LRD", "State", "Latitude", "Longitude", "Status or reason"]);
-  await expect(dcs).toContainText("Ready to apply.");
+  await expect(dcs.getByRole("button", { name: "Apply DC List…" })).toBeEnabled();
   await expect(dcs).not.toContainText("Apply Site Location first");
   await dcs.getByRole("button", { name: "Apply DC List…" }).click();
   const dialog = page.getByRole("dialog", { name: "Apply DC List?" });
@@ -198,7 +198,6 @@ const SL_HEAD = ["Link", "Distance", "Route", "Section", "Type"];
 
 test("span list preview: header found, problem rows in the table, nothing to apply", async ({ page }) => {
   await openUpload(page, "Span list");
-  await expect(page.getByRole("tabpanel", { name: "Span list" })).toContainText("Columns: Link, Distance (required); Route, Section, Type (optional). Other columns are ignored.");
   await page.getByLabel("Upload a span list").setInputFiles(file(`e2e-spans-${stamp}.xlsx`, [
     { name: "Cover", rows: [["synthetic test file"]] },
     { name: "Links", rows: [["title row"], SL_HEAD, ["ZZQA-ZZQB", 12.5, "R1", "N-C", "Trunk"], ["bad link", "x", null, null, "Ring"]] },
@@ -290,7 +289,7 @@ test("reservation workbook: preview, confirm, re-upload shows Already imported",
   const input = page.getByLabel("Upload a Reservation workbook");
   await input.setInputFiles(wb);
   const preview = page.getByTestId("ru-preview");
-  await expect(preview).toContainText("Nothing is saved until you confirm.");
+  await expect(preview).toBeVisible();
   const res = page.getByTestId("ru-reservations");
   await expect(res).toContainText("Reservations to import (1)");
   const row = res.getByRole("row", { name: new RegExp(customer) });

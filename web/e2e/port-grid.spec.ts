@@ -60,9 +60,11 @@ test("chosen bar: counts chosen cores, blocks without customer, Clear resets", a
   await expect(bar).toContainText("15 more can be chosen");
   await expect(bar.locator(".cchip")).toHaveCount(3);
   await expect(avail.first()).toContainText("Chosen");
-  // sticky: the bar sits at the viewport bottom while the grid is in view
+  // sticky: the bar (with the stale note above it, in one wrapper) sits at the viewport bottom while the grid is in view
   await page.getByRole("grid", { name: "Cores" }).scrollIntoViewIfNeeded();
-  expect(await bar.evaluate((el) => getComputedStyle(el).position)).toBe("sticky");
+  expect(await bar.evaluate((el) => getComputedStyle(el.parentElement!).position)).toBe("sticky");
+  const [note, b] = await Promise.all([page.getByTestId("stale-note").boundingBox(), bar.boundingBox()]);
+  expect(note!.y + note!.height).toBeLessThanOrEqual(b!.y); // the stale note is directly above the bar, never under it
   await bar.getByRole("button", { name: "Reserve 3 cores" }).click();
   await expect(bar.getByRole("alert")).toContainText("Choose a customer");
   await bar.getByRole("button", { name: "Clear" }).click();

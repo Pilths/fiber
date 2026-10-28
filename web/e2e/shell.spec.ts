@@ -26,7 +26,7 @@ test("selecting a span from Find shows the cores section and writes the hash; th
   await signIn(page);
   await page.getByRole("list", { name: "Spans" }).getByRole("button", { name: new RegExp(SPAN) }).click();
   await expect(page.getByRole("heading", { name: `Cores of ${SPAN}` })).toBeVisible();
-  await expect(page.getByRole("tabpanel", { name: "Cores" })).toContainText("Free to reserve");
+  await expect(page.getByRole("region", { name: "Inspector" })).toContainText("Free to reserve");
   await expect(page).toHaveURL(new RegExp(`#span=${encodeURIComponent(SPAN)}$`));
 
   const other = await page.context().newPage();
@@ -39,14 +39,12 @@ test("selecting a span from Find shows the cores section and writes the hash; th
   await expect(other.locator('[role=gridcell][data-status="Available"]').first()).toBeFocused();
 });
 
-test("Site and Services tabs are disabled but focusable", async ({ page }) => {
+test("the Inspector has no tab strip and no eyebrow: the span name is its first line", async ({ page }) => {
   await signIn(page);
-  for (const name of ["Site", "Services"]) {
-    const tab = page.getByRole("tab", { name: new RegExp(`^${name}`) });
-    await expect(tab).toHaveAttribute("aria-disabled", "true");
-    await expect(tab).toContainText("Later");
-    await tab.focus();
-    await expect(tab).toBeFocused();
-  }
-  await expect(page.getByRole("tab", { name: "Cores" })).toHaveAttribute("aria-selected", "true");
+  const ins = page.getByRole("region", { name: "Inspector" });
+  await expect(ins.getByRole("tab")).toHaveCount(0);
+  await page.getByRole("list", { name: "Spans" }).getByRole("button", { name: new RegExp(SPAN) }).click();
+  await expect(ins.getByRole("heading", { level: 3 })).toHaveText(SPAN);
+  await expect(ins).not.toContainText("Selected span");
+  await expect(ins).not.toContainText("Later");
 });

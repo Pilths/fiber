@@ -12,10 +12,7 @@ function Shell({ title, children }: { title: string; children: React.ReactNode }
       <section className="card w-[400px] p-8!" aria-labelledby="auth-h">
         <div className="mb-6 flex items-center gap-2.5">
           {LOGO}
-          <div>
-            <p className="text-base leading-5 font-semibold">Fiber</p>
-            <span className="block text-xs leading-4 text-muted-foreground">Malaysia network</span>
-          </div>
+          <p className="text-base leading-5 font-semibold">Fiber</p>
         </div>
         <h1 id="auth-h" className="mb-5 text-xl leading-7 font-semibold">{title}</h1>
         {children}

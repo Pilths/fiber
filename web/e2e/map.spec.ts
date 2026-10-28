@@ -42,9 +42,10 @@ test("map loads with no request leaving the app origin; chips, sites, layers and
   await expect(map(page).getByTestId("map-site")).toHaveCount(5);
   await expect(map(page).getByRole("button", { name: /^Site DEV Kuala Lumpur DC, data centre, 3 spans$/ })).toBeVisible();
   await expect(map(page).getByRole("button", { name: /^Site DEV Penang Tower, other site/ })).toBeVisible();
-  await expect(chip(page, FAR)).toContainText(/\d+/);
+  await expect(chip(page, FAR)).toHaveText(/^(\d+|–)$/); // the free-core number only, no icon
+  await expect(chips(page).locator("svg")).toHaveCount(0);
   await expect(page.getByTestId("map-not-drawn")).toContainText("2 spans not on the map (no coordinates)");
-  await expect(page.getByText("Basemap: self-hosted tiles")).toBeVisible();
+  await expect(map(page).getByRole("group", { name: "Map key" })).toContainText("Free to reserve");
   if (m === "gl") {
     await expect(page.getByTestId("map-note")).toHaveCount(0);
     await page.waitForFunction(() => document.querySelector(".maplibregl-canvas"));

@@ -150,19 +150,20 @@ export function RouteForm({ rp }: { rp: RoutePlanner }) {
     const err = pickErr(k);
     const site = k === "from" ? rp.from : rp.to;
     const text = k === "from" ? rp.fromText : rp.toText;
+    const fid = k === "from" ? "route-from" : `${id}-${k}`; // fixed id: the "Choose From" button in the Inspector focuses it
     return (
       <div className="grid min-w-0 gap-1">
-        <label htmlFor={`${id}-${k}`} className="lbl">{label}</label>
+        <label htmlFor={fid} className="lbl">{label}</label>
         <div className="relative">
           <Shape kind={site?.kind} className={`pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 ${site ? "" : "opacity-0"}`} />
-          <input id={`${id}-${k}`} list={`${id}-sites`} className="field pl-8" autoComplete="off" placeholder={blank === k ? text : "Type a site"}
+          <input id={fid} list={`${id}-sites`} className="field pl-8" autoComplete="off" placeholder={blank === k ? text : "Type a site"}
             value={blank === k ? "" : text} aria-invalid={!!err} aria-describedby={err ? `${id}-${k}-e` : `${id}-${k}-k`}
             onChange={(e) => { setBlank(null); (k === "from" ? rp.setFrom : rp.setTo)(e.target.value); }}
             onFocus={() => { setLeft((l) => ({ ...l, [k]: false })); if (site) setBlank(k); }}
             onBlur={() => { setBlank(null); setLeft((l) => ({ ...l, [k]: true })); }} />
         </div>
         {err ? <p id={`${id}-${k}-e`} className="text-body font-semibold text-red">{err}</p>
-          : <p id={`${id}-${k}-k`} className="text-xs text-muted-foreground">{site ? cap(kindWord(site.kind)) : "Data centre or site"}</p>}
+          : <p id={`${id}-${k}-k`} className="sr-only">{site ? cap(kindWord(site.kind)) : "Data centre or site"}</p>}
       </div>
     );
   };
@@ -198,7 +199,6 @@ export function RouteForm({ rp }: { rp: RoutePlanner }) {
           : rp.res && o.length === 0 ? <p className="empty px-4 py-3 text-body"><b className="block font-semibold">{rp.res.message ?? "No route found"}</b>Pick other sites.</p>
           : o.length > 0 && (
             <>
-              <p className="lbl mb-1.5">{o.length} {o.length === 1 ? "option" : "options"}, {rp.sort === "km" ? "shortest first" : "most free cores first"}</p>
               <ul aria-label="Route options" className="grid gap-2">
                 {o.map((op, i) => <li key={i}><OptionCard op={op} i={i} need={need} pressed={rp.idx === i} onClick={() => rp.select(i)} /></li>)}
               </ul>
@@ -235,7 +235,8 @@ function OptionCard({ op, i, need, pressed, onClick }: { op: RouteOption; i: num
 // ---------- Inspector, route state (same fixed card parts as the span state) ----------
 export function RouteSummary({ rp, onGo }: { rp: RoutePlanner; onGo: () => void }) {
   const op = rp.option;
-  if (!op) return <Placeholder title="No route selected" text="Choose From and To in Find, then pick an option." />;
+  if (!op) return <Placeholder title="No route selected" text="Choose From and To in Find, then pick a route option."
+    actions={<button type="button" className="btn btn-sm" onClick={() => document.getElementById("route-from")?.focus()}>Choose From</button>} />;
   const need = rp.need ?? 0;
   const short = op.insufficient ? op.spans.find((s) => isShort(s, need)) : undefined;
   const name = `${op.spans[0].site_a} to ${op.spans[op.spans.length - 1].site_b}`;
@@ -250,10 +251,11 @@ export function RouteSummary({ rp, onGo }: { rp: RoutePlanner; onGo: () => void 
       </div>
       <div className="ins-body">
         <dl className="grid grid-cols-3 rounded-md border">
-          <div className="px-3 py-2"><dt className="lbl">Spans</dt><dd className="text-xl font-bold">{op.total_spans}</dd></div>
-          <div className="border-l px-3 py-2"><dt className="lbl">Distance</dt><dd className="text-xl font-bold">{totalKm(op)}<small className="ml-1 text-xs font-normal text-muted-foreground">km</small></dd></div>
-          <div className="border-l px-3 py-2"><dt className="lbl">dB estimate</dt>
-            <dd className="text-xl font-bold">{op.estimated_db == null ? "–" : op.estimated_db.toFixed(2)}{op.estimated_db != null && <small className="ml-1 text-xs font-normal text-muted-foreground">dB</small>}</dd>
+          <div className="px-3 py-2"><dt className="sr-only">Spans</dt>
+            <dd className="text-xl font-bold">{op.total_spans}<small className="ml-1 text-xs font-normal text-muted-foreground">{op.total_spans === 1 ? "span" : "spans"}</small></dd></div>
+          <div className="border-l px-3 py-2"><dt className="sr-only">Distance</dt><dd className="text-xl font-bold">{totalKm(op)}<small className="ml-1 text-xs font-normal text-muted-foreground">km</small></dd></div>
+          <div className="border-l px-3 py-2"><dt className="sr-only">dB estimate</dt>
+            <dd className="text-xl font-bold">{op.estimated_db == null ? "–" : op.estimated_db.toFixed(2)}<small className="ml-1 text-xs font-normal text-muted-foreground">{op.estimated_db == null ? "no dB estimate" : "dB est."}</small></dd>
           </div>
         </dl>
         {short && (
@@ -266,8 +268,7 @@ export function RouteSummary({ rp, onGo }: { rp: RoutePlanner; onGo: () => void 
           {op.spans.map((s, i) => (
             <li key={s.span_id} className="grid grid-cols-[20px_minmax(0,1fr)_auto] items-center gap-2 border-b border-rule py-1.5 last:border-0">
               <span className="text-muted-foreground">{i + 1}</span>
-              <span className="min-w-0"><b className="block truncate font-semibold" title={s.name}>{s.name}</b>
-                <span className="text-xs text-muted-foreground">{s.km == null ? "No distance" : `${km(s.km)} km`}</span></span>
+              <b className="min-w-0 truncate font-semibold" title={s.name}>{s.name}</b>
               <FreeBadge s={{ survey_cores: s.surveyed ? 1 : null, free_to_reserve: s.free_to_reserve }} />
             </li>
           ))}
@@ -441,7 +442,6 @@ function Diagram({ rp, op, need, type, loss }: { rp: RoutePlanner; op: RouteOpti
       <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
         <span className="inline-flex items-center gap-1.5"><Shape kind="data_center" className="scale-75" />Data centre</span>
         <span className="inline-flex items-center gap-1.5"><Shape kind="site" className="scale-75" />Site</span>
-        <span>Above the line: span and route type. Below: distance, estimated loss, free cores.</span>
       </p>
     </>
   );
@@ -500,7 +500,6 @@ function ReserveBox({ op, need, onDone }: { op: RouteOption; need: number; onDon
       {warning}
       {tried && !customer && <p role="alert" className="mt-2.5 text-body font-bold text-red">Choose a customer before submitting.</p>}
       {msg && <p role={msg.ok ? "status" : "alert"} className={`mt-2.5 text-body ${msg.ok ? "font-semibold" : "font-bold text-red"}`}>{msg.text}</p>}
-      <p className="mt-2 text-xs text-muted-foreground">Goes to an admin for approval.</p>
     </section>
   );
 }

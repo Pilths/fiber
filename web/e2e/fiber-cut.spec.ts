@@ -118,7 +118,6 @@ test("Edit span: ticking Fiber cut sends fiber_cut true with the reason", async 
   const dlg = page.getByRole("dialog", { name: /^Edit span/ });
   const box = dlg.getByRole("checkbox", { name: /Fiber cut/ });
   await expect(box).not.toBeChecked();
-  await expect(dlg).toContainText("Marks every core on this span unavailable. Needs a reason.");
   await box.check();
   await dlg.getByRole("button", { name: "Save" }).click();
   await expect(dlg.getByRole("alert")).toContainText("Enter a reason");

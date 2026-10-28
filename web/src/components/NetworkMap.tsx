@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type PointerEvent as RPointerEvent } from "react";
 import { api } from "@/api/client";
-import { Icon } from "@/components/Icon";
 import { health } from "@/lib/status";
 
 // Network map card body (TASK-054, TASK-055). One overlay draws spans (SVG lines), free-cores chips and site markers
@@ -52,6 +51,8 @@ function midpoint(p: [number, number][]): [number, number] {
 
 const COLOR = { ok: "var(--green)", low: "var(--amber)", full: "var(--red)", not_surveyed: "var(--ns)" } as const;
 const kindOf = (t: string | null) => (t ?? "").toLowerCase();
+// Chip text: the free-core number only; a cut span reads 0, not surveyed a dash.
+const chipText = (p: SpanProps) => (p.fiber_cut ? "0" : p.surveyed ? String(p.free_to_reserve) : "–");
 
 type Basemap = "loading" | "gl" | "missing" | "nogl" | "failed";
 const NOTE: Partial<Record<Basemap, string>> = {
@@ -179,7 +180,7 @@ export function NetworkMap({ selectedIds, routeKey, visible, onSelectSpan, onSit
 
   // Declutter, greedy: site markers, then chips (selected first), then site names. A chip or name that would overlap
   // something already placed is hidden (visibility: hidden) until the user zooms in; the Find list still reaches it.
-  const placed: number[][] = [[0, 0, 380, 50], [0, size.h - 150, 260, size.h]]; // controls, key
+  const placed: number[][] = [[0, 0, 380, 50], [0, size.h - 170, 300, size.h]]; // controls, key
   const fits = (x: number, y: number, w: number, h: number) => {
     const r = [x - w / 2, y - h / 2, x + w / 2, y + h / 2];
     if (placed.some((q) => r[0] < q[2] && r[2] > q[0] && r[1] < q[3] && r[3] > q[1])) return false;
@@ -189,7 +190,7 @@ export function NetworkMap({ selectedIds, routeKey, visible, onSelectSpan, onSit
   const siteXY = (sites?.features ?? []).map((f) => (view && size.w ? P(f.geometry.coordinates) : [0, 0]));
   siteXY.forEach(([x, y]) => placed.push([x - 11, y - 11, x + 11, y + 11]));
   const chipShown = new Set([...drawn].filter((d) => d.show).sort((a, b) => Number(b.on) - Number(a.on)).filter(({ p, on, mid }) => {
-    const w = 34 + 7.5 * health({ survey_cores: p.surveyed ? 1 : null, free_to_reserve: p.free_to_reserve, fiber_cut: p.fiber_cut }).value.length;
+    const w = 20 + 7.5 * chipText(p).length;
     return on ? fits(mid[0], mid[1] - 11, Math.max(w, 7.5 * p.name.length + 16), 46) : fits(mid[0], mid[1], w + 4, 24);
   }).map((d) => d.p.span_id));
   const nameShown = siteXY.map(([x, y], i) => fits(x, y + 33, 7.2 * sites!.features[i].properties.name.length + 12, 18));
@@ -198,6 +199,7 @@ export function NetworkMap({ selectedIds, routeKey, visible, onSelectSpan, onSit
   // under the map). MapLibre follows container size changes itself (ResizeObserver), the overlay via `box` above.
   return (
     <div className="flex flex-1 flex-col">
+      <p id="map-instr" className="sr-only">Chips show free to reserve. Tab to a chip or site and press Enter to select; Esc clears the selection.</p>
       <div ref={box} role="region" aria-label="Network map" aria-describedby="map-instr" data-testid="network-map" data-mode={base === "gl" ? "gl" : base === "loading" ? "loading" : "svg"}
         className={`relative flex-1 overflow-hidden bg-map select-none ${full ? "" : "min-h-[clamp(520px,calc(100vh-210px),860px)] rounded-md border border-border"}`}
         onKeyDown={(e) => { if (e.key === "Escape") { setLayersOpen(false); onClear(); } }}
@@ -237,7 +239,7 @@ export function NetworkMap({ selectedIds, routeKey, visible, onSelectSpan, onSit
                 <button key={p.span_id} type="button" data-testid="map-chip" data-span-id={p.span_id} data-selected={on} aria-pressed={on}
                   aria-label={`Span ${p.name}, ${p.route_type ?? "no route type"}, ${p.surveyed ? `${p.free_to_reserve} free to reserve, ${h.word}` : "not surveyed"}`}
                   className={`mchip ${h.cls} ${on ? "on" : ""}`} style={{ left: mid[0], top: mid[1], visibility: chipShown.has(p.span_id) ? undefined : "hidden", opacity: dim ? 0.6 : undefined }} onClick={() => onSelectSpan(p.span_id)}>
-                  <Icon name={h.icon} />{h.value}
+                  {chipText(p)}
                   {on && <span className="mname" aria-hidden="true">{p.name}</span>}
                 </button>
               );
@@ -262,7 +264,7 @@ export function NetworkMap({ selectedIds, routeKey, visible, onSelectSpan, onSit
                   </label>
                 ))}
               </fieldset>
-              <p id="later-t" className="mt-1.5 text-xs leading-snug text-muted-foreground">Planned for a later release: services (bandwidth) and data centre details.</p>
+              <p id="later-t" className="sr-only">Planned for a later release: services (bandwidth) and data centre details.</p>
             </div>
           </div>
           <div className="flex" role="group" aria-label="Zoom">
@@ -280,27 +282,26 @@ export function NetworkMap({ selectedIds, routeKey, visible, onSelectSpan, onSit
           )}
         </div>
 
-        <ul aria-label="Map key" className="mleg">
-          <li><span className="lc h-green"><Icon name="ch" />10+</span>Healthy</li>
-          <li><span className="ll" aria-hidden="true" />Trunk</li>
-          <li><span className="lc h-amber"><Icon name="lo" />1-9</span>Low</li>
-          <li><span className="ll m" aria-hidden="true" />Metro</li>
-          <li><span className="lc h-red"><Icon name="fl" />0</span>Full</li>
-          <li><span className="ll b" aria-hidden="true" />Bespoke</li>
-          <li><span className="lc h-ns"><Icon name="ns" /></span>Not surveyed</li>
-          <li><span className="ll s" aria-hidden="true" />Selected</li>
-          <li><span className="rb-sh dc size-3!" aria-hidden="true" />Data centre</li>
-          <li><span className="rb-sh st size-2.5!" aria-hidden="true" />Other site</li>
-        </ul>
+        <div role="group" aria-label="Map key" className="mleg">
+          <p className="mleg-h">Free to reserve</p>
+          <p className="mleg-h">Route type</p>
+          <span><span className="slot"><b className="lc h-green">10+</b></span>Healthy</span>
+          <span><i className="slot" aria-hidden="true"><i className="ll" /></i>Trunk</span>
+          <span><span className="slot"><b className="lc h-amber">1-9</b></span>Low</span>
+          <span><i className="slot" aria-hidden="true"><i className="ll m" /></i>Metro</span>
+          <span><span className="slot"><b className="lc h-red">0</b></span>Full or cut</span>
+          <span><i className="slot" aria-hidden="true"><i className="ll b" /></i>Bespoke</span>
+          <span><span className="slot"><b className="lc h-ns">–</b></span>Not surveyed</span>
+          <span><i className="slot" aria-hidden="true"><i className="ll s" /></i>Selected</span>
+          <p className="mleg-h col-span-2">Sites</p>
+          <span><i className="slot" aria-hidden="true"><i className="rb-sh dc size-3!" /></i>Data centre</span>
+          <span><i className="slot" aria-hidden="true"><i className="rb-sh st size-2.5!" /></i>Other site</span>
+        </div>
         {(NOTE[base] || err) && (
           <p role="status" data-testid="map-note" className="absolute top-3 right-3 z-10 max-w-[340px] note px-3 py-1.5 text-xs font-medium text-amber">
             {err ? "Could not load the map data. Search and lists still work." : NOTE[base]}
           </p>
         )}
-      </div>
-      <div className="mt-3 flex justify-between gap-4 text-xs text-muted-foreground">
-        <span id="map-instr">Chips show free to reserve. Tab to a chip or site and press Enter to select; Esc clears the selection.</span>
-        <span className="flex-none">Basemap: self-hosted tiles</span>
       </div>
       {spans && spans.not_drawn.length > 0 && (
         <details className="mt-2 text-xs text-muted-foreground" data-testid="map-not-drawn">

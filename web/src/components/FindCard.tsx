@@ -8,8 +8,8 @@ type Span = components["schemas"]["SpanSummary"];
 export function FreeBadge({ s }: { s: Parameters<typeof health>[0] }) {
   const h = health(s);
   return (
-    <span className={`pill min-w-11 justify-center gap-[5px] ${h.cls}`}>
-      <Icon name={h.icon} className="size-2.5" />{h.value}<span className="sr-only">{s.survey_cores == null ? "" : ` free to reserve, ${h.word}`}</span>
+    <span className={`pill min-w-11 justify-center ${h.cls}`}>
+      {h.value}<span className="sr-only">{s.survey_cores == null ? "" : ` free to reserve, ${h.word}`}</span>
     </span>
   );
 }
@@ -47,7 +47,7 @@ export function FindCard({ spans, selectedId, onSelect, loss, mode, onMode, rout
         <>
           <div className="relative mt-3">
             <svg viewBox="0 0 16 16" aria-hidden="true" className="ni pointer-events-none absolute left-3 top-2.5 text-muted-foreground"><path d="M7 12A5 5 0 1 0 7 2a5 5 0 0 0 0 10zM14 14l-3.5-3.5" /></svg>
-            <input type="search" aria-label="Span or site name" placeholder="Span or site name" className="field pl-9" value={q} onChange={(e) => setQ(e.target.value)} />
+            <input id="find-q" type="search" aria-label="Span or site name" placeholder="Span or site name" className="field pl-9" value={q} onChange={(e) => setQ(e.target.value)} />
           </div>
           <div className="lbl mt-3 flex justify-between px-2.5"><span>Span</span><span>Free to reserve</span></div>
           {!spans && <p className="py-3 text-body text-muted-foreground">Loading spans...</p>}

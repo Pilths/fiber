@@ -58,7 +58,6 @@ test("route options: up to 3, a Best match, every field shown", async ({ page })
   await expect(diagram(page).locator("g[aria-hidden=true]")).toHaveCount(rows + 1);
   await expect(diagram(page)).toContainText(/End · [\d.]+\+? km · ([\d.]+ dB total|No dB estimate)/);
   await expect(groups(page).first()).toHaveAttribute("aria-label", /^Span DEV .+ - DEV .+, (Trunk|Metro|Bespoke|–), ([\d.]+ km|no distance), ([\d.]+ dB|no dB estimate), (\d+ free cores|not surveyed)$/);
-  await expect(section).toContainText("Above the line: span and route type. Below: distance, estimated loss, free cores.");
   await expect(page.getByRole("list", { name: "Route as text" })).toContainText(`Site ${FROM}`);
   await noOldWords(page);
   // screenshot a 3-span option when the dev data has one
@@ -119,7 +118,7 @@ test("Most free cores sends sort=free_cores and re-ranks", async ({ page }) => {
   const res = await req;
   const url = new URL(res.url());
   expect(url.searchParams.get("sort")).toBe("free_cores");
-  await expect(page.getByTestId("route-form")).toContainText("most free cores first");
+  await expect(page.getByRole("radio", { name: "Most free cores" })).toBeChecked();
   const after = await options(page).allTextContents();
   // Same set of routes, ranked by fewest free (highest first) when the dev counts differ.
   expect(after.length).toBe(before.length);

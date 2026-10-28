@@ -128,7 +128,7 @@
 
   /* Inspector (B2): fixed-height card; fixed head, a body that scrolls inside the card, a pinned footer. Span and route states share them.
      A long title (DEV seed names, not 4-letter LRD pairs) drops to 24px and may wrap; it is never cut, admins click the site names in it. */
-  .ins-head { flex: none; padding: 0 20px 10px; border-bottom: 1px solid var(--border); }
+  .ins-head { flex: none; padding: 14px 20px 10px; border-bottom: 1px solid var(--border); }
   .ins-body { flex: 1; min-height: 0; overflow-y: auto; padding: 10px 20px 8px; }
   .ins-foot { flex: none; display: flex; gap: 8px; padding: 14px 20px; border-top: 1px solid var(--border); }
   .ins-title { min-width: 0; overflow-wrap: anywhere; font-size: 32px; line-height: 38px; font-weight: 700; letter-spacing: -.025em; }
@@ -195,10 +195,11 @@
 .k-use { background: var(--use); }
 .k-fault { background: repeating-linear-gradient(135deg, var(--red-bg) 0 2px, var(--red) 2px 3px); box-shadow: inset 0 0 0 1px var(--red); }
 
-/* Chosen bar: footer band of the cores card, sticky to the viewport bottom while the card is in view.
+/* Chosen bar: footer band of the cores card; its wrapper .cstick (with the stale note) is sticky to the viewport bottom while the card is in view.
    overflow: clip (not hidden) keeps the band inside the card without making it a scroll container. */
 .ccard { padding-bottom: 0; overflow: clip; }
-.cfoot { position: sticky; bottom: 0; z-index: 6; margin: 16px -20px 0; padding: 14px 20px 16px; border-top: 1px solid var(--border); background: var(--subtle); }
+.cstick { position: sticky; bottom: 0; z-index: 6; margin: 16px -20px 0; background: #fff; }
+.cfoot { padding: 14px 20px 16px; border-top: 1px solid var(--border); background: var(--subtle); }
 .cfoot[data-has="true"] { background: var(--blue-bg); border-top-color: var(--blue-bd); }
 .cchip { display: inline-flex; align-items: center; height: 24px; padding: 0 10px; border-radius: 4px; background: var(--blue); color: #fff; font-size: 12px; font-weight: 600; }
 
@@ -218,7 +219,6 @@
 .lrow input { width: 16px; height: 16px; accent-color: var(--blue); flex: none; }
 .lrow input[aria-disabled="true"] { cursor: not-allowed; }
 .mchip { position: absolute; z-index: 5; transform: translate(-50%, -50%); display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 9px; border-radius: 999px; border: 1px solid; font-size: 12px; line-height: 1; font-weight: 700; white-space: nowrap; cursor: pointer; }
-.mchip .ic { width: 11px; height: 11px; }
 .mchip.h-green { border-color: var(--green); } .mchip.h-amber { border-color: var(--amber); } .mchip.h-red { border-color: var(--red); }
 .mchip.h-ns { font-weight: 500; }
 .mchip.on { border-width: 2px; padding: 0 8px; z-index: 6; }
@@ -233,10 +233,12 @@
 .msite.end .code { color: var(--blue); }
 .msite.end .shape.dc { background: var(--blue); outline-color: var(--blue); }
 .msite.end .shape.st { border-color: var(--blue); }
-.mleg { position: absolute; z-index: 10; left: 12px; bottom: 12px; display: grid; grid-template-columns: auto auto; gap: 6px 18px; padding: 10px 12px; background: #fff; border: 1px solid var(--border); border-radius: 6px; font-size: 12px; line-height: 16px; color: var(--muted-ink); }
-.mleg li { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
-.mleg .lc { display: inline-flex; align-items: center; gap: 3px; height: 18px; padding: 0 8px; border-radius: 999px; border: 1px solid; font-weight: 700; font-size: 11px; }
-.mleg .lc .ic { width: 10px; height: 10px; }
+/* Map key: fixed-width card, bottom left. Two columns (free to reserve | route type), then sites; every row the same height. */
+.mleg { position: absolute; z-index: 10; left: 12px; bottom: 12px; width: 268px; display: grid; grid-template-columns: 1fr 1fr; grid-auto-rows: 20px; gap: 2px 16px; padding: 8px 12px 10px; background: #fff; border: 1px solid var(--border); border-radius: 6px; font-size: 12px; line-height: 20px; color: var(--ink); }
+.mleg > span { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+.mleg .slot { flex: none; width: 30px; display: inline-flex; justify-content: center; }
+.mleg-h { font-weight: 600; color: var(--muted-ink); white-space: nowrap; }
+.mleg .lc { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 16px; border-radius: 999px; border: 1px solid; font-weight: 700; font-size: 11px; line-height: 1; }
 .mleg .lc.h-green { border-color: var(--green); } .mleg .lc.h-amber { border-color: var(--amber); } .mleg .lc.h-red { border-color: var(--red); }
 .ll { width: 26px; height: 0; border-top: 6px solid var(--ink); flex: none; }
 .ll.m { border-top-width: 3px; } .ll.b { border-top: 3px dashed var(--ink); } .ll.s { border-top: 4px solid var(--blue); }

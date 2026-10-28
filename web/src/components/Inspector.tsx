@@ -18,13 +18,17 @@ export const Facts = ({ d }: { d: Detail }) => (
 );
 
 // Nothing selected: a dashed placeholder filling the same card.
-export const Placeholder = ({ title, text }: { title: string; text?: string }) => (
-  <div className="flex min-h-0 flex-1 px-5 pt-1 pb-5">
+// actions: buttons that move focus to the control the text names.
+export const Placeholder = ({ title, text, actions }: { title: string; text?: string; actions?: ReactNode }) => (
+  <div className="flex min-h-0 flex-1 p-5">
     <p className="empty flex flex-1 flex-col items-center justify-center text-center text-body text-muted-foreground">
       <b className="mb-0.5 block text-sm font-semibold text-foreground">{title}</b>{text}
+      {actions && <span className="mt-3 flex flex-wrap justify-center gap-2">{actions}</span>}
     </p>
   </div>
 );
+
+const focusEl = (id: string) => document.getElementById(id)?.focus();
 
 type Admin = { onEditSpan: (focus?: SpanFocus) => void; onEditSite: (end: "a" | "b") => void } | null; // null for planners
 
@@ -32,28 +36,15 @@ export function Inspector({ detail, loading, onGoToCores, loss, onSeeLoss, onSee
   detail: Detail | null; loading: boolean; onGoToCores: () => void; loss: LossDetail | null; onSeeLoss: () => void; onSeeHeld: () => void; admin: Admin;
   onPlanRoute: (site: string) => void; route?: ReactNode; // route: the route summary, shown instead of the span in Route mode
 }) {
-  const tab = "relative inline-flex h-7 items-center gap-1.5 border-b-2 border-transparent px-1.5 text-xs font-semibold whitespace-nowrap focus-visible:-outline-offset-3 [&_.later]:h-4 [&_.later]:px-1.5 [&_.later]:text-[10px]";
-  const later = (name: string) => (
-    <button type="button" role="tab" aria-selected="false" aria-disabled="true" title={`${name}: later`} className={`${tab} cursor-not-allowed font-medium text-muted-foreground`}
-      onClick={(e) => e.preventDefault()}>
-      {name}<span className="later">Later</span>
-    </button>
-  );
   return (
     <section className="card flex h-[420px] flex-none flex-col overflow-hidden p-0" aria-label="Inspector" data-testid="inspector">
-      <div className="flex flex-none items-center justify-between gap-3 px-5 pt-3 pb-1">
-        <span className="lbl">{route ? "Selected route" : "Selected span"}</span>
-        <div role="tablist" aria-label="Inspector" className="flex gap-1">
-          <button type="button" role="tab" aria-selected="true" className={`${tab} border-b-foreground`}>Cores</button>
-          {later("Site")}
-          {later("Services")}
-        </div>
-      </div>
-      <div role="tabpanel" aria-label="Cores" className="flex min-h-0 flex-1 flex-col">
-        {route ?? (!detail
-          ? <Placeholder title={loading ? "Loading span..." : "No span selected"} text={loading ? undefined : "Choose a span in Find, or search in the top bar."} />
-          : <Body d={detail} onGoToCores={onGoToCores} loss={loss} onSeeLoss={onSeeLoss} onSeeHeld={onSeeHeld} admin={admin} onPlanRoute={onPlanRoute} />)}
-      </div>
+      {route ?? (!detail
+        ? <Placeholder title={loading ? "Loading span..." : "No span selected"} text={loading ? undefined : "Select a span from the list in Find, or search by site or span in the top bar."}
+          actions={loading ? undefined : <>
+            <button type="button" className="btn btn-sm" onClick={() => focusEl("global-search")}>Search by site or span</button>
+            <button type="button" className="btn btn-sm" onClick={() => focusEl("find-q")}>Choose from the list</button>
+          </>} />
+        : <Body d={detail} onGoToCores={onGoToCores} loss={loss} onSeeLoss={onSeeLoss} onSeeHeld={onSeeHeld} admin={admin} onPlanRoute={onPlanRoute} />)}
     </section>
   );
 }
@@ -118,8 +109,8 @@ function Body({ d, onGoToCores, loss, onSeeLoss, onSeeHeld, admin, onPlanRoute }
               </>
             ) : spanName(d)}
           </h3>
-          {/* The one health chip: icon only (word on hover and for screen readers); a cut span says Cut. */}
-          <span className={`pill mt-2 flex-none ${h.cls}`} title={h.word} data-testid="health"><Icon name={h.icon} />{cut ? h.word : <span className="sr-only">{h.word}</span>}</span>
+          {/* Health reads from the big number's colour and the bar; only a cut span gets a chip. */}
+          {cut && <span className="pill h-red mt-2 flex-none" data-testid="health"><Icon name="fl" />Cut</span>}
         </div>
         <div className="ins-facts">
           <Facts d={d} />
@@ -151,12 +142,7 @@ function Body({ d, onGoToCores, loss, onSeeLoss, onSeeHeld, admin, onPlanRoute }
           <>
             <div className="flex items-baseline gap-2.5">
               <span className={`text-[32px] leading-9 font-bold tracking-tight ${h.cls.replace("h-", "v-")}`}>{cut ? 0 : d.free_to_reserve}</span>
-              <p className="text-body text-muted-foreground">
-                free to reserve{cut ? ": fiber cut, nothing can be booked" : (
-                  <>: <b className="font-semibold text-foreground">{n.Available}</b> Available
-                    {d.unassigned_reserved > 0 && <> minus <b className="font-semibold text-foreground">{d.unassigned_reserved}</b> reserved by count</>}, of <b className="font-semibold text-foreground">{d.survey_cores}</b> surveyed</>
-                )}
-              </p>
+              <p className="text-body text-muted-foreground">free to reserve</p>
             </div>
             <div className="mt-1.5 flex h-2 gap-0.5" aria-hidden data-testid="free-bar">
               {cut ? <span className="k k-fault h-full rounded" style={{ flex: 1 }} />

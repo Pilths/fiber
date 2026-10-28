@@ -2,6 +2,7 @@ import { useState } from "react";
 import { api, errorText } from "@/api/client";
 import type { components } from "@/api/schema";
 import { Icon } from "@/components/Icon";
+import { Blank } from "@/components/LossCard";
 import { Dialog } from "@/components/upload-parts";
 import { spanName, STATUS, statusLabel, type CoreStatus } from "@/lib/status";
 
@@ -37,31 +38,29 @@ export function HeldTable({ d, admin, onOpen, onChanged }: { d: Detail; admin: b
           <table className="tbl table-fixed [&_td]:text-center! [&_th]:text-center!">
             <caption className="sr-only">Allocations on this span</caption>
             <thead><tr>
-              <th scope="col" className="w-[9%]">Cores</th><th scope="col" className="w-[14%]">Status</th><th scope="col" className="w-[17%]">Customer</th>
-              <th scope="col">Ports or detail</th><th scope="col" className="w-[14%]">Circuit</th><th scope="col" className="w-[15%] pr-0!">Planned date</th>
+              <th scope="col" className="w-[10%]">Cores</th><th scope="col" className="w-[20%]">Status</th><th scope="col" className="w-[25%]">Customer</th>
+              <th scope="col">Ports or detail</th><th scope="col" className="w-[18%] pr-0!">Planned date</th>
             </tr></thead>
             <tbody>
-              {rows.map((c) => (
+              {rows.map((c) => { const na = c.status === "Faulty" ? <Blank>Not applicable</Blank> : <Blank />; return (
                 <tr key={c.id} onClick={() => onOpen(c)} className={`cursor-pointer hover:bg-raised ${c.status === "Faulty" ? "bg-red-bg" : c.status === "Requested" ? "bg-amber-bg" : ""}`}>
                   <th scope="row" className={`text-left font-semibold text-foreground ${c.status === "Faulty" ? "pl-3 shadow-[inset_3px_0_0_var(--red)]" : ""}`}>
                     <button type="button" className="link" aria-label={`Core ${c.number} details`} onClick={(e) => { e.stopPropagation(); onOpen(c); }}>{c.number}</button>
                   </th>
-                  <td><span className={`inline-flex items-center gap-2 font-semibold whitespace-nowrap ${STATUS[c.status].tone}`}><Icon name={STATUS[c.status].icon} />{c.status}</span>
+                  <td><span className={`inline-flex items-center gap-2 font-semibold whitespace-nowrap ${STATUS[c.status].tone}`}><Icon name={STATUS[c.status].icon} />{statusLabel(c.status)}</span>
                     {c.stale && <>{" "}<span className="pill h-amber mt-1" title={`No keep for over 3 months since ${c.stale_since ?? "-"}`}><Icon name="lo" />Stale<span className="sr-only">: no keep for over 3 months since {c.stale_since ?? "-"}</span></span></>}</td>
-                  <td className="truncate">{c.customer ?? "-"}</td>
-                  <td className="py-2 leading-snug">{c.status === "Faulty" ? "Not bookable" : c.port_a || c.port_b ? `${c.port_a ?? "-"} to ${c.port_b ?? "-"}` : "-"}</td>
-                  <td className="truncate font-mono text-body">{c.circuit_id ?? "-"}</td>
-                  <td className="pr-0 whitespace-nowrap">{c.planned_date ?? "-"}</td>
+                  <td className="truncate">{c.customer ?? na}</td>
+                  <td className="py-2 leading-snug">{c.status === "Faulty" ? "Not bookable" : c.port_a || c.port_b ? <>{c.port_a ?? <Blank />} to {c.port_b ?? <Blank />}</> : <Blank>No ports yet</Blank>}</td>
+                  <td className="pr-0 whitespace-nowrap">{c.planned_date ?? na}</td>
                 </tr>
-              ))}
+              ); })}
               {holds.map((h) => (
                 <tr key={`u${h.reservation_id}`} data-testid="unassigned-row">
                   <th scope="row" className="text-left font-semibold">{h.remaining}</th>
                   <td><span className="inline-flex items-center gap-2 font-semibold whitespace-nowrap text-use"><Icon name="co" />Unassigned</span></td>
-                  <td className="truncate" title={h.customer ?? undefined}>{h.customer ?? "-"}</td>
-                  <td className="py-2 leading-snug">{admin ? <button type="button" className="btn btn-sm" onClick={() => setAssign(h)}>Assign cores</button> : "-"}</td>
-                  <td>-</td>
-                  <td className="pr-0 whitespace-nowrap">{h.planned_date ?? "-"}</td>
+                  <td className="truncate" title={h.customer ?? undefined}>{h.customer ?? <Blank />}</td>
+                  <td className="py-2 leading-snug">{admin ? <button type="button" className="btn btn-sm" onClick={() => setAssign(h)}>Assign cores</button> : <Blank>No ports yet</Blank>}</td>
+                  <td className="pr-0 whitespace-nowrap">{h.planned_date ?? <Blank />}</td>
                 </tr>
               ))}
             </tbody>

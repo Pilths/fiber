@@ -102,7 +102,6 @@ test("admin edits span distance with a reason; calculated loss follows; then rev
   await signIn(page, "admin1");
   await pick(page, CJBJ);
   const loss = page.getByTestId("loss-card");
-  await expect(loss).toContainText("18.2 km × 0.3 dB/km");
   await expect(loss).toContainText("5.46 dB");
 
   const edit = async (km: string, reason: string) => {
@@ -119,7 +118,6 @@ test("admin edits span distance with a reason; calculated loss follows; then rev
   await page.screenshot({ path: "e2e/screenshots/edit-span.png" });
   await dlg.getByRole("button", { name: "Save" }).click();
   await expect(dlg).toBeHidden();
-  await expect(loss).toContainText("18.3 km × 0.3 dB/km");
   await expect(loss).toContainText("5.49 dB");
 
   dlg = await edit("18.2", "E2E: revert");
@@ -127,7 +125,7 @@ test("admin edits span distance with a reason; calculated loss follows; then rev
   await expect(dlg).toBeHidden();
   await expect(loss).toContainText("5.46 dB");
   await page.getByRole("region", { name: "Inspector" }).getByRole("button", { name: "Edit span" }).click();
-  await page.getByText(/^History/).click();
+  await page.getByRole("dialog", { name: /^Edit span/ }).getByText(/^History/).click();
   await expect(page.getByTestId("edit-history").getByRole("listitem").first()).toContainText("Reason: E2E: revert");
 });
 
@@ -139,7 +137,7 @@ test("lowering the survey count below taken cores is refused in plain words", as
   await dlg.getByLabel("Survey count").fill("1");
   await dlg.getByLabel("Reason (required)").fill("E2E: should be refused");
   await dlg.getByRole("button", { name: "Save" }).click();
-  await expect(dlg.getByRole("alert")).toContainText(/^Cores 2, .* are in use or have history and cannot be removed/);
+  await expect(dlg.getByRole("alert")).toContainText(/^Cores 2, .* are allocated or have history and cannot be removed/);
   await dlg.getByRole("button", { name: "Cancel" }).click();
   await expect(page.getByRole("region", { name: /^Cores of/ })).toContainText("24 surveyed of 144");
 });
@@ -194,7 +192,7 @@ test("admin edits a core's ports with a reason, then puts them back", async ({ p
   await dlg.getByRole("button", { name: "Save" }).click();
   await expect(dlg).toBeHidden();
   await expect(d).toBeVisible(); // closing the nested dialog leaves the drawer open
-  await expect(d).toContainText("E2E-KL-21 to -");
+  await expect(d).toContainText("E2E-KL-21 to Not recorded");
   await expect(d.getByRole("list", { name: "Core history, newest first" })).toContainText("port_a changed to E2E-KL-21");
 
   await d.getByRole("button", { name: "Edit ports" }).click();
@@ -203,7 +201,7 @@ test("admin edits a core's ports with a reason, then puts them back", async ({ p
   await dlg.getByLabel("Reason (required)").fill("E2E: undo");
   await dlg.getByRole("button", { name: "Save" }).click();
   await expect(dlg).toBeHidden();
-  await expect(d).toContainText(oldA || oldB ? `${oldA || "-"} to ${oldB || "-"}` : "Add ports");
+  await expect(d).toContainText(oldA || oldB ? `${oldA || "Not recorded"} to ${oldB || "Not recorded"}` : "Add ports");
 });
 
 test("one Unassigned row per reservation; admin assign dialog limits the choice", async ({ page }) => {

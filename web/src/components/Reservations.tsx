@@ -214,7 +214,6 @@ export function Approvals({ me, onChanged }: { me: Me; onChanged: () => void }) 
     <section aria-labelledby="appr-h" className="card mx-auto w-full max-w-6xl">
       <div className="card-h">
         <h2 id="appr-h">Approvals{data ? ` (${data.length})` : ""}</h2>
-        <small className="hint">New requests and release requests, oldest first.</small>
       </div>
       {me.role !== "admin" && <p role="alert">Admins only.</p>}
       {error && me.role === "admin" && <p role="alert">Could not load approvals.</p>}
@@ -312,7 +311,6 @@ export function NeedsReview({ me, onChanged }: { me: Me; onChanged: () => void }
   return (
     <section aria-labelledby="nr-h" className="card mx-auto w-full max-w-4xl space-y-3">
       <h2 id="nr-h" className="text-base leading-6 font-semibold">Action needed{data ? ` (${data.length})` : ""}</h2>
-      <p className="text-sm text-muted-foreground">Stale reservations, release requests, allocated cores that went faulty and reservations on a cut span (Fiber cut).</p>
       {error && <p role="alert">Could not load the list.</p>}
       {data && data.length === 0 && <p>Nothing needs action.</p>}
       <div className="space-y-3">

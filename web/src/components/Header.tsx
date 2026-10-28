@@ -71,6 +71,7 @@ function GlobalSearch({ onPick }: { onPick: (r: Result) => void }) {
     <div ref={box} className="relative ml-auto min-w-[260px] flex-[0_1_420px]">
       <svg viewBox="0 0 16 16" aria-hidden="true" className="ni pointer-events-none absolute left-3 top-2.5 text-muted-foreground"><path d="M7 12A5 5 0 1 0 7 2a5 5 0 0 0 0 10zM14 14l-3.5-3.5" /></svg>
       <input
+        id="global-search"
         role="combobox"
         aria-label={label}
         aria-expanded={showList}
@@ -159,7 +160,7 @@ function Account({ me, onView, onSignOut, onChangePassword }: { me: Me; onView: 
         <span aria-hidden className="grid size-[30px] place-items-center rounded-full bg-res text-xs font-semibold text-white">{initials}</span>
         <span>
           <b className="block text-body leading-[17px] font-semibold">{me.display_name}</b>
-          <small className="block text-xs leading-4 text-muted-foreground">{role}</small>
+          <small className="sr-only"> {role}</small>
         </span>
         <svg viewBox="0 0 16 16" aria-hidden="true" className="ni"><path d="M4 6l4 4 4-4" /></svg>
       </button>
@@ -203,10 +204,7 @@ export function Header({ onPick, view, onView, me, approvals, stale, onSignOut, 
     <header className="sticky top-0 z-20 flex h-[60px] items-center gap-5 border-b bg-white px-6">
       <div className="flex flex-none items-center gap-2.5">
         {LOGO}
-        <div>
-          <h1 className="text-base leading-5 font-semibold">Fiber</h1>
-          <span className="block text-xs leading-4 whitespace-nowrap text-muted-foreground">Malaysia network</span>
-        </div>
+        <h1 className="text-base leading-5 font-semibold">Fiber</h1>
       </div>
       <nav aria-label="Main">
         <ul className="flex items-center gap-0.5">
