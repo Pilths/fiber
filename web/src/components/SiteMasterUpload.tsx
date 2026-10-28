@@ -226,6 +226,7 @@ export function SiteMasterUpload() {
   const [confirming, setConfirming] = useState<Kind | null>(null);
   const [done, setDone] = useState<Partial<Record<Kind, Applied>>>({}); // sheets applied from this upload while others remain
   const [result, setResult] = useState<Applied | null>(null);
+  const [addOnly, setAddOnly] = useState(false);
 
   const loadCurrent = useCallback(() => {
     api.get("/api/admin/site-master/current").then((d) => setCur(d as unknown as typeof cur)).catch(() => {});
@@ -236,7 +237,7 @@ export function SiteMasterUpload() {
     setBusy(true); setError(null); setResult(null); setStaged(null); setDone({}); setConfirming(null);
     setOverride({ sites: false, dcs: false }); setReason({ sites: "", dcs: "" }); setDecisions({});
     try {
-      setStaged((await api.postFile("/api/admin/site-master/uploads", f)) as Staged);
+      setStaged((await api.postFile("/api/admin/site-master/uploads", f, { add_only: String(addOnly) })) as Staged);
       loadCurrent();
     } catch (e) {
       setError(uploadError(e));
@@ -327,6 +328,13 @@ export function SiteMasterUpload() {
       </div>
       <div className="space-y-4">
         <FilePick label="Upload a site master workbook" busy={busy} onFile={pick} />
+        <div>
+          <label className="flex w-fit items-center gap-2 text-body font-medium">
+            <input type="checkbox" className="size-4" checked={addOnly} onChange={(e) => setAddOnly(e.target.checked)} aria-describedby="sm-add-only-hint" />
+            Add and update only
+          </label>
+          <p id="sm-add-only-hint" className="mt-0.5 pl-6 text-xs text-muted-foreground">Use for a hand-picked list. Sites that are not in the file stay active.</p>
+        </div>
         {error && <Note tone="red" role="alert" title={error} />}
         <div aria-live="polite" data-testid="sm-result">
           {result && (
@@ -350,6 +358,7 @@ export function SiteMasterUpload() {
           <small className="hint flex-none">Each sheet is applied on its own. Nothing is saved until you apply it.</small>
         </div>
         <div className="space-y-6">
+          {staged.add_only && <p className="text-body text-muted-foreground">Add and update only: sites not in this file are kept.</p>}
           {sheets.map((s) => (
             <SheetPanel key={`${staged.upload_id}-${s.kind}`} uploadId={staged.upload_id} s={s} applied={!!done[s.kind]}
               override={override[s.kind]} onOverride={(on) => setOverride((o) => ({ ...o, [s.kind]: on }))}>

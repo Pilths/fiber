@@ -529,7 +529,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Upload */
+        /**
+         * Upload
+         * @description add_only: the file is part of the list; sites not in it are kept active and the row-count check is skipped.
+         */
         post: operations["upload_api_admin_site_master_uploads_post"];
         delete?: never;
         options?: never;
@@ -990,6 +993,11 @@ export interface components {
         Body_upload_api_admin_site_master_uploads_post: {
             /** File */
             file: string;
+            /**
+             * Add Only
+             * @default false
+             */
+            add_only: boolean;
         };
         /** Body_upload_api_admin_uploads_post */
         Body_upload_api_admin_uploads_post: {
@@ -1749,6 +1757,11 @@ export interface components {
             possible_renames: {
                 [key: string]: unknown;
             }[];
+            /**
+             * Add Only
+             * @default false
+             */
+            add_only: boolean;
         };
         /** UserCreate */
         UserCreate: {

@@ -269,7 +269,7 @@ def diff_fields(kind: str, p: dict[str, Any], row: DbSite, prot: dict[int, set[s
 
 
 def _eval_sheet(kind: str, ps: ParsedSheet, snap: dict[str, DbSite], prot: dict[int, set[str]],
-                site_coords: dict[str, tuple[float, float]], known: set[str]) -> SheetResult:
+                site_coords: dict[str, tuple[float, float]], known: set[str], add_only: bool = False) -> SheetResult:
     res = SheetResult(kind, ps.sheet_name, ps.found, ps.items)
     expected = SHEETS[kind][1]
     if not ps.found:
@@ -307,13 +307,14 @@ def _eval_sheet(kind: str, ps: ParsedSheet, snap: dict[str, DbSite], prot: dict[
         else:
             it.db_id, it.changes = row.id, diff_fields(kind, p, row, prot)
             it.group = "changed" if it.changes else "unchanged"
-    res.missing = [r for r in snap.values() if r.cls == kind and r.active and r.name not in counts]
+    # add-only: the file is a part of the list, so nothing is "missing" and the row-count check does not apply
+    res.missing = [] if add_only else [r for r in snap.values() if r.cls == kind and r.active and r.name not in counts]
     # whole-file checks
     if not ps.items:
         res.block_reasons.append("sheet is empty")
         res.hard = True
     active = sum(1 for r in snap.values() if r.cls == kind and r.active)
-    if ps.items and len(counts) * DROP_LIMIT[1] <= active * DROP_LIMIT[0]:
+    if ps.items and not add_only and len(counts) * DROP_LIMIT[1] <= active * DROP_LIMIT[0]:
         res.block_reasons.append(f"file has {len(counts)} rows but the database has {active} active "
                                  f"({round(100 * (active - len(counts)) / active)}% fewer, limit is 10%)")
     if kind == "dcs":
@@ -346,18 +347,18 @@ def used_site_ids(db: Session, ids: list[int]) -> set[int]:
     return {r[0] for r in db.execute(text(sql), {"ids": ids})}
 
 
-def evaluate(db: Session, parsed: dict[str, ParsedSheet]) -> dict[str, SheetResult]:
+def evaluate(db: Session, parsed: dict[str, ParsedSheet], add_only: bool = False) -> dict[str, SheetResult]:
     snap, prot = load_snapshot(db), load_protected(db)
     coords = {n: (r.lat, r.lon) for n, r in snap.items() if r.cls == "sites" and r.lat is not None and r.lon is not None}
     known = {n for n, r in snap.items() if r.cls == "sites"}
-    out = {"sites": _eval_sheet("sites", parsed["sites"], snap, prot, {}, set())}
+    out = {"sites": _eval_sheet("sites", parsed["sites"], snap, prot, {}, set(), add_only)}
     if not out["sites"].blocked or not out["sites"].hard:  # file sites count unless the sheet is blocked for good
         for it in out["sites"].items:
             if it.status == "ready":
                 known.add(it.p["key"])
                 if it.p["lat"] is not None:
                     coords[it.p["key"]] = (it.p["lat"], it.p["lon"])
-    out["dcs"] = _eval_sheet("dcs", parsed["dcs"], snap, prot, coords, known)
+    out["dcs"] = _eval_sheet("dcs", parsed["dcs"], snap, prot, coords, known, add_only)
     for r in out.values():
         r.in_use = used_site_ids(db, [m.id for m in r.missing])
     return out
@@ -371,10 +372,10 @@ def _payload(it: Item) -> dict[str, Any]:
             "possible_rename": it.rename, "parsed": it.p}
 
 
-def stage(db: Session, admin_id: int, filename: str, parsed: dict[str, ParsedSheet]) -> dict[str, Any]:
+def stage(db: Session, admin_id: int, filename: str, parsed: dict[str, ParsedSheet], add_only: bool = False) -> dict[str, Any]:
     """Store every row raw in upload_rows and the uploads row. Writes nothing else."""
-    res = evaluate(db, parsed)
-    summary = {"sheets": [res[k].summary() for k in SHEETS], "possible_renames": [], "applied": None}
+    res = evaluate(db, parsed, add_only)
+    summary = {"sheets": [res[k].summary() for k in SHEETS], "possible_renames": [], "applied": None, "add_only": add_only}
     uid = db.execute(text("INSERT INTO uploads (user_id, filename, kind, status, summary) "
                           "VALUES (:u, :f, 'site_master', 'staged', CAST(:s AS jsonb)) RETURNING id"),
                      {"u": admin_id, "f": filename, "s": json.dumps(summary)}).scalar_one()
@@ -543,7 +544,7 @@ def apply_upload(db: Session, admin_id: int, upload_id: int, override: dict[str,
         raise ApplyError(409, f"{', '.join(again)} was already applied from this upload")
     if any(override.values()) and not (reason or "").strip():
         raise ApplyError(422, "A reason is required to override the row-count check")
-    res = evaluate(db, load_staged(db, upload_id, up["summary"]))
+    res = evaluate(db, load_staged(db, upload_id, up["summary"]), bool(up["summary"].get("add_only")))
     todo = [k for k in (only or SHEETS) if k not in done and res[k].found and (not res[k].blocked or (not res[k].hard and override.get(k)))]
     if not todo:
         raise ApplyError(409, "Nothing can be applied: " + "; ".join(
