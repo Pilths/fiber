@@ -268,8 +268,8 @@ def test_dashboard_site_edit_marks_site_master_field_protected(client, db):
     items = client.get(f"{tsm.URL}/uploads/{uid}/rows", params={"sheet": "sites", "group": "changed"}, headers=tru.ADMIN).json()["items"]
     ch = {c["field"]: c for c in items[0]["changes"]}
     assert items[0]["edited_in_dashboard"]
-    for f in ("location", "region"):
-        assert ch[f]["protected"] and ch[f]["note"] == "edited in dashboard, file differs"
+    assert ch["location"]["protected"] and ch["location"]["note"] == "edited in dashboard, file differs"
+    assert "region" not in ch  # Site Location has no region: an upload never compares or changes it
     done = client.post(f"{tsm.URL}/uploads/{uid}/apply", json={}, headers=tru.ADMIN)
     assert done.status_code == 200
     assert one(db, "SELECT ST_Y(geom) FROM sites WHERE id = :i", i=sid) == pytest.approx(3.5)

@@ -115,7 +115,7 @@ def test_placeholders_are_blank_not_invalid_text(client, admin):
     r = post(client, data)
     p = {i["key"]: i for i in rows(client, r.json()["upload_id"], "sites", "problem")["items"]}
     assert p["AAAA"]["reason"] == "missing coordinates"
-    assert p["BBBB"]["reason"] == "region is blank"
+    assert "BBBB" not in p  # Site Location has no region, so a blank or odd region is not a problem
     ok = row_of(client, r.json()["upload_id"], "sites", "added", "CCCC")
     assert "SITE_TYPE" not in ok["parsed"]["details"]
     assert sheets(r)["dcs"]["counts"]["added"] == 1  # blank DC coordinates fall back to the site
@@ -125,17 +125,17 @@ def test_preview_groups_and_nothing_written_before_apply(client, admin, db):
     seed_sites(db, ["KEEP", "OLDD", "SAME"])
     db.execute(text("UPDATE sites SET geom = ST_SetSRID(ST_MakePoint(101.7, 3.2), 4326) WHERE name = 'KEEP'"))
     before = (count(db), count(db, "SELECT count(*) FROM data_edits"))
-    data = workbook([site("KEEP"), site("SAME"), site("NEWW"), site("BADD", 0, 0), site("ODDR", region="Atlantis")])
+    data = workbook([site("KEEP"), site("SAME"), site("NEWW"), site("BADD", 0, 0), site("ODDR", region="Atlantis")])  # region is ignored
     r = post(client, data)
     uid = r.json()["upload_id"]
     c = sheets(r)["sites"]["counts"]
-    assert (c["rows"], c["added"], c["changed"], c["missing"], c["problem"], c["unchanged"]) == (5, 1, 1, 1, 2, 1)
+    assert (c["rows"], c["added"], c["changed"], c["missing"], c["problem"], c["unchanged"]) == (5, 2, 1, 1, 1, 1)
     ch = row_of(client, uid, "sites", "changed", "KEEP")["changes"]
     assert ch == [{"field": "location", "old": "3.200000,101.700000", "new": "3.100000,101.600000", "protected": False}]
     assert row_of(client, uid, "sites", "missing", "OLDD")["db_id"]
-    assert "unknown region" in row_of(client, uid, "sites", "problem", "ODDR")["reason"]
+    assert row_of(client, uid, "sites", "added", "ODDR")["parsed"]["lat"] == 3.1  # unknown region: not a problem
     assert row_of(client, uid, "sites", "problem", "BADD")["raw"]["LATITUDE_IN_DECIMAL"] == 0
-    assert rows(client, uid, "sites", "problem", page_size=1)["total"] == 2
+    assert rows(client, uid, "sites", "problem", page_size=1)["total"] == 1
     assert len(rows(client, uid, "sites", "problem", page_size=1)["items"]) == 1
     assert (count(db), count(db, "SELECT count(*) FROM data_edits")) == before  # staging only
     assert count(db, "SELECT count(*) FROM upload_rows") == 6  # 5 file rows raw + 1 missing
@@ -230,12 +230,12 @@ def test_apply_updates_with_history_and_deactivates_missing(client, admin, db):
                                                                   "deactivated": 1, "kept_active": 0, "skipped": 0, "applied": True}
     assert count(db, "SELECT active FROM sites WHERE name = 'GONE'") is False  # never deleted
     assert count(db, "SELECT active FROM sites WHERE name = 'BACK'") is True
-    assert count(db, "SELECT details->>'region' FROM sites WHERE name = 'AAAA'") == "North"
+    assert count(db, "SELECT details->>'region' FROM sites WHERE name = 'AAAA'") == "Central"  # an upload never touches region
     edits = db.execute(text("SELECT field, old_value, new_value, reason FROM data_edits WHERE entity = 'site' "
                             "AND entity_id = (SELECT id FROM sites WHERE name = 'AAAA') ORDER BY field")).all()
-    assert [e[0] for e in edits] == ["details.SITE_TYPE", "location", "region"]
+    assert [e[0] for e in edits] == ["details.SITE_TYPE", "location"]
     assert all(e[3] == f"site master upload master-oct.xlsx #{uid}" for e in edits)
-    assert db.execute(text("SELECT user_id FROM data_edits WHERE field = 'region'")).scalar_one() == admin
+    assert db.execute(text("SELECT user_id FROM data_edits WHERE field = 'location'")).scalar_one() == admin
     assert apply(client, uid).status_code == 409  # already applied
     cur = client.get(f"{URL}/current").json()
     assert cur["current"]["filename"] == "master-oct.xlsx" and cur["current"]["sheets"]["sites"]["rows"] == 3
@@ -260,15 +260,14 @@ def test_dashboard_edited_field_is_protected(client, admin, db):
     sid = count(db, "SELECT id FROM sites WHERE name = 'AAAA'")
     db.execute(text("INSERT INTO data_edits (entity, entity_id, field, old_value, new_value, reason, user_id) "
                     "VALUES ('site', :i, 'location', 'a', 'b', 'surveyed on site', :u)"), {"i": sid, "u": admin})
-    r = post(client, workbook([site("AAAA", 3.5, 101.9, "North")], None))
+    r = post(client, workbook([site("AAAA", 3.5, 101.9, "North", "Pole")], None))
     uid = r.json()["upload_id"]
     row = row_of(client, uid, "sites", "changed", "AAAA")
     loc = next(c for c in row["changes"] if c["field"] == "location")
     assert row["edited_in_dashboard"] and loc["protected"] and loc["note"] == "edited in dashboard, file differs"
     res = apply(client, uid).json()["sheets"]["sites"]
-    assert res["changed"] == 1 and res["protected_kept"] == 1
+    assert res["changed"] == 1 and res["protected_kept"] == 1  # SITE_TYPE changes; the location stays as edited
     assert count(db, "SELECT ST_Y(geom) FROM sites WHERE name = 'AAAA'") == pytest.approx(3.1)  # dashboard value kept
-    assert count(db, "SELECT details->>'region' FROM sites WHERE name = 'AAAA'") == "North"
 
 
 def rename_setup(client, db):

@@ -55,9 +55,9 @@ test("site master preview: counts per sheet, 10% drop override, blocked DC sheet
   await expect(sites.getByRole("table")).toContainText("E2E Site Two");
   await expect(sites.getByRole("table")).toContainText("missing coordinates");
   await expect(sites.getByRole("table")).toContainText("Needs review");
-  await expect(sites.getByRole("columnheader")).toHaveText(["Row", "Site name", "Latitude", "Longitude", "Region", "Status or reason"]);
+  await expect(sites.getByRole("columnheader")).toHaveText(["Row", "Site name", "Latitude", "Longitude", "Status or reason"]);
   const two = sites.getByRole("row", { name: /E2E Site Two/ });
-  await expect(two.getByRole("cell")).toHaveText(["3", "TBA", "TBA", "Central", /^Needs review.*missing coordinates/]);
+  await expect(two.getByRole("cell")).toHaveText(["3", "TBA", "TBA", /^Needs review.*missing coordinates/]);
   await sites.getByRole("button", { name: "Missing 4" }).click();
   await expect(sites.getByRole("table")).toContainText("in use, stays active");
 
