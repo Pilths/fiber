@@ -74,7 +74,7 @@ test("fiber cut: banner, 0 Cut, one red bar, Fiber cut key row; planner has no R
   await expect(banner).toContainText("All cores on this span are unavailable.");
   await expect(banner.getByRole("button", { name: "Restore" })).toHaveCount(0);
   await expect(i.locator(".pill.h-red").first()).toHaveText("Cut");
-  await expect(i.locator(".v-red").first()).toHaveText("0Cut"); // the big number reads 0, red, with the word Cut
+  await expect(i.locator(".v-red").first()).toHaveText("0"); // the big number reads 0, red; the title chip says Cut
   const bar = i.getByTestId("free-bar").locator("span");
   await expect(bar).toHaveCount(1);
   await expect(bar).toHaveClass(/k-fault/);

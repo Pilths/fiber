@@ -5,7 +5,7 @@ import { health, inFilter, LEVEL, spanName, type SpanFilter, type SpanLoss } fro
 
 type Span = components["schemas"]["SpanSummary"];
 
-export function FreeBadge({ s }: { s: Span }) {
+export function FreeBadge({ s }: { s: Parameters<typeof health>[0] }) {
   const h = health(s);
   return (
     <span className={`pill min-w-11 justify-center gap-[5px] ${h.cls}`}>

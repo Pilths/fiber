@@ -2,7 +2,9 @@ import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import { api, ApiError, errorText } from "@/api/client";
 import type { components } from "@/api/schema";
 import { useCustomerPicker } from "@/components/ChosenBar";
+import { FreeBadge } from "@/components/FindCard";
 import { Icon } from "@/components/Icon";
+import { Placeholder } from "@/components/Inspector";
 import { db } from "@/lib/status";
 
 // Route planner (TASK-051, TASK-076, route loss line of TASK-040). The routes API returns plain dicts, so the shapes live here.
@@ -230,38 +232,49 @@ function OptionCard({ op, i, need, pressed, onClick }: { op: RouteOption; i: num
   );
 }
 
-// ---------- Inspector, route state ----------
+// ---------- Inspector, route state (same fixed card parts as the span state) ----------
 export function RouteSummary({ rp, onGo }: { rp: RoutePlanner; onGo: () => void }) {
   const op = rp.option;
-  if (!op) {
-    return (
-      <p className="empty px-4 py-5 text-center text-body text-muted-foreground">
-        <b className="mb-0.5 block text-sm font-semibold text-foreground">No route selected</b>
-        Choose From and To in Find, then pick an option.
-      </p>
-    );
-  }
+  if (!op) return <Placeholder title="No route selected" text="Choose From and To in Find, then pick an option." />;
   const need = rp.need ?? 0;
   const short = op.insufficient ? op.spans.find((s) => isShort(s, need)) : undefined;
+  const name = `${op.spans[0].site_a} to ${op.spans[op.spans.length - 1].site_b}`;
   return (
-    <div className="flex flex-1 flex-col" data-testid="route-summary">
-      <p className="lbl">Route, option {(rp.idx ?? 0) + 1}</p>
-      <h3 className="text-2xl leading-[30px] font-bold tracking-tight">{op.spans[0].site_a} to {op.spans[op.spans.length - 1].site_b}</h3>
-      <p className="mt-1 text-body text-muted-foreground"><b className="text-foreground">{need}</b> {need === 1 ? "core" : "cores"} needed per span</p>
-      <dl className="mt-4 grid grid-cols-3 rounded-md border">
-        <div className="p-3"><dt className="lbl">Spans</dt><dd className="text-2xl font-bold">{op.total_spans}</dd></div>
-        <div className="border-l p-3"><dt className="lbl">Distance</dt><dd className="text-2xl font-bold">{totalKm(op)}<small className="ml-1 text-xs font-normal text-muted-foreground">km</small></dd></div>
-        <div className="border-l p-3"><dt className="lbl">dB estimate</dt>
-          <dd className="text-2xl font-bold">{op.estimated_db == null ? "–" : op.estimated_db.toFixed(2)}{op.estimated_db != null && <small className="ml-1 text-xs font-normal text-muted-foreground">dB</small>}</dd>
-        </div>
-      </dl>
-      {short && (
-        <p className="mt-3 flex gap-2 rounded-md border border-l-3 border-red-bd border-l-red bg-red-bg px-3 py-2.5 text-body font-medium text-red">
-          <Icon name="fl" className="ic mt-[3px]" /><span>{shortText(short, need)}. Pick another option or lower the cores needed.</span>
+    <div className="flex min-h-0 flex-1 flex-col" data-testid="route-summary">
+      <div className="ins-head">
+        <h3 className={`ins-title ${name.length > 22 ? "long" : ""}`}>{name}</h3>
+        <p className="ins-facts">
+          <span>Option <b className="font-semibold text-foreground">{(rp.idx ?? 0) + 1}</b></span>
+          <span><b className="font-semibold text-foreground">{need}</b> {need === 1 ? "core" : "cores"} needed per span</span>
         </p>
-      )}
-      <div className="-mx-5 mt-auto border-t px-5 pt-5">
-        <button type="button" className="btn w-full" onClick={onGo}>Go to route table and Reserve</button>
+      </div>
+      <div className="ins-body">
+        <dl className="grid grid-cols-3 rounded-md border">
+          <div className="px-3 py-2"><dt className="lbl">Spans</dt><dd className="text-xl font-bold">{op.total_spans}</dd></div>
+          <div className="border-l px-3 py-2"><dt className="lbl">Distance</dt><dd className="text-xl font-bold">{totalKm(op)}<small className="ml-1 text-xs font-normal text-muted-foreground">km</small></dd></div>
+          <div className="border-l px-3 py-2"><dt className="lbl">dB estimate</dt>
+            <dd className="text-xl font-bold">{op.estimated_db == null ? "–" : op.estimated_db.toFixed(2)}{op.estimated_db != null && <small className="ml-1 text-xs font-normal text-muted-foreground">dB</small>}</dd>
+          </div>
+        </dl>
+        {short && (
+          <p className="mt-3 flex gap-2 rounded-md border border-l-3 border-red-bd border-l-red bg-red-bg px-3 py-2.5 text-body font-medium text-red">
+            <Icon name="fl" className="ic mt-[3px]" /><span>{shortText(short, need)}. Pick another option or lower the cores needed.</span>
+          </p>
+        )}
+        <p className="lbl mt-3">Spans on this route</p>
+        <ol aria-label="Spans on this route" className="text-body">
+          {op.spans.map((s, i) => (
+            <li key={s.span_id} className="grid grid-cols-[20px_minmax(0,1fr)_auto] items-center gap-2 border-b border-rule py-1.5 last:border-0">
+              <span className="text-muted-foreground">{i + 1}</span>
+              <span className="min-w-0"><b className="block truncate font-semibold" title={s.name}>{s.name}</b>
+                <span className="text-xs text-muted-foreground">{s.km == null ? "No distance" : `${km(s.km)} km`}</span></span>
+              <FreeBadge s={{ survey_cores: s.surveyed ? 1 : null, free_to_reserve: s.free_to_reserve }} />
+            </li>
+          ))}
+        </ol>
+      </div>
+      <div className="ins-foot">
+        <button type="button" className="btn flex-1" onClick={onGo}>Go to route table and Reserve</button>
       </div>
     </div>
   );
