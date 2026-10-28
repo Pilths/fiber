@@ -20,14 +20,15 @@ export function FindCard({ spans, selectedId, onSelect, loss, mode, onMode, rout
   mode: "span" | "route"; onMode: (m: "span" | "route") => void; route: ReactNode;
   filter: SpanFilter; onFilter: (f: SpanFilter) => void;
 }) {
-  const { q, region, routeType } = filter;
+  const { q, region, routeType, route: routeF } = filter;
   const setQ = (v: string) => onFilter({ ...filter, q: v });
   const setRegion = (v: string) => onFilter({ ...filter, region: v });
   const setRouteType = (v: string) => onFilter({ ...filter, routeType: v });
+  const setRoute = (v: string) => onFilter({ ...filter, route: v });
   const all = spans ?? [];
   // Loss marker only for amber or worse, so the list stays quiet.
   const warn = new Map(loss.filter((l) => l.level && l.level !== "green").map((l) => [l.span_id, LEVEL[l.level!]]));
-  const opts = (k: "region" | "route_type") => [...new Set(all.map((s) => s[k]).filter((v): v is string => !!v))].sort();
+  const opts = (k: "region" | "route_type" | "route") => [...new Set(all.map((s) => s[k]).filter((v): v is string => !!v))].sort();
   const t = q.trim().toLowerCase();
   const shown = all.filter((s) => inFilter(s, filter) && (!t || spanName(s).toLowerCase().includes(t)));
 
@@ -75,7 +76,7 @@ export function FindCard({ spans, selectedId, onSelect, loss, mode, onMode, rout
         </>
       )}
 
-      {mode === "span" && <div className="mt-4 grid grid-cols-2 gap-x-3 gap-y-2 border-t pt-3.5">
+      {mode === "span" && <div className="mt-4 grid grid-cols-3 gap-x-3 gap-y-2 border-t pt-3.5">
         <label className="grid gap-1"><span className="lbl">Region</span>
           <select className="field" value={region} onChange={(e) => setRegion(e.target.value)}>
             <option value="">All regions</option>
@@ -86,6 +87,12 @@ export function FindCard({ spans, selectedId, onSelect, loss, mode, onMode, rout
           <select className="field" value={routeType} onChange={(e) => setRouteType(e.target.value)}>
             <option value="">All types</option>
             {opts("route_type").map((o) => <option key={o}>{o}</option>)}
+          </select>
+        </label>
+        <label className="grid gap-1"><span className="lbl">Route</span>
+          <select className="field" value={routeF} onChange={(e) => setRoute(e.target.value)}>
+            <option value="">All routes</option>
+            {opts("route").map((o) => <option key={o}>{o}</option>)}
           </select>
         </label>
       </div>}

@@ -20,6 +20,8 @@ class SpanSummary(BaseModel):
     site_b: str
     route_type: str | None
     region: str | None
+    route: str | None
+    section: str | None
     distance_km: Decimal | None
     free_cores: int  # Available cores
     status_mix: dict[str, int]

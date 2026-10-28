@@ -13,6 +13,7 @@ from app.db import get_db
 from app.history import router as history_router
 from app.ingest.reservation_upload_router import router as reservation_upload_router
 from app.ingest.site_master_router import router as site_master_router
+from app.ingest.span_list_router import router as span_list_router
 from app.inventory.router import router as inventory_router
 from app.loss.router import router as loss_router
 from app.map.router import router as map_router
@@ -26,6 +27,7 @@ app.include_router(inventory_router)
 app.include_router(reservations_router)
 app.include_router(loss_router)
 app.include_router(site_master_router)
+app.include_router(span_list_router)
 app.include_router(reservation_upload_router)
 app.include_router(admin_edits_router)
 app.include_router(history_router)

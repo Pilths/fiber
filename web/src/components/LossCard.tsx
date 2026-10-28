@@ -2,10 +2,11 @@ import { useState, type ReactNode } from "react";
 import { Icon } from "@/components/Icon";
 import { db, LEVEL, pct, signedDb, type LossDetail, type SpanLoss } from "@/lib/status";
 
-export function LossPill({ l }: { l: Pick<SpanLoss, "level" | "deviation_pct"> }) {
+export function LossPill({ l, compact }: { l: Pick<SpanLoss, "level" | "deviation_pct">; compact?: boolean }) {
   if (!l.level) return null;
   const v = LEVEL[l.level];
   const word = l.level === "green" && (l.deviation_pct ?? 0) < 0 ? "Below calculated" : v.word;
+  if (compact) return <span className={`pill ${v.cls}`} data-level={l.level} title={word}><Icon name={v.icon} /><span className="sr-only">{word}</span></span>;
   return <span className={`pill ${v.cls}`} data-level={l.level}><Icon name={v.icon} />{word}</span>;
 }
 
