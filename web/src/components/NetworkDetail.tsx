@@ -150,8 +150,8 @@ export function CoresTable({ d, loss, focusCoreId, onActions }: { d: Detail; los
         <table className="tbl table-fixed [&_thead_th]:sticky [&_thead_th]:top-0 [&_thead_th]:z-1 [&_thead_th]:bg-white">
           <caption className="sr-only">Cores of {spanName(d)}</caption>
           <thead><tr>
-            <th scope="col" className="w-[9%]">Core</th><th scope="col" className="w-[19%]">Status</th><th scope="col" className="w-[22%]">Customer</th>
-            <th scope="col" className="w-[13%]">Planned date</th><th scope="col">Ports</th><th scope="col" className="w-[13%] pr-0!">Loss</th>
+            <th scope="col" className="w-[7%]">Core</th><th scope="col" className="w-[14%]">Status</th><th scope="col" className="w-[13%]">Circuit ID</th><th scope="col" className="w-[17%]">Customer</th>
+            <th scope="col" className="w-[12%]">Planned date</th><th scope="col">Ports</th><th scope="col" className="w-[11%] pr-0!">Loss</th>
           </tr></thead>
           <tbody>
             {rows.map((c) => {
@@ -166,6 +166,7 @@ export function CoresTable({ d, loss, focusCoreId, onActions }: { d: Detail; los
                     </th>
                     <td><span className={`inline-flex items-center gap-1.5 font-semibold whitespace-nowrap ${st.tone}`}><Icon name={st.icon} />{statusLabel(c.status)}</span>
                       {c.stale && <>{" "}<span className="pill h-amber" title={`No keep for over 3 months since ${c.stale_since ?? "-"}`}><Icon name="lo" />Stale<span className="sr-only">: no keep for over 3 months since {c.stale_since ?? "-"}</span></span></>}</td>
+                    <td className="truncate font-mono">{(!free && c.circuit_id) || <Dash />}</td>
                     <td className="truncate">{(!free && c.customer) || <Dash />}</td>
                     <td className="whitespace-nowrap">{(!free && c.planned_date) || <Dash />}</td>
                     <td className="truncate">{ports(c)}</td>
@@ -173,7 +174,7 @@ export function CoresTable({ d, loss, focusCoreId, onActions }: { d: Detail; los
                   </tr>
                   {open && (
                     <tr data-testid="core-detail">
-                      <td colSpan={6} className="h-auto! bg-subtle px-4! py-3!">
+                      <td colSpan={7} className="h-auto! bg-subtle px-4! py-3!">
                         <div className="flex items-start justify-between gap-4">
                           <dl className="grid flex-1 grid-cols-3 gap-x-6 gap-y-2.5 text-body" data-testid="core-fields">
                             <Field label="SRF ID">{(!free && c.srf_id) || <Dash />}</Field>
