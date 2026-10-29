@@ -45,7 +45,7 @@ test("map loads with no request leaving the app origin; chips, sites, layers and
   await expect(chip(page, FAR)).toHaveText(/^(\d+|–)$/); // the free-core number only, no icon
   await expect(chips(page).locator("svg")).toHaveCount(0);
   await expect(page.getByTestId("map-not-drawn")).toContainText("2 spans not on the map (no coordinates)");
-  await expect(map(page).getByRole("group", { name: "Map key" })).toContainText("Free to reserve");
+  await expect(map(page).getByRole("group", { name: "Map key" })).toContainText("Route type");
   if (m === "gl") {
     await expect(page.getByTestId("map-note")).toHaveCount(0);
     await page.waitForFunction(() => document.querySelector(".maplibregl-canvas"));

@@ -283,15 +283,10 @@ export function NetworkMap({ selectedIds, routeKey, visible, onSelectSpan, onSit
         </div>
 
         <div role="group" aria-label="Map key" className="mleg">
-          <p className="mleg-h">Free to reserve</p>
-          <p className="mleg-h">Route type</p>
-          <span><span className="slot"><b className="lc h-green">10+</b></span>Healthy</span>
+          <p className="mleg-h col-span-2">Route type</p>
           <span><i className="slot" aria-hidden="true"><i className="ll" /></i>Trunk</span>
-          <span><span className="slot"><b className="lc h-amber">1-9</b></span>Low</span>
           <span><i className="slot" aria-hidden="true"><i className="ll m" /></i>Metro</span>
-          <span><span className="slot"><b className="lc h-red">0</b></span>Full or cut</span>
           <span><i className="slot" aria-hidden="true"><i className="ll b" /></i>Bespoke</span>
-          <span><span className="slot"><b className="lc h-ns">–</b></span>Not surveyed</span>
           <span><i className="slot" aria-hidden="true"><i className="ll s" /></i>Selected</span>
           <p className="mleg-h col-span-2">Sites</p>
           <span><i className="slot" aria-hidden="true"><i className="rb-sh dc size-3!" /></i>Data centre</span>
