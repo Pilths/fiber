@@ -138,6 +138,8 @@ td{padding:8px 0;border-bottom:1px solid var(--rule)}
 
     <section class="card" aria-labelledby="d3" id="loss" hidden>
       <h2 id="d3"></h2>
+      <div class="lossgrid" id="coreinfo"></div>
+      <h3 class="lbl" style="margin-top:16px;padding-top:12px;border-top:1px solid var(--rule)">Loss of this core</h3>
       <div class="lossgrid" id="lossgrid"></div>
       <div id="lossnote"></div>
     </section>
@@ -165,7 +167,13 @@ SPANS.forEach(s=>{
   s.name=s.a+"-"+s.b; s.calc=+(s.km*0.3).toFixed(2);
   s.cores=Array.from({length:s.n},(_,i)=>{
     const r=rnd(s.id*100+i), st=r<.5?"Available":r<.62?"Requested":r<.8?"Reserved":"In use";
-    const c={n:i+1,status:st,tests:[]};
+    const c={n:i+1,status:st,tests:[],customer:null,planned:null,pa:null,pb:null,circuit:null};
+    if(st!=="Available"){
+      c.customer=["Telco Alpha","Beta Networks","Gamma Cloud","Delta Mobile","Epsilon DC"][Math.floor(rnd(s.id*31+i)*5)];
+      c.planned=`2026-${String(1+Math.floor(rnd(i+9)*12)).padStart(2,"0")}-${String(1+Math.floor(rnd(i+s.id)*27)).padStart(2,"0")}`;
+      if(st==="Reserved"||st==="In use"){c.pa=`${s.a} ODF-${1+i%4}/${10+i}`;c.pb=`${s.b} ODF-${1+(i+1)%4}/${10+i}`;}
+      if(st==="In use")c.circuit=`CKT-${s.id}${String(i+1).padStart(2,"0")}${(i*37)%90+10}`;
+    }
     if(rnd(s.id*7+i*3)<.35){ // measured cores; calculated is the span expected value
       const k=1+Math.floor(rnd(i+s.id)*2);
       for(let t=0;t<k;t++) c.tests.push({on:`2026-0${3+t*2}-${10+i%18}`,db:+(s.calc*(.85+rnd(i*5+t+s.id)*.5)).toFixed(2),method:["OTDR","Power meter"][t%2],by:["Field team 2","Field team 4"][(i+t)%2]});
@@ -253,7 +261,15 @@ function openCore(n){
   const s=SPANS.find(x=>x.id===sel),c=s.cores.find(x=>x.n===n); coreSel=n;
   document.querySelectorAll(".core").forEach(b=>b.setAttribute("aria-pressed",String(+b.dataset.c===n)));
   $("loss").hidden=false;
-  $("d3").textContent=`Loss of core ${n} on ${s.name}`;
+  $("d3").textContent=`Core ${n} of ${s.name}`;
+  const B=(t)=>t||'<span class="lbl">Not recorded</span>';
+  const I=(a,b)=>`<div><div class="lbl">${a}</div><div style="font-size:16px;font-weight:700;margin-top:2px">${b}</div></div>`;
+  const stCol={Available:"var(--green)",Requested:"var(--amber)",Reserved:"var(--blue)","In use":"var(--use)"}[c.status];
+  $("coreinfo").innerHTML=I("Status",`<span style="color:${stCol}">${ICON[c.status]} ${LABEL[c.status]}</span>`)+
+    I("Customer",c.status==="Available"?'<span class="lbl">None</span>':B(c.customer))+
+    I("Planned date",c.status==="Available"?'<span class="lbl">None</span>':B(c.planned))+
+    I("Ports",c.status==="Available"?'<span class="lbl">None</span>':c.pa?`${c.pa} to ${c.pb}`:'<span class="lbl">No ports yet</span>')+
+    I("Circuit ID",c.circuit||'<span class="lbl">Not recorded</span>');
   if(!c.tests.length){
     $("lossgrid").innerHTML="";
     $("lossnote").innerHTML=`<p class="note">This core has no loss test yet. Calculated loss for the span is ${s.calc.toFixed(2)} dB.</p>`;
