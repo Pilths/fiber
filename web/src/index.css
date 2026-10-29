@@ -128,11 +128,13 @@
 
   /* Inspector (B2): fixed-height card; fixed head, a body that scrolls inside the card, a pinned footer. Span and route states share them.
      A long title (DEV seed names, not 4-letter LRD pairs) drops to 24px and may wrap; it is never cut, admins click the site names in it. */
-  .ins-head { flex: none; padding: 14px 20px 10px; border-bottom: 1px solid var(--border); }
-  .ins-body { flex: 1; min-height: 0; overflow-y: auto; padding: 10px 20px 8px; }
-  .ins-foot { flex: none; display: flex; gap: 8px; padding: 14px 20px; border-top: 1px solid var(--border); }
+  /* Top padding puts the title's first-line cap centre on the map toolbar's centre line (map card: 1px border + 12px inset
+     + 1px stage border + 12px toolbar offset + 16px half button = 42px; inspector-layout.spec.ts checks it). */
+  .ins-head { flex: none; padding: 22px 20px 10px; border-bottom: 1px solid var(--border); }
+  .ins-body { flex: 1; min-height: 0; overflow-y: auto; padding: 10px 20px 6px; }
+  .ins-foot { flex: none; display: flex; gap: 8px; padding: 12px 20px; border-top: 1px solid var(--border); }
   .ins-title { min-width: 0; overflow-wrap: anywhere; font-size: 32px; line-height: 38px; font-weight: 700; letter-spacing: -.025em; }
-  .ins-title.long { font-size: 24px; line-height: 30px; }
+  .ins-title.long { margin-top: 4px; font-size: 24px; line-height: 30px; }
   .ins-facts { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 16px; margin-top: 4px; font-size: 13px; color: var(--muted-ink); }
   .badge { display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--red); color: #fff; font-size: 11px; font-weight: 700; line-height: 1; }
   .later { display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border: 1px solid #7a808a; border-radius: 4px; background: var(--raised); color: var(--muted-ink); font-size: 11px; font-weight: 600; letter-spacing: .02em; }

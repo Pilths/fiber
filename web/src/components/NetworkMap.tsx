@@ -62,7 +62,7 @@ const NOTE: Partial<Record<Basemap, string>> = {
 };
 const webgl = () => { try { return !!document.createElement("canvas").getContext("webgl2"); } catch { return false; } };
 
-export function NetworkMap({ selectedIds, routeKey, visible, onSelectSpan, onSite, onClear, version }: {
+export function NetworkMap({ selectedIds, routeKey, visible, onSelectSpan: selectSpan, onSite, onClear, version }: {
   selectedIds: number[]; routeKey: string | null; visible: (p: SpanProps) => boolean;
   onSelectSpan: (id: number) => void; onSite: (name: string) => void; onClear: () => void; version: number;
 }) {
@@ -130,6 +130,9 @@ export function NetworkMap({ selectedIds, routeKey, visible, onSelectSpan, onSit
     if (map.current) map.current.easeTo({ center: [v.lng, v.lat], zoom: v.zoom, duration: 250 });
     else setView(v);
   }, []);
+  // A span picked on the map is already in view and stays put; a span picked anywhere else (the Find list, search) is followed.
+  const clicked = useRef<number | null>(null);
+  const onSelectSpan = (id: number) => { clicked.current = id; selectSpan(id); };
   const sel = new Set(selectedIds);
   const feats = spans?.features ?? [];
   const fitTo = (ids: number[] | null) => {
@@ -150,6 +153,11 @@ export function NetworkMap({ selectedIds, routeKey, visible, onSelectSpan, onSit
   useEffect(() => {
     if (fitted.current && routeKey && selectedIds.length) fitTo(selectedIds);
   }, [routeKey, selKey]); // eslint-disable-line react-hooks/exhaustive-deps -- refit only when the route changes
+  useEffect(() => {
+    if (!fitted.current || routeKey || selectedIds.length !== 1) return;
+    if (clicked.current === selectedIds[0]) { clicked.current = null; return; }
+    fitTo(selectedIds);
+  }, [selKey]); // eslint-disable-line react-hooks/exhaustive-deps -- follow a span selected outside the map
 
   // SVG mode camera: drag to pan.
   const drag = useRef<{ x: number; y: number; v: View } | null>(null);
@@ -200,7 +208,7 @@ export function NetworkMap({ selectedIds, routeKey, visible, onSelectSpan, onSit
   return (
     <div className="flex flex-1 flex-col">
       <p id="map-instr" className="sr-only">Chips show free to reserve. Tab to a chip or site and press Enter to select; Esc clears the selection.</p>
-      <div ref={box} role="region" aria-label="Network map" aria-describedby="map-instr" data-testid="network-map" data-mode={base === "gl" ? "gl" : base === "loading" ? "loading" : "svg"}
+      <div ref={box} data-testid="network-map" data-mode={base === "gl" ? "gl" : base === "loading" ? "loading" : "svg"}
         className={`relative flex-1 overflow-hidden bg-map select-none ${full ? "" : "min-h-[clamp(520px,calc(100vh-210px),860px)] rounded-md border border-border"}`}
         onKeyDown={(e) => { if (e.key === "Escape") { setLayersOpen(false); onClear(); } }}
         onPointerDown={onDown} onPointerMove={onMove} onPointerUp={() => { drag.current = null; }}>

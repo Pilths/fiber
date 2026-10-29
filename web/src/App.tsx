@@ -228,10 +228,7 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
       )}
       {view === "map" && (
         <main className="grid grid-cols-12 gap-4 px-6 pt-6 pb-10">
-          <section className="card col-span-8 flex flex-col" aria-labelledby="map-h">
-            <div className="card-h">
-              <h2 id="map-h">Network map</h2>
-            </div>
+          <section className="card col-span-8 flex flex-col p-3" aria-label="Network map" aria-describedby="map-instr">
             <NetworkMap version={version} onSelectSpan={(id) => open(id)} onSite={mapSite} onClear={clearSelection}
               selectedIds={mode === "route" ? rp.option?.spans.map((s) => s.span_id) ?? [] : spanId != null ? [spanId] : []}
               routeKey={mode === "route" && rp.option ? `${rp.idx}-${routeName}` : null} visible={(p) => inFilter({ ...p, route: routeOf.get(p.span_id) }, filter)} />

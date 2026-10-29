@@ -191,7 +191,7 @@ test("map card fills its row and the stage fills the card: nothing, span and rou
   await signIn(page);
   await expect(chips(page)).toHaveCount(5);
   const gaps = () => page.evaluate(() => {
-    const card = document.querySelector("section[aria-labelledby=map-h]")!;
+    const card = document.querySelector('section[aria-label="Network map"]')!;
     const body = card.lastElementChild!; // NetworkMap root: stage, then the note line and "not on the map"
     const pad = parseFloat(getComputedStyle(card).paddingBottom);
     const right = (card.nextElementSibling as HTMLElement).getBoundingClientRect();
@@ -213,6 +213,35 @@ test("map card fills its row and the stage fills the card: nothing, span and rou
   await page.getByRole("list", { name: "Route options" }).getByTestId("route-option").first().click();
   await expect(map(page).locator("[data-testid=map-line][data-selected=true]").first()).toBeVisible();
   await check();
+});
+
+// A span picked in Find is followed by the camera; a span clicked on the map is already in view and stays put.
+test("picking a span in Find moves the camera; clicking it on the map does not", async ({ page }) => {
+  await signIn(page);
+  test.skip((await mode(page)) !== "gl", "camera checks need MapLibre (basemap installed and WebGL)");
+  await page.waitForFunction(() => (window as { fiberMap?: { loaded(): boolean } }).fiberMap?.loaded());
+  const cam = () => page.evaluate(() => {
+    const m = (window as unknown as { fiberMap: import("maplibre-gl").Map }).fiberMap, c = m.getCenter();
+    return { zoom: m.getZoom(), lng: c.lng, lat: c.lat, moving: m.isMoving() };
+  });
+  const still = async () => { await expect.poll(async () => (await cam()).moving).toBe(false); await page.waitForTimeout(400); return cam(); };
+  const start = await still(); // the first fit to all spans
+
+  await page.getByRole("list", { name: "Spans" }).getByRole("button", { name: new RegExp(`^${SPAN}`) }).click();
+  await expect(page.getByRole("heading", { name: `Cores of ${SPAN}` })).toBeVisible();
+  await expect.poll(async () => (await cam()).zoom).toBeGreaterThan(start.zoom + 0.5);
+  const followed = await still();
+  expect(followed.zoom).toBeGreaterThan(start.zoom);
+  expect(Math.hypot(followed.lng - start.lng, followed.lat - start.lat)).toBeGreaterThan(1e-3);
+
+  await page.evaluate(() => scrollTo(0, 0));
+  const other = "DEV Cyberjaya DC - DEV Bukit Jalil TOC";
+  await chip(page, other).click(); // a different span, clicked on the map
+  await expect(page.getByRole("heading", { name: `Cores of ${other}` })).toBeVisible();
+  const after = await still();
+  expect(after.zoom).toBeCloseTo(followed.zoom, 5);
+  expect(after.lng).toBeCloseTo(followed.lng, 6);
+  expect(after.lat).toBeCloseTo(followed.lat, 6);
 });
 
 // Buildings and walking paths draw past the extract's zoom 14 (overzoom). Needs the basemap installed and WebGL.

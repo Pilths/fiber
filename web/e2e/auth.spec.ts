@@ -22,7 +22,7 @@ test("wrong password shows the error; planner1 signs in, sees the map, signs out
   await shot(page, "login");
 
   await signIn(page, "planner1");
-  await expect(page.getByRole("heading", { name: "Network map" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Network map" })).toBeVisible();
   await (await account(page)).getByRole("menuitem", { name: "Sign out" }).click();
   await expect(page.getByRole("button", { name: "Sign in" })).toBeVisible();
   await page.reload(); // the session is gone on the server too
@@ -86,7 +86,7 @@ test("new user: temporary password, forced change, deactivate blocks, activate r
   await expect(user.getByRole("alert")).toContainText("Current password is wrong");
   await user.getByLabel("Current password").fill(temp);
   await user.getByRole("button", { name: "Change password" }).click();
-  await expect(user.getByRole("heading", { name: "Network map" })).toBeVisible();
+  await expect(user.getByRole("region", { name: "Network map" })).toBeVisible();
 
   // Deactivate signs the user out and blocks sign-in.
   await admin.reload();

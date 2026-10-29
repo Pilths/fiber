@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import type { components } from "@/api/schema";
 import { Icon, type IconName } from "@/components/Icon";
 import type { SpanFocus } from "@/components/AdminEdit";
@@ -44,13 +44,13 @@ export function Inspector({ detail, loading, onGoToCores, loss, onSeeLoss, onSee
             <button type="button" className="btn btn-sm" onClick={() => focusEl("global-search")}>Search by site or span</button>
             <button type="button" className="btn btn-sm" onClick={() => focusEl("find-q")}>Choose from the list</button>
           </>} />
-        : <Body d={detail} onGoToCores={onGoToCores} loss={loss} onSeeLoss={onSeeLoss} onSeeHeld={onSeeHeld} admin={admin} onPlanRoute={onPlanRoute} />)}
+        : <Body key={detail.id} d={detail} onGoToCores={onGoToCores} loss={loss} onSeeLoss={onSeeLoss} onSeeHeld={onSeeHeld} admin={admin} onPlanRoute={onPlanRoute} />)}
     </section>
   );
 }
 
 const link = "font-[inherit] underline-offset-4 hover:text-blue hover:underline";
-type Line = { key: string; icon: IconName; tone: string; word: string; customer: string | null; what: string };
+type Line = { key: string; icon: IconName; tone: string; word: string; customer: string | null; what: string; date: string | null; n: number };
 
 // One line per reservation and status (held cores), then one per count-only reservation; the Allocations table has the detail.
 function allocations(d: Detail): Line[] {
@@ -63,11 +63,11 @@ function allocations(d: Detail): Line[] {
   return [
     ...[...groups].map(([key, cs]) => ({
       key, icon: STATUS[cs[0].status].icon, tone: STATUS[cs[0].status].tone, word: statusLabel(cs[0].status), customer: cs[0].customer,
-      what: `${cs.length === 1 ? "Core" : "Cores"} ${cs.map((c) => c.number).join(", ")}`,
+      what: `${cs.length === 1 ? "Core" : "Cores"} ${cs.map((c) => c.number).join(", ")}`, date: cs[0].planned_date, n: cs.length,
     })),
     ...d.unassigned.map((u) => ({
       key: `u${u.reservation_id}`, icon: "co" as const, tone: "text-use", word: "Unassigned", customer: u.customer,
-      what: `${u.remaining} ${u.remaining === 1 ? "core" : "cores"}`,
+      what: `${u.remaining} ${u.remaining === 1 ? "core" : "cores"}`, date: u.planned_date, n: u.remaining,
     })),
   ];
 }
@@ -92,10 +92,19 @@ function Body({ d, onGoToCores, loss, onSeeLoss, onSeeHeld, admin, onPlanRoute }
   const tone = high
     ? { strip: "border-red-bd bg-red-bg text-red", row: "bg-red-bg shadow-[inset_3px_0_0_var(--red)]", text: "text-red" }
     : { strip: "border-amber-bd bg-amber-bg text-amber", row: "bg-amber-bg shadow-[inset_3px_0_0_var(--amber)]", text: "text-amber" };
-  // An alert takes room in the fixed card, so Allocations shows fewer lines and the Loss row stays in view.
+  // Allocations shows as many lines (up to 4) as the fixed card has room for: an alert or a 2-line title takes room,
+  // so lines drop one at a time until the body no longer scrolls (down to the header line alone), and the Loss row stays in view.
   const lines = allocations(d);
-  const shown = lines.slice(0, cut || lv ? 1 : 3);
+  const total = lines.reduce((s, l) => s + l.n, 0);
+  const [max, setMax] = useState(4);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const b = bodyRef.current;
+    if (b && max > 0 && b.scrollHeight > b.clientHeight) setMax(max - 1);
+  }, [max, d, loss]); // re-measure as the loss alert and data arrive
+  const shown = lines.slice(0, max);
   const more = lines.length - shown.length;
+  const dated = shown.some((l) => l.date);
   return (
     <>
       <div className="ins-head">
@@ -118,7 +127,7 @@ function Body({ d, onGoToCores, loss, onSeeLoss, onSeeHeld, admin, onPlanRoute }
         </div>
       </div>
 
-      <div className="ins-body">
+      <div className="ins-body" ref={bodyRef}>
         {(cut || lv) && (
           <div className="mb-2 space-y-2 text-body">
             {cut && (
@@ -170,7 +179,7 @@ function Body({ d, onGoToCores, loss, onSeeLoss, onSeeHeld, admin, onPlanRoute }
           </div>
         ) : <p className="text-body text-muted-foreground">Not surveyed, cannot be booked. Cable size {d.cable_size}.</p>}
 
-        <div className={`mt-2 flex items-center gap-2 border-t py-1.5 text-body ${lv ? `-mx-5 px-5 ${tone.row}` : ""}`} data-testid="inspector-loss" data-level={lv ?? undefined}>
+        <div className={`mt-1.5 flex items-center gap-2 border-t py-1 text-body ${lv ? `-mx-5 px-5 ${tone.row}` : ""}`} data-testid="inspector-loss" data-level={lv ?? undefined}>
           <span className="lbl">Loss</span>
           <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
             {!loss ? <span className="text-muted-foreground">Loading...</span>
@@ -181,23 +190,25 @@ function Body({ d, onGoToCores, loss, onSeeLoss, onSeeHeld, admin, onPlanRoute }
           <button type="button" className="flex-none font-semibold link" onClick={onSeeLoss}>See loss</button>
         </div>
 
-        <div className="border-t pt-2 text-body" data-testid="inspector-held">
-          <div className="flex items-center justify-between gap-2">
-            <span className="lbl">Allocated</span>
-            <button type="button" className="flex-none font-semibold link" onClick={onSeeHeld}>{more > 0 ? `+${more} more in Allocations` : "See allocations"}</button>
-          </div>
-          {!lines.length ? <p className="text-muted-foreground">None</p> : (
+        {!lines.length ? <p className="border-t pt-2 text-body text-muted-foreground" data-testid="inspector-held">No allocations</p> : (
+          <div className="border-t pt-1.5 text-body" data-testid="inspector-held">
+            <div className="flex items-center justify-between gap-2">
+              <span className="flex items-baseline gap-2"><span className="lbl">Allocated</span><b className="font-semibold">{total} {total === 1 ? "core" : "cores"}</b></span>
+              <button type="button" className="flex-none font-semibold link" onClick={onSeeHeld}>See allocations</button>
+            </div>
             <ul aria-label="Allocated on this span">
               {shown.map((l) => (
-                <li key={l.key} className="grid grid-cols-[104px_minmax(0,1fr)_auto] items-center gap-3 border-b border-rule py-1 last:border-0">
+                <li key={l.key} className={`grid items-center gap-2 border-b border-rule py-0.5 last:border-0 ${dated ? "grid-cols-[100px_minmax(0,1fr)_minmax(0,auto)_76px]" : "grid-cols-[100px_minmax(0,1fr)_minmax(0,auto)]"}`}>
                   <span className={`flex items-center gap-1.5 font-semibold ${l.tone}`}><Icon name={l.icon} />{l.word}</span>
                   <span className="truncate" title={l.customer ?? undefined}>{l.customer ?? "-"}</span>
-                  <span className="max-w-36 truncate text-right text-muted-foreground" title={l.what}>{l.what}</span>
+                  <span className="max-w-32 truncate text-muted-foreground" title={l.what}>{l.what}</span>
+                  {dated && <span className="text-right whitespace-nowrap text-muted-foreground">{l.date ?? ""}</span>}
                 </li>
               ))}
             </ul>
-          )}
-        </div>
+            {more > 0 && shown.length > 0 && <button type="button" className="font-semibold link" onClick={onSeeHeld}>+{more} more in Allocations</button>}
+          </div>
+        )}
       </div>
 
       <div className="ins-foot">
