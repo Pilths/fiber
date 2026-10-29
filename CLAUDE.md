@@ -33,7 +33,7 @@ Read before working: `docs/PRD.md` (requirements), `docs/architecture.md` (desig
 - Nothing is deleted. Accounts are deactivated.
 - After the first import the dashboard database is the source of truth and the Excel is a feed. A field edited in the dashboard is protected from uploads.
 - Internal span ID is the key. Two sites have at most one span; uploads match a span by its site pair. Circuit ID comes from another system and is an optional field on the core, because one span carries many circuits.
-- Measurements are stored per span. Distance comes from the Excel.
+- Loss belongs to a CORE, not to the whole span cable: a measurement is one core's test. The calculated loss (distance x 0.3 dB/km) is the span's expected value that each core is compared with. Span-level views (Inspector, Find, map) show the worst measured core and how many cores are measured. A measurement with no core recorded (old Excel imports) is shown as "core not recorded". Distance comes from the Excel.
 - Site is the general term for a site, building or equipment location.
 - The same Docker Compose setup runs unchanged on the personal laptop, work laptop, dev server and production server. Anything machine-specific lives only in `.env`.
 
