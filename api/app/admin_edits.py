@@ -113,7 +113,7 @@ def set_core_ports(db: DB, admin: Admin, core_id: int, body: CorePortsBody) -> C
 class SpanBody(BaseModel):
     reason: Reason
     distance_km: Decimal | None = Field(None, ge=0, max_digits=10, decimal_places=3)
-    route_type: Literal["Bespoke", "Trunk", "Metro"] | None = None
+    route_type: Literal["Trunk", "Metro"] | None = None
     region: str | None = None
     site_a_id: int | None = None
     site_b_id: int | None = None

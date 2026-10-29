@@ -27,7 +27,7 @@ SPANS: list[tuple[str, str, str, str, float | None, float | None]] = [
     ("KL", "IPH", "Trunk", "North", 205.0, 0.95),
     ("IPH", "PEN", "Trunk", "North", 120.4, 1.15),
     ("KL", "KTN", "Trunk", "East Coast", 290.0, 1.0),
-    ("BJ", "KTN", "Bespoke", "East Coast", None, None),
+    ("BJ", "KTN", "Metro", "East Coast", None, None),
 ]
 CORES = 24
 

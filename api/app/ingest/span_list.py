@@ -26,7 +26,7 @@ ALIASES = {"link": "link", "links": "link", "sitea": "site_a", "section": "secti
            "distance": "distance", "distancekm": "distance", "km": "distance", "route": "route", "type": "type", "routetype": "type"}
 EXPECTED = "Link, Distance"
 GROUP_COL = {"new": "new", "changed": "changed", "unchanged": "unchanged", "problem": "needs_review"}
-TYPES = {"trunk": "Trunk", "metro": "Metro", "bespoke": "Bespoke"}
+TYPES = {"trunk": "Trunk", "metro": "Metro"}
 FIELDS = ("distance_km", "route_type", "route", "section")  # span columns a row may change
 MAX_DISTANCE = Decimal("9999999.999")  # numeric(10,3)
 
@@ -92,7 +92,7 @@ def _parse_row(headers: list[str], values: tuple[Any, ...]) -> Item:
         reasons.append(why)
     typ = _cell(f.get("type"))
     if typ is not None and typ.casefold() not in TYPES:
-        reasons.append("type must be Trunk, Metro or Bespoke")
+        reasons.append("type must be Trunk or Metro")
     item.p = {"link": link, "a": a, "b": b, "distance": dist, "route": _cell(f.get("route")), "section": _cell(f.get("section")),
               "type": TYPES.get((typ or "").casefold()), "reasons": reasons}
     return item

@@ -134,7 +134,7 @@ def test_row_rules(client, admin, sites):
     p = problems(client, uid)
     assert 2 not in p  # Site A is not checked, so a different Site A is fine
     assert p[3] == p[4] == p[5] == "distance is not a number"
-    assert p[6] == "type must be Trunk, Metro or Bespoke"
+    assert p[6] == "type must be Trunk or Metro"
     assert all("Link" in p[n] for n in (7, 8, 10, 11))
     assert p[9] == "site OFFF is not active in the dashboard"
     assert p[12] == p[13] == "duplicate link in file (rows 12, 13)"
@@ -224,3 +224,9 @@ def test_migration_0008_roundtrip(engine, db):
     db.execute(text("INSERT INTO sites (name, kind) VALUES ('A','site'), ('B','site')"))
     db.execute(text("INSERT INTO spans (site_a_id, site_b_id, route, section) SELECT a.id, b.id, 'r', 's' FROM sites a, sites b "
                     "WHERE a.name = 'A' AND b.name = 'B'"))
+
+
+def test_bespoke_type_is_no_longer_accepted(client, admin, sites):
+    uid = post(client, workbook([row("AAAA-BBBB", typ="Bespoke"), row("BBBB-CCCC", typ="metro")])).json()["upload_id"]
+    p = problems(client, uid)
+    assert p == {2: "type must be Trunk or Metro"}

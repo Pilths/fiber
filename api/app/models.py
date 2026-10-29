@@ -91,7 +91,7 @@ class Span(Base):
     __tablename__ = "spans"
     __table_args__ = (
         CheckConstraint("site_a_id <> site_b_id", name="spans_sites_differ_ck"),
-        _in("route_type", ("Bespoke", "Trunk", "Metro"), "spans_route_type_ck"),
+        _in("route_type", ("Trunk", "Metro"), "spans_route_type_ck"),
         _in("region", ("North", "Central", "South", "East Coast"), "spans_region_ck"),
         CheckConstraint("distance_km >= 0", name="spans_distance_ck"),
         CheckConstraint("cable_size > 0", name="spans_cable_size_ck"),
