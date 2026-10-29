@@ -36,9 +36,9 @@ test("selecting a span from Find (Reserve tab) writes the hash and shows it on t
   await other.goto(`/#span=${encodeURIComponent(SPAN)}`);
   await expect(other.locator("#span-h", { hasText: SPAN })).toBeVisible();
 
-  // Details scrolls to the span detail
-  await other.getByRole("button", { name: "Open span details" }).click();
-  await expect(other.getByRole("heading", { name: "Cores", exact: true })).toBeInViewport();
+  // Cores scrolls to the span's core table
+  await other.getByRole("button", { name: "Go to cores" }).click();
+  await expect(other.getByRole("heading", { name: `Cores of ${SPAN}` })).toBeInViewport();
   await tab(other, "Reserve");
   await expect(other.getByRole("list", { name: "Spans" }).getByRole("button", { pressed: true })).toContainText(SPAN);
 });

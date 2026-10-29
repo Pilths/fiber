@@ -14,15 +14,14 @@ test("Inspector shows the worst core and how many cores are measured", async ({ 
   await signIn(page);
   await pick(page, SPANS.measured);
   const line = page.getByTestId("inspector-loss");
-  await expect(line).toContainText(/core (\d+|not recorded): [\d.]+ dB/);
-  await expect(line).toContainText(/\d+ of \d+ cores measured/);
-  await expect(page.getByTestId("span-card")).toContainText("Worst core");
+  await expect(line).toContainText(/Worst corecore (\d+|not recorded)(, [+-][\d.]+%)?/);
+  await expect(page.getByTestId("span-facts")).toContainText(/Cores measured\d+ of \d+/);
 });
 
 test("a measured core: its loss in the core table, its tests in the row detail", async ({ page }) => {
   await signIn(page);
   await pick(page, SPANS.measured);
-  await page.getByRole("button", { name: "Open span details" }).click();
+  await page.getByRole("button", { name: "Go to cores" }).click();
   const row = page.locator("tr[data-core]:has([data-level])").first();
   const n = await row.getAttribute("data-core");
   const latest = /[\d.]+ dB/.exec(await row.locator("td").last().innerText())![0];
@@ -40,8 +39,8 @@ test("a measured core: its loss in the core table, its tests in the row detail",
 test("no distance span: says so and never shows 0 dB", async ({ page }) => {
   await signIn(page);
   await pick(page, SPANS.noDistance);
-  await expect(page.getByTestId("inspector-loss")).toContainText("No core measured");
-  const span = page.getByTestId("span-card");
+  await expect(page.getByTestId("inspector-loss")).toContainText("Not measured");
+  const span = page.getByTestId("span-facts");
   await expect(span).toContainText("No distance");
   await expect(span).not.toContainText("0.00 dB");
   await page.getByRole("button", { name: "Core 1 details" }).click();

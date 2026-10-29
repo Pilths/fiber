@@ -10,7 +10,7 @@ import { Header, type View } from "@/components/Header";
 import { HeldTable } from "@/components/HeldTable";
 import { Icon } from "@/components/Icon";
 import { Inspector } from "@/components/Inspector";
-import { CoresTable, RouteSearch, SpanCard, SpanDiagram, Unassigned, type Found } from "@/components/NetworkDetail";
+import { CoresTable, RouteSearch, SpanDiagram, Unassigned, type Found } from "@/components/NetworkDetail";
 import { NetworkMap } from "@/components/NetworkMap";
 import { PortGrid } from "@/components/PortGrid";
 import { RouteForm, RouteSection, RouteSummary, useRoutePlanner } from "@/components/RoutePlanner";
@@ -188,15 +188,11 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
     if (location.hash.startsWith("#span=")) history.replaceState(null, "", location.pathname);
   };
   const routeName = rp.option && `${rp.option.spans[0].site_a} to ${rp.option.spans[rp.option.spans.length - 1].site_b}`;
-  const onRoute = found?.ids.map((id) => {
-    const x = spans?.find((y) => y.id === id);
-    return { id, name: x ? spanName(x) : `Span ${id}`, km: x?.distance_km != null ? Number(x.distance_km) : null };
-  }) ?? [];
   const mapIds = found ? [...found.ids, ...(spanId != null && !found.ids.includes(spanId) ? [spanId] : [])]
     : spanId != null ? [spanId] : [];
   const spanLoss = loss?.span_id === spanId ? loss : null;
   const measured = useMemo(() => new Set(spanLoss?.cores.map((c) => c.core_id)), [spanLoss]);
-  const toDetail = () => document.getElementById("detail")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  const toCores = () => document.getElementById("cores")?.scrollIntoView({ behavior: "smooth", block: "start" });
 
   return (
     <div className="min-h-screen">
@@ -226,20 +222,15 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
             <NetworkMap version={version} onSelectSpan={(id) => open(id)} onSite={() => {}} onClear={clearSelection}
               selectedIds={mapIds} routeKey={found ? `found-${found.ids.join(",")}` : null} visible={() => true} />
           </section>
-          <div className="col-span-4 min-w-0">
-            <Inspector detail={detail} loading={spanId != null && !detail} loss={spanLoss} admin={admin} onDetails={toDetail} onRoute={onRoute} onPick={(id) => open(id)} />
+          {/* The Inspector fills the map card's height (absolute), so the map alone sets the row height. */}
+          <div className="relative col-span-4 min-w-0">
+            <Inspector detail={detail} loading={spanId != null && !detail} loss={spanLoss} admin={admin} onCores={toCores} fill />
           </div>
           {detail && (
-            <div id="detail" className="col-span-12 scroll-mt-4 space-y-4">
+            <div className="col-span-12 space-y-4">
               <SpanDiagram spans={spans} found={found} d={detail} loss={lossList} selectedId={detail.id} onPick={(id) => open(id)} />
-              <SpanCard d={detail} loss={spanLoss} />
-              <section className="card" aria-labelledby="cores-h">
-                <div className="card-h items-center">
-                  <div className="flex min-w-0 flex-wrap items-baseline gap-x-5 gap-y-1">
-                    <h2 id="cores-h">Cores</h2>
-                    {detail.survey_cores != null && <span className="text-body text-muted-foreground"><b className="font-semibold text-foreground">{detail.survey_cores}</b> surveyed of {detail.cable_size}</span>}
-                  </div>
-                </div>
+              <section id="cores" className="card scroll-mt-4" aria-labelledby="cores-h">
+                <div className="card-h items-center"><h2 id="cores-h">Cores of {spanName(detail)}</h2></div>
                 {detail.survey_cores == null
                   ? <NotSurveyed d={detail} admin={admin} />
                   : <CoresTable key={`${detail.id}-${focusCoreId}`} d={detail} loss={spanLoss} focusCoreId={focusCoreId} onActions={(c) => setDrawerCore(c.id)} />}
@@ -252,7 +243,7 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
         <main className="grid grid-cols-12 items-start gap-4 px-6 pt-6 pb-10">
           <div className="col-span-4 flex min-w-0 flex-col gap-4">
             <FindCard spans={spans} selectedId={spanId} onSelect={(id) => open(id)} loss={lossList} mode={mode} onMode={setMode} route={<RouteForm rp={rp} />} filter={filter} onFilter={setFilter} />
-            {mode === "route" && <Inspector detail={null} loading={false} loss={null} admin={null} onDetails={() => {}} onRoute={[]} onPick={() => {}}
+            {mode === "route" && <Inspector detail={null} loading={false} loss={null} admin={null} onCores={() => {}}
               route={<RouteSummary key={`${rp.idx}-${routeName}`} rp={rp} onGo={goToRoute} />} />}
           </div>
           <div className="col-span-8 min-w-0 space-y-4">

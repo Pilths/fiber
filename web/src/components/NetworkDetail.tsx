@@ -2,10 +2,10 @@ import { Fragment, useEffect, useState, type FormEvent } from "react";
 import { api } from "@/api/client";
 import type { components } from "@/api/schema";
 import { Icon } from "@/components/Icon";
-import { Blank, LossPill, Metric } from "@/components/LossCard";
+import { Blank, LossPill } from "@/components/LossCard";
 import type { RouteOption } from "@/components/RoutePlanner";
 import { FreeBadge } from "@/components/FindCard";
-import { countBy, db, LEVEL, pct, spanName, STATUS, STATUS_ORDER, statusLabel, type CoreStatus, type LossDetail, type SpanLoss } from "@/lib/status";
+import { countBy, db, LEVEL, pct, perKm, spanName, totalLoss, STATUS, STATUS_ORDER, statusLabel, type CoreStatus, type LossDetail, type SpanLoss } from "@/lib/status";
 
 type Detail = components["schemas"]["SpanDetail"];
 type Core = Detail["cores"][number];
@@ -53,12 +53,6 @@ export function RouteSearch({ onFound }: { onFound: (f: Found | null) => void })
 }
 
 
-// Total loss of a span: its worst measured core (dB); not measured -> the calculated loss (distance x 0.3 dB/km), flagged.
-type Loss = Pick<SpanLoss, "measured_db" | "calculated_db">;
-const totalLoss = (l: Loss | null | undefined) =>
-  l?.measured_db != null ? { db: l.measured_db, calc: false } : l?.calculated_db != null ? { db: l.calculated_db, calc: true } : null;
-const lossText = (t: { db: number; calc: boolean } | null) => (t ? `${db(t.db)}${t.calc ? " calculated" : ""}` : "No distance");
-const perKm = (dB: number, km: number) => `${(dB / km).toFixed(2)} dB/km`;
 const kmOf = (s: { distance_km: string | null }) => (s.distance_km ? Number(s.distance_km) : null);
 
 // Route (or the one selected span) as a horizontal chain: site, span, site ... Each span is a button that selects it.
@@ -71,11 +65,12 @@ export function SpanDiagram({ spans, found, d, loss, selectedId, onPick }: {
     : [{ s: d, a: d.site_a, b: d.site_b, id: d.id }];
   const rows = chain.map((c) => ({ ...c, l: loss.find((x) => x.span_id === c.id) }));
   const km = rows.reduce((n, r) => n + (r.s ? kmOf(r.s) ?? 0 : 0), 0);
-  const allMeasured = rows.every((r) => r.l?.measured_db != null);
-  // A span with no distance has no calculated loss: it adds neither dB nor km, and the line says how many were left out.
-  const vals = rows.map((r) => (allMeasured ? r.l!.measured_db : r.l?.calculated_db) ?? null);
-  const missing = vals.filter((v) => v == null).length;
-  const total = missing === rows.length ? null : vals.reduce<number>((n, v) => n + (v ?? 0), 0);
+  // Spans with a distance count: worst measured core if measured, else calculated. A span with no distance adds neither dB nor km.
+  const used = rows.flatMap((r) => { const k = r.s ? kmOf(r.s) : null, t = k ? totalLoss(r.l) : null; return t ? [{ k: k!, ...t }] : []; });
+  const missing = rows.length - used.length;
+  const total = used.length ? used.reduce((n, u) => n + u.db, 0) : null;
+  const usedKm = used.reduce((n, u) => n + u.k, 0);
+  const anyCalc = used.some((u) => u.calc);
   return (
     <section className="card" aria-labelledby="diagram-h" data-testid="span-diagram">
       <h2 id="diagram-h" className="sr-only">{onRoute ? `Route ${chain[0].a} to ${chain[chain.length - 1].b}` : spanName(d)}</h2>
@@ -104,36 +99,10 @@ export function SpanDiagram({ spans, found, d, loss, selectedId, onPick }: {
         })}
       </ol>
       <p className="mt-4 border-t pt-3 text-body" data-testid="route-totals">
-        {rows.length} {rows.length === 1 ? "span" : "spans"}, {Number(km.toFixed(1))} km, total loss {total == null ? "unknown" : `${db(total)}${allMeasured ? "" : " calculated"}`}
-        {total != null && km > 0 && `, average ${perKm(total, km)}`}
+        {rows.length} {rows.length === 1 ? "span" : "spans"}, {Number(km.toFixed(1))} km, total loss {total == null ? "unknown" : `${db(total)}${anyCalc ? " (calculated where not measured)" : ""}`}
+        {total != null && usedKm > 0 && `, average ${perKm(total, usedKm)}`}
         {total != null && missing > 0 && `, ${missing} ${missing === 1 ? "span" : "spans"} without distance not counted`}
       </p>
-    </section>
-  );
-}
-
-export function SpanCard({ d, loss }: { d: Detail; loss: LossDetail | null }) {
-  const cut = d.fiber_cut;
-  const typeRoute = [d.route_type, d.route].filter(Boolean).join(", ");
-  const t = totalLoss(loss), km = kmOf(d);
-  const worst = !loss || loss.measured_db == null ? "Not measured"
-    : [loss.worst_core_number != null ? `core ${loss.worst_core_number}` : "core not recorded", loss.deviation_pct != null && pct(loss.deviation_pct)].filter(Boolean).join(", ");
-  return (
-    <section className="card" aria-labelledby="span-h" data-testid="span-card">
-      <h2 id="span-h" className="mb-4 text-2xl leading-8 font-bold tracking-tight">{spanName(d)}</h2>
-      <dl className="grid grid-cols-7 gap-4 [&_dd>span]:text-xl [&_dd>span]:leading-7">
-        <Metric label="Type and route" value={typeRoute || "-"} />
-        <Metric label="Distance" value={km ? `${km} km` : "No distance"} />
-        <Metric label="Free cores">
-          <span className={`block font-bold tracking-tight ${cut ? "text-red" : ""}`}>
-            {cut ? "Cut" : d.survey_cores == null ? "Not surveyed" : `${d.free_to_reserve} of ${d.survey_cores}`}
-          </span>
-        </Metric>
-        <Metric label="Total loss" value={loss ? lossText(t) : "-"} />
-        <Metric label="Average loss per km" value={!loss ? "-" : !km ? "No distance" : t ? perKm(t.db, km) : "-"} />
-        <Metric label="Worst core" value={worst} />
-        <Metric label="Cores measured" value={loss ? `${loss.measured_cores} of ${loss.total_cores}` : "-"} />
-      </dl>
     </section>
   );
 }
@@ -142,8 +111,9 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   return <div className="min-w-0"><dt className="lbl">{label}</dt><dd className="mt-0.5 font-semibold break-words">{children}</dd></div>;
 }
 
-const ports = (c: Core) => c.status === "Available" ? <Blank>None</Blank>
-  : c.port_a || c.port_b ? <>{c.port_a ?? <Blank />} to {c.port_b ?? <Blank />}</> : <Blank>No ports yet</Blank>;
+const Dash = () => <Blank>-</Blank>;
+const ports = (c: Core) => c.status === "Available" ? <Dash />
+  : c.port_a || c.port_b ? <>{c.port_a ?? <Dash />} to {c.port_b ?? <Dash />}</> : <Blank>No ports yet</Blank>;
 
 // View-only table of the span's cores; a row opens its detail (circuit, loss tests) right under it.
 export function CoresTable({ d, loss, focusCoreId, onActions }: { d: Detail; loss: LossDetail | null; focusCoreId: number | null; onActions: (c: Core) => void }) {
@@ -176,20 +146,22 @@ export function CoresTable({ d, loss, focusCoreId, onActions }: { d: Detail; los
                 <Fragment key={c.id}>
                   <tr onClick={() => toggle(c.id)} className={`cursor-pointer hover:bg-raised ${open ? "bg-blue-bg" : ""}`} data-core={c.number}>
                     <th scope="row" className="text-left font-semibold">
-                      <button type="button" className="link" aria-expanded={open} aria-label={`Core ${c.number} details`} onClick={(e) => { e.stopPropagation(); toggle(c.id); }}>{c.number}</button>
+                      <button type="button" className="inline-flex cursor-pointer items-center gap-1.5 font-semibold" aria-expanded={open} aria-label={`Core ${c.number} details`} onClick={(e) => { e.stopPropagation(); toggle(c.id); }}>
+                        <span aria-hidden className="w-3 text-muted-foreground">{open ? "\u25BE" : "\u25B8"}</span>{c.number}
+                      </button>
                     </th>
                     <td><span className={`inline-flex items-center gap-1.5 font-semibold whitespace-nowrap ${st.tone}`}><Icon name={st.icon} />{statusLabel(c.status)}</span>
                       {c.stale && <>{" "}<span className="pill h-amber" title={`No keep for over 3 months since ${c.stale_since ?? "-"}`}><Icon name="lo" />Stale<span className="sr-only">: no keep for over 3 months since {c.stale_since ?? "-"}</span></span></>}</td>
-                    <td className="truncate">{free ? <Blank>None</Blank> : c.customer ?? <Blank />}</td>
-                    <td className="whitespace-nowrap">{free ? <Blank>None</Blank> : c.planned_date ?? <Blank />}</td>
+                    <td className="truncate">{(!free && c.customer) || <Dash />}</td>
+                    <td className="whitespace-nowrap">{(!free && c.planned_date) || <Dash />}</td>
                     <td className="truncate">{ports(c)}</td>
-                    <td className="pr-0 whitespace-nowrap">{cl ? <span className="inline-flex items-center gap-2">{db(cl.measured_db)}<LossPill l={cl} compact /></span> : "-"}</td>
+                    <td className="pr-0 whitespace-nowrap">{cl ? <span className="inline-flex items-center gap-2">{db(cl.measured_db)}<LossPill l={cl} compact /></span> : <Dash />}</td>
                   </tr>
                   {open && (
                     <tr data-testid="core-detail">
                       <td colSpan={6} className="h-auto! bg-subtle px-4! py-3!">
                         <div className="flex items-start justify-between gap-4">
-                          <dl className="text-body"><Field label="Circuit ID">{free ? <Blank>None</Blank> : c.circuit_id ? <span className="font-mono">{c.circuit_id}</span> : <Blank />}</Field></dl>
+                          <dl className="text-body"><Field label="Circuit ID">{!free && c.circuit_id ? <span className="font-mono">{c.circuit_id}</span> : <Dash />}</Field></dl>
                           <button type="button" className="btn btn-sm" onClick={() => onActions(c)}>History and actions</button>
                         </div>
                         {!loss ? <p className="mt-2 text-body text-muted-foreground">Loading loss...</p> : !cl ? (

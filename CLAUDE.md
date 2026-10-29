@@ -45,7 +45,7 @@ Read before working: `docs/PRD.md` (requirements), `docs/architecture.md` (desig
 - Core status words are Available, Requested, Reserved, In service (data value `In use`). There is no per-core Faulty: a fiber cut is a state of the span. Route types are Trunk and Metro only (Bespoke was removed). The section is "Allocations", not "Held" or "Taken".
 - Map chips show only the free-core number on the line, no icons. Status is never colour alone: symbol, pattern or word somewhere on the screen.
 - Do not add Collapse map, Site/Services "Later" tabs, a Circuit column in Allocations, or helper lines like "Reserve is off: ...".
-- The Inspector is a fixed 420px card above Find, the same height in every state.
+- Map page (overview, view only): Route A to B search, map with the Inspector (420px wide, as tall as the map card, every span fact lives there), span diagram below the map, then the core table. No Find card, no core picking, no reserve box there. Reserving and Allocations live on the Reserve tab.
 
 ## Delegating to subagents
 

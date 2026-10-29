@@ -70,6 +70,9 @@ export const EVENT_WORD: Record<string, string> = {
   release_requested: "Release requested", released: "Released", release_declined: "Release declined", corrected: "Corrected", assigned: "Cores assigned",
 };
 
-// Worst measured core of a span, e.g. "core 12: 7.40 dB"; old imports have no core recorded.
-export const worstText = (l: { measured_db: number | null; worst_core_number?: number | null }) =>
-  l.measured_db == null ? null : `${l.worst_core_number != null ? `core ${l.worst_core_number}` : "core not recorded"}: ${db(l.measured_db)}`;
+// Total loss of a span: its worst measured core (dB); not measured -> the calculated loss (distance x 0.3 dB/km), flagged.
+type Loss = Pick<SpanLoss, "measured_db" | "calculated_db">;
+export const totalLoss = (l: Loss | null | undefined) =>
+  l?.measured_db != null ? { db: l.measured_db, calc: false } : l?.calculated_db != null ? { db: l.calculated_db, calc: true } : null;
+export const lossText = (t: { db: number; calc: boolean } | null) => (t ? `${db(t.db)}${t.calc ? " calculated" : ""}` : "No distance");
+export const perKm = (dB: number, km: number) => `${(dB / km).toFixed(2)} dB/km`;

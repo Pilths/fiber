@@ -4,7 +4,7 @@ import { signIn } from "./helpers";
 // Dev seed: Cyberjaya DC to Kuantan Hut has several paths; the search shows the best one.
 test.use({ viewport: { width: 1440, height: 900 } });
 
-test("route search, pick a span in the diagram: totals, Span card loss, core table filter and row detail", async ({ page }) => {
+test("route search, pick a span in the diagram: totals, Inspector loss facts, core table filter and row detail", async ({ page }) => {
   await signIn(page);
   await expect(page.getByRole("region", { name: "Find" })).toHaveCount(0); // the Map page is view only
   const search = page.getByRole("region", { name: "Route search" });
@@ -17,25 +17,28 @@ test("route search, pick a span in the diagram: totals, Span card loss, core tab
   const segs = diagram.getByRole("list", { name: "Spans on the route" }).getByRole("button");
   await expect(segs.first()).toHaveAttribute("aria-pressed", "true");
   const n = await segs.count();
-  await expect(diagram.getByTestId("route-totals")).toHaveText(new RegExp(`^${n} spans?, [\\d.]+ km, total loss [\\d.]+ dB( calculated)?, average [\\d.]+ dB/km(, \\d+ spans? without distance not counted)?$`));
+  await expect(diagram.getByTestId("route-totals")).toHaveText(new RegExp(`^${n} spans?, [\\d.]+ km, total loss [\\d.]+ dB( \\(calculated where not measured\\))?, average [\\d.]+ dB/km(, \\d+ spans? without distance not counted)?$`));
 
   const last = segs.filter({ hasText: /\d km/ }).last(); // a span with a distance, so it has a calculated loss
   const name = (await last.locator(".sr-only").first().textContent())!.replace(/,$/, "");
   await last.click();
   await expect(last).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator("#span-h")).toHaveText(name);
-  const card = page.getByTestId("span-card");
+  await expect(page.getByTestId("span-card")).toHaveCount(0); // its facts live in the Inspector
+  const card = page.getByTestId("span-facts");
   await expect(card).toContainText(/Total loss[\d.]+ dB/);
   await expect(card).toContainText(/Average loss per km([\d.]+ dB\/km|No distance)/);
-  await expect(card).toContainText("Cores measured");
+  await expect(card).toContainText(/Cores measured\d+ of \d+/);
+  await expect(page.getByRole("region", { name: "Inspector" }).getByText("Spans on route")).toHaveCount(0);
 
-  await page.getByRole("button", { name: "Open span details" }).click();
-  await expect(page.getByRole("heading", { name: "Cores", exact: true })).toBeInViewport();
+  await page.getByRole("button", { name: "Go to cores" }).click();
+  await expect(page.getByRole("heading", { name: `Cores of ${name}` })).toBeInViewport();
   const table = page.getByRole("table", { name: `Cores of ${name}` });
   const chips = page.getByRole("group", { name: "Filter cores by status" });
   await chips.getByRole("button", { name: /^Available/ }).click();
   const avail = Number((await chips.getByRole("button", { name: /^Available/ }).textContent())!.replace(/\D/g, ""));
   await expect(table.locator("tbody > tr[data-core]")).toHaveCount(avail);
+  await expect(table.locator("tbody")).not.toContainText("None"); // empty cells show "-"
   await chips.getByRole("button", { name: /^All/ }).click();
 
   // a core with a loss test if the span has one, else the first core

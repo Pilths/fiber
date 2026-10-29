@@ -25,10 +25,11 @@ test("no alert for a normal span", async ({ page }) => {
   await signIn(page);
   await pick(page);
   const i = inspector(page);
-  await expect(i.getByTestId("inspector-loss")).toContainText("core 12: 3.50 dB+1.2%, 3 of 24 cores measured");
+  await expect(i.getByTestId("inspector-loss")).toContainText("core 12, +1.2%");
+  await expect(i.getByTestId("span-facts")).toContainText("Cores measured3 of 24");
   await expect(i.getByTestId("fiber-cut")).toHaveCount(0);
   await expect(i.getByTestId("loss-alert")).toHaveCount(0);
-  await expect(i.locator("dl")).not.toContainText("Fiber cut");
+  await expect(i.locator("dl").first()).not.toContainText("Fiber cut");
   await i.screenshot({ path: "e2e/screenshots/inspector-normal.png" });
 });
 
@@ -74,7 +75,7 @@ test("fiber cut: banner, 0 Cut, one red bar, Fiber cut key row; planner has no R
   const bar = i.getByTestId("free-bar").locator("span");
   await expect(bar).toHaveCount(1);
   await expect(bar).toHaveClass(/k-fault/);
-  await expect(i.locator("dl")).toContainText("Fiber cut");
+  await expect(i.locator("dl").first()).toContainText("Fiber cut");
   await i.screenshot({ path: "e2e/screenshots/inspector-cut.png" });
 });
 

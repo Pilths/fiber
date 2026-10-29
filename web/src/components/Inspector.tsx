@@ -3,7 +3,7 @@ import type { components } from "@/api/schema";
 import { Icon } from "@/components/Icon";
 import type { SpanFocus } from "@/components/AdminEdit";
 import { LossPill } from "@/components/LossCard";
-import { countBy, db, health, LEVEL, pct, spanName, worstText, type LossDetail } from "@/lib/status";
+import { countBy, db, health, LEVEL, lossText, pct, perKm, spanName, totalLoss, type LossDetail } from "@/lib/status";
 
 type Detail = components["schemas"]["SpanDetail"];
 
@@ -32,24 +32,25 @@ const focusEl = (id: string) => document.getElementById(id)?.focus();
 
 type Admin = { onEditSpan: (focus?: SpanFocus) => void; onEditSite: (end: "a" | "b") => void } | null; // null for planners
 
-export function Inspector({ detail, loading, loss, admin, route, onDetails, onRoute, onPick }: {
+// fill: take the full height of a relative parent (Map page, beside the map); else the fixed 420px card (Reserve tab).
+export function Inspector({ detail, loading, loss, admin, route, onCores, fill }: {
   detail: Detail | null; loading: boolean; loss: LossDetail | null; admin: Admin;
   route?: ReactNode; // route: the route summary, shown instead of the span in Route mode
-  onDetails: () => void; onRoute: RouteRow[]; onPick: (id: number) => void; // onRoute: spans of the searched route
+  onCores: () => void; fill?: boolean;
 }) {
   return (
-    <section className="card flex h-[420px] flex-none flex-col overflow-hidden p-0" aria-label="Inspector" data-testid="inspector">
+    <section className={`card flex flex-col overflow-hidden p-0 ${fill ? "absolute inset-0" : "h-[420px] flex-none"}`} aria-label="Inspector" data-testid="inspector">
       {route ?? (!detail
         ? <Placeholder title={loading ? "Loading span..." : "No span selected"} text={loading ? undefined : "Select a span on the map, search a route above the map, or search by site or span in the top bar."}
           actions={loading ? undefined : <>
             <button type="button" className="btn btn-sm" onClick={() => focusEl("route-a")}>Search a route</button>
             <button type="button" className="btn btn-sm" onClick={() => focusEl("global-search")}>Search by site or span</button>
           </>} />
-        : <Body key={detail.id} d={detail} loss={loss} admin={admin} onRoute={onRoute} onPick={onPick} />)}
+        : <Body key={detail.id} d={detail} loss={loss} admin={admin} />)}
       {!route && (
         <div className="ins-foot">
-          <button type="button" className="btn btn-p flex-1 justify-between" onClick={onDetails} disabled={!detail} aria-label="Open span details">
-            Details<span aria-hidden>&#9660;</span>
+          <button type="button" className="btn btn-p flex-1 justify-between" onClick={onCores} disabled={!detail} aria-label="Go to cores">
+            Cores<span aria-hidden>&#9660;</span>
           </button>
         </div>
       )}
@@ -58,13 +59,13 @@ export function Inspector({ detail, loading, loss, admin, route, onDetails, onRo
 }
 
 const link = "font-[inherit] underline-offset-4 hover:text-blue hover:underline";
-export type RouteRow = { id: number; name: string; km: number | null };
 
-function Body({ d, loss, admin, onRoute, onPick }: { d: Detail; loss: LossDetail | null; admin: Admin; onRoute: RouteRow[]; onPick: (id: number) => void }) {
+function Body({ d, loss, admin }: { d: Detail; loss: LossDetail | null; admin: Admin }) {
   const h = health(d);
   const n = countBy(d);
   const surveyed = d.survey_cores != null;
   const cut = d.fiber_cut;
+  const t = totalLoss(loss), km = d.distance_km ? Number(d.distance_km) : null;
   const parts = [  // reserved includes cores held by count only
     { k: "k-free", v: d.free_to_reserve, label: "Free to reserve" },
     { k: "k-cores", v: n.Reserved + n.Requested + d.unassigned_reserved, label: "Reserved" },
@@ -82,7 +83,7 @@ function Body({ d, loss, admin, onRoute, onPick }: { d: Detail; loss: LossDetail
     <>
       <div className="ins-head">
         <div className="flex items-start justify-between gap-3">
-          <h3 className={`ins-title ${spanName(d).length > 22 ? "long" : ""}`}>
+          <h3 id="span-h" className={`ins-title ${spanName(d).length > 22 ? "long" : ""}`}>
             {admin ? (
               <>
                 <button type="button" className={link} aria-label={`Edit site ${d.site_a}`} onClick={() => admin.onEditSite("a")}>{d.site_a}</button>
@@ -124,7 +125,7 @@ function Body({ d, loss, admin, onRoute, onPick }: { d: Detail; loss: LossDetail
           <>
             <div className="flex items-baseline gap-2.5">
               <span className={`text-[32px] leading-9 font-bold tracking-tight ${h.cls.replace("h-", "v-")}`}>{cut ? 0 : d.free_to_reserve}</span>
-              <p className="text-body text-muted-foreground">free to reserve</p>
+              <p className="text-body font-semibold text-muted-foreground">free of {d.survey_cores ?? "-"}</p>
             </div>
             <div className="mt-1.5 flex h-2 gap-0.5" aria-hidden data-testid="free-bar">
               {cut ? <span className="k k-fault h-full rounded" style={{ flex: 1 }} />
@@ -152,37 +153,25 @@ function Body({ d, loss, admin, onRoute, onPick }: { d: Detail; loss: LossDetail
           </div>
         ) : <p className="text-body text-muted-foreground">Not surveyed, cannot be booked. Cable size {d.cable_size}.</p>}
 
-        <div className={`mt-1.5 flex items-center gap-2 border-t py-1 text-body ${lv ? `-mx-5 px-5 ${tone.row}` : ""}`} data-testid="inspector-loss" data-level={lv ?? undefined}>
-          <span className="lbl flex-none">Worst core</span>
-          <span className="flex min-w-0 flex-1 items-center justify-end gap-2 text-right">
-            {!loss ? <span className="text-muted-foreground">Loading...</span>
-              : loss.measured_db != null ? (
+        {/* Span facts: total loss is the worst measured core, else the calculated loss (distance x 0.3 dB/km). */}
+        <dl className="mt-4 border-t text-body [&>div]:flex [&>div]:min-h-10 [&>div]:items-center [&>div]:justify-between [&>div]:gap-3 [&>div]:border-b [&>div]:py-1.5 [&_dd]:text-right [&_dd]:font-semibold" data-testid="span-facts">
+          <div><dt>Total loss</dt><dd>{!loss ? "Loading..." : lossText(t)}</dd></div>
+          <div><dt>Average loss per km</dt><dd>{!loss ? "Loading..." : !km ? "No distance" : t ? perKm(t.db, km) : "-"}</dd></div>
+          <div className={lv ? `-mx-5 px-5 ${tone.row}` : ""} data-testid="inspector-loss" data-level={lv ?? undefined}>
+            <dt>Worst core</dt>
+            <dd className="flex min-w-0 items-center justify-end gap-2">
+              {!loss ? "Loading..." : loss.measured_db == null ? "Not measured" : (
                 <>
-                  <span className={lv ? tone.text : undefined}>
-                    <b className="font-semibold">{worstText(loss)}</b>
-                    <span className="block text-xs text-muted-foreground">{loss.deviation_pct != null && `${pct(loss.deviation_pct)}, `}{loss.measured_cores} of {loss.total_cores} cores measured</span>
-                  </span>
+                  <b className={`font-semibold ${lv ? tone.text : ""}`}>
+                    {loss.worst_core_number != null ? `core ${loss.worst_core_number}` : "core not recorded"}{loss.deviation_pct != null && `, ${pct(loss.deviation_pct)}`}
+                  </b>
                   <LossPill l={loss} compact />
                 </>
-              ) : <span className="text-muted-foreground">No core measured</span>}
-          </span>
-        </div>
-
-        {onRoute.length > 0 && (
-          <div className="mt-2 border-t pt-1.5">
-            <h4 className="lbl">Spans on route</h4>
-            <ul aria-label="Spans on route" className="text-body">
-              {onRoute.map((r) => (
-                <li key={r.id}>
-                  <button type="button" aria-pressed={r.id === d.id} onClick={() => onPick(r.id)}
-                    className={`flex w-full items-center justify-between rounded px-2 py-1 text-left hover:bg-raised ${r.id === d.id ? "bg-blue-bg font-semibold" : ""}`}>
-                    <span className="truncate">{r.name}</span>{r.km != null && <span className="text-muted-foreground">{Number(r.km)} km</span>}
-                  </button>
-                </li>
-              ))}
-            </ul>
+              )}
+            </dd>
           </div>
-        )}
+          <div><dt>Cores measured</dt><dd>{loss ? `${loss.measured_cores} of ${loss.total_cores}` : "Loading..."}</dd></div>
+        </dl>
       </div>
     </>
   );

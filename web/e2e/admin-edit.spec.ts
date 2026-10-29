@@ -115,7 +115,7 @@ test("lowering the survey count below taken cores is refused in plain words", as
   await dlg.getByRole("button", { name: "Save" }).click();
   await expect(dlg.getByRole("alert")).toContainText(/^Cores 2, .* are allocated or have history and cannot be removed/);
   await dlg.getByRole("button", { name: "Cancel" }).click();
-  await expect(page.getByRole("region", { name: "Cores", exact: true })).toContainText("24 surveyed of 144");
+  await expect(page.getByRole("region", { name: "Inspector" })).toContainText("free of 24");
 });
 
 test("admin opens a site from the Inspector: fields, reason required, history", async ({ page }) => {

@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { pickSpan, signIn, tab } from "./helpers";
 
-// The Inspector is a fixed 420px card on the right of the map (Find lives on the Reserve tab).
+// On the Map page the Inspector fills the height of the map card beside it (Find lives on the Reserve tab).
 test.use({ viewport: { width: 1440, height: 900 } });
 test.afterEach(({ page }) => page.unrouteAll({ behavior: "ignoreErrors" }));
 
@@ -15,24 +15,26 @@ async function footerInCard(page: Page, name: string) {
   expect(b!.y + b!.height).toBeLessThanOrEqual(c!.y + c!.height);
 }
 
-test("Inspector is 420px: nothing, span, route searched and fiber cut", async ({ page }) => {
+test("Inspector is as tall as the map card: nothing, span, route searched and fiber cut", async ({ page }) => {
   await signIn(page, "admin1");
-  const seen: { state: string; height: number }[] = [];
-  const note = async (state: string) => seen.push({ state, height: (await inspector(page).boundingBox())!.height });
+  const map = page.getByRole("region", { name: "Network map" }).first();
+  // Polled: the map card can grow a line (spans without coordinates) a frame after the selection.
+  const note = (state: string) => expect.poll(async () => Math.abs((await inspector(page).boundingBox())!.height - (await map.boundingBox())!.height), { message: `${state}: Inspector height minus map height` }).toBeLessThanOrEqual(1);
 
   await expect(inspector(page)).toContainText("No span selected");
   await note("nothing");
 
   await pickSpan(page, KLBJ);
-  await footerInCard(page, "Open span details");
+  await footerInCard(page, "Go to cores");
   await note("span");
 
   const search = page.getByRole("region", { name: "Route search" });
   await search.getByLabel("Route A").fill("DEV Cyberjaya DC");
   await search.getByLabel("Route B").fill("DEV Kuantan Hut");
   await search.getByRole("button", { name: "Search" }).click();
-  await expect(inspector(page).getByText("Spans on route")).toBeVisible();
-  await footerInCard(page, "Open span details");
+  await expect(page.getByTestId("span-diagram").getByRole("list", { name: "Spans on the route" })).toBeVisible();
+  await expect(inspector(page).getByText("Spans on route")).toHaveCount(0);
+  await footerInCard(page, "Go to cores");
   await note("route");
 
   // Fiber cut and red loss, mocked so dev data never changes.
@@ -41,13 +43,12 @@ test("Inspector is 420px: nothing, span, route searched and fiber cut", async ({
     r.fulfill({ json: { ...(await (await r.fetch()).json()), status: "measured", level: "red", measured_db: 7.4, deviation_pct: 29.5 } }));
   await pickSpan(page, KLBJ);
   await expect(inspector(page).getByTestId("fiber-cut")).toBeVisible();
-  await footerInCard(page, "Open span details");
+  await footerInCard(page, "Go to cores");
   // The worst-core row stays in view above the pinned footer.
-  const [loss, foot] = await Promise.all([inspector(page).getByTestId("inspector-loss").boundingBox(), inspector(page).getByRole("button", { name: "Open span details" }).boundingBox()]);
+  const [loss, foot] = await Promise.all([inspector(page).getByTestId("inspector-loss").boundingBox(), inspector(page).getByRole("button", { name: "Go to cores" }).boundingBox()]);
   expect(loss!.y + loss!.height).toBeLessThanOrEqual(foot!.y);
   await note("cut");
 
-  for (const s of seen) expect(Math.abs(s.height - 420), `${s.state} height ${s.height}`).toBeLessThanOrEqual(1);
 });
 
 // The Inspector title's first line shares one band with the map toolbar: cap-height centre within 4px of the button centre.
