@@ -25,6 +25,9 @@ class SpanLoss(BaseModel):
     last_test_date: date | None
     test_method: str | None
     field_team: str | None
+    worst_core_number: int | None = None
+    measured_cores: int = 0
+    total_cores: int = 0
     status: Literal["measured", "calculated_only", "no_distance"]
 
 
@@ -34,10 +37,26 @@ class MeasurementOut(BaseModel):
     created_at: datetime
     test_method: str | None
     field_team: str | None
+    core_number: int | None = None
+
+
+class CoreLoss(BaseModel):
+    core_id: int
+    core_number: int
+    calculated_db: Db | None
+    measured_db: Db
+    difference_db: Db | None
+    deviation_pct: Pct | None
+    level: Level | None
+    tested_on: date | None
+    test_method: str | None
+    field_team: str | None
+    history: list[MeasurementOut]
 
 
 class SpanLossDetail(SpanLoss):
     history: list[MeasurementOut]
+    cores: list[CoreLoss]
 
 
 class Count(BaseModel):

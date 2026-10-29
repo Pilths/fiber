@@ -23,7 +23,8 @@ def span(db: DB, span_id: int) -> SpanLossDetail:
     rows = service.span_rows(db, span_id)
     if not rows:
         raise HTTPException(404, "Span not found")
-    return SpanLossDetail(**rows[0], history=service.history(db, span_id))
+    return SpanLossDetail(**rows[0], history=service.history(db, span_id),
+                          cores=service.core_losses(db, span_id, rows[0]["calculated_db"]))
 
 
 @router.get("/coverage")

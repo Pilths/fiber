@@ -110,3 +110,51 @@ def test_route_totals_and_worst_level(client, db, spans):
     r = client.get(f"/api/loss/route?span_ids={a},{c}", headers=H()).json()
     assert r["total_calculated_db"] is None  # a span with no distance never counts as 0
     assert client.get("/api/loss/route?span_ids=999999", headers=H()).status_code == 404
+
+
+# ---- loss per core ----
+def mk_cores(db, span, n=2):
+    return [one(db, "INSERT INTO cores (span_id, number) VALUES (:s,:n) RETURNING id", s=span, n=i + 1) for i in range(n)]
+
+
+def measure_core(db, span, core, loss, at="now()"):
+    from sqlalchemy import text
+    db.execute(text(f"INSERT INTO measurements (span_id, core_id, loss_db, created_at, test_method, field_team) "
+                    f"VALUES (:s,:c,:l,{at},'OTDR','T1')"), {"s": span, "c": core, "l": loss})
+
+
+def test_worst_core_wins_and_detail_cores(client, db, spans):
+    from sqlalchemy import text
+    a = spans[0]  # 10 km -> calculated 3.0
+    db.execute(text("UPDATE spans SET survey_cores = 4 WHERE id = :s"), {"s": a})
+    c1, c2 = mk_cores(db, a)
+    measure_core(db, a, c1, 3.6, "now() - interval '3 days'")  # old, superseded
+    measure_core(db, a, c1, 3.0, "now() - interval '1 day'")
+    measure_core(db, a, c2, 3.2)  # +6.7% amber, the worst latest
+    row = {r["span_id"]: r for r in client.get("/api/loss/spans", headers=H()).json()}[a]
+    assert row["measured_db"] == 3.2 and row["level"] == "amber" and row["worst_core_number"] == 2
+    assert row["measured_cores"] == 2 and row["total_cores"] == 4
+    d = client.get(f"/api/loss/spans/{a}", headers=H()).json()
+    assert [c["core_number"] for c in d["cores"]] == [1, 2]
+    assert d["cores"][0]["measured_db"] == 3.0 and [h["loss_db"] for h in d["cores"][0]["history"]] == [3.0, 3.6]
+    assert d["cores"][1]["level"] == "amber" and d["cores"][1]["calculated_db"] == 3.0
+    assert len(d["history"]) == 3 and d["history"][0]["core_number"] == 2
+
+
+def test_null_core_measurement_still_works(client, db, spans):
+    a = spans[0]
+    (c1,) = mk_cores(db, a, 1)
+    measure(db, a, 3.0)  # no core
+    row = client.get(f"/api/loss/spans/{a}", headers=H()).json()
+    assert row["measured_db"] == 3.0 and row["worst_core_number"] is None
+    assert row["measured_cores"] == 0 and row["total_cores"] == 0 and row["cores"] == []
+    assert row["history"][0]["core_number"] is None
+    measure_core(db, a, c1, 3.9)  # worse than the anonymous one
+    row = client.get(f"/api/loss/spans/{a}", headers=H()).json()
+    assert row["measured_db"] == 3.9 and row["worst_core_number"] == 1 and row["measured_cores"] == 1
+    assert client.get(f"/api/loss/route?span_ids={a}", headers=H()).json()["total_measured_db"] == 3.9
+
+
+def test_measurement_core_column_and_index(db):
+    assert one(db, "SELECT count(*) FROM information_schema.columns WHERE table_name='measurements' AND column_name='core_id'") == 1
+    assert one(db, "SELECT count(*) FROM pg_indexes WHERE tablename='measurements' AND indexname='measurements_core_ix'") == 1

@@ -272,7 +272,7 @@ class UploadRow(Base):
 
 class Measurement(Base):
     __tablename__ = "measurements"
-    __table_args__ = (Index("measurements_span_created_ix", "span_id", "created_at"),)
+    __table_args__ = (Index("measurements_span_created_ix", "span_id", "created_at"), Index("measurements_core_ix", "core_id"))
     id: Mapped[int] = _id()
     span_id: Mapped[int] = _fk("spans")
     loss_db: Mapped[Decimal] = mapped_column(Numeric(8, 3))
@@ -281,6 +281,7 @@ class Measurement(Base):
     created_at: Mapped[datetime] = _created()
     test_method: Mapped[str | None] = mapped_column(Text)
     field_team: Mapped[str | None] = mapped_column(Text)
+    core_id: Mapped[int | None] = _fk("cores", True)
 
 
 class DataEdit(Base):
