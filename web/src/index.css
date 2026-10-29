@@ -177,10 +177,7 @@
 .core-inuse { background: var(--use); border-color: var(--use); color: #fff; }
 .core-reserved .w, .core-inuse .w { color: #fff; }
 .core-requested { background: var(--amber-bg) repeating-linear-gradient(135deg, var(--amber-bg) 0 5px, #f3d9b8 5px 6.5px); border: 1px dashed var(--amber); color: var(--amber); }
-.core-faulty { background: repeating-linear-gradient(135deg, transparent 0 5px, var(--red-bd) 5px 6.5px), repeating-linear-gradient(45deg, transparent 0 5px, var(--red-bd) 5px 6.5px) var(--red-bg);
-  border: 2px solid var(--red); padding: 6px 7px 5px; color: var(--red); }
 .core-requested .n, .core-requested .w { background: var(--amber-bg); color: var(--amber); justify-self: start; border-radius: 2px; }
-.core-faulty .n, .core-faulty .w { background: var(--red-bg); color: var(--red); justify-self: start; border-radius: 2px; }
 .core:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; z-index: 1; }
 /* legend swatches reuse the cell classes */
 .sw { width: 22px; height: 20px; display: inline-flex; align-items: center; justify-content: center; border-radius: 4px; padding: 0; }
@@ -241,6 +238,6 @@
 .mleg .lc { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 16px; border-radius: 999px; border: 1px solid; font-weight: 700; font-size: 11px; line-height: 1; }
 .mleg .lc.h-green { border-color: var(--green); } .mleg .lc.h-amber { border-color: var(--amber); } .mleg .lc.h-red { border-color: var(--red); }
 .ll { width: 26px; height: 0; border-top: 6px solid var(--ink); flex: none; }
-.ll.m { border-top-width: 3px; } .ll.b { border-top: 3px dashed var(--ink); } .ll.s { border-top: 4px solid var(--blue); }
+.ll.m { border-top-width: 3px; } .ll.s { border-top: 4px solid var(--blue); }
 /* MapLibre's attribution sits bottom right, clear of the key. */
 .maplibregl-ctrl-attrib { font-size: 11px; }

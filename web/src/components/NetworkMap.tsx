@@ -215,8 +215,8 @@ export function NetworkMap({ selectedIds, routeKey, visible, onSelectSpan, onSit
                   <g key={p.span_id} data-testid="map-line" data-span-id={p.span_id} data-selected={on} data-state={!show ? "hidden" : dim ? "dim" : ""} opacity={!show ? 0.12 : dim ? 0.35 : 1}>
                     {on && <path d={d} fill="none" stroke="#fff" strokeWidth={w + 4} strokeLinecap="round" strokeLinejoin="round" />}
                     <path d={d} fill="none" stroke={on ? "var(--blue)" : COLOR[p.chip]} strokeWidth={p.chip === "not_surveyed" && !on ? 4 : w}
-                      strokeLinecap={t === "bespoke" ? "butt" : "round"} strokeLinejoin="round"
-                      strokeDasharray={p.chip === "not_surveyed" && !on ? "1 7" : t === "bespoke" ? "10 6" : undefined} />
+                      strokeLinecap="round" strokeLinejoin="round"
+                      strokeDasharray={p.chip === "not_surveyed" && !on ? "1 7" : undefined} />
                     {show && <path d={d} data-hit fill="none" stroke="transparent" strokeWidth={18} className="cursor-pointer" style={{ pointerEvents: "stroke" }} onClick={() => onSelectSpan(p.span_id)} />}
                   </g>
                 );
@@ -286,7 +286,6 @@ export function NetworkMap({ selectedIds, routeKey, visible, onSelectSpan, onSit
           <p className="mleg-h col-span-2">Route type</p>
           <span><i className="slot" aria-hidden="true"><i className="ll" /></i>Trunk</span>
           <span><i className="slot" aria-hidden="true"><i className="ll m" /></i>Metro</span>
-          <span><i className="slot" aria-hidden="true"><i className="ll b" /></i>Bespoke</span>
           <span><i className="slot" aria-hidden="true"><i className="ll s" /></i>Selected</span>
           <p className="mleg-h col-span-2">Sites</p>
           <span><i className="slot" aria-hidden="true"><i className="rb-sh dc size-3!" /></i>Data centre</span>

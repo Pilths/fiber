@@ -17,7 +17,7 @@ export function HeldTable({ d, admin, onOpen, onChanged }: { d: Detail; admin: b
   const [assign, setAssign] = useState<Hold | null>(null);
   const held = d.cores.filter((c) => c.status !== "Available");
   const count = (f: Filter) => (f === "All" ? held.length + d.unassigned.length : f === "Unassigned" ? d.unassigned.length : held.filter((c) => c.status === f).length);
-  const filters = (["All", "Reserved", "Requested", "In use", "Faulty", "Unassigned"] as Filter[]).filter((f) => f === "All" || count(f) > 0);
+  const filters = (["All", "Reserved", "Requested", "In use", "Unassigned"] as Filter[]).filter((f) => f === "All" || count(f) > 0);
   const rows = held.filter((c) => filter === "All" || c.status === filter);
   const holds = filter === "All" || filter === "Unassigned" ? d.unassigned : [];
 
@@ -42,15 +42,15 @@ export function HeldTable({ d, admin, onOpen, onChanged }: { d: Detail; admin: b
               <th scope="col">Ports or detail</th><th scope="col" className="w-[18%] pr-0!">Planned date</th>
             </tr></thead>
             <tbody>
-              {rows.map((c) => { const na = c.status === "Faulty" ? <Blank>Not applicable</Blank> : <Blank />; return (
-                <tr key={c.id} onClick={() => onOpen(c)} className={`cursor-pointer hover:bg-raised ${c.status === "Faulty" ? "bg-red-bg" : c.status === "Requested" ? "bg-amber-bg" : ""}`}>
-                  <th scope="row" className={`text-left font-semibold text-foreground ${c.status === "Faulty" ? "pl-3 shadow-[inset_3px_0_0_var(--red)]" : ""}`}>
+              {rows.map((c) => { const na = <Blank />; return (
+                <tr key={c.id} onClick={() => onOpen(c)} className={`cursor-pointer hover:bg-raised ${c.status === "Requested" ? "bg-amber-bg" : ""}`}>
+                  <th scope="row" className="text-left font-semibold text-foreground">
                     <button type="button" className="link" aria-label={`Core ${c.number} details`} onClick={(e) => { e.stopPropagation(); onOpen(c); }}>{c.number}</button>
                   </th>
                   <td><span className={`inline-flex items-center gap-2 font-semibold whitespace-nowrap ${STATUS[c.status].tone}`}><Icon name={STATUS[c.status].icon} />{statusLabel(c.status)}</span>
                     {c.stale && <>{" "}<span className="pill h-amber mt-1" title={`No keep for over 3 months since ${c.stale_since ?? "-"}`}><Icon name="lo" />Stale<span className="sr-only">: no keep for over 3 months since {c.stale_since ?? "-"}</span></span></>}</td>
                   <td className="truncate">{c.customer ?? na}</td>
-                  <td className="py-2 leading-snug">{c.status === "Faulty" ? "Not bookable" : c.port_a || c.port_b ? <>{c.port_a ?? <Blank />} to {c.port_b ?? <Blank />}</> : <Blank>No ports yet</Blank>}</td>
+                  <td className="py-2 leading-snug">{c.port_a || c.port_b ? <>{c.port_a ?? <Blank />} to {c.port_b ?? <Blank />}</> : <Blank>No ports yet</Blank>}</td>
                   <td className="pr-0 whitespace-nowrap">{c.planned_date ?? na}</td>
                 </tr>
               ); })}

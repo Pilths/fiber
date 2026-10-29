@@ -79,7 +79,7 @@ function Body({ d, onGoToCores, loss, onSeeLoss, onSeeHeld, admin, onPlanRoute }
   const n = countBy(d);
   const surveyed = d.survey_cores != null;
   const cut = d.fiber_cut;
-  const parts = [  // reserved includes cores held by count only; faulty cores are in the core grid, not here
+  const parts = [  // reserved includes cores held by count only
     { k: "k-free", v: d.free_to_reserve, label: "Free to reserve" },
     { k: "k-cores", v: n.Reserved + n.Requested + d.unassigned_reserved, label: "Reserved" },
     { k: "k-use", v: n["In use"], label: "In service" },

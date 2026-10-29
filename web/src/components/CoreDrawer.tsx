@@ -25,9 +25,6 @@ export function CoreDrawer({ core, span, ends, me, onClose, onChanged }: {
   const [res, setRes] = useState<Holder | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [mode, setMode] = useState<"status" | null>(null);
-  const [reason, setReason] = useState("");
-  const [tried, setTried] = useState(false);
   const [ports, setPorts] = useState(false);
   const admin = me.role === "admin";
 
@@ -42,9 +39,6 @@ export function CoreDrawer({ core, span, ends, me, onClose, onChanged }: {
     setError(null);
     try {
       await fn();
-      setMode(null);
-      setReason("");
-      setTried(false);
       onChanged();
       load();
     } catch (e) {
@@ -52,13 +46,6 @@ export function CoreDrawer({ core, span, ends, me, onClose, onChanged }: {
     } finally {
       setBusy(false);
     }
-  };
-  const target = core.status === "Faulty" ? "Available" : "Faulty";
-  const setStatus = (e: React.FormEvent) => {
-    e.preventDefault();
-    setTried(true);
-    if (!reason.trim()) return;
-    act(() => api.post("/api/admin/cores/{cid}/status", { path: { cid: core.id }, body: { status: target, reason: reason.trim() } }));
   };
 
   const st = STATUS[core.status];
@@ -69,7 +56,7 @@ export function CoreDrawer({ core, span, ends, me, onClose, onChanged }: {
     const r = (await api.get("/api/reservations")).find((x) => x.id === rid);
     return resAction(rid, "release", { cores: r?.release_requested_cores ?? [] });
   };
-  const na = core.status === "Available" || core.status === "Faulty" ? <Blank>Not applicable</Blank> : <Blank />;
+  const na = core.status === "Available" ? <Blank>Not applicable</Blank> : <Blank />;
   const facts: [string, React.ReactNode][] = [
     ["Customer", core.customer ?? na],
     ["Reserved by", res ? `${res.owner.display_name}, reservation #${res.reservation_id}` : <Blank key="r">Not applicable</Blank>],
@@ -100,27 +87,6 @@ export function CoreDrawer({ core, span, ends, me, onClose, onChanged }: {
           {canKeep && <button type="button" className="btn" disabled={busy} onClick={() => act(() => resAction(res.reservation_id, "keep"))}>Keep</button>}
           {canKeep && <button type="button" className="btn" disabled={busy} onClick={() => act(() => resAction(res.reservation_id, "request-release", { cores: [core.id] }))}>Request release of core {core.number}</button>}
           {canRelease && <button type="button" className="btn btn-p" disabled={busy} onClick={() => act(() => release(res.reservation_id))}>Release requested cores</button>}
-        </div>
-      )}
-
-      {admin && (
-        <div className="mt-4 border-t pt-4">
-          {mode !== "status" ? (
-            <>
-              <button type="button" className="btn" onClick={() => setMode("status")}>Mark {target}</button>
-            </>
-          ) : (
-            <form onSubmit={setStatus} noValidate aria-label={`Mark core ${core.number} ${target}`}>
-              <label className="block"><span className="lbl mb-1 block text-body! text-foreground!">Reason (required)</span>
-                <input className="field" value={reason} onChange={(e) => setReason(e.target.value)} autoFocus aria-invalid={tried && !reason.trim()} />
-              </label>
-              {tried && !reason.trim() && <p role="alert" className="mt-1.5 text-body font-semibold text-red">Enter a reason: every edit is kept as history.</p>}
-              <div className="mt-3 flex gap-2">
-                <button type="submit" className="btn btn-p" disabled={busy}>Mark {target}</button>
-                <button type="button" className="btn" onClick={() => { setMode(null); setTried(false); }}>Cancel</button>
-              </div>
-            </form>
-          )}
         </div>
       )}
 

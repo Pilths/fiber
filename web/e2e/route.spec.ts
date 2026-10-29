@@ -57,7 +57,7 @@ test("route options: up to 3, a Best match, every field shown", async ({ page })
   await expect(groups(page)).toHaveCount(rows);
   await expect(diagram(page).locator("g[aria-hidden=true]")).toHaveCount(rows + 1);
   await expect(diagram(page)).toContainText(/End · [\d.]+\+? km · ([\d.]+ dB total|No dB estimate)/);
-  await expect(groups(page).first()).toHaveAttribute("aria-label", /^Span DEV .+ - DEV .+, (Trunk|Metro|Bespoke|–), ([\d.]+ km|no distance), ([\d.]+ dB|no dB estimate), (\d+ free cores|not surveyed)$/);
+  await expect(groups(page).first()).toHaveAttribute("aria-label", /^Span DEV .+ - DEV .+, (Trunk|Metro|–), ([\d.]+ km|no distance), ([\d.]+ dB|no dB estimate), (\d+ free cores|not surveyed)$/);
   await expect(page.getByRole("list", { name: "Route as text" })).toContainText(`Site ${FROM}`);
   await noOldWords(page);
   // screenshot a 3-span option when the dev data has one

@@ -77,8 +77,8 @@ test("each status has a distinct symbol and text, not colour alone", async ({ pa
   const key = page.getByRole("list", { name: "Status key" });
   const items = await key.getByRole("listitem").allInnerTexts();
   const icons = await key.locator("svg[data-icon]").evaluateAll((els) => els.map((e) => e.getAttribute("data-icon")));
-  expect(new Set(icons).size).toBe(6); // 5 statuses + Chosen, each its own symbol
-  for (const s of ["Available", "Chosen", "Requested", "Reserved", "In service", "Faulty"]) expect(items.join("|")).toContain(s);
+  expect(new Set(icons).size).toBe(5); // 4 statuses + Chosen, each its own symbol
+  for (const s of ["Available", "Chosen", "Requested", "Reserved", "In service"]) expect(items.join("|")).toContain(s);
 
   // Cell patterns differ without any colour: compare border style/width and background-image.
   const looks = await page.evaluate(() => {
@@ -92,7 +92,7 @@ test("each status has a distinct symbol and text, not colour alone", async ({ pa
     return seen;
   });
   // In use / Available differ by fill (checked via contrast pairs below); the pattern-based ones must all differ.
-  const sig = ["Available", "Requested", "Reserved", "Faulty"].map((s) => looks[s]).filter(Boolean);
+  const sig = ["Available", "Requested", "Reserved"].map((s) => looks[s]).filter(Boolean);
   expect(new Set(sig).size).toBe(sig.length);
   expect(Object.keys(looks).length).toBeGreaterThanOrEqual(3);
 });
@@ -112,7 +112,7 @@ test("each status has a distinct symbol and text, not colour alone", async ({ pa
       navCurrent: "nav button[aria-current]",
       later: ".later",
       badge: "[aria-label=Spans] .pill",
-      ...Object.fromEntries(["Available", "Requested", "Reserved", "In use", "Faulty"].map((st) => [`cell ${st}`, `[role=gridcell][data-status="${st}"]`])),
+      ...Object.fromEntries(["Available", "Requested", "Reserved", "In use"].map((st) => [`cell ${st}`, `[role=gridcell][data-status="${st}"]`])),
     });
     expect(Object.keys(ratios).length).toBeGreaterThan(8);
     for (const [k, v] of Object.entries(ratios)) expect(v, `${k} ${v.toFixed(2)}`).toBeGreaterThanOrEqual(4.5);

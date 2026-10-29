@@ -42,7 +42,7 @@ Read before working: `docs/PRD.md` (requirements), `docs/architecture.md` (desig
 - No eyebrow labels: no small label above a title or a number ("Selected span", "Free to reserve" as a tiny line).
 - No subtext: no muted explanation or restating line under or beside a title, number or control. Keep only labels, table headers, empty states, validation and error messages, confirmation counts, and a fact that appears nowhere else. Screen-reader text may stay as sr-only.
 - No check-mark or "healthy" chip beside a title. Status shows in the number's colour; a state such as Cut keeps its chip.
-- Core status words are Available, Reserved, In service (data value `In use`), Faulty. Spans have a fiber cut (not Faulty). The section is "Allocations", not "Held" or "Taken".
+- Core status words are Available, Requested, Reserved, In service (data value `In use`). There is no per-core Faulty: a fiber cut is a state of the span. Route types are Trunk and Metro only (Bespoke was removed). The section is "Allocations", not "Held" or "Taken".
 - Map chips show only the free-core number on the line, no icons. Status is never colour alone: symbol, pattern or word somewhere on the screen.
 - Do not add Collapse map, Site/Services "Later" tabs, a Circuit column in Allocations, or helper lines like "Reserve is off: ...".
 - The Inspector is a fixed 420px card above Find, the same height in every state.

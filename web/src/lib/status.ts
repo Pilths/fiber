@@ -9,7 +9,6 @@ export const STATUS: Record<CoreStatus, { icon: IconName; cls: string; tone: str
   Requested: { icon: "rq", cls: "core-requested", tone: "text-amber" },
   Reserved: { icon: "rs", cls: "core-reserved", tone: "text-foreground" },
   "In use": { icon: "iu", cls: "core-inuse", tone: "text-use" },
-  Faulty: { icon: "fl", cls: "core-faulty", tone: "text-red" },
 };
 export const STATUS_ORDER = Object.keys(STATUS) as CoreStatus[];
 // The API and the data keep "In use"; the screens say "In service".
@@ -27,7 +26,7 @@ export function health(s: { survey_cores: number | null; free_to_reserve: number
 }
 
 export const countBy = (d: { cores: { status: CoreStatus }[] }) => {
-  const n: Record<CoreStatus, number> = { Available: 0, Requested: 0, Reserved: 0, "In use": 0, Faulty: 0 };
+  const n: Record<CoreStatus, number> = { Available: 0, Requested: 0, Reserved: 0, "In use": 0 };
   for (const c of d.cores) n[c.status]++;
   return n;
 };

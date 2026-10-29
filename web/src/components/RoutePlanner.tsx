@@ -408,7 +408,7 @@ function Diagram({ rp, op, need, type, loss }: { rp: RoutePlanner; op: RouteOpti
                 className="rd-g cursor-pointer" onClick={() => { setCur(i); rp.setSpanIdx(i); }} onFocus={() => setCur(i)}>
                 <title>{s.name}</title>
                 <rect className="hit" x={a + 4} y={y - 46} width={b - a - 8} height={92} rx={4} fill={sel ? "var(--blue-bg)" : "transparent"} />
-                <line x1={a} y1={y} x2={b} y2={y} stroke="var(--blue)" strokeWidth={tt === "trunk" ? 5 : 3} strokeDasharray={tt === "bespoke" ? "7 5" : undefined} />
+                <line x1={a} y1={y} x2={b} y2={y} stroke="var(--blue)" strokeWidth={tt === "trunk" ? 5 : 3} />
                 <text x={m} y={y - 30} textAnchor="middle" className="fill-current text-[11px] text-muted-foreground">{t}</text>
                 <text x={m} y={y - 13} textAnchor="middle" className="fill-current text-xs font-semibold text-foreground">{fit(s.name, step - 24, 6.6)}</text>
                 <text x={m} y={y + 23} textAnchor="middle" className="fill-current text-xs text-foreground">{dist(s, d)}</text>

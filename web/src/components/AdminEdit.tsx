@@ -122,7 +122,7 @@ export function EditSpanDialog({ spanId, focus, onClose, onSaved }: { spanId: nu
     // Only changed fields are sent.
     const body: components["schemas"]["SpanBody"] = { reason: f.reason.trim() };
     if (f.distance !== "" && (s.distance_km == null || Number(f.distance) !== Number(s.distance_km))) body.distance_km = f.distance;
-    if (f.route && f.route !== s.route_type) body.route_type = f.route as "Bespoke" | "Trunk" | "Metro";
+    if (f.route && f.route !== s.route_type) body.route_type = f.route as "Trunk" | "Metro";
     if (f.region && f.region !== s.region) body.region = f.region;
     if (a.id !== s.site_a_id) body.site_a_id = a.id;
     if (b.id !== s.site_b_id) body.site_b_id = b.id;
@@ -152,7 +152,7 @@ export function EditSpanDialog({ spanId, focus, onClose, onSaved }: { spanId: nu
             <label><span className={lbl}>Route type</span>
               <select className="field" value={f.route} onChange={set("route")}>
                 {!s.route_type && <option value="">Not set</option>}
-                {["Bespoke", "Trunk", "Metro"].map((r) => <option key={r}>{r}</option>)}
+                {["Trunk", "Metro"].map((r) => <option key={r}>{r}</option>)}
               </select>
             </label>
             <label><span className={lbl}>Region</span>

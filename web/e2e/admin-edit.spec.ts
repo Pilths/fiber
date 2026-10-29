@@ -4,7 +4,7 @@ import { signIn } from "./helpers";
 // Session 8: core detail drawer, admin edits (TEST-011) and reservation history (TEST-021).
 // Every edit here is reversed in the same test; nothing is deleted, so the history rows stay.
 const KLCJ = /^DEV Kuala Lumpur DC - DEV Cyberjaya DC/; // core 1 Reserved by planner1 (approved)
-const KLBJ = /^DEV Kuala Lumpur DC - DEV Bukit Jalil TOC/; // core 20 is free: marked Faulty and back
+const KLBJ = /^DEV Kuala Lumpur DC - DEV Bukit Jalil TOC/; // cores 20 and 21 are free
 const CJBJ = /^DEV Cyberjaya DC - DEV Bukit Jalil TOC/; // distance 18.2 km, changed and reverted
 
 test.use({ viewport: { width: 1440, height: 900 } });
@@ -69,33 +69,6 @@ test("taken-cores table tags stale cores", async ({ page }) => {
   await pick(page, new RegExp(`^${c.span_name}`));
   const row = page.getByRole("table", { name: "Allocations on this span" }).getByRole("row").filter({ has: page.getByRole("button", { name: `Core ${c.number} details` }) });
   await expect(row).toContainText(/Stale: no keep for over 3 months since /);
-});
-
-test("admin marks a free core Faulty with a reason, then Available again", async ({ page }) => {
-  await signIn(page, "admin1");
-  await pick(page, KLBJ);
-  await cell(page, 20).focus();
-  await page.getByRole("button", { name: "Core 20 details" }).click();
-  const d = drawer(page);
-  await expect(d.getByTestId("core-status")).toContainText("Available");
-  await d.getByRole("button", { name: "Mark Faulty" }).click();
-  const form = d.getByRole("form", { name: "Mark core 20 Faulty" });
-  await form.getByRole("button", { name: "Mark Faulty" }).click();
-  await expect(form.getByRole("alert")).toContainText("Enter a reason");
-  await expect(cell(page, 20)).toHaveAttribute("data-status", "Available");
-  await form.getByLabel("Reason (required)").fill("E2E: OTDR test failed");
-  await form.getByRole("button", { name: "Mark Faulty" }).click();
-  await expect(d.getByTestId("core-status")).toContainText("Faulty");
-  await expect(cell(page, 20)).toHaveAttribute("data-status", "Faulty");
-  const first = d.getByRole("list", { name: "Core history, newest first" }).getByRole("listitem").first();
-  await expect(first).toContainText("Marked Faulty by DEV admin1");
-  await expect(first).toContainText("Reason: E2E: OTDR test failed");
-
-  await d.getByRole("button", { name: "Mark Available" }).click();
-  await d.getByLabel("Reason (required)").fill("E2E: repaired");
-  await d.getByRole("form", { name: "Mark core 20 Available" }).getByRole("button", { name: "Mark Available" }).click();
-  await expect(cell(page, 20)).toHaveAttribute("data-status", "Available");
-  await expect(first).toContainText("Marked Available by DEV admin1");
 });
 
 test("admin edits span distance with a reason; calculated loss follows; then reverts", async ({ page }) => {
