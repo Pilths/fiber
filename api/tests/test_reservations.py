@@ -257,13 +257,13 @@ def test_005_stale_keep_and_undated_import(client, w, db):
     assert ("stale", dated) in review(client)
 
 
-def test_faulty_held_core_is_in_needs_review(client, w, db):
+def test_old_core_status_edit_is_not_in_needs_review(client, w, db):
     rid = book(client, w, [w["c1"][1]]).json()["id"]
     act(client, rid, "approve")
     db.execute(text("INSERT INTO data_edits (entity, entity_id, field, new_value, reason, user_id) "
                     "VALUES ('core', :c, 'status', 'Faulty', 'OTDR', :u)"), {"c": w["c1"][1], "u": w["admin1"]})
-    items = client.get("/api/needs-review", headers=H("planner1")).json()
-    assert [(i["kind"], i["detail"]) for i in items] == [("faulty_held", "Faulty core taken: 1")]
+    assert client.get("/api/needs-review", headers=H("planner1")).json() == []
+    assert "faulty_held" not in client.get("/openapi.json").text
 
 
 # ---------- TEST-006 ----------

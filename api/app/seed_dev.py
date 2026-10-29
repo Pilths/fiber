@@ -110,10 +110,6 @@ def run(db: Session) -> None:
         ins("INSERT INTO reservation_events (reservation_id, type, user_id) VALUES (:r, :t, :u)",
             r=res, t=kind, u=user[who])
 
-    ins("INSERT INTO data_edits (entity, entity_id, field, old_value, new_value, reason, user_id) "
-        "VALUES ('core', :c, 'status', 'Available', 'Faulty', 'DEV: dark fibre fails OTDR test', :u)",
-        c=cores[span[2]][5], u=user["admin1"])
-
 
 def main() -> None:
     with Session(engine) as db:

@@ -40,7 +40,7 @@ def net(db):
     reserve(cores[2], approved=False)  # Requested
     reserve(cores[3], approved=True)   # Reserved
     db.execute(text("INSERT INTO data_edits (entity, entity_id, field, new_value, reason, user_id) "
-                    "VALUES ('core', :c, 'status', 'Faulty', 'test', :u)"), {"c": cores[5], "u": adm})
+                    "VALUES ('core', :c, 'status', 'Faulty', 'old edit, now history only', :u)"), {"c": cores[5], "u": adm})
     return {"s1": s1, "s2": s2, "cores": cores}
 
 
@@ -82,10 +82,10 @@ def test_span_list_filter(client, net):
     r = client.get("/api/spans", params={"region": "North"}, headers=H).json()
     assert [s["id"] for s in r] == [net["s1"]]
     s = r[0]
-    assert (s["site_a"], s["site_b"], s["route_type"], s["free_cores"]) == ("Alpha Hub", "Bravo Hub", "Trunk", 1)
-    assert s["status_mix"] == {"Available": 1, "Requested": 1, "Reserved": 1, "In use": 1, "Faulty": 1}
+    assert (s["site_a"], s["site_b"], s["route_type"], s["free_cores"]) == ("Alpha Hub", "Bravo Hub", "Trunk", 2)
+    assert s["status_mix"] == {"Available": 2, "Requested": 1, "Reserved": 1, "In use": 1}
     assert (s["survey_cores"], s["cable_size"], s["not_surveyed"]) == (5, 144, 139)
-    assert (s["unassigned_reserved"], s["free_to_reserve"]) == (0, 1)
+    assert (s["unassigned_reserved"], s["free_to_reserve"]) == (0, 2)
     other = client.get("/api/spans", headers=H).json()[1]  # never surveyed: not bookable
     assert (other["survey_cores"], other["not_surveyed"], other["free_to_reserve"]) == (None, None, 0)
 
@@ -94,7 +94,7 @@ def test_span_detail(client, net):
     r = client.get(f"/api/spans/{net['s1']}", headers=H).json()
     cores = r["cores"]
     assert [c["number"] for c in cores] == [1, 2, 3, 4, 5]
-    assert [c["status"] for c in cores] == ["Available", "Requested", "Reserved", "In use", "Faulty"]
+    assert [c["status"] for c in cores] == ["Available", "Requested", "Reserved", "In use", "Available"]
     assert cores[1]["customer"] == "Telekom Zeta" and cores[1]["planned_date"] == "2026-12-01"
     assert cores[0]["customer"] is None
     assert cores[3]["circuit_id"] == "CKT-9001"

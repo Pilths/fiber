@@ -148,17 +148,13 @@ def _reservation(r: RowResult, f: dict[str, Any], label: str | None, known: set[
             reasons.append(f"cannot read {col} '{f.get(col)}'")
     if p["survey_cores"] is not None:
         p["survey_cores"] = int(p["survey_cores"])
-    # optional columns (not in the sample workbook): a test result for the span, and a core fault mark
+    # optional columns (not in the sample workbook): a test result for the span
     for key, col, conv in [("loss_db", "loss (db)", _float), ("tested_on", "tested on", _date)]:
         try:
             p[key] = conv(f.get(col, f.get(col.replace(" (", "("))))
         except ValueError:
             p[key] = None
             reasons.append(f"cannot read {col} '{f.get(col)}'")
-    cs = _text(f.get("core status"))
-    p["core_status"] = cs and cs.capitalize()
-    if cs and p["core_status"] != "Faulty":
-        reasons.append(f"core status '{cs}' is not Faulty")
     if no_customer:
         reasons.insert(0, no_customer)
     _finish(r, reasons, reject=bool(no_customer))

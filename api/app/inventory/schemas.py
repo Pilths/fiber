@@ -4,7 +4,7 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-CoreStatus = Literal["Available", "Requested", "Reserved", "In use", "Faulty"]
+CoreStatus = Literal["Available", "Requested", "Reserved", "In use"]
 
 
 class SearchResult(BaseModel):

@@ -67,33 +67,6 @@ def get_history(db: DB, entity: Entity, id: int) -> list[HistoryRow]:
     return history(db, entity, id)
 
 
-# ---------- core status ----------
-
-class CoreStatusBody(BaseModel):
-    status: Literal["Faulty", "Available"]
-    reason: Reason
-
-
-@router.post("/cores/{cid}/status")
-def set_core_status(db: DB, admin: Admin, cid: int, body: CoreStatusBody) -> dict[str, Any]:
-    found = db.execute(text("SELECT c.span_id, (s.survey_cores IS NOT NULL AND c.number > s.survey_cores) FROM cores c "
-                            "JOIN spans s ON s.id = c.span_id WHERE c.id = :c"), {"c": cid}).first()
-    if found is None:
-        raise HTTPException(404, "Core not found")
-    span, hidden = found
-    if hidden:
-        raise conflict("Core is beyond the span's surveyed count.")
-    db.execute(text("SELECT id FROM spans WHERE id = :s FOR UPDATE"), {"s": span})
-    old = db.execute(text("SELECT status FROM core_status_v WHERE core_id = :c"), {"c": cid}).scalar_one()
-    if body.status == "Faulty" and old == "Faulty":
-        raise conflict("Core is already Faulty.")
-    if body.status == "Available" and old != "Faulty":
-        raise conflict(f"Core is {old}, not Faulty. In use comes from the Excel and Reserved from the reservation flow.")
-    _log(db, admin, "core", cid, [("status", old, body.status)], body.reason)
-    db.commit()
-    return {"core_id": cid, "status": db.execute(text("SELECT status FROM core_status_v WHERE core_id = :c"), {"c": cid}).scalar_one()}
-
-
 # ---------- core ports (typed by hand; the reservation upload does not import ports) ----------
 
 class CorePortsBody(BaseModel):
@@ -192,7 +165,7 @@ def _resize(db: Session, sid: int, new: int) -> None:
         {"s": sid, "n": new}).all()
     if blocking:
         nums = [n for _, n in blocking]
-        raise conflict(f"Cannot lower to {new}: cores {', '.join(map(str, nums))} are reserved, in use, faulty, have ports "
+        raise conflict(f"Cannot lower to {new}: cores {', '.join(map(str, nums))} are reserved, in use, have ports "
                        "or have reservation history.", blocking_core_numbers=nums, blocking_core_ids=[i for i, _ in blocking])
     free_after = db.execute(text("SELECT count(*) FROM cores c JOIN core_status_v v ON v.core_id = c.id "
                                  "WHERE c.span_id = :s AND c.number <= :n AND v.status = 'Available'"), {"s": sid, "n": new}).scalar_one()

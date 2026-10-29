@@ -170,14 +170,15 @@ def test_measurements_appended_once(client, db, admin):
     assert n(db, "SELECT count(*) FROM measurements WHERE upload_id IS NOT NULL") == 2
 
 
-def test_faulty_row_is_needs_review_because_ports_are_not_imported(client, db, admin):
-    run(client, row())
+def test_core_status_column_is_ignored_and_raw_cell_kept(client, db, admin):
     j = up(client, workbook(row(status="Faulty"))).json()
-    assert j["counts"]["faulty"] == 0 and j["counts"]["needs_review"] == 1 and j["counts"]["reservations"] == 0
-    assert "not imported" in rows_of(client, j["upload_id"], "needs_review")[0]["reason"]
+    assert j["counts"]["reservations"] == 1 and j["counts"]["needs_review"] == 0 and "faulty" not in j["counts"]
+    assert "Faulty" in n(db, f"SELECT raw::text FROM upload_rows WHERE upload_id = {j['upload_id']} AND entity = 'reservation'")
     out = confirm(client, j["upload_id"]).json()
-    assert out["counts"]["faulty_cores"] == 0 and out["counts"]["reservations"] == 0
-    assert n(db, "SELECT count(*) FROM reservations") == 1 and n(db, "SELECT count(*) FROM data_edits WHERE entity = 'core'") == 0
+    assert out["counts"]["reservations"] == 1 and "faulty_cores" not in out["counts"]
+    assert n(db, "SELECT count(*) FROM data_edits WHERE entity = 'core'") == 0
+    odd = up(client, workbook(row(status="Broken"))).json()  # any value imports normally, no "is not Faulty" reason
+    assert odd["counts"]["needs_review"] == 0
 
 
 def test_switch_closed(client, db, admin):

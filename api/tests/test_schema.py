@@ -144,10 +144,8 @@ def test_status_flow(db, ids):
     assert status(db, ids["core"]) == "Reserved"
     db.execute(text("UPDATE cores SET in_use = true WHERE id = :core"), ids)
     assert status(db, ids["core"]) == "In use"
-    edit(db, ids, "Faulty")
-    assert status(db, ids["core"]) == "Faulty"
-    edit(db, ids, "Available")
-    assert status(db, ids["core"]) == "In use"  # fault cleared, in_use still true
+    edit(db, ids, "Faulty")  # an old per-core status edit is history only: it drives no status
+    assert status(db, ids["core"]) == "In use"
     db.execute(text("UPDATE cores SET in_use = false WHERE id = :core"), ids)
     db.execute(text("DELETE FROM core_holds"))
     assert status(db, ids["core"]) == "Available"

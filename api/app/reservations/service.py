@@ -108,11 +108,6 @@ def approvals(db: Session) -> list[ReservationOut]:
 
 
 def needs_review(db: Session, user: CurrentUser) -> list[NeedsReviewItem]:
-    faulty: dict[int, list[int]] = {}
-    for rid, number in db.execute(text(
-            "SELECT h.reservation_id, c.number FROM core_holds h JOIN core_status_v v ON v.core_id = h.core_id "
-            "JOIN cores c ON c.id = h.core_id WHERE v.status = 'Faulty' ORDER BY c.span_id, c.number")):
-        faulty.setdefault(rid, []).append(number)
     cut: dict[int, list[str]] = {}  # reservation -> names of cut spans it holds cores or a count on
     for rid, name in db.execute(text(
             "SELECT x.rid, a.name || ' - ' || b.name FROM ("
@@ -122,19 +117,16 @@ def needs_review(db: Session, user: CurrentUser) -> list[NeedsReviewItem]:
             "ORDER BY x.rid, s.id")):
         cut.setdefault(rid, []).append(name)
     where = ("(st.is_stale OR (st.status = 'approved' AND st.last_event = 'release_requested') "
-             "OR r.id = ANY(CAST(:faulty AS bigint[])) OR r.id = ANY(CAST(:cut AS bigint[])))")
+             "OR r.id = ANY(CAST(:cut AS bigint[])))")
     if user.role != "admin":
         where += " AND r.planner_id = :uid"
     items = []
-    for r in load(db, where, "st.last_event_at, r.id", faulty=list(faulty), cut=list(cut), uid=user.id):
+    for r in load(db, where, "st.last_event_at, r.id", cut=list(cut), uid=user.id):
         if r.stale:
             items.append(NeedsReviewItem(kind="stale", reservation=r,
                                          detail=f"Stale: {r.age_days} days since last event. Keep it or request release."))
         if r.awaiting == "release":
             items.append(NeedsReviewItem(kind="release_requested", reservation=r, detail="Release requested, waiting for an admin."))
-        if r.id in faulty:
-            items.append(NeedsReviewItem(kind="faulty_held", reservation=r,
-                                         detail="Faulty core taken: " + ", ".join(map(str, faulty[r.id]))))
         if r.id in cut:
             items.append(NeedsReviewItem(kind="fiber_cut", reservation=r, detail="Fiber cut: " + ", ".join(cut[r.id])))
     return items

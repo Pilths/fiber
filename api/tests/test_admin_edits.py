@@ -31,31 +31,12 @@ def approved(client, w, cores, user="planner1"):
     return rid
 
 
-# ---------- core status (TASK-046, TEST-011) ----------
+# ---------- core status endpoint is gone (a fibre cut is span-level) ----------
 
-def test_011_core_status_needs_reason_and_writes_edit(client, w, db):
+def test_core_status_endpoint_is_gone(client, w, db):
     c = w["c1"][1]
-    for body in ({"status": "Faulty"}, {"status": "Faulty", "reason": ""}, {"status": "Faulty", "reason": "   "}):
-        assert post(client, f"cores/{c}/status", **body).status_code == 422
-    assert core_status(db, c) == "Available" and not edits(db, "core", c)
-    r = post(client, f"cores/{c}/status", status="Faulty", reason="OTDR shows a break")
-    assert r.status_code == 200 and r.json() == {"core_id": c, "status": "Faulty"}
-    assert edits(db, "core", c) == [("status", "Available", "Faulty", "OTDR shows a break")]
-    assert one(db, "SELECT user_id FROM data_edits WHERE entity = 'core'") == w["admin1"]
-    assert post(client, f"cores/{c}/status", status="Faulty", reason="again").status_code == 409
-    assert post(client, f"cores/{c}/status", status="Available", reason="spliced").status_code == 200
-    assert core_status(db, c) == "Available"
-    assert post(client, f"cores/{w['c1'][2]}/status", status="Available", reason="x").status_code == 409  # not Faulty
-    assert post(client, f"cores/{c}/status", status="Reserved", reason="x").status_code == 422
-    assert post(client, "cores/999999/status", status="Faulty", reason="x").status_code == 404
-
-
-def test_faulty_held_core_in_action_needed(client, w):
-    c = w["c1"][1]
-    rid = approved(client, w, [c])
-    assert post(client, f"cores/{c}/status", status="Faulty", reason="cut").status_code == 200
-    items = client.get("/api/needs-review", headers=H("planner1")).json()
-    assert [(i["kind"], i["reservation"]["id"]) for i in items] == [("faulty_held", rid)]
+    assert post(client, f"cores/{c}/status", status="Available", reason="x").status_code in (404, 405)
+    assert not edits(db, "core", c)
 
 
 def test_011_distance_edit_changes_calculated_loss(client, w):
@@ -112,8 +93,9 @@ def test_survey_lower_blocked_by_held_or_history_allowed_when_free(client, w, db
     assert post(client, f"spans/{s2}", survey_cores=2, reason="resurvey").status_code == 200
     assert one(db, "SELECT count(*) FROM cores WHERE span_id = :s", s=s2) == 4  # rows stay, nothing is deleted
     assert edits(db, "span", s2) == [("survey_cores", "4", "2", "resurvey")]
-    # faulty history blocks too
-    assert post(client, f"cores/{w['c1'][3]}/status", status="Faulty", reason="cut").status_code == 200
+    # an old core status edit (history) blocks too
+    db.execute(text("INSERT INTO data_edits (entity, entity_id, field, new_value, reason, user_id) "
+                    "VALUES ('core', :c, 'status', 'Faulty', 'old', :u)"), {"c": w["c1"][3], "u": w["admin1"]})
     assert post(client, f"spans/{s}", survey_cores=2, reason="x").json()["detail"]["blocking_core_numbers"] == [3, 6]
 
 
@@ -180,8 +162,7 @@ def test_site_edit(client, w, db):
 
 def test_planner_gets_403_on_every_admin_edit_endpoint(client, w, db):
     a = one(db, "SELECT id FROM sites WHERE name = 'A'")
-    for path, body in [(f"cores/{w['c1'][1]}/status", {"status": "Faulty", "reason": "x"}),
-                       (f"spans/{w['s1']}", {"cable_size": 96, "reason": "x"}), (f"sites/{a}", {"name": "Z", "reason": "x"})]:
+    for path, body in [(f"spans/{w['s1']}", {"cable_size": 96, "reason": "x"}), (f"sites/{a}", {"name": "Z", "reason": "x"})]:
         assert post(client, path, user="planner1", **body).status_code == 403
     for path in ("history?entity=core&id=1", f"spans/{w['s1']}", f"sites/{a}", "sites?q=A"):
         assert client.get(f"/api/admin/{path}", headers=H("planner1")).status_code == 403
@@ -236,10 +217,11 @@ def test_021_planner_sees_only_own_reservation_history(client, w):
     assert client.get("/api/reservations/99999/history", headers=H("admin1")).status_code == 404
 
 
-def test_core_history_events_edits_and_visibility(client, w):
+def test_core_history_events_edits_and_visibility(client, w, db):
     c1, c2 = w["c1"][1], w["c1"][2]
     rid = approved(client, w, [c1, c2])
-    post(client, f"cores/{c1}/status", status="Faulty", reason="cut")
+    db.execute(text("INSERT INTO data_edits (entity, entity_id, field, old_value, new_value, reason, user_id) "
+                    "VALUES ('core', :c, 'status', 'Reserved', 'Faulty', 'cut', :u)"), {"c": c1, "u": w["admin1"]})
     act(client, rid, "release", cores=[c2])
     h = client.get(f"/api/cores/{c1}/history", headers=H("planner1")).json()
     assert {(i["kind"], i["type"]) for i in h} == {("reservation_event", "requested"), ("reservation_event", "approved"),
@@ -305,7 +287,6 @@ def test_lowered_cores_are_hidden_everywhere_and_raise_reuses_rows(client, w, db
     hidden = book(client, w, [ids[3]])
     assert hidden.status_code == 409 and hidden.json()["detail"]["taken_core_ids"] == [ids[3]]
     assert book(client, w, [ids[1], ids[3]]).status_code == 409
-    assert post(client, f"cores/{ids[3]}/status", status="Faulty", reason="x").status_code == 409
     assert not client.get("/api/search", params={"q": "3"}, headers=H("planner1")).json() or all(
         r.get("core_id") != ids[3] for r in client.get("/api/search", params={"q": "3"}, headers=H("planner1")).json())
     # raising reuses the same rows; new rows only beyond the highest existing number
@@ -443,3 +424,22 @@ def test_migration_0009_roundtrip(engine, db):
     command.upgrade(cfg, "head")
     a, b = (one(db, "INSERT INTO sites (name, kind) VALUES (:n,'site') RETURNING id", n=n) for n in "AB")
     assert one(db, "INSERT INTO spans (site_a_id, site_b_id) VALUES (:a,:b) RETURNING fiber_cut", a=a, b=b) is False
+
+
+def test_migration_0010_roundtrip(engine, db):
+    from conftest import alembic_cfg
+
+    from alembic import command
+    cfg = alembic_cfg()
+    view = "SELECT pg_get_viewdef('core_status_v'::regclass)"
+    command.downgrade(cfg, "0009")
+    assert "Faulty" in one(db, view)  # previous view restored
+    command.upgrade(cfg, "head")
+    assert "Faulty" not in one(db, view)
+    a, b = (one(db, "INSERT INTO sites (name, kind) VALUES (:n,'site') RETURNING id", n=n) for n in "AB")
+    sp = one(db, "INSERT INTO spans (site_a_id, site_b_id) VALUES (:a,:b) RETURNING id", a=a, b=b)
+    core = one(db, "INSERT INTO cores (span_id, number) VALUES (:s, 1) RETURNING id", s=sp)
+    u = one(db, "INSERT INTO users (username, display_name, role) VALUES ('m10','m10','admin') RETURNING id")
+    db.execute(text("INSERT INTO data_edits (entity, entity_id, field, new_value, reason, user_id) "
+                    "VALUES ('core', :c, 'status', 'Faulty', 'old', :u)"), {"c": core, "u": u})
+    assert one(db, "SELECT status FROM core_status_v WHERE core_id = :c", c=core) == "Available"  # old edit drives nothing
