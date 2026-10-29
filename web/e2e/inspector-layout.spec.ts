@@ -36,11 +36,11 @@ test("Inspector is 420px and Find starts at the same y: nothing, span, route and
 
   await page.getByRole("list", { name: "Spans" }).getByRole("button", { name: KLBJ }).click();
   await expect(page.getByRole("grid", { name: "Cores" })).toBeVisible();
-  await footerInCard(page, "Go to cores");
-  await footerInCard(page, "Plan a route from here");
+  await footerInCard(page, "Open span details");
   await note("span");
 
-  await page.getByRole("button", { name: "Plan a route from here" }).click();
+  await page.getByRole("radio", { name: "Route A to B" }).check({ force: true });
+  await page.getByLabel("From", { exact: true }).fill("DEV Kuala Lumpur DC");
   await page.getByLabel("To", { exact: true }).fill("DEV Cyberjaya DC");
   await page.getByTestId("route-option").first().click();
   await expect(page.getByTestId("route-summary")).toBeVisible();
@@ -54,9 +54,9 @@ test("Inspector is 420px and Find starts at the same y: nothing, span, route and
   await page.getByRole("radio", { name: "Span or site" }).check({ force: true });
   await page.getByRole("list", { name: "Spans" }).getByRole("button", { name: KLBJ }).click();
   await expect(inspector(page).getByTestId("fiber-cut")).toBeVisible();
-  await footerInCard(page, "Go to cores");
-  // The Loss row stays in view above the pinned footer; Allocations gives up lines instead.
-  const [loss, foot] = await Promise.all([inspector(page).getByTestId("inspector-loss").boundingBox(), inspector(page).getByRole("button", { name: "Go to cores" }).boundingBox()]);
+  await footerInCard(page, "Open span details");
+  // The worst-core row stays in view above the pinned footer.
+  const [loss, foot] = await Promise.all([inspector(page).getByTestId("inspector-loss").boundingBox(), inspector(page).getByRole("button", { name: "Open span details" }).boundingBox()]);
   expect(loss!.y + loss!.height).toBeLessThanOrEqual(foot!.y);
   await note("cut");
 

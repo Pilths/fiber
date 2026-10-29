@@ -217,7 +217,8 @@ test("Reserve on a sufficient route sends one request (then withdrawn)", async (
   expect(r.ok()).toBeTruthy();
 });
 
-test("Plan a route from here prefills From with site A", async ({ page }) => {
+// Plan a route from here was removed: the route search bar above the map replaces it.
+test.fixme("Plan a route from here prefills From with site A", async ({ page }) => {
   await signIn(page);
   await page.getByRole("list", { name: "Spans" }).getByRole("button", { name: /^DEV Kuala Lumpur DC - DEV Cyberjaya DC/ }).click();
   await page.getByRole("button", { name: "Plan a route from here" }).click();

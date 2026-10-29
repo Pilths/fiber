@@ -6,12 +6,14 @@ import { STATUS, statusLabel } from "@/lib/status";
 type Core = components["schemas"]["CoreDetail"];
 const COLS = 12; // one fibre tube per row
 
-export function PortGrid({ cores, selected, onToggle, onOpen, focusCoreId }: {
+export function PortGrid({ cores, selected, onToggle, onOpen, focusCoreId, measured, current }: {
   cores: Core[];
   selected: Set<number>;
   onToggle: (id: number) => void;
-  onOpen: (c: Core) => void; // core detail; Available cores open it from the "Core N details" button
+  onOpen: (c: Core) => void; // shows the core in the core card (Available cores are also chosen or unchosen)
   focusCoreId: number | null;
+  measured?: Set<number>; // core ids with a loss test: a ▲ in the cell
+  current?: number | null; // core id shown in the core card: outlined
 }) {
   const [idx, setIdx] = useState(0); // roving tabindex position
   const [caption, setCaption] = useState<Core | null>(null);
@@ -36,9 +38,9 @@ export function PortGrid({ cores, selected, onToggle, onOpen, focusCoreId }: {
     if (e.key in d) { e.preventDefault(); move(i + d[e.key]); }
     else if (e.key === "Home") { e.preventDefault(); move(0); }
     else if (e.key === "End") { e.preventDefault(); move(cores.length - 1); }
-    else if (e.key === " " || e.key === "Enter") { e.preventDefault(); if (c.status === "Available") onToggle(c.id); else onOpen(c); }
+    else if (e.key === " " || e.key === "Enter") { e.preventDefault(); if (c.status === "Available") onToggle(c.id); onOpen(c); }
   };
-  const label = (c: Core) => `Core ${c.number}: ${selected.has(c.id) ? "Chosen" : statusLabel(c.status)}${c.customer ? `, ${c.customer}` : ""}`;
+  const label = (c: Core) => `Core ${c.number}: ${selected.has(c.id) ? "Chosen" : statusLabel(c.status)}${c.customer ? `, ${c.customer}` : ""}${measured?.has(c.id) ? ", loss measured" : ""}`;
   const rows = Array.from({ length: Math.ceil(cores.length / COLS) }, (_, r) => cores.slice(r * COLS, r * COLS + COLS));
 
   return (
@@ -66,8 +68,9 @@ export function PortGrid({ cores, selected, onToggle, onOpen, focusCoreId }: {
                       aria-disabled={!avail}
                       title={label(c)}
                       data-status={c.status}
+                      data-current={c.id === current || undefined}
                       className={`core ${STATUS[c.status].cls}`}
-                      onClick={() => { setIdx(i); if (avail) onToggle(c.id); else onOpen(c); }}
+                      onClick={() => { setIdx(i); if (avail) onToggle(c.id); onOpen(c); }}
                       onFocus={() => { setIdx(i); setCaption(c); }}
                       onMouseEnter={() => setCaption(c)}
                       onMouseLeave={() => setCaption(null)}
@@ -76,6 +79,7 @@ export function PortGrid({ cores, selected, onToggle, onOpen, focusCoreId }: {
                       <span className="n">{c.number}</span>
                       <Icon name={chosen ? "ch" : STATUS[c.status].icon} />
                       <span className="w">{chosen ? "Chosen" : statusLabel(c.status)}</span>
+                      {measured?.has(c.id) && <span aria-hidden className="lm">&#9650;</span>}
                     </div>
                   );
                 })}
@@ -87,7 +91,7 @@ export function PortGrid({ cores, selected, onToggle, onOpen, focusCoreId }: {
       <div className="mt-2 flex items-center gap-3">
         <p className="min-h-5 flex-1 text-body text-muted-foreground" data-testid="grid-caption">
           {caption
-            ? `${label(caption)}${caption.circuit_id ? `, circuit ${caption.circuit_id}` : ""}${caption.status !== "Available" ? " (not selectable; click or Enter for its detail)" : ""}`
+            ? `${label(caption)}${caption.circuit_id ? `, circuit ${caption.circuit_id}` : ""}${caption.status !== "Available" ? " (not selectable)" : ""}`
             : ""}
         </p>
         {cores[idx] && <button type="button" className="btn btn-sm flex-none" onClick={() => onOpen(cores[idx])}>Core {cores[idx].number} details</button>}

@@ -1,9 +1,9 @@
-import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import type { components } from "@/api/schema";
-import { Icon, type IconName } from "@/components/Icon";
+import { Icon } from "@/components/Icon";
 import type { SpanFocus } from "@/components/AdminEdit";
 import { LossPill } from "@/components/LossCard";
-import { countBy, db, health, LEVEL, pct, spanName, STATUS, statusLabel, type LossDetail } from "@/lib/status";
+import { countBy, db, health, LEVEL, pct, spanName, worstText, type LossDetail } from "@/lib/status";
 
 type Detail = components["schemas"]["SpanDetail"];
 
@@ -32,9 +32,10 @@ const focusEl = (id: string) => document.getElementById(id)?.focus();
 
 type Admin = { onEditSpan: (focus?: SpanFocus) => void; onEditSite: (end: "a" | "b") => void } | null; // null for planners
 
-export function Inspector({ detail, loading, onGoToCores, loss, onSeeLoss, onSeeHeld, admin, onPlanRoute, route }: {
-  detail: Detail | null; loading: boolean; onGoToCores: () => void; loss: LossDetail | null; onSeeLoss: () => void; onSeeHeld: () => void; admin: Admin;
-  onPlanRoute: (site: string) => void; route?: ReactNode; // route: the route summary, shown instead of the span in Route mode
+export function Inspector({ detail, loading, loss, admin, route, onDetails, onRoute, onPick }: {
+  detail: Detail | null; loading: boolean; loss: LossDetail | null; admin: Admin;
+  route?: ReactNode; // route: the route summary, shown instead of the span in Route mode
+  onDetails: () => void; onRoute: RouteRow[]; onPick: (id: number) => void; // onRoute: spans of the searched route
 }) {
   return (
     <section className="card flex h-[420px] flex-none flex-col overflow-hidden p-0" aria-label="Inspector" data-testid="inspector">
@@ -44,37 +45,22 @@ export function Inspector({ detail, loading, onGoToCores, loss, onSeeLoss, onSee
             <button type="button" className="btn btn-sm" onClick={() => focusEl("global-search")}>Search by site or span</button>
             <button type="button" className="btn btn-sm" onClick={() => focusEl("find-q")}>Choose from the list</button>
           </>} />
-        : <Body key={detail.id} d={detail} onGoToCores={onGoToCores} loss={loss} onSeeLoss={onSeeLoss} onSeeHeld={onSeeHeld} admin={admin} onPlanRoute={onPlanRoute} />)}
+        : <Body key={detail.id} d={detail} loss={loss} admin={admin} onRoute={onRoute} onPick={onPick} />)}
+      {!route && (
+        <div className="ins-foot">
+          <button type="button" className="btn btn-p flex-1 justify-between" onClick={onDetails} disabled={!detail} aria-label="Open span details">
+            Details<span aria-hidden>&#9660;</span>
+          </button>
+        </div>
+      )}
     </section>
   );
 }
 
 const link = "font-[inherit] underline-offset-4 hover:text-blue hover:underline";
-type Line = { key: string; icon: IconName; tone: string; word: string; customer: string | null; what: string; date: string | null; n: number };
+export type RouteRow = { id: number; name: string; km: number | null };
 
-// One line per reservation and status (held cores), then one per count-only reservation; the Allocations table has the detail.
-function allocations(d: Detail): Line[] {
-  const groups = new Map<string, Detail["cores"]>();
-  for (const c of d.cores) {
-    if (c.status === "Available") continue;
-    const k = `${c.reservation_id ?? "-"}|${c.status}|${c.customer ?? ""}`;
-    groups.set(k, [...(groups.get(k) ?? []), c]);
-  }
-  return [
-    ...[...groups].map(([key, cs]) => ({
-      key, icon: STATUS[cs[0].status].icon, tone: STATUS[cs[0].status].tone, word: statusLabel(cs[0].status), customer: cs[0].customer,
-      what: `${cs.length === 1 ? "Core" : "Cores"} ${cs.map((c) => c.number).join(", ")}`, date: cs[0].planned_date, n: cs.length,
-    })),
-    ...d.unassigned.map((u) => ({
-      key: `u${u.reservation_id}`, icon: "co" as const, tone: "text-use", word: "Unassigned", customer: u.customer,
-      what: `${u.remaining} ${u.remaining === 1 ? "core" : "cores"}`, date: u.planned_date, n: u.remaining,
-    })),
-  ];
-}
-
-function Body({ d, onGoToCores, loss, onSeeLoss, onSeeHeld, admin, onPlanRoute }: {
-  d: Detail; onGoToCores: () => void; loss: LossDetail | null; onSeeLoss: () => void; onSeeHeld: () => void; admin: Admin; onPlanRoute: (site: string) => void;
-}) {
+function Body({ d, loss, admin, onRoute, onPick }: { d: Detail; loss: LossDetail | null; admin: Admin; onRoute: RouteRow[]; onPick: (id: number) => void }) {
   const h = health(d);
   const n = countBy(d);
   const surveyed = d.survey_cores != null;
@@ -92,19 +78,6 @@ function Body({ d, onGoToCores, loss, onSeeLoss, onSeeHeld, admin, onPlanRoute }
   const tone = high
     ? { strip: "border-red-bd bg-red-bg text-red", row: "bg-red-bg shadow-[inset_3px_0_0_var(--red)]", text: "text-red" }
     : { strip: "border-amber-bd bg-amber-bg text-amber", row: "bg-amber-bg shadow-[inset_3px_0_0_var(--amber)]", text: "text-amber" };
-  // Allocations shows as many lines (up to 4) as the fixed card has room for: an alert or a 2-line title takes room,
-  // so lines drop one at a time until the body no longer scrolls (down to the header line alone), and the Loss row stays in view.
-  const lines = allocations(d);
-  const total = lines.reduce((s, l) => s + l.n, 0);
-  const [max, setMax] = useState(4);
-  const bodyRef = useRef<HTMLDivElement>(null);
-  useLayoutEffect(() => {
-    const b = bodyRef.current;
-    if (b && max > 0 && b.scrollHeight > b.clientHeight) setMax(max - 1);
-  }, [max, d, loss]); // re-measure as the loss alert and data arrive
-  const shown = lines.slice(0, max);
-  const more = lines.length - shown.length;
-  const dated = shown.some((l) => l.date);
   return (
     <>
       <div className="ins-head">
@@ -127,7 +100,7 @@ function Body({ d, onGoToCores, loss, onSeeLoss, onSeeHeld, admin, onPlanRoute }
         </div>
       </div>
 
-      <div className="ins-body" ref={bodyRef}>
+      <div className="ins-body">
         {(cut || lv) && (
           <div className="mb-2 space-y-2 text-body">
             {cut && (
@@ -180,40 +153,36 @@ function Body({ d, onGoToCores, loss, onSeeLoss, onSeeHeld, admin, onPlanRoute }
         ) : <p className="text-body text-muted-foreground">Not surveyed, cannot be booked. Cable size {d.cable_size}.</p>}
 
         <div className={`mt-1.5 flex items-center gap-2 border-t py-1 text-body ${lv ? `-mx-5 px-5 ${tone.row}` : ""}`} data-testid="inspector-loss" data-level={lv ?? undefined}>
-          <span className="lbl">Loss</span>
-          <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
+          <span className="lbl flex-none">Worst core</span>
+          <span className="flex min-w-0 flex-1 items-center justify-end gap-2 text-right">
             {!loss ? <span className="text-muted-foreground">Loading...</span>
               : loss.measured_db != null ? (
-                <><span className={lv ? tone.text : undefined}><b className="font-semibold">{db(loss.measured_db)}</b> measured{loss.deviation_pct != null && `, ${pct(loss.deviation_pct)}`}</span><LossPill l={loss} compact /></>
-              ) : <span className="text-muted-foreground">{loss.status === "no_distance" ? "Not measured, no distance" : "Not measured"}</span>}
+                <>
+                  <span className={lv ? tone.text : undefined}>
+                    <b className="font-semibold">{worstText(loss)}</b>
+                    <span className="block text-xs text-muted-foreground">{loss.deviation_pct != null && `${pct(loss.deviation_pct)}, `}{loss.measured_cores} of {loss.total_cores} cores measured</span>
+                  </span>
+                  <LossPill l={loss} compact />
+                </>
+              ) : <span className="text-muted-foreground">No core measured</span>}
           </span>
-          <button type="button" className="flex-none font-semibold link" onClick={onSeeLoss}>See loss</button>
         </div>
 
-        {!lines.length ? <p className="border-t pt-2 text-body text-muted-foreground" data-testid="inspector-held">No allocations</p> : (
-          <div className="border-t pt-1.5 text-body" data-testid="inspector-held">
-            <div className="flex items-center justify-between gap-2">
-              <span className="flex items-baseline gap-2"><span className="lbl">Allocated</span><b className="font-semibold">{total} {total === 1 ? "core" : "cores"}</b></span>
-              <button type="button" className="flex-none font-semibold link" onClick={onSeeHeld}>See allocations</button>
-            </div>
-            <ul aria-label="Allocated on this span">
-              {shown.map((l) => (
-                <li key={l.key} className={`grid items-center gap-2 border-b border-rule py-0.5 last:border-0 ${dated ? "grid-cols-[100px_minmax(0,1fr)_minmax(0,auto)_76px]" : "grid-cols-[100px_minmax(0,1fr)_minmax(0,auto)]"}`}>
-                  <span className={`flex items-center gap-1.5 font-semibold ${l.tone}`}><Icon name={l.icon} />{l.word}</span>
-                  <span className="truncate" title={l.customer ?? undefined}>{l.customer ?? "-"}</span>
-                  <span className="max-w-32 truncate text-muted-foreground" title={l.what}>{l.what}</span>
-                  {dated && <span className="text-right whitespace-nowrap text-muted-foreground">{l.date ?? ""}</span>}
+        {onRoute.length > 0 && (
+          <div className="mt-2 border-t pt-1.5">
+            <h4 className="lbl">Spans on route</h4>
+            <ul aria-label="Spans on route" className="text-body">
+              {onRoute.map((r) => (
+                <li key={r.id}>
+                  <button type="button" aria-pressed={r.id === d.id} onClick={() => onPick(r.id)}
+                    className={`flex w-full items-center justify-between rounded px-2 py-1 text-left hover:bg-raised ${r.id === d.id ? "bg-blue-bg font-semibold" : ""}`}>
+                    <span className="truncate">{r.name}</span>{r.km != null && <span className="text-muted-foreground">{Number(r.km)} km</span>}
+                  </button>
                 </li>
               ))}
             </ul>
-            {more > 0 && shown.length > 0 && <button type="button" className="font-semibold link" onClick={onSeeHeld}>+{more} more in Allocations</button>}
           </div>
         )}
-      </div>
-
-      <div className="ins-foot">
-        <button type="button" className="btn btn-p flex-1" onClick={onGoToCores} disabled={!surveyed}>Go to cores</button>
-        <button type="button" className="btn flex-1" onClick={() => onPlanRoute(d.site_a)}>Plan a route from here</button>
       </div>
     </>
   );

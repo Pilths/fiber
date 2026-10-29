@@ -75,7 +75,7 @@ test("map loads with no request leaving the app origin; chips, sites, layers and
 test("clicking a chip selects the span; Enter on a chip too; Esc clears", async ({ page }) => {
   await signIn(page);
   await chip(page, FAR).click();
-  await expect(page.getByRole("heading", { name: `Cores of ${FAR}` })).toBeVisible();
+  await expect(page.locator("#span-h", { hasText: FAR })).toBeVisible();
   await expect(page).toHaveURL(new RegExp(`#span=${encodeURIComponent(FAR)}$`));
   await expect(chip(page, FAR)).toHaveAttribute("aria-pressed", "true");
   await expect(map(page).locator('[data-testid=map-line][data-selected=true]')).toHaveCount(1);
@@ -87,10 +87,10 @@ test("clicking a chip selects the span; Enter on a chip too; Esc clears", async 
   const other = "DEV Kuala Lumpur DC - DEV Ipoh Exchange";
   await chip(page, other).focus();
   await page.keyboard.press("Enter");
-  await expect(page.getByRole("heading", { name: `Cores of ${other}` })).toBeVisible();
+  await expect(page.locator("#span-h", { hasText: other })).toBeVisible();
   await chip(page, other).focus();
   await page.keyboard.press("Escape");
-  await expect(page.getByRole("heading", { name: /^Cores of/ })).toHaveCount(0);
+  await expect(page.locator("#span-h")).toHaveCount(0);
   await expect(map(page).locator('[data-testid=map-line][data-selected=true]')).toHaveCount(0);
   expect(page.url()).not.toContain("#span=");
 });
@@ -170,7 +170,7 @@ test("no WebGL: the SVG fallback draws spans and selects by click", async ({ pag
   await expect(page.getByTestId("map-note")).toContainText("no WebGL");
   await expect(chips(page)).toHaveCount(5);
   await chip(page, FAR).click();
-  await expect(page.getByRole("heading", { name: `Cores of ${FAR}` })).toBeVisible();
+  await expect(page.locator("#span-h", { hasText: FAR })).toBeVisible();
   await page.getByRole("button", { name: "Zoom in" }).click();
   await page.getByRole("button", { name: "Fit selection" }).click();
   await expect(chip(page, FAR)).toBeInViewport();
@@ -201,7 +201,7 @@ test("map card fills its row and the stage fills the card: nothing, span and rou
   const check = async () => expect.poll(async () => { const g = await gaps(); return Math.abs(g.underCard) <= 3 && Math.abs(g.inCard) <= 3; }).toBe(true);
   await check();
   await chip(page, FAR).click();
-  await expect(page.getByRole("heading", { name: `Cores of ${FAR}` })).toBeVisible();
+  await expect(page.locator("#span-h", { hasText: FAR })).toBeVisible();
   await check();
   await page.evaluate(() => scrollTo(0, 0));
   await settle(page);
@@ -228,7 +228,7 @@ test("picking a span in Find moves the camera; clicking it on the map does not",
   const start = await still(); // the first fit to all spans
 
   await page.getByRole("list", { name: "Spans" }).getByRole("button", { name: new RegExp(`^${SPAN}`) }).click();
-  await expect(page.getByRole("heading", { name: `Cores of ${SPAN}` })).toBeVisible();
+  await expect(page.locator("#span-h", { hasText: SPAN })).toBeVisible();
   await expect.poll(async () => (await cam()).zoom).toBeGreaterThan(start.zoom + 0.5);
   const followed = await still();
   expect(followed.zoom).toBeGreaterThan(start.zoom);
@@ -237,7 +237,7 @@ test("picking a span in Find moves the camera; clicking it on the map does not",
   await page.evaluate(() => scrollTo(0, 0));
   const other = "DEV Cyberjaya DC - DEV Bukit Jalil TOC";
   await chip(page, other).click(); // a different span, clicked on the map
-  await expect(page.getByRole("heading", { name: `Cores of ${other}` })).toBeVisible();
+  await expect(page.locator("#span-h", { hasText: other })).toBeVisible();
   const after = await still();
   expect(after.zoom).toBeCloseTo(followed.zoom, 5);
   expect(after.lng).toBeCloseTo(followed.lng, 6);

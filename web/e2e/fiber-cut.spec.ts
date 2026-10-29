@@ -21,14 +21,14 @@ async function pick(page: Page) {
   await page.getByRole("list", { name: "Spans" }).getByRole("button", { name: KLBJ }).click();
   await expect(page.getByRole("grid", { name: "Cores" })).toBeVisible();
 }
-const measured = (level: string, db: number, pct: number) => ({ status: "measured", level, measured_db: db, deviation_pct: pct });
+const measured = (level: string, db: number, pct: number) => ({ status: "measured", level, measured_db: db, deviation_pct: pct, worst_core_number: 12, measured_cores: 3, total_cores: 24 });
 
 test("no alert for a normal span", async ({ page }) => {
   await mock(page, { fiber_cut: false }, measured("green", 3.5, 1.2));
   await signIn(page);
   await pick(page);
   const i = inspector(page);
-  await expect(i.getByTestId("inspector-loss")).toContainText("3.50 dB measured");
+  await expect(i.getByTestId("inspector-loss")).toContainText("core 12: 3.50 dB+1.2%, 3 of 24 cores measured");
   await expect(i.getByTestId("fiber-cut")).toHaveCount(0);
   await expect(i.getByTestId("loss-alert")).toHaveCount(0);
   await expect(i.locator("dl")).not.toContainText("Fiber cut");

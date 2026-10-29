@@ -16,7 +16,7 @@ test("keyboard: roving tabindex, arrows, Space/Enter select only Available", asy
   await openSpan(page);
   const cells = page.getByRole("gridcell");
   expect(await cells.count()).toBe(24);
-  await expect(page.getByRole("region", { name: /^Cores of/ })).toContainText("24 surveyed of 144");
+  await expect(page.getByRole("region", { name: "Cores", exact: true })).toContainText("24 surveyed of 144");
   // 12 cores per row, and the whole row fits the panel at 1280px (no horizontal scroll)
   const tops = await cells.evaluateAll((els) => els.slice(0, 13).map((e) => Math.round(e.getBoundingClientRect().top)));
   expect(new Set(tops.slice(0, 12)).size).toBe(1);
@@ -122,8 +122,7 @@ test("each status has a distinct symbol and text, not colour alone", async ({ pa
 test("count-only reservation shows on the span and in My reservations; admin sees Approvals", async ({ page }) => {
   await signIn(page);
   await pickSpan(page, /^DEV Cyberjaya DC - DEV Bukit Jalil/);
-  await expect(page.getByTestId("inspector-held")).toContainText("cores");
-  await expect(page.getByRole("table", { name: "Allocations on this span" })).toContainText("Unassigned");
+  await expect(page.getByTestId("unassigned")).toContainText("requested, not assigned yet");
   await page.getByRole("button", { name: /My reservations/ }).click();
   await expect(page.getByTestId("reservation").filter({ hasText: "3 not assigned yet" })).toBeVisible();
   await page.getByRole("button", { name: "Rejected" }).click();

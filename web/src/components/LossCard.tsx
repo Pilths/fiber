@@ -19,7 +19,7 @@ const NOTE: Record<SpanLoss["status"], string | null> = {
   no_distance: "No distance in the Excel, so no calculated loss.",
 };
 
-function Metric({ label, value, children }: { label: string; value?: string; children?: ReactNode }) {
+export function Metric({ label, value, children }: { label: string; value?: string; children?: ReactNode }) {
   return (
     <div className="min-w-0 border-l border-rule pl-4 first:border-l-0 first:pl-0">
       <dt className="lbl">{label}</dt>

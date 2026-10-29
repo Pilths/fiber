@@ -1150,6 +1150,31 @@ export interface components {
             /** Cores */
             cores?: number[];
         };
+        /** CoreLoss */
+        CoreLoss: {
+            /** Core Id */
+            core_id: number;
+            /** Core Number */
+            core_number: number;
+            /** Calculated Db */
+            calculated_db: number | null;
+            /** Measured Db */
+            measured_db: number;
+            /** Difference Db */
+            difference_db: number | null;
+            /** Deviation Pct */
+            deviation_pct: number | null;
+            /** Level */
+            level: ("green" | "amber" | "red" | "off_scale") | null;
+            /** Tested On */
+            tested_on: string | null;
+            /** Test Method */
+            test_method: string | null;
+            /** Field Team */
+            field_team: string | null;
+            /** History */
+            history: components["schemas"]["MeasurementOut"][];
+        };
         /** CorePortsBody */
         CorePortsBody: {
             /** Port A */
@@ -1345,6 +1370,8 @@ export interface components {
             test_method: string | null;
             /** Field Team */
             field_team: string | null;
+            /** Core Number */
+            core_number?: number | null;
         };
         /** NeedsReviewItem */
         NeedsReviewItem: {
@@ -1719,6 +1746,18 @@ export interface components {
             test_method: string | null;
             /** Field Team */
             field_team: string | null;
+            /** Worst Core Number */
+            worst_core_number?: number | null;
+            /**
+             * Measured Cores
+             * @default 0
+             */
+            measured_cores: number;
+            /**
+             * Total Cores
+             * @default 0
+             */
+            total_cores: number;
             /**
              * Status
              * @enum {string}
@@ -1753,6 +1792,18 @@ export interface components {
             test_method: string | null;
             /** Field Team */
             field_team: string | null;
+            /** Worst Core Number */
+            worst_core_number?: number | null;
+            /**
+             * Measured Cores
+             * @default 0
+             */
+            measured_cores: number;
+            /**
+             * Total Cores
+             * @default 0
+             */
+            total_cores: number;
             /**
              * Status
              * @enum {string}
@@ -1760,6 +1811,8 @@ export interface components {
             status: "measured" | "calculated_only" | "no_distance";
             /** History */
             history: components["schemas"]["MeasurementOut"][];
+            /** Cores */
+            cores: components["schemas"]["CoreLoss"][];
         };
         /** SpanSummary */
         SpanSummary: {

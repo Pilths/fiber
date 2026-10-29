@@ -25,18 +25,18 @@ test("tabs by role: planner sees Map and My reservations; admin (via dev switche
 test("selecting a span from Find shows the cores section and writes the hash; the hash restores it", async ({ page }) => {
   await signIn(page);
   await page.getByRole("list", { name: "Spans" }).getByRole("button", { name: new RegExp(SPAN) }).click();
-  await expect(page.getByRole("heading", { name: `Cores of ${SPAN}` })).toBeVisible();
+  await expect(page.locator("#span-h", { hasText: SPAN })).toBeVisible();
   await expect(page.getByRole("region", { name: "Inspector" })).toContainText("Free to reserve");
   await expect(page).toHaveURL(new RegExp(`#span=${encodeURIComponent(SPAN)}$`));
 
   const other = await page.context().newPage();
   await other.goto(`/#span=${encodeURIComponent(SPAN)}`);
-  await expect(other.getByRole("heading", { name: `Cores of ${SPAN}` })).toBeVisible();
+  await expect(other.locator("#span-h", { hasText: SPAN })).toBeVisible();
   await expect(other.getByRole("list", { name: "Spans" }).getByRole("button", { pressed: true })).toContainText(SPAN);
 
-  // Go to cores focuses the first Available core
-  await other.getByRole("button", { name: "Go to cores" }).click();
-  await expect(other.locator('[role=gridcell][data-status="Available"]').first()).toBeFocused();
+  // Details scrolls to the span detail
+  await other.getByRole("button", { name: "Open span details" }).click();
+  await expect(other.getByRole("heading", { name: "Cores", exact: true })).toBeInViewport();
 });
 
 test("the Inspector has no tab strip and no eyebrow: the span name is its first line", async ({ page }) => {

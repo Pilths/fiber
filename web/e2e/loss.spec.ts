@@ -1,84 +1,56 @@
 import { expect, test, type Page } from "@playwright/test";
 import { contrast, signIn } from "./helpers";
 
-// Dev seed: span 1 below calculated, 3 amber, 4 red, 5 off scale, 7 no distance.
+// Loss belongs to a core. Dev seed: KL DC - Bukit Jalil has a measured core; Bukit Jalil - Kuantan has no distance.
 const SPANS = {
-  below: /^DEV Kuala Lumpur DC - DEV Cyberjaya DC/,
-  amber: /^DEV Kuala Lumpur DC - DEV Bukit Jalil TOC/,
-  red: /^DEV Kuala Lumpur DC - DEV Ipoh Exchange/,
-  off: /^DEV Ipoh Exchange - DEV Penang Tower/,
+  measured: /^DEV Kuala Lumpur DC - DEV Bukit Jalil TOC/,
   noDistance: /^DEV Bukit Jalil TOC - DEV Kuantan Hut/,
 };
-const card = (page: Page) => page.getByTestId("loss-card");
 async function pick(page: Page, name: RegExp) {
   await page.getByRole("list", { name: "Spans" }).getByRole("button", { name }).click();
-  await expect(card(page).getByRole("heading", { name: /^Loss of/ })).toBeVisible();
-  await expect(card(page).getByText("Latest measured")).toBeVisible();
+  await expect(page.locator("#span-h")).toHaveText(name);
 }
 
 test.use({ viewport: { width: 1440, height: 900 } });
 
-test("each level shows a pill with its own symbol and word, below the taken-cores table", async ({ page }) => {
+test("Inspector shows the worst core and how many cores are measured", async ({ page }) => {
   await signIn(page);
-  const seen: Record<string, string | null> = {};
-  for (const [level, word, key] of [["amber", "Over 3%", "amber"], ["red", "Over 7%", "red"], ["off_scale", "Off scale (over 10%)", "off"], ["green", "Below calculated", "below"]] as const) {
-    await pick(page, SPANS[key]);
-    const pill = card(page).locator(`.pill[data-level=${level}]`);
-    await expect(pill).toHaveText(word);
-    seen[level] = await pill.locator("svg").getAttribute("data-icon");
-    // contrast of the pill text on its own background
-    const r = await contrast(page, { pill: `[data-testid=loss-card] .pill[data-level=${level}]` });
-    expect(r.pill, `${level} ${r.pill.toFixed(2)}`).toBeGreaterThanOrEqual(4.5);
-  }
-  expect(new Set(Object.values(seen)).size).toBe(4); // four symbols, never colour alone
-  // placement: the Loss card comes after "Allocations"
-  const held = await page.getByRole("region", { name: /^Allocations/ }).boundingBox();
-  const loss = await card(page).boundingBox();
-  expect(loss!.y).toBeGreaterThan(held!.y);
+  await pick(page, SPANS.measured);
+  const line = page.getByTestId("inspector-loss");
+  await expect(line).toContainText(/core (\d+|not recorded): [\d.]+ dB/);
+  await expect(line).toContainText(/\d+ of \d+ cores measured/);
+  await expect(page.getByTestId("span-card")).toContainText("Worst core");
 });
 
-test("amber span: metrics and history newest first", async ({ page }) => {
+test("a measured core: Calculated, Latest measured, Difference, Level and its tests", async ({ page }) => {
   await signIn(page);
-  await pick(page, SPANS.amber);
-  const c = card(page);
-  await expect(c).toContainText("3.60 dB");
-  await expect(c).toContainText("3.78 dB");
-  await expect(c.getByRole("heading", { name: "History" })).toBeVisible();
-  const rows = c.getByTestId("loss-history").locator("tbody tr");
+  await pick(page, SPANS.measured);
+  await page.getByRole("button", { name: "Open span details" }).click();
+  const cell = page.locator("[role=gridcell]:has(.lm)").first();
+  await cell.click({ force: true }); // taken cells are aria-disabled, which Playwright treats as disabled
+  const loss = page.getByTestId("core-loss");
+  for (const t of ["Calculated", "Latest measured", "Difference", "Level"]) await expect(loss).toContainText(t);
+  const rows = page.getByTestId("core-tests").locator("tbody tr");
   expect(await rows.count()).toBeGreaterThan(0);
-  expect(await rows.count()).toBeLessThanOrEqual(5);
-  // the first history row is the latest measurement shown above it
-  await expect(rows.first()).toContainText("3.78 dB");
-  await expect(rows.first().locator("td").nth(1)).toHaveText("+5.0%");
-  await c.locator(".card-h").scrollIntoViewIfNeeded();
-  await page.screenshot({ path: "e2e/screenshots/loss-amber.png" });
+  // the newest test is the latest measured value above it
+  const latest = (await loss.locator("dd").nth(1).innerText()).trim();
+  await expect(rows.first().locator("td").first()).toHaveText(latest);
+  const pill = loss.locator(".pill");
+  if (await pill.count()) {
+    const r = await contrast(page, { pill: "[data-testid=core-loss] .pill" });
+    expect(r.pill).toBeGreaterThanOrEqual(4.5);
+  }
+  await page.getByTestId("core-card").scrollIntoViewIfNeeded();
+  await page.screenshot({ path: "e2e/screenshots/core-loss.png" });
 });
 
 test("no distance span: says so and never shows 0 dB", async ({ page }) => {
   await signIn(page);
-  await page.getByRole("list", { name: "Spans" }).getByRole("button", { name: SPANS.noDistance }).click();
-  const c = card(page);
-  await expect(c).toContainText("No distance in the Excel, so no calculated loss.");
-  await expect(c).toContainText("No distance");
-  await expect(c).not.toContainText("0.00 dB");
-  await expect(c).not.toContainText(/\b0 dB/);
-  await expect(page.getByTestId("inspector-loss")).toContainText("Not measured");
-  await c.scrollIntoViewIfNeeded();
-  await page.screenshot({ path: "e2e/screenshots/loss-no-distance.png" });
-});
-
-test("Inspector loss line and See loss moves focus to the Loss card", async ({ page }) => {
-  await signIn(page);
-  await pick(page, SPANS.amber);
-  const line = page.getByTestId("inspector-loss");
-  await expect(line).toContainText("3.78 dB measured, +5.0%");
-  await expect(line.locator(".pill[data-level=amber]")).toHaveText("Over 3%");
-  await line.scrollIntoViewIfNeeded();
-  await page.screenshot({ path: "e2e/screenshots/inspector-loss.png" });
-  await line.getByRole("button", { name: "See loss" }).click();
-  const h = card(page).getByRole("heading", { name: /^Loss of/ });
-  await expect(h).toBeFocused();
-  await expect(h).toBeInViewport();
-  // Find list marks amber-or-worse spans with a symbol and text
-  await expect(page.getByRole("list", { name: "Spans" }).getByRole("button", { name: SPANS.red })).toContainText("Loss Over 7%");
+  await pick(page, SPANS.noDistance);
+  await expect(page.getByTestId("inspector-loss")).toContainText("No core measured");
+  const span = page.getByTestId("span-card");
+  await expect(span).toContainText("No distance");
+  await expect(span).not.toContainText("0.00 dB");
+  await page.getByRole("gridcell").first().click({ force: true });
+  await expect(page.getByTestId("core-no-loss")).toHaveText("No loss test yet. No distance, so no calculated loss.");
 });

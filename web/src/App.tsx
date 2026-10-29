@@ -7,10 +7,9 @@ import { ChosenBar } from "@/components/ChosenBar";
 import { CoreDrawer } from "@/components/CoreDrawer";
 import { FindCard } from "@/components/FindCard";
 import { Header, type View } from "@/components/Header";
-import { HeldTable } from "@/components/HeldTable";
 import { Icon } from "@/components/Icon";
-import { LossCard } from "@/components/LossCard";
-import { Facts, Inspector } from "@/components/Inspector";
+import { Inspector } from "@/components/Inspector";
+import { CoreCard, RouteSearch, SpanCard, Unassigned, type Found } from "@/components/NetworkDetail";
 import { NetworkMap } from "@/components/NetworkMap";
 import { PortGrid } from "@/components/PortGrid";
 import { RouteForm, RouteSection, RouteSummary, useRoutePlanner } from "@/components/RoutePlanner";
@@ -82,6 +81,8 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
   const [lossList, setLossList] = useState<SpanLoss[]>([]);
   const [version, setVersion] = useState(0); // bumped after a booking or edit so the span list and grid reload
   const [drawerCore, setDrawerCore] = useState<number | null>(null);
+  const [coreId, setCoreId] = useState<number | null>(null); // core shown in the core card
+  const [found, setFound] = useState<Found | null>(null); // route search result
   const [editSpan, setEditSpan] = useState<{ focus?: SpanFocus } | null>(null);
   const [editSite, setEditSite] = useState<number | null>(null);
   const [filter, setFilter] = useState<SpanFilter>(NO_FILTER);
@@ -147,6 +148,7 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
     setFocusCoreId(coreId);
     setSelected((s) => (s.size ? new Set() : s));
     setDrawerCore(null);
+    setCoreId(coreId);
   }, [setView]);
 
   // Hash -> selection, on load and when the hash changes (back button, pasted link).
@@ -169,11 +171,6 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
 
   const toggle = (id: number) => setSelected((s) => { const n = new Set(s); if (!n.delete(id)) n.add(id); return n; });
   const chosen = detail?.cores.filter((c) => selected.has(c.id)) ?? [];
-  const goToCores = () => {
-    const cell = document.querySelector<HTMLElement>('[role=gridcell][data-status="Available"]') ?? document.querySelector<HTMLElement>("[role=gridcell]");
-    cell?.scrollIntoView({ block: "center" });
-    cell?.focus({ preventScroll: true });
-  };
   const changed = () => { setVersion((v) => v + 1); refreshBell(); };
   const drawn = detail?.cores.find((c) => c.id === drawerCore);
   const admin = me.role === "admin" && spanId != null ? {
@@ -187,7 +184,6 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
     h?.scrollIntoView({ block: "start" });
     h?.focus({ preventScroll: true });
   };
-  const planRoute = (site: string) => { setMode("route"); rp.setFrom(site); rp.setTo(""); };
   // Map: a site click lists its spans in Find (span mode) or fills From, then To (route mode); Esc clears the selection.
   const mapSite = (name: string) => {
     if (mode === "span") setFilter((f) => ({ ...f, q: name }));
@@ -196,15 +192,21 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
   };
   const clearSelection = () => {
     if (mode === "route") { rp.clear(); return; }
-    setSpanId(null); setDetail(null); setSelected(new Set()); setDrawerCore(null);
+    setSpanId(null); setDetail(null); setSelected(new Set()); setDrawerCore(null); setCoreId(null); setFound(null);
     if (location.hash.startsWith("#span=")) history.replaceState(null, "", location.pathname);
   };
   const routeName = rp.option && `${rp.option.spans[0].site_a} to ${rp.option.spans[rp.option.spans.length - 1].site_b}`;
-  const goTo = (id: string) => () => {
-    const h = document.getElementById(id);
-    h?.scrollIntoView({ block: "start" });
-    h?.focus({ preventScroll: true });
-  };
+  const onRoute = found?.ids.map((id) => {
+    const x = spans?.find((y) => y.id === id);
+    return { id, name: x ? spanName(x) : `Span ${id}`, km: x?.distance_km != null ? Number(x.distance_km) : null };
+  }) ?? [];
+  const mapIds = mode === "route" ? rp.option?.spans.map((s) => s.span_id) ?? []
+    : found ? [...found.ids, ...(spanId != null && !found.ids.includes(spanId) ? [spanId] : [])]
+    : spanId != null ? [spanId] : [];
+  const spanLoss = loss?.span_id === spanId ? loss : null;
+  const core = detail?.cores.find((c) => c.id === coreId);
+  const measured = useMemo(() => new Set(spanLoss?.cores.map((c) => c.core_id)), [spanLoss]);
+  const toDetail = () => document.getElementById("detail")?.scrollIntoView({ behavior: "smooth", block: "start" });
 
   return (
     <div className="min-h-screen">
@@ -228,26 +230,27 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
       )}
       {view === "map" && (
         <main className="grid grid-cols-12 gap-4 px-6 pt-6 pb-10">
+          <RouteSearch onFound={(f) => { setFound(f); if (f) open(f.ids[0]); }} />
           <section className="card col-span-8 flex flex-col p-3" aria-label="Network map" aria-describedby="map-instr">
             <NetworkMap version={version} onSelectSpan={(id) => open(id)} onSite={mapSite} onClear={clearSelection}
-              selectedIds={mode === "route" ? rp.option?.spans.map((s) => s.span_id) ?? [] : spanId != null ? [spanId] : []}
-              routeKey={mode === "route" && rp.option ? `${rp.idx}-${routeName}` : null} visible={(p) => inFilter({ ...p, route: routeOf.get(p.span_id) }, filter)} />
+              selectedIds={mapIds}
+              routeKey={mode === "route" ? (rp.option ? `${rp.idx}-${routeName}` : null) : found ? `found-${found.ids.join(",")}` : null} visible={(p) => inFilter({ ...p, route: routeOf.get(p.span_id) }, filter)} />
           </section>
           <div className="col-span-4 flex min-w-0 flex-col gap-4">{/* B2: Inspector first, fixed height, so Find never moves */}
-            <Inspector detail={detail} loading={spanId != null && !detail} onGoToCores={goToCores} loss={loss?.span_id === spanId ? loss : null} onSeeLoss={goTo("loss-h")} onSeeHeld={goTo("held-h")} admin={admin}
-              onPlanRoute={planRoute} route={mode === "route" ? <RouteSummary key={`${rp.idx}-${routeName}`} rp={rp} onGo={goToRoute} /> : undefined} />
+            <Inspector detail={detail} loading={spanId != null && !detail} loss={spanLoss} admin={admin} onDetails={toDetail} onRoute={onRoute} onPick={(id) => open(id)}
+              route={mode === "route" ? <RouteSummary key={`${rp.idx}-${routeName}`} rp={rp} onGo={goToRoute} /> : undefined} />
             <FindCard spans={spans} selectedId={spanId} onSelect={(id) => open(id)} loss={lossList} mode={mode} onMode={setMode} route={<RouteForm rp={rp} />} filter={filter} onFilter={setFilter} />
           </div>
 
           {mode === "route" && rp.option && <RouteSection rp={rp} spans={spans} onDone={changed} />}
           {mode === "span" && detail && (
-            <div className="col-span-12 space-y-4">
+            <div id="detail" className="col-span-12 scroll-mt-4 space-y-4">
+              <SpanCard d={detail} loss={spanLoss} />
               <section className={`card ${detail.survey_cores != null ? "ccard" : ""}`} aria-labelledby="cores-h">
                 <div className="card-h items-center">
                   <div className="flex min-w-0 flex-wrap items-baseline gap-x-5 gap-y-1">
-                    <h2 id="cores-h" className="text-2xl! leading-8! font-bold! tracking-tight">Cores of {spanName(detail)}</h2>
+                    <h2 id="cores-h">Cores</h2>
                     <span className="flex flex-wrap gap-x-4 text-body text-muted-foreground">
-                      <Facts d={detail} />
                       {detail.survey_cores != null && <span><b className="font-semibold text-foreground">{detail.survey_cores}</b> surveyed of {detail.cable_size}</span>}
                     </span>
                   </div>
@@ -259,12 +262,11 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
                       {admin && <button type="button" className="btn btn-sm" onClick={() => admin.onEditSpan("survey")}>Enter survey count</button>}
                     </div>
                   )
-                  : <Cores d={detail} selected={selected} chosen={chosen} toggle={toggle} focusCoreId={focusCoreId} onOpen={(c) => setDrawerCore(c.id)}
+                  : <Cores d={detail} selected={selected} chosen={chosen} toggle={toggle} focusCoreId={focusCoreId} onOpen={(c) => setCoreId(c.id)} measured={measured} current={coreId}
                       onClear={() => setSelected(new Set())}
                       onDone={() => { setSelected(new Set()); setVersion((v) => v + 1); refreshBell(); }} />}
               </section>
-              <HeldTable d={detail} admin={me.role === "admin"} onOpen={(c) => setDrawerCore(c.id)} onChanged={changed} />
-              <LossCard key={detail.id} loss={loss?.span_id === detail.id ? loss : null} />
+              {core && <CoreCard d={detail} core={core} loss={spanLoss} onOpen={() => setDrawerCore(core.id)} />}
             </div>
           )}
           {detail && drawn && <CoreDrawer key={drawn.id} core={drawn} span={spanName(detail)} ends={[detail.site_a, detail.site_b]} me={me} onClose={() => setDrawerCore(null)} onChanged={changed} />}
@@ -276,9 +278,9 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
   );
 }
 
-function Cores({ d, selected, chosen, toggle, focusCoreId, onOpen, onClear, onDone }: {
+function Cores({ d, selected, chosen, toggle, focusCoreId, onOpen, onClear, onDone, measured, current }: {
   d: Detail; selected: Set<number>; chosen: Detail["cores"]; toggle: (id: number) => void; focusCoreId: number | null;
-  onOpen: (c: Detail["cores"][number]) => void; onClear: () => void; onDone: () => void;
+  onOpen: (c: Detail["cores"][number]) => void; onClear: () => void; onDone: () => void; measured: Set<number>; current: number | null;
 }) {
   const n = countBy(d);
   return (
@@ -293,8 +295,10 @@ function Cores({ d, selected, chosen, toggle, focusCoreId, onOpen, onClear, onDo
             </li>
           );
         })}
+        <li className="flex items-center gap-2" data-key="measured"><span aria-hidden className="text-foreground">&#9650;</span>Loss measured</li>
       </ul>
-      <PortGrid cores={d.cores} selected={selected} onToggle={toggle} onOpen={onOpen} focusCoreId={focusCoreId} />
+      <PortGrid cores={d.cores} selected={selected} onToggle={toggle} onOpen={onOpen} focusCoreId={focusCoreId} measured={measured} current={current} />
+      <Unassigned d={d} />
       {/* The stale note sticks with the chosen bar, directly above it, so the bar never covers it. */}
       <div className="cstick">
         {chosen.length > 0 && <p className="mx-5 mb-3 flex items-center gap-2 note px-3 py-2 text-body" data-testid="stale-note">

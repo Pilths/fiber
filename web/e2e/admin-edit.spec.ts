@@ -15,12 +15,14 @@ const pick = async (page: Page, name: RegExp) => {
 };
 const cell = (page: Page, n: number) => page.getByRole("gridcell", { name: new RegExp(`^Core ${n}:`) });
 const drawer = (page: Page) => page.getByRole("dialog", { name: /^Core \d+ on / });
+const actions = (page: Page) => page.getByTestId("core-card").getByRole("button", { name: "History and actions" });
 
 test("core drawer: opens from a taken core with history, Keep for the owner, Esc returns focus", async ({ page }) => {
   await signIn(page, "planner1");
   await pick(page, KLCJ);
   await cell(page, 1).focus();
-  await page.keyboard.press("Enter");
+  await page.keyboard.press("Enter"); // shows the core in the core card
+  await actions(page).click();
   const d = drawer(page);
   await expect(d).toBeVisible();
   await expect(d.getByRole("heading", { level: 2 })).toHaveText("Core 1 on DEV Kuala Lumpur DC - DEV Cyberjaya DC");
@@ -37,17 +39,14 @@ test("core drawer: opens from a taken core with history, Keep for the owner, Esc
   await page.screenshot({ path: "e2e/screenshots/core-drawer.png" });
   await page.keyboard.press("Escape");
   await expect(d).toBeHidden();
-  await expect(cell(page, 1)).toBeFocused();
-
-  // the taken-cores table opens the same drawer
-  await page.getByRole("table", { name: "Allocations on this span" }).getByRole("button", { name: "Core 2 details" }).click();
-  await expect(drawer(page).getByRole("heading", { level: 2 })).toHaveText(/^Core 2 on/);
+  await expect(actions(page)).toBeFocused();
 });
 
 test("planner sees no Keep on others' cores and no edit buttons", async ({ page }) => {
   await signIn(page, "planner2");
   await pick(page, KLCJ);
   await cell(page, 1).click({ force: true }); // taken cells are aria-disabled (not selectable), which Playwright treats as disabled
+  await actions(page).click();
   const d = drawer(page);
   await expect(d).toContainText("DEV Telco Alpha");
   await expect(d.getByText(/^DEV planner1, reservation #\d+$/)).toBeVisible(); // Reserved by: from GET /api/cores/{id}
@@ -60,7 +59,8 @@ test("planner sees no Keep on others' cores and no edit buttons", async ({ page 
   await expect(inspector.getByRole("button", { name: /^Edit site/ })).toHaveCount(0);
 });
 
-test("taken-cores table tags stale cores", async ({ page }) => {
+// moves to Reserve screen (Allocations table no longer on the map page)
+test.fixme("taken-cores table tags stale cores", async ({ page }) => {
   await signIn(page, "admin1");
   const rs: { stale: boolean; cores: { core_id: number; held: boolean }[] }[] = await (await page.request.get("/api/reservations")).json();
   const core = rs.filter((r) => r.stale).flatMap((r) => r.cores).find((c) => c.held);
@@ -74,7 +74,7 @@ test("taken-cores table tags stale cores", async ({ page }) => {
 test("admin edits span distance with a reason; calculated loss follows; then reverts", async ({ page }) => {
   await signIn(page, "admin1");
   await pick(page, CJBJ);
-  const loss = page.getByTestId("loss-card");
+  const loss = page.getByTestId("span-card");
   await expect(loss).toContainText("5.46 dB");
 
   const edit = async (km: string, reason: string) => {
@@ -112,7 +112,7 @@ test("lowering the survey count below taken cores is refused in plain words", as
   await dlg.getByRole("button", { name: "Save" }).click();
   await expect(dlg.getByRole("alert")).toContainText(/^Cores 2, .* are allocated or have history and cannot be removed/);
   await dlg.getByRole("button", { name: "Cancel" }).click();
-  await expect(page.getByRole("region", { name: /^Cores of/ })).toContainText("24 surveyed of 144");
+  await expect(page.getByRole("region", { name: "Cores", exact: true })).toContainText("24 surveyed of 144");
 });
 
 test("admin opens a site from the Inspector: fields, reason required, history", async ({ page }) => {
@@ -151,6 +151,7 @@ test("admin edits a core's ports with a reason, then puts them back", async ({ p
   await pick(page, KLBJ);
   await cell(page, 21).focus();
   await page.getByRole("button", { name: "Core 21 details" }).click();
+  await actions(page).click();
   const d = drawer(page);
   const dlg = page.getByRole("dialog", { name: "Ports of core 21" });
   const a = dlg.getByLabel("Port at DEV Kuala Lumpur DC");
@@ -177,7 +178,8 @@ test("admin edits a core's ports with a reason, then puts them back", async ({ p
   await expect(d).toContainText(oldA || oldB ? `${oldA || "Not recorded"} to ${oldB || "Not recorded"}` : "Add ports");
 });
 
-test("one Unassigned row per reservation; admin assign dialog limits the choice", async ({ page }) => {
+// moves to Reserve screen (Allocations table no longer on the map page)
+test.fixme("one Unassigned row per reservation; admin assign dialog limits the choice", async ({ page }) => {
   await signIn(page, "admin1");
   await pick(page, CJBJ);
   const table = page.getByRole("table", { name: "Allocations on this span" });

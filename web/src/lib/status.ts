@@ -69,3 +69,7 @@ export const EVENT_WORD: Record<string, string> = {
   requested: "Requested", approved: "Approved", rejected: "Rejected", withdrawn: "Withdrawn", kept: "Kept",
   release_requested: "Release requested", released: "Released", release_declined: "Release declined", corrected: "Corrected", assigned: "Cores assigned",
 };
+
+// Worst measured core of a span, e.g. "core 12: 7.40 dB"; old imports have no core recorded.
+export const worstText = (l: { measured_db: number | null; worst_core_number?: number | null }) =>
+  l.measured_db == null ? null : `${l.worst_core_number != null ? `core ${l.worst_core_number}` : "core not recorded"}: ${db(l.measured_db)}`;
