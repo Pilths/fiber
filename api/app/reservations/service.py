@@ -217,15 +217,16 @@ def _check_book(db: Session, core_ids: list[int]) -> list[dict[str, Any]]:
 
 # ---------- planner / any user ----------
 
-def create(db: Session, user: CurrentUser, customer_id: int, planned_date: date | None, core_ids: list[int]) -> ReservationOut:
+def create(db: Session, user: CurrentUser, customer_id: int, planned_date: date | None, core_ids: list[int],
+           srf_id: str | None = None) -> ReservationOut:
     core_ids = sorted(set(core_ids))
     if not db.execute(text("SELECT 1 FROM customers WHERE id = :c"), {"c": customer_id}).first():
         raise HTTPException(422, "Unknown customer")
     _check_book(db, core_ids)
     rid = db.execute(text(
-        "INSERT INTO reservations (customer_id, planner_id, planned_date, is_new_customer) VALUES "
-        "(:c, :u, :d, NOT EXISTS (SELECT 1 FROM reservations WHERE customer_id = :c)) RETURNING id"),
-        {"c": customer_id, "u": user.id, "d": planned_date}).scalar_one()
+        "INSERT INTO reservations (customer_id, planner_id, planned_date, is_new_customer, srf_id) VALUES "
+        "(:c, :u, :d, NOT EXISTS (SELECT 1 FROM reservations WHERE customer_id = :c), :srf) RETURNING id"),
+        {"c": customer_id, "u": user.id, "d": planned_date, "srf": (srf_id or "").strip() or None}).scalar_one()
     _event(db, rid, "requested", user)
     _hold(db, rid, core_ids)
     db.commit()

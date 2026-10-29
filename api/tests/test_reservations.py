@@ -413,3 +413,12 @@ def test_core_holder_endpoint_and_span_stale(client, w, db):
     hidden = one(db, "INSERT INTO cores (span_id, number) VALUES (:s, 7) RETURNING id", s=w["s1"])
     assert client.get(f"/api/cores/{hidden}", headers=H("planner1")).status_code == 404
     assert client.get("/api/cores/999999", headers=H("planner1")).status_code == 404
+
+
+def test_srf_and_planner_on_span_detail(client, w, db):
+    core = w["c1"][1]
+    assert book(client, w, [core], srf_id=" SRF-9 ").status_code == 200
+    held = next(c for c in span(client, w["s1"])["cores"] if c["id"] == core)
+    assert held["srf_id"] == "SRF-9" and held["planner"] and held["srf_id"] != " SRF-9 "
+    free = next(c for c in span(client, w["s1"])["cores"] if c["id"] != core and c["status"] == "Available")
+    assert free["srf_id"] is None and free["planner"] is None

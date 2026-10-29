@@ -45,7 +45,8 @@ ORDER BY s.id
 CORE_SQL = """
 SELECT c.id, c.number, v.status, c.circuit_id, pa.port_id AS port_a, pb.port_id AS port_b,
        COALESCE(cust.name, hc.name) AS customer, COALESCE(corr_date.planned_date, r.planned_date) AS planned_date,
-       r.id AS reservation_id, COALESCE(st.is_stale, false) AS stale, st.stale_since
+       r.id AS reservation_id, COALESCE(st.is_stale, false) AS stale, st.stale_since,
+       r.srf_id, pu.display_name AS planner
 FROM cores c
 JOIN core_status_v v ON v.core_id = c.id
 LEFT JOIN ports pa ON pa.id = c.port_a_id
@@ -54,6 +55,7 @@ LEFT JOIN core_holds h ON h.core_id = c.id
 LEFT JOIN reservations r ON r.id = h.reservation_id
 LEFT JOIN reservation_state_v st ON st.reservation_id = r.id
 LEFT JOIN customers hc ON hc.id = r.customer_id
+LEFT JOIN users pu ON pu.id = r.planner_id
 LEFT JOIN LATERAL (
   SELECT e.customer_id FROM reservation_events e
   WHERE e.reservation_id = r.id AND e.type = 'corrected' AND e.customer_id IS NOT NULL
@@ -77,10 +79,11 @@ CORE_ONE_SQL = CORE_SQL.replace("SELECT c.id, c.number,", "SELECT c.span_id, a.n
 # Count-only holds with cores still to assign; customer and date take the latest correction like CORE_SQL.
 UNASSIGNED_SQL = """
 SELECT u.reservation_id, COALESCE(cust.name, hc.name) AS customer, u.remaining,
-       COALESCE(corr_date.planned_date, r.planned_date) AS planned_date
+       COALESCE(corr_date.planned_date, r.planned_date) AS planned_date, r.srf_id, pu.display_name AS planner
 FROM reservation_unassigned_v u
 JOIN reservations r ON r.id = u.reservation_id
 JOIN customers hc ON hc.id = r.customer_id
+JOIN users pu ON pu.id = r.planner_id
 LEFT JOIN LATERAL (
   SELECT e.customer_id FROM reservation_events e
   WHERE e.reservation_id = r.id AND e.type = 'corrected' AND e.customer_id IS NOT NULL
@@ -138,6 +141,7 @@ def get_core(db: Session, core_id: int, user_id: int) -> CoreHolderDetail | None
         owner = db.execute(text(HOLDER_SQL), {"rid": row["reservation_id"]}).mappings().one()
         holder = Holder(reservation_id=row["reservation_id"], customer=row["customer"], planned_date=row["planned_date"],
                         state=state, stale=row["stale"], stale_since=row["stale_since"],
+                        srf_id=row["srf_id"], planner=row["planner"],
                         owner=Owner(**owner), is_mine=owner["id"] == user_id)
     return CoreHolderDetail(core_id=row["id"], number=row["number"], span_id=row["span_id"], span_name=row["span_name"],
                             status=row["status"], circuit_id=row["circuit_id"], port_a=row["port_a"], port_b=row["port_b"],

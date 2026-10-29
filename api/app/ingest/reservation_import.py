@@ -63,11 +63,11 @@ def place_reservation(db: Any, counts: dict[str, int], p: dict[str, Any], site_i
         cust = one(db, "INSERT INTO customers (name, created_by) VALUES (:n, :u) RETURNING id", n=p["customer"], u=creator_id)
         counts["customers"] = counts.get("customers", 0) + 1
     res = one(db, "INSERT INTO reservations (customer_id, planner_id, planned_date, imported, group_label, additional, "
-                  "cv_ready_date, contractor, remark, port_info_raw, monitoring_code, fiber_monitored, "
+                  "cv_ready_date, contractor, remark, srf_id, port_info_raw, monitoring_code, fiber_monitored, "
                   "unassigned_cores, unassigned_span_id) VALUES "
-                  "(:c, :u, :pd, true, :gl, :ad, :cv, :ct, :rm, :pi, :mc, :fm, :uc, :us) RETURNING id",
+                  "(:c, :u, :pd, true, :gl, :ad, :cv, :ct, :rm, :sr, :pi, :mc, :fm, :uc, :us) RETURNING id",
               c=cust, u=creator_id, pd=p["planned_date"], gl=p["group_label"], ad=p["additional"],
-              cv=p["cv_ready_date"], ct=p["contractor"], rm=p["remark"], pi=p["port_info_raw"],
+              cv=p["cv_ready_date"], ct=p["contractor"], rm=p["remark"], sr=p.get("srf_id"), pi=p["port_info_raw"],
               mc=p["monitoring_code"], fm=p["fiber_monitored"],
               uc=p["unassigned_cores"], us=span_id if p["unassigned_cores"] else None)
     ev = "INSERT INTO reservation_events (reservation_id, type, user_id) VALUES (:r, :t, :u)"

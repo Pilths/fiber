@@ -45,6 +45,8 @@ class CoreDetail(BaseModel):
     reservation_id: int | None = None  # holder, when the core is held
     stale: bool = False
     stale_since: date | None = None  # date the 3-month stale clock started (latest keep, else approval)
+    srf_id: str | None = None
+    planner: str | None = None  # display name of the planner who made the reservation
 
 
 class Owner(BaseModel):
@@ -60,6 +62,8 @@ class Holder(BaseModel):
     state: Literal["requested", "approved", "release_requested"]
     stale: bool
     stale_since: date | None
+    srf_id: str | None = None
+    planner: str | None = None
     owner: Owner
     is_mine: bool
 
@@ -82,6 +86,8 @@ class UnassignedHold(BaseModel):
     customer: str | None
     remaining: int
     planned_date: date | None
+    srf_id: str | None = None
+    planner: str | None = None
 
 
 class SpanDetail(SpanSummary):

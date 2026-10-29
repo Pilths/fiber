@@ -88,9 +88,9 @@ def run(db: Session) -> None:
     cust = [one("INSERT INTO customers (name, created_by) VALUES (:n, :u) RETURNING id", n=n, u=user["planner1"])
             for n in ("DEV Telco Alpha", "DEV Telco Beta", "DEV Bank Gamma")]
 
-    def reserve(customer: int, planner: str, span_id: int, nums: list[int], approver: str | None) -> None:
-        res = one("INSERT INTO reservations (customer_id, planner_id, planned_date) "
-                  "VALUES (:c, :u, current_date + 30) RETURNING id", c=customer, u=user[planner])
+    def reserve(customer: int, planner: str, span_id: int, nums: list[int], approver: str | None, srf: str | None = None) -> None:
+        res = one("INSERT INTO reservations (customer_id, planner_id, planned_date, srf_id) "
+                  "VALUES (:c, :u, current_date + 30, :srf) RETURNING id", c=customer, u=user[planner], srf=srf)
         ins("INSERT INTO reservation_events (reservation_id, type, user_id) VALUES (:r, 'requested', :u)",
             r=res, u=user[planner])
         if approver:
@@ -100,8 +100,8 @@ def run(db: Session) -> None:
             ins("INSERT INTO reservation_cores (reservation_id, core_id) VALUES (:r, :c)", r=res, c=cores[span_id][num])
             ins("INSERT INTO core_holds (core_id, reservation_id) VALUES (:c, :r)", c=cores[span_id][num], r=res)
 
-    reserve(cust[0], "planner1", span[0], [1, 2], "admin1")
-    reserve(cust[1], "planner2", span[3], [1, 2], None)
+    reserve(cust[0], "planner1", span[0], [1, 2], "admin1", "SRF-DEV-001")
+    reserve(cust[1], "planner2", span[3], [1, 2], None, "SRF-DEV-002")
 
     # count-only reservation, as an Excel import makes it: 3 cores wanted on CJ-BJ, ports not assigned yet
     res = one("INSERT INTO reservations (customer_id, planner_id, imported, unassigned_cores, unassigned_span_id) "

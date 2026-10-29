@@ -295,3 +295,15 @@ def test_header_row_and_sheet_name_found_by_scanning(client, db, admin):
     r = up(client, out.getvalue())
     assert r.status_code == 201, r.text
     assert r.json()["counts"]["reservations"] == 1
+
+
+def test_srf_header_imports(client, db, admin):
+    wb = openpyxl.load_workbook(io.BytesIO(workbook(row())))
+    ws = wb["Reservation"]
+    ws.cell(1, 20, "SRF ID")
+    ws.cell(2, 20, "  SRF-77 ")
+    out = io.BytesIO()
+    wb.save(out)
+    uid = up(client, out.getvalue()).json()["upload_id"]
+    assert confirm(client, uid).status_code == 200
+    assert n(db, "SELECT count(*) FROM reservations WHERE srf_id = 'SRF-77'") == 1

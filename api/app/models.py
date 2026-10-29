@@ -179,6 +179,7 @@ class Reservation(Base):
     cv_ready_date: Mapped[date | None] = mapped_column(Date)
     contractor: Mapped[str | None] = mapped_column(Text)
     remark: Mapped[str | None] = mapped_column(Text)
+    srf_id: Mapped[str | None] = mapped_column(Text)
     port_info_raw: Mapped[str | None] = mapped_column(Text)
     monitoring_code: Mapped[str | None] = mapped_column(Text)
     fiber_monitored: Mapped[str | None] = mapped_column(Text)
