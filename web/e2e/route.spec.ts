@@ -213,7 +213,11 @@ test("Reserve on a sufficient route sends one request (then withdrawn)", async (
   await expect(box).toContainText(/1 core on each of \d+ spans, \d+ in total\. Cores are assigned from the first free cores on each span\./);
   await box.getByLabel("Search customers").fill("DEV Telco Alpha");
   await box.getByRole("button", { name: "DEV Telco Alpha", exact: true }).click();
+  await box.getByLabel("SRF ID").fill("SRF-E2E");
+  await box.screenshot({ path: "test-results/route-reserve.png" });
+  const sent = page.waitForRequest((q) => q.method() === "POST" && q.url().endsWith("/api/reservations"));
   await box.getByRole("button", { name: "Reserve on this route" }).click();
+  expect((await sent).postDataJSON().srf_id).toBe("SRF-E2E");
   const status = box.getByRole("status");
   await expect(status).toContainText(/Request #\d+ sent/);
   const id = /Request #(\d+)/.exec((await status.textContent())!)![1];

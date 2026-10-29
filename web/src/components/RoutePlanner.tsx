@@ -450,6 +450,7 @@ function Diagram({ rp, op, need, type, loss }: { rp: RoutePlanner; op: RouteOpti
 function ReserveBox({ op, need, onDone }: { op: RouteOption; need: number; onDone: () => void }) {
   const id = useId();
   const [date, setDate] = useState("");
+  const [srf, setSrf] = useState("");
   const [tried, setTried] = useState(false);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
@@ -465,7 +466,7 @@ function ReserveBox({ op, need, onDone }: { op: RouteOption; need: number; onDon
     try {
       const p = await api.get("/api/routes/pick", { query: { span_ids: op.spans.map((s) => s.span_id), cores_needed: need } }) as unknown as
         { spans: { name: string; cores: { number: number }[] }[]; core_ids: number[] };
-      const r = await api.post("/api/reservations", { body: { customer_id: customer.id, planned_date: date || null, cores: p.core_ids } });
+      const r = await api.post("/api/reservations", { body: { customer_id: customer.id, planned_date: date || null, ...(srf.trim() && { srf_id: srf.trim() }), cores: p.core_ids } });
       setMsg({ ok: true, text: `Request #${r.id} sent (${r.status}): ${p.spans.map((s) => `${s.name} cores ${s.cores.map((c) => c.number).join(", ")}`).join("; ")}. Nothing is reserved until an admin approves.` });
       setTried(false);
       onDone();
@@ -479,12 +480,15 @@ function ReserveBox({ op, need, onDone }: { op: RouteOption; need: number; onDon
   return (
     <section className="card" aria-labelledby={`${id}-h`} data-testid="route-reserve">
       <div className="card-h"><h2 id={`${id}-h`}>Reserve on this route</h2></div>
-      <div className="flex items-end gap-6">
-      <p className="max-w-[380px] flex-1 self-center text-body text-muted-foreground">
+      <div className="flex flex-wrap items-end gap-6">
+      <p className="max-w-[380px] min-w-[200px] flex-1 self-center text-body text-muted-foreground">
         <b className="text-foreground">{need}</b> {need === 1 ? "core" : "cores"} on each of <b className="text-foreground">{op.total_spans}</b> spans, <b className="text-foreground">{total}</b> in total. Cores are assigned from the first free cores on each span.
       </p>
       <form className="flex flex-1 items-end justify-end gap-3" onSubmit={submit} noValidate>
         {field}
+        <label className="grid w-[140px] min-w-[90px] gap-1"><span className="lbl">SRF ID</span>
+          <input className="field" value={srf} onChange={(e) => setSrf(e.target.value)} autoComplete="off" />
+        </label>
         <label className="grid w-[170px] shrink-0 gap-1"><span className="lbl">Planned date</span>
           <input type="date" className="field" value={date} onChange={(e) => setDate(e.target.value)} />
         </label>

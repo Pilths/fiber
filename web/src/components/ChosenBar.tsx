@@ -88,6 +88,7 @@ export function ChosenBar({ cores, free, onClear, onDone }: {
   onDone: () => void;
 }) {
   const [date, setDate] = useState("");
+  const [srf, setSrf] = useState("");
   const [tried, setTried] = useState(false);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -102,7 +103,7 @@ export function ChosenBar({ cores, free, onClear, onDone }: {
     setBusy(true);
     setMsg(null);
     try {
-      const r = await api.post("/api/reservations", { body: { customer_id: customer.id, planned_date: date || null, cores: cores.map((c) => c.id) } });
+      const r = await api.post("/api/reservations", { body: { customer_id: customer.id, planned_date: date || null, ...(srf.trim() && { srf_id: srf.trim() }), cores: cores.map((c) => c.id) } });
       setMsg({ text: `Request #${r.id} sent (${r.status}). Nothing is reserved until an admin approves.`, ok: true });
       setTried(false);
       onDone();
@@ -125,6 +126,9 @@ export function ChosenBar({ cores, free, onClear, onDone }: {
       </div>
       <div className="mt-3 flex flex-wrap items-end gap-3">
         {field}
+        <label className="grid flex-[0_0_140px] gap-1"><span className="lbl">SRF ID</span>
+          <input className="field" value={srf} onChange={(e) => setSrf(e.target.value)} autoComplete="off" />
+        </label>
         <label className="grid flex-[0_0_160px] gap-1"><span className="lbl">Planned date</span>
           <input type="date" className="field" value={date} onChange={(e) => setDate(e.target.value)} />
         </label>

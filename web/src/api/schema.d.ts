@@ -1091,6 +1091,10 @@ export interface components {
             stale: boolean;
             /** Stale Since */
             stale_since?: string | null;
+            /** Srf Id */
+            srf_id?: string | null;
+            /** Planner */
+            planner?: string | null;
         };
         /** CoreHistoryItem */
         CoreHistoryItem: {
@@ -1344,6 +1348,10 @@ export interface components {
             stale: boolean;
             /** Stale Since */
             stale_since: string | null;
+            /** Srf Id */
+            srf_id?: string | null;
+            /** Planner */
+            planner?: string | null;
             owner: components["schemas"]["Owner"];
             /** Is Mine */
             is_mine: boolean;
@@ -1456,6 +1464,8 @@ export interface components {
             planned_date?: string | null;
             /** Cores */
             cores: number[];
+            /** Srf Id */
+            srf_id?: string | null;
         };
         /** ReservationOut */
         ReservationOut: {
@@ -1861,6 +1871,10 @@ export interface components {
             remaining: number;
             /** Planned Date */
             planned_date: string | null;
+            /** Srf Id */
+            srf_id?: string | null;
+            /** Planner */
+            planner?: string | null;
         };
         /** UserCreate */
         UserCreate: {

@@ -10,13 +10,13 @@ const pick = (page: Page, name: RegExp) => pickSpan(page, name);
 
 test.use({ viewport: { width: 1440, height: 900 } });
 
-test("Inspector shows the worst core and how many cores are measured", async ({ page }) => {
+test("Inspector shows total loss in its level colour, no worst core", async ({ page }) => {
   await signIn(page);
   await pick(page, SPANS.measured);
   const line = page.getByTestId("inspector-loss");
-  await expect(page.getByTestId("span-facts")).toContainText(/Worst core(\d+|Not recorded)Difference[+−]?[\d.]+%/);
+  await expect(line).toContainText(/^Total loss[\d.]+ dB/);
   await expect(line.locator(".pill")).toHaveCount(0);
-  await expect(page.getByTestId("span-facts")).toContainText(/Cores measured\d+ of \d+/);
+  await expect(page.getByTestId("span-facts")).not.toContainText(/Worst core|Cores measured|Difference/);
 });
 
 test("a measured core: its loss in the core table, its tests in the row detail", async ({ page }) => {
@@ -43,7 +43,8 @@ test("no distance span: dashes, never 0 dB", async ({ page }) => {
   await signIn(page);
   await pick(page, SPANS.noDistance);
   const span = page.getByTestId("span-facts");
-  await expect(span).toContainText("Total loss-Average loss per km-Worst core-Difference-");
+  await expect(span).toContainText("Distance-");
+  await expect(span).toContainText("Total loss-Average loss per km-");
   await expect(span).not.toContainText("0.00 dB");
   await page.getByRole("button", { name: "Core 1 details" }).click();
   await expect(page.getByTestId("core-no-loss")).toHaveText("No loss test");

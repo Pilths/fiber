@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
 import type { components } from "@/api/schema";
 import { Icon } from "@/components/Icon";
-import type { SpanFocus } from "@/components/AdminEdit";
 import { LossNum } from "@/components/LossCard";
+import type { SpanFocus } from "@/components/AdminEdit";
 import { countBy, db, health, LEVEL, pct, perKm, spanName, totalLoss, type LossDetail } from "@/lib/status";
 
 type Detail = components["schemas"]["SpanDetail"];
@@ -72,7 +72,7 @@ function Body({ d, loss, admin }: { d: Detail; loss: LossDetail | null; admin: A
     { k: "k-use", v: n["In use"], label: "In service" },
   ];
   // Loss alert strip: amber or worse, measured only. The card has one alert slot: a cut span shows the cut banner,
-  // and its loss stays visible in the coloured Difference row.
+  // and the core table carries per-core loss.
   const lv = loss?.measured_db != null && loss.deviation_pct != null && loss.level && loss.level !== "green" ? loss.level : null;
   const high = lv === "red" || lv === "off_scale";
   const strip = high ? "border-red-bd bg-red-bg text-red" : "border-amber-bd bg-amber-bg text-amber"; // literal for Tailwind
@@ -152,15 +152,11 @@ function Body({ d, loss, admin }: { d: Detail; loss: LossDetail | null; admin: A
 
         {/* Span facts: total loss is the worst measured core, else the calculated loss (distance x 0.3 dB/km). */}
         <dl className="mt-4 border-t text-body [&>div]:flex [&>div]:min-h-10 [&>div]:items-center [&>div]:justify-between [&>div]:gap-3 [&>div]:border-b [&>div]:py-1.5 [&_dd]:text-right [&_dd]:font-semibold" data-testid="span-facts">
+          <div><dt>Distance</dt><dd>{km ? `${km} km` : "-"}</dd></div>
+          <div><dt>Free cores</dt><dd>{surveyed ? `${cut ? 0 : d.free_to_reserve} of ${d.survey_cores}` : "-"}</dd></div>
           <div><dt>Cable size</dt><dd>{d.cable_size}</dd></div>
-          <div><dt>{t?.calc ? "Calculated loss" : "Total loss"}</dt><dd>{!loss ? "Loading..." : t ? db(t.db) : "-"}</dd></div>
+          <div data-testid="inspector-loss" data-level={loss?.level ?? undefined}><dt>{t?.calc ? "Calculated loss" : "Total loss"}</dt><dd>{!loss ? "Loading..." : !t ? "-" : t.calc ? db(t.db) : <LossNum l={loss}>{db(t.db)}</LossNum>}</dd></div>
           <div><dt>Average loss per km</dt><dd>{!loss ? "Loading..." : t && km ? perKm(t.db, km) : "-"}</dd></div>
-          <div><dt>Worst core</dt><dd>{!loss ? "Loading..." : loss.measured_db == null ? "-" : loss.worst_core_number ?? "Not recorded"}</dd></div>
-          <div data-testid="inspector-loss" data-level={loss?.level ?? undefined}>
-            <dt>Difference</dt>
-            <dd>{!loss ? "Loading..." : loss.measured_db != null && loss.deviation_pct != null ? <LossNum l={loss}>{pct(loss.deviation_pct)}</LossNum> : "-"}</dd>
-          </div>
-          <div><dt>Cores measured</dt><dd>{loss ? `${loss.measured_cores} of ${loss.total_cores}` : "Loading..."}</dd></div>
         </dl>
       </div>
     </>

@@ -25,9 +25,9 @@ test("no alert for a normal span", async ({ page }) => {
   await signIn(page);
   await pick(page);
   const i = inspector(page);
-  await expect(i.getByTestId("span-facts")).toContainText("Worst core12Difference+1.2%");
+  await expect(i.getByTestId("span-facts")).toContainText("Total loss3.50 dB");
   await expect(i.getByTestId("span-facts").locator(".pill")).toHaveCount(0); // level shows in the number's colour only
-  await expect(i.getByTestId("span-facts")).toContainText("Cores measured3 of 24");
+  await expect(i.getByTestId("span-facts")).not.toContainText("Worst core");
   await expect(i.getByTestId("fiber-cut")).toHaveCount(0);
   await expect(i.getByTestId("loss-alert")).toHaveCount(0);
   await expect(i.locator("dl").first()).not.toContainText("Fiber cut");
@@ -47,7 +47,7 @@ test("red loss level: red alert strip and red loss row", async ({ page }) => {
   const row = i.getByTestId("inspector-loss");
   await expect(row).toHaveAttribute("data-level", "red");
   await expect(row.locator("dd [data-level=red]")).toHaveCSS("color", "rgb(180, 35, 24)");
-  await expect(row).toContainText("+29.5%, Over 7%"); // sr-only word beside the coloured number
+  await expect(row).toContainText("7.40 dB, Over 7%"); // sr-only word beside the coloured number
   const r = await contrast(page, { strip: "[data-testid=loss-alert] b", row: "[data-testid=inspector-loss] dd [data-level]" });
   expect(r.strip).toBeGreaterThanOrEqual(4.5);
   expect(r.row).toBeGreaterThanOrEqual(4.5);

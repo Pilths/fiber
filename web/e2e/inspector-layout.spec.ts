@@ -44,7 +44,7 @@ test("Inspector is as tall as the map card: nothing, span, route searched and fi
   await pickSpan(page, KLBJ);
   await expect(inspector(page).getByTestId("fiber-cut")).toBeVisible();
   await footerInCard(page, "Go to cores");
-  // The worst-core row stays in view above the pinned footer.
+  // The loss row stays in view above the pinned footer.
   const [loss, foot] = await Promise.all([inspector(page).getByTestId("inspector-loss").boundingBox(), inspector(page).getByRole("button", { name: "Go to cores" }).boundingBox()]);
   expect(loss!.y + loss!.height).toBeLessThanOrEqual(foot!.y);
   await note("cut");

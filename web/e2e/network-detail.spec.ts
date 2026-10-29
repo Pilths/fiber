@@ -32,8 +32,8 @@ test("route search, pick a span in the diagram: totals, Inspector loss facts, co
   await expect(page.locator("#span-h")).toHaveText(name);
   await expect(page.getByTestId("span-card")).toHaveCount(0); // its facts live in the Inspector
   const card = page.getByTestId("span-facts");
-  await expect(card).toContainText(/^Cable size\d+(Total|Calculated) loss[\d.]+ dBAverage loss per km[\d.]+ dB\/kmWorst core(\d+|-|Not recorded)Difference/);
-  await expect(card).toContainText(/Cores measured\d+ of \d+/);
+  await expect(card).toHaveText(/^Distance[\d.]+ kmFree cores(\d+ of \d+|-)Cable size\d+(Total|Calculated) loss[\d.]+ dB(, [^A]+)?Average loss per km[\d.]+ dB\/km$/);
+  await expect(page.locator("body")).not.toContainText("Worst core");
   await expect(page.getByRole("region", { name: "Inspector" }).getByText("Spans on route")).toHaveCount(0);
 
   await page.getByRole("button", { name: "Go to cores" }).click();
@@ -46,16 +46,21 @@ test("route search, pick a span in the diagram: totals, Inspector loss facts, co
   await expect(table.locator("tbody")).not.toContainText("None"); // empty cells show "-"
   await chips.getByRole("button", { name: /^All/ }).click();
 
-  // a core with a loss test if the span has one, else the first core
+  // a held core if the span has one, else a core with a loss test, else the first core
   await expect(page.getByTestId("inspector-loss")).not.toContainText("Loading");
-  const measured = table.locator("tbody > tr[data-core]:has([data-level])");
-  const row = (await measured.count()) ? measured.first() : table.locator("tbody > tr[data-core]").first();
+  const all = table.locator("tbody > tr[data-core]");
+  const held = all.filter({ hasText: /Reserved|In service/ }), measured = table.locator("tbody > tr[data-core]:has([data-level])");
+  const row = (await held.count()) ? held.first() : (await measured.count()) ? measured.first() : all.first();
   const core = await row.getAttribute("data-core");
   await row.getByRole("button", { name: `Core ${core} details` }).click();
   await expect(row.getByRole("button", { name: `Core ${core} details` })).toHaveAttribute("aria-expanded", "true");
   const detail = page.getByTestId("core-detail");
   await expect(detail).toHaveCount(1);
-  await expect(detail).toContainText("Circuit ID");
+  const fields = detail.getByTestId("core-fields");
+  await expect(fields.locator("dt")).toHaveText(["SRF ID", "Customer", "Planner", "Planned date", "Status", "Port A", "Port B", "Circuit ID", "Loss", "Average loss per km", "Difference vs calculated"]);
+  await expect(fields.getByText("SRF ID", { exact: true })).toBeVisible();
+  await expect(fields.getByText("Planner", { exact: true })).toBeVisible();
+  await expect(fields.locator("dd").filter({ hasText: /^$/ })).toHaveCount(0); // empty values show "-"
   await expect(detail.getByTestId("core-tests").or(detail.getByTestId("core-no-loss"))).toBeVisible();
   await expect(detail.getByRole("button", { name: "History and actions" })).toBeVisible();
   await page.evaluate(() => scrollTo(0, 0)); // the sticky header stays at the top of the full-page shot

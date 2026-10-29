@@ -135,7 +135,7 @@ export function CoresTable({ d, loss, focusCoreId, onActions }: { d: Detail; los
   const [openId, setOpenId] = useState<number | null>(focusCoreId);
   const n = countBy(d);
   const rows = d.cores.filter((c) => filter === "All" || c.status === filter);
-  const calc = loss?.calculated_db ?? null;
+  const calc = loss?.calculated_db ?? null, km = kmOf(d);
   const toggle = (id: number) => setOpenId((o) => (o === id ? null : id));
   return (
     <>
@@ -175,10 +175,22 @@ export function CoresTable({ d, loss, focusCoreId, onActions }: { d: Detail; los
                     <tr data-testid="core-detail">
                       <td colSpan={6} className="h-auto! bg-subtle px-4! py-3!">
                         <div className="flex items-start justify-between gap-4">
-                          <dl className="text-body"><Field label="Circuit ID">{!free && c.circuit_id ? <span className="font-mono">{c.circuit_id}</span> : <Dash />}</Field></dl>
-                          <button type="button" className="btn btn-sm" onClick={() => onActions(c)}>History and actions</button>
+                          <dl className="grid flex-1 grid-cols-3 gap-x-6 gap-y-2.5 text-body" data-testid="core-fields">
+                            <Field label="SRF ID">{(!free && c.srf_id) || <Dash />}</Field>
+                            <Field label="Customer">{(!free && c.customer) || <Dash />}</Field>
+                            <Field label="Planner">{(!free && c.planner) || <Dash />}</Field>
+                            <Field label="Planned date">{(!free && c.planned_date) || <Dash />}</Field>
+                            <Field label="Status"><span className={`inline-flex items-center gap-1.5 ${st.tone}`}><Icon name={st.icon} />{statusLabel(c.status)}</span></Field>
+                            <Field label="Port A">{(!free && c.port_a) || <Dash />}</Field>
+                            <Field label="Port B">{(!free && c.port_b) || <Dash />}</Field>
+                            <Field label="Circuit ID">{!free && c.circuit_id ? <span className="font-mono">{c.circuit_id}</span> : <Dash />}</Field>
+                            <Field label="Loss">{cl ? <LossNum l={cl}>{db(cl.measured_db)}</LossNum> : <Dash />}</Field>
+                            <Field label="Average loss per km">{cl && km ? perKm(cl.measured_db, km) : <Dash />}</Field>
+                            <Field label="Difference vs calculated">{cl?.deviation_pct != null ? <LossNum l={cl}>{pct(cl.deviation_pct)}</LossNum> : <Dash />}</Field>
+                          </dl>
+                          <button type="button" className="btn btn-sm flex-none" onClick={() => onActions(c)}>History and actions</button>
                         </div>
-                        {!loss ? <p className="mt-2 text-body text-muted-foreground">Loading loss...</p> : !cl ? (
+                        {!loss ? <p className="mt-3 text-body text-muted-foreground">Loading loss...</p> : !cl ? (
                           <p className="mt-2 text-body text-muted-foreground" data-testid="core-no-loss">No loss test</p>
                         ) : (
                           <table className="tbl mt-2 table-fixed" data-testid="core-tests">
@@ -220,7 +232,7 @@ export const Unassigned = ({ d }: { d: Detail }) => d.unassigned.length > 0 && (
     {d.unassigned.map((u) => (
       <div key={u.reservation_id} className="flex gap-3 py-0.5">
         <dt className="w-28 flex-none text-muted-foreground">Unassigned</dt>
-        <dd className="font-semibold">{u.remaining} {u.remaining === 1 ? "core" : "cores"}{u.customer ? `, ${u.customer}` : ""}</dd>
+        <dd className="font-semibold">{[`${u.remaining} ${u.remaining === 1 ? "core" : "cores"}`, u.customer, u.srf_id, u.planner].filter(Boolean).join(", ")}</dd>
       </div>
     ))}
   </dl>
