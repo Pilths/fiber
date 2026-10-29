@@ -122,7 +122,7 @@ function GlobalSearch({ onPick }: { onPick: (r: Result) => void }) {
   );
 }
 
-export type View = "map" | "mine" | "approvals" | "upload" | "users";
+export type View = "map" | "reserve" | "mine" | "approvals" | "upload" | "users";
 
 export const LOGO = (
   <svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true">
@@ -194,6 +194,7 @@ export function Header({ onPick, view, onView, me, approvals, stale, onSignOut, 
   const admin = me?.role === "admin";
   const tabs: [View, string, string, React.ReactNode][] = [
     ["map", "Map", "M2 4l4-1.5 4 1.5 4-1.5v9.5l-4 1.5-4-1.5-4 1.5zM6 2.5v9.5M10 4v9.5", null],
+    ["reserve", "Reserve", "M8 3v10M3 8h10", null],
     ["mine", "My reservations", "M4 2.5h8v11l-4-3-4 3z", stale > 0 && <span key="b" className="badge">{stale}<span className="sr-only"> stale</span></span>],
   ];
   if (admin) {

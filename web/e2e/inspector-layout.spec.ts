@@ -1,20 +1,13 @@
 import { expect, test, type Page } from "@playwright/test";
-import { signIn } from "./helpers";
+import { pickSpan, signIn, tab } from "./helpers";
 
-// B2 layout: the Inspector sits above Find at a fixed 420px, so Find never moves between states.
+// The Inspector is a fixed 420px card on the right of the map (Find lives on the Reserve tab).
 test.use({ viewport: { width: 1440, height: 900 } });
 test.afterEach(({ page }) => page.unrouteAll({ behavior: "ignoreErrors" }));
 
 const KLBJ = /^DEV Kuala Lumpur DC - DEV Bukit Jalil TOC/;
 const inspector = (page: Page) => page.getByRole("region", { name: "Inspector" });
 
-// Page-relative boxes (scroll-proof) of the Inspector and Find cards.
-async function layout(page: Page) {
-  return page.evaluate(() => {
-    const box = (el: Element | null) => { const r = el!.getBoundingClientRect(); return { top: r.top + scrollY, bottom: r.bottom + scrollY, height: r.height }; };
-    return { ins: box(document.querySelector('section[aria-label="Inspector"]')), find: box(document.getElementById("find-h")!.closest("section")) };
-  });
-}
 async function footerInCard(page: Page, name: string) {
   const btn = inspector(page).getByRole("button", { name });
   await expect(btn).toBeVisible();
@@ -22,37 +15,31 @@ async function footerInCard(page: Page, name: string) {
   expect(b!.y + b!.height).toBeLessThanOrEqual(c!.y + c!.height);
 }
 
-test("Inspector is 420px and Find starts at the same y: nothing, span, route and fiber cut", async ({ page }) => {
+test("Inspector is 420px: nothing, span, route searched and fiber cut", async ({ page }) => {
   await signIn(page, "admin1");
-  const seen: { state: string; height: number; find: number }[] = [];
-  const note = async (state: string) => {
-    const l = await layout(page);
-    seen.push({ state, height: l.ins.height, find: l.find.top });
-    expect(l.find.top).toBeGreaterThan(l.ins.bottom); // Inspector first
-  };
+  const seen: { state: string; height: number }[] = [];
+  const note = async (state: string) => seen.push({ state, height: (await inspector(page).boundingBox())!.height });
 
   await expect(inspector(page)).toContainText("No span selected");
   await note("nothing");
 
-  await page.getByRole("list", { name: "Spans" }).getByRole("button", { name: KLBJ }).click();
-  await expect(page.getByRole("grid", { name: "Cores" })).toBeVisible();
+  await pickSpan(page, KLBJ);
   await footerInCard(page, "Open span details");
   await note("span");
 
-  await page.getByRole("radio", { name: "Route A to B" }).check({ force: true });
-  await page.getByLabel("From", { exact: true }).fill("DEV Kuala Lumpur DC");
-  await page.getByLabel("To", { exact: true }).fill("DEV Cyberjaya DC");
-  await page.getByTestId("route-option").first().click();
-  await expect(page.getByTestId("route-summary")).toBeVisible();
-  await footerInCard(page, "Go to route table and Reserve");
+  const search = page.getByRole("region", { name: "Route search" });
+  await search.getByLabel("Route A").fill("DEV Cyberjaya DC");
+  await search.getByLabel("Route B").fill("DEV Kuantan Hut");
+  await search.getByRole("button", { name: "Search" }).click();
+  await expect(inspector(page).getByText("Spans on route")).toBeVisible();
+  await footerInCard(page, "Open span details");
   await note("route");
 
   // Fiber cut and red loss, mocked so dev data never changes.
   await page.route(/\/api\/spans\/\d+$/, async (r) => r.fulfill({ json: { ...(await (await r.fetch()).json()), fiber_cut: true, free_to_reserve: 0 } }));
   await page.route(/\/api\/loss\/spans\/\d+$/, async (r) =>
     r.fulfill({ json: { ...(await (await r.fetch()).json()), status: "measured", level: "red", measured_db: 7.4, deviation_pct: 29.5 } }));
-  await page.getByRole("radio", { name: "Span or site" }).check({ force: true });
-  await page.getByRole("list", { name: "Spans" }).getByRole("button", { name: KLBJ }).click();
+  await pickSpan(page, KLBJ);
   await expect(inspector(page).getByTestId("fiber-cut")).toBeVisible();
   await footerInCard(page, "Open span details");
   // The worst-core row stays in view above the pinned footer.
@@ -61,7 +48,6 @@ test("Inspector is 420px and Find starts at the same y: nothing, span, route and
   await note("cut");
 
   for (const s of seen) expect(Math.abs(s.height - 420), `${s.state} height ${s.height}`).toBeLessThanOrEqual(1);
-  for (const s of seen) expect(s.find, `${s.state} Find y`).toBe(seen[0].find);
 });
 
 // The Inspector title's first line shares one band with the map toolbar: cap-height centre within 4px of the button centre.
@@ -80,14 +66,16 @@ async function titleVsToolbar(page: Page) {
 
 test("Inspector title lines up with the map toolbar: short and long title, span and route", async ({ page }) => {
   await signIn(page, "admin1");
-  await page.getByRole("list", { name: "Spans" }).getByRole("button", { name: KLBJ }).click();
+  await pickSpan(page, KLBJ);
   await expect(inspector(page)).toContainText("Edit span");
   const long = await titleVsToolbar(page);
   expect(long.lines).toBe(2);
   expect(Math.abs(long.cap - long.button), JSON.stringify(long)).toBeLessThanOrEqual(4);
 
   await page.route(/\/api\/spans\/\d+$/, async (r) => r.fulfill({ json: { ...(await (await r.fetch()).json()), site_a: "KLDC", site_b: "BJTC" } }));
+  await tab(page, "Reserve");
   await page.getByRole("list", { name: "Spans" }).getByRole("button", { name: /DEV Ipoh Exchange - DEV Penang Tower/ }).click();
+  await tab(page, "Map");
   await expect(inspector(page).getByRole("heading")).toHaveText("KLDC - BJTC");
   const short = await titleVsToolbar(page);
   expect(Math.abs(short.cap - short.button), JSON.stringify(short)).toBeLessThanOrEqual(4);

@@ -1,10 +1,13 @@
 import { expect, test, type Page } from "@playwright/test";
-import { contrast, signIn } from "./helpers";
+import { contrast, signIn, tab } from "./helpers";
 
 const SPAN = "DEV Kuala Lumpur DC - DEV Cyberjaya DC"; // dev seed: has Available, Reserved and In use cores
 
-const pickSpan = (page: Page, name: string | RegExp) =>
-  page.getByRole("list", { name: "Spans" }).getByRole("button", { name: typeof name === "string" ? new RegExp(name) : name }).click();
+// Choosing cores lives on the Reserve tab.
+const pickSpan = async (page: Page, name: string | RegExp) => {
+  await tab(page, "Reserve");
+  await page.getByRole("list", { name: "Spans" }).getByRole("button", { name: typeof name === "string" ? new RegExp(name) : name }).click();
+};
 
 async function openSpan(page: Page) {
   await signIn(page);

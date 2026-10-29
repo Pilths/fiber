@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { contrast, signIn } from "./helpers";
+import { contrast, pickSpan, signIn } from "./helpers";
 
 // Inspector alerts: fiber cut (span state) and high loss. Responses are mocked, so dev data never changes.
 const KLBJ = /^DEV Kuala Lumpur DC - DEV Bukit Jalil TOC/;
@@ -17,10 +17,7 @@ async function mock(page: Page, span: object, loss?: object) {
     r.request().method() === "GET" ? r.fulfill({ json: { ...(await (await r.fetch()).json()), ...span } }) : r.fallback());
   if (loss) await page.route(/\/api\/loss\/spans\/\d+$/, async (r) => r.fulfill({ json: { ...(await (await r.fetch()).json()), ...loss } }));
 }
-async function pick(page: Page) {
-  await page.getByRole("list", { name: "Spans" }).getByRole("button", { name: KLBJ }).click();
-  await expect(page.getByRole("grid", { name: "Cores" })).toBeVisible();
-}
+const pick = (page: Page) => pickSpan(page, KLBJ);
 const measured = (level: string, db: number, pct: number) => ({ status: "measured", level, measured_db: db, deviation_pct: pct, worst_core_number: 12, measured_cores: 3, total_cores: 24 });
 
 test("no alert for a normal span", async ({ page }) => {

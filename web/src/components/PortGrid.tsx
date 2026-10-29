@@ -10,10 +10,10 @@ export function PortGrid({ cores, selected, onToggle, onOpen, focusCoreId, measu
   cores: Core[];
   selected: Set<number>;
   onToggle: (id: number) => void;
-  onOpen: (c: Core) => void; // shows the core in the core card (Available cores are also chosen or unchosen)
+  onOpen: (c: Core) => void; // core drawer; Available cores open it from the "Core N details" button
   focusCoreId: number | null;
   measured?: Set<number>; // core ids with a loss test: a ▲ in the cell
-  current?: number | null; // core id shown in the core card: outlined
+  current?: number | null; // core id open in the drawer: outlined
 }) {
   const [idx, setIdx] = useState(0); // roving tabindex position
   const [caption, setCaption] = useState<Core | null>(null);
@@ -38,7 +38,7 @@ export function PortGrid({ cores, selected, onToggle, onOpen, focusCoreId, measu
     if (e.key in d) { e.preventDefault(); move(i + d[e.key]); }
     else if (e.key === "Home") { e.preventDefault(); move(0); }
     else if (e.key === "End") { e.preventDefault(); move(cores.length - 1); }
-    else if (e.key === " " || e.key === "Enter") { e.preventDefault(); if (c.status === "Available") onToggle(c.id); onOpen(c); }
+    else if (e.key === " " || e.key === "Enter") { e.preventDefault(); if (c.status === "Available") onToggle(c.id); else onOpen(c); }
   };
   const label = (c: Core) => `Core ${c.number}: ${selected.has(c.id) ? "Chosen" : statusLabel(c.status)}${c.customer ? `, ${c.customer}` : ""}${measured?.has(c.id) ? ", loss measured" : ""}`;
   const rows = Array.from({ length: Math.ceil(cores.length / COLS) }, (_, r) => cores.slice(r * COLS, r * COLS + COLS));
@@ -70,7 +70,7 @@ export function PortGrid({ cores, selected, onToggle, onOpen, focusCoreId, measu
                       data-status={c.status}
                       data-current={c.id === current || undefined}
                       className={`core ${STATUS[c.status].cls}`}
-                      onClick={() => { setIdx(i); if (avail) onToggle(c.id); onOpen(c); }}
+                      onClick={() => { setIdx(i); if (avail) onToggle(c.id); else onOpen(c); }}
                       onFocus={() => { setIdx(i); setCaption(c); }}
                       onMouseEnter={() => setCaption(c)}
                       onMouseLeave={() => setCaption(null)}

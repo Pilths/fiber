@@ -40,10 +40,10 @@ export function Inspector({ detail, loading, loss, admin, route, onDetails, onRo
   return (
     <section className="card flex h-[420px] flex-none flex-col overflow-hidden p-0" aria-label="Inspector" data-testid="inspector">
       {route ?? (!detail
-        ? <Placeholder title={loading ? "Loading span..." : "No span selected"} text={loading ? undefined : "Select a span from the list in Find, or search by site or span in the top bar."}
+        ? <Placeholder title={loading ? "Loading span..." : "No span selected"} text={loading ? undefined : "Select a span on the map, search a route above the map, or search by site or span in the top bar."}
           actions={loading ? undefined : <>
+            <button type="button" className="btn btn-sm" onClick={() => focusEl("route-a")}>Search a route</button>
             <button type="button" className="btn btn-sm" onClick={() => focusEl("global-search")}>Search by site or span</button>
-            <button type="button" className="btn btn-sm" onClick={() => focusEl("find-q")}>Choose from the list</button>
           </>} />
         : <Body key={detail.id} d={detail} loss={loss} admin={admin} onRoute={onRoute} onPick={onPick} />)}
       {!route && (

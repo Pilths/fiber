@@ -308,7 +308,7 @@ export function RouteSection({ rp, spans, onDone }: { rp: RoutePlanner; spans: S
       <section className="card" aria-labelledby="route-t">
         <div className="card-h"><h2 id="route-t">Spans on this path</h2></div>
         {/* v4 .tw: full card width, cells never wrap, long names scroll inside this box */}
-        <div tabIndex={0} role="region" aria-label="Spans on this path, scrolls sideways" className="overflow-x-auto rounded-md border" data-testid="route-table-box">
+        <div tabIndex={0} role="region" aria-label="Spans on this path, scrolls sideways" className="relative overflow-x-auto rounded-md border" data-testid="route-table-box">
             <table className="tbl [&_tbody_th]:h-10 [&_td]:h-10 [&_td]:px-3! [&_th]:px-3! [&_td]:whitespace-nowrap [&_th]:whitespace-nowrap" data-testid="route-table">
               <caption className="sr-only">Spans on this route, in travel order, with loss and free cores</caption>
               <thead className="[&_th]:bg-subtle"><tr>

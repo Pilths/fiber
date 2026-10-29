@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { contrast, signIn } from "./helpers";
+import { contrast, signIn, tab } from "./helpers";
 
 // Dev seed: Cyberjaya DC to Kuantan Hut has several paths (via Bukit Jalil, via Kuala Lumpur, ...). Site ids vary by database.
 const FROM = "DEV Cyberjaya DC", TO = "DEV Kuantan Hut";
@@ -19,7 +19,9 @@ const noOldWords = async (page: Page) => {
 // Scroll the route section to the top, under the sticky header.
 const toSection = (page: Page) => page.evaluate(() => scrollTo(0, document.getElementById("route-h")!.getBoundingClientRect().top + scrollY - 84));
 
+// The route planner and its Reserve flow live on the Reserve tab.
 async function plan(page: Page, cores = "2", from = FROM, to = TO) {
+  await tab(page, "Reserve");
   await page.getByRole("radio", { name: "Route A to B" }).check({ force: true });
   await page.getByLabel("From", { exact: true }).fill(from);
   await page.getByLabel("To", { exact: true }).fill(to);
@@ -156,6 +158,7 @@ test("too many cores: options short, diagram span short, Reserve off naming the 
 
 test("from equal to to shows the inline error", async ({ page }) => {
   await signIn(page);
+  await tab(page, "Reserve");
   await page.getByRole("radio", { name: "Route A to B" }).check({ force: true });
   await page.getByLabel("From", { exact: true }).fill(FROM);
   await page.getByLabel("To", { exact: true }).fill(FROM);
@@ -196,6 +199,7 @@ test("#route= restores the selection; arrow keys move between diagram spans, Ent
   await expect(row(1)).toHaveAttribute("aria-selected", "true");
   // #span= still works and switches back to span mode
   await page.goto("/");
+  await tab(page, "Reserve");
   await page.getByRole("list", { name: "Spans" }).getByRole("button").first().click();
   await expect(page).toHaveURL(/#span=/);
 });

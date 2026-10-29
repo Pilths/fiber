@@ -46,3 +46,15 @@ export function contrast(page: Page, sel: Record<string, string>) {
     return out;
   }, sel);
 }
+
+// Main nav tabs. "Reserve" also names the booking button, so the tab is found inside the nav.
+export const tab = (page: Page, name: "Map" | "Reserve") =>
+  page.getByRole("navigation", { name: "Main" }).getByRole("button", { name, exact: true }).click();
+
+// The Map page has no span list: pick the span from Find on the Reserve tab, then come back. The tabs share the selection.
+export async function pickSpan(page: Page, name: RegExp | string) {
+  await tab(page, "Reserve");
+  await page.getByRole("list", { name: "Spans" }).getByRole("button", { name: typeof name === "string" ? new RegExp(name) : name }).click();
+  await tab(page, "Map");
+  await expect(page.locator("#span-h")).toHaveText(name);
+}

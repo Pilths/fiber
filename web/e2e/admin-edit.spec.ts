@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { signIn } from "./helpers";
+import { pickSpan, signIn, tab } from "./helpers";
 
 // Session 8: core detail drawer, admin edits (TEST-011) and reservation history (TEST-021).
 // Every edit here is reversed in the same test; nothing is deleted, so the history rows stay.
@@ -9,19 +9,22 @@ const CJBJ = /^DEV Cyberjaya DC - DEV Bukit Jalil TOC/; // distance 18.2 km, cha
 
 test.use({ viewport: { width: 1440, height: 900 } });
 
-const pick = async (page: Page, name: RegExp) => {
+// Map page: the span is picked on the Reserve tab (Find), then shown on the Map.
+const pick = (page: Page, name: RegExp) => pickSpan(page, name);
+// Reserve tab: Find list, core grid and Allocations.
+const pickToReserve = async (page: Page, name: RegExp) => {
+  await tab(page, "Reserve");
   await page.getByRole("list", { name: "Spans" }).getByRole("button", { name }).click();
-  await expect(page.getByRole("grid", { name: "Cores" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /^Allocations/ })).toBeVisible();
 };
-const cell = (page: Page, n: number) => page.getByRole("gridcell", { name: new RegExp(`^Core ${n}:`) });
+const openCore = (page: Page, n: number) => page.getByRole("button", { name: `Core ${n} details`, exact: true }).click();
 const drawer = (page: Page) => page.getByRole("dialog", { name: /^Core \d+ on / });
-const actions = (page: Page) => page.getByTestId("core-card").getByRole("button", { name: "History and actions" });
+const actions = (page: Page) => page.getByTestId("core-detail").getByRole("button", { name: "History and actions" });
 
 test("core drawer: opens from a taken core with history, Keep for the owner, Esc returns focus", async ({ page }) => {
   await signIn(page, "planner1");
   await pick(page, KLCJ);
-  await cell(page, 1).focus();
-  await page.keyboard.press("Enter"); // shows the core in the core card
+  await openCore(page, 1); // opens the core's row detail
   await actions(page).click();
   const d = drawer(page);
   await expect(d).toBeVisible();
@@ -45,7 +48,7 @@ test("core drawer: opens from a taken core with history, Keep for the owner, Esc
 test("planner sees no Keep on others' cores and no edit buttons", async ({ page }) => {
   await signIn(page, "planner2");
   await pick(page, KLCJ);
-  await cell(page, 1).click({ force: true }); // taken cells are aria-disabled (not selectable), which Playwright treats as disabled
+  await openCore(page, 1);
   await actions(page).click();
   const d = drawer(page);
   await expect(d).toContainText("DEV Telco Alpha");
@@ -59,14 +62,13 @@ test("planner sees no Keep on others' cores and no edit buttons", async ({ page 
   await expect(inspector.getByRole("button", { name: /^Edit site/ })).toHaveCount(0);
 });
 
-// moves to Reserve screen (Allocations table no longer on the map page)
-test.fixme("taken-cores table tags stale cores", async ({ page }) => {
+test("taken-cores table tags stale cores", async ({ page }) => {
   await signIn(page, "admin1");
   const rs: { stale: boolean; cores: { core_id: number; held: boolean }[] }[] = await (await page.request.get("/api/reservations")).json();
   const core = rs.filter((r) => r.stale).flatMap((r) => r.cores).find((c) => c.held);
   test.skip(!core, "Dev data has no stale reservation holding a core; not faking one by changing server data.");
   const c: { number: number; span_name: string } = await (await page.request.get(`/api/cores/${core!.core_id}`)).json();
-  await pick(page, new RegExp(`^${c.span_name}`));
+  await pickToReserve(page, new RegExp(`^${c.span_name}`));
   const row = page.getByRole("table", { name: "Allocations on this span" }).getByRole("row").filter({ has: page.getByRole("button", { name: `Core ${c.number} details` }) });
   await expect(row).toContainText(/Stale: no keep for over 3 months since /);
 });
@@ -74,7 +76,8 @@ test.fixme("taken-cores table tags stale cores", async ({ page }) => {
 test("admin edits span distance with a reason; calculated loss follows; then reverts", async ({ page }) => {
   await signIn(page, "admin1");
   await pick(page, CJBJ);
-  const loss = page.getByTestId("span-card");
+  await openCore(page, 4); // a core with no loss test shows the span's calculated loss
+  const loss = page.getByTestId("core-no-loss");
   await expect(loss).toContainText("5.46 dB");
 
   const edit = async (km: string, reason: string) => {
@@ -149,8 +152,7 @@ test("reservation History disclosure lists events in order", async ({ page }) =>
 test("admin edits a core's ports with a reason, then puts them back", async ({ page }) => {
   await signIn(page, "admin1");
   await pick(page, KLBJ);
-  await cell(page, 21).focus();
-  await page.getByRole("button", { name: "Core 21 details" }).click();
+  await openCore(page, 21);
   await actions(page).click();
   const d = drawer(page);
   const dlg = page.getByRole("dialog", { name: "Ports of core 21" });
@@ -178,10 +180,9 @@ test("admin edits a core's ports with a reason, then puts them back", async ({ p
   await expect(d).toContainText(oldA || oldB ? `${oldA || "Not recorded"} to ${oldB || "Not recorded"}` : "Add ports");
 });
 
-// moves to Reserve screen (Allocations table no longer on the map page)
-test.fixme("one Unassigned row per reservation; admin assign dialog limits the choice", async ({ page }) => {
+test("one Unassigned row per reservation; admin assign dialog limits the choice", async ({ page }) => {
   await signIn(page, "admin1");
-  await pick(page, CJBJ);
+  await pickToReserve(page, CJBJ);
   const table = page.getByRole("table", { name: "Allocations on this span" });
   const rows = table.getByTestId("unassigned-row");
   const n = await rows.count();
