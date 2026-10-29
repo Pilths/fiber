@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Route view mock</title>
+<style>
+:root{--bg:#f3f4f6;--card:#fff;--line:#d5d9e0;--rule:#e6e8ec;--ink:#14181f;--muted:#5d6675;--blue:#1d5fd1;--blue-bg:#e8f0fd;--green:#17703a;--green-bg:#e3f4e9;--amber:#8a5a00;--amber-bg:#fdf1d6;--red:#b3261e;--red-bg:#fbe5e3;--use:#4b3fa3;--use-bg:#ece9fa}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--ink);min-width:1200px}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
+.page{max-width:1440px;margin:0 auto;padding:12px 16px 48px;display:grid;gap:12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:14px 16px}
+h2{font-size:16px;font-weight:700}
+.lbl{font-size:12px;font-weight:600;color:var(--muted)}
+.field{height:36px;border:1px solid var(--line);border-radius:6px;padding:0 10px;background:#fff;width:100%}
+.btn{height:36px;padding:0 14px;border:1px solid var(--line);border-radius:6px;background:#fff;font-weight:600;cursor:pointer}
+.btn-p{background:var(--ink);color:#fff;border-color:var(--ink)}
+.pill{display:inline-flex;align-items:center;gap:4px;height:22px;padding:0 8px;border-radius:999px;font-size:12px;font-weight:700}
+.p-red{background:var(--red-bg);color:var(--red)}.p-amber{background:var(--amber-bg);color:var(--amber)}.p-green{background:var(--green-bg);color:var(--green)}
+.free{display:inline-flex;min-width:30px;justify-content:center;height:22px;align-items:center;border-radius:999px;background:var(--green-bg);color:var(--green);font-size:12px;font-weight:700;padding:0 7px}
+
+/* search + diagram card */
+.bar{display:grid;grid-template-columns:1fr 36px 1fr auto;gap:8px;align-items:end}
+.bar label{display:grid;gap:4px}
+.chain{display:flex;flex-wrap:wrap;align-items:center;gap:6px 0;margin-top:14px;padding-top:14px;border-top:1px solid var(--rule)}
+.site{font-weight:700;padding:0 8px;white-space:nowrap}
+.seg{display:grid;justify-items:center;gap:4px;min-width:150px;padding:8px 12px;border:1px solid transparent;border-radius:6px;background:none;cursor:pointer}
+.seg:hover{background:var(--bg)}
+.seg[aria-pressed=true]{border-color:var(--blue);background:var(--blue-bg)}
+.seg .ln{width:100%;height:0;border-top:4px solid var(--blue)}
+.seg.cut .ln{border-top:4px dashed var(--red)}
+.seg .meta{display:flex;gap:6px;align-items:center;font-size:13px;font-weight:600}
+.totals{margin-top:10px;font-weight:600}
+
+/* map + inspector */
+.top{display:grid;grid-template-columns:1fr 420px;gap:12px}
+.map{padding:12px;height:560px}
+.map svg{width:100%;height:100%;border-radius:6px;background:#eaf0f6;display:block}
+.sl{stroke:#9aa4b2;stroke-width:4;fill:none;stroke-linecap:round;cursor:pointer}
+.sl.rt{stroke:var(--blue);stroke-width:5}.sl.sel{stroke:var(--ink);stroke-width:7}.sl.cut{stroke:var(--red);stroke-dasharray:2 9}
+.dot{fill:#fff;stroke:var(--ink);stroke-width:2.5}
+.st{font-size:12px;font-weight:700;fill:var(--ink);paint-order:stroke;stroke:#eaf0f6;stroke-width:4px}
+.ins{height:560px;display:flex;flex-direction:column}
+.ins h2{font-size:19px;line-height:1.25}
+.tags{display:flex;gap:12px;font-weight:600;margin-top:4px}
+.big{font-size:30px;font-weight:800;line-height:1}
+.stack{display:flex;height:10px;border-radius:3px;overflow:hidden;margin-top:10px;gap:2px}
+.keyrow{display:flex;gap:12px;font-size:12px;margin-top:6px}
+.rows{margin-top:14px;border-top:1px solid var(--rule)}
+.row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--rule);gap:12px}
+.row b{text-align:right}
+.go{margin-top:auto;display:flex;justify-content:space-between;align-items:center;height:44px;border:0;border-radius:6px;background:var(--ink);color:#fff;padding:0 14px;font-weight:700;cursor:pointer;width:100%}
+.empty{margin:auto;color:var(--muted)}
+
+/* cores table */
+.chips{display:flex;gap:8px;margin-top:12px}
+.chip{height:32px;padding:0 12px;border:1px solid var(--line);border-radius:6px;background:#fff;font-weight:600;cursor:pointer;display:inline-flex;gap:6px;align-items:center}
+.chip[aria-pressed=true]{background:var(--ink);color:#fff;border-color:var(--ink)}
+.tblwrap{max-height:480px;overflow:auto;margin-top:12px}
+table{width:100%;border-collapse:collapse;table-layout:fixed}
+th{position:sticky;top:0;background:#fff;font-size:12px;color:var(--muted);text-align:left;padding:8px 6px;border-bottom:1px solid var(--line)}
+td{padding:9px 6px;border-bottom:1px solid var(--rule);vertical-align:middle}
+tr.r{cursor:pointer}tr.r:hover{background:var(--bg)}
+tr.r[aria-expanded=true]{background:var(--blue-bg)}
+.cb{border:0;background:none;font-weight:700;cursor:pointer;display:inline-flex;gap:6px;align-items:center}
+.s-Available{color:var(--green)}.s-Requested{color:var(--amber)}.s-Reserved{color:var(--blue)}.s-In{color:var(--use)}
+.dash{color:var(--muted)}
+.sub td{background:#fafbfc;padding:12px 16px}
+.sub table{table-layout:auto}
+.sub th{position:static;background:none}
+.note{color:var(--muted);font-weight:600}
+.unas{margin-top:10px;font-size:13px}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- 1. Search, with its answer right under it -->
+  <section class="card" aria-label="Route">
+    <form class="bar" onsubmit="search();return false">
+      <label><span class="lbl">Route A</span><input class="field" id="a" list="sites" value="CYBJ"></label>
+      <button type="button" class="btn" id="swap" aria-label="Swap A and B" style="padding:0">&#8646;</button>
+      <label><span class="lbl">Route B</span><input class="field" id="b" list="sites" value="KTNH"></label>
+      <button class="btn btn-p">Search</button>
+      <datalist id="sites"></datalist>
+    </form>
+    <div class="chain" id="chain"></div>
+    <p class="totals" id="totals"></p>
+  </section>
+
+  <!-- 2. Map and Inspector (one span, every span fact lives here) -->
+  <div class="top">
+    <section class="card map" aria-label="Network map"><svg id="svg" viewBox="0 0 800 520" role="img" aria-label="Network map"></svg></section>
+    <aside class="card ins" id="ins" aria-label="Inspector"></aside>
+  </div>
+
+  <!-- 3. Cores -->
+  <section class="card" id="cores" aria-labelledby="ch">
+    <h2 id="ch"></h2>
+    <div class="chips" id="chips" role="group" aria-label="Filter cores by status"></div>
+    <div class="tblwrap">
+      <table>
+        <caption class="lbl" style="position:absolute;left:-9999px">Cores on this span</caption>
+        <thead><tr><th style="width:8%">Core</th><th style="width:16%">Status</th><th style="width:22%">Customer</th><th style="width:14%">Planned date</th><th>Ports</th><th style="width:15%">Loss</th></tr></thead>
+        <tbody id="tb"></tbody>
+      </table>
+    </div>
+    <p class="unas" id="unas"></p>
+  </section>
+</div>
+
+<script>
+const SITES={CYBJ:[150,420,"Cyberjaya DC"],BKJL:[330,250,"Bukit Jalil TOC"],KTNH:[640,140,"Kuantan Hut"],KLDC:[200,110,"Kuala Lumpur DC"],PTJY:[480,430,"Putrajaya Hub"],SPNG:[650,400,"Seremban Node"]};
+const SPANS=[
+ {id:1,a:"CYBJ",b:"BKJL",km:18.2,type:"Metro",route:"R3",cut:false,n:24},
+ {id:2,a:"BKJL",b:"KTNH",km:null,type:"Trunk",route:"R1",cut:false,n:24},
+ {id:3,a:"KLDC",b:"BKJL",km:12,type:"Metro",route:"R3",cut:false,n:24},
+ {id:4,a:"CYBJ",b:"PTJY",km:22.5,type:"Metro",route:"R2",cut:false,n:12},
+ {id:5,a:"PTJY",b:"SPNG",km:31,type:"Trunk",route:"R2",cut:true,n:12},
+ {id:6,a:"SPNG",b:"KTNH",km:96,type:"Trunk",route:"R1",cut:false,n:24},
+ {id:7,a:"KLDC",b:"KTNH",km:205,type:"Trunk",route:"R1",cut:false,n:24},
+];
+const LABEL={Available:"Available",Requested:"Requested",Reserved:"Reserved","In use":"In service"};
+const ICON={Available:"○",Requested:"◐",Reserved:"●","In use":"■"};
+const rnd=s=>{const x=Math.sin(s)*10000;return x-Math.floor(x)};
+const CUST=["Telco Alpha","Beta Networks","Gamma Cloud","Delta Mobile"];
+SPANS.forEach(s=>{
+  s.name=`${SITES[s.a][2]} - ${SITES[s.b][2]}`; s.calc=s.km==null?null:s.km*0.3;
+  s.cores=Array.from({length:s.n},(_,i)=>{
+    const r=rnd(s.id*97+i),st=r<.6?"Available":r<.7?"Requested":r<.85?"Reserved":"In use",c={n:i+1,status:st,tests:[]};
+    if(st!=="Available"){c.customer=CUST[Math.floor(rnd(i*3+s.id)*4)];c.planned=`2026-${String(1+i%12).padStart(2,"0")}-${String(3+i%25).padStart(2,"0")}`}
+    if(st==="Reserved"||st==="In use"){c.ports=`${s.a} ODF-1/${10+i} to ${s.b} ODF-2/${10+i}`}
+    if(st==="In use")c.circuit=`CKT-${s.id}${100+i}`;
+    if(s.calc&&rnd(s.id*13+i*7)<.3){c.tests=[{on:"2026-10-"+String(1+i%28).padStart(2,"0"),db:s.calc*(.9+rnd(i+s.id)*.35),m:"OTDR",by:"Field team 2"}]}
+    return c});
+  s.unas=s.id===1?[{n:3,cust:"Bank Gamma"}]:[];
+});
+const dev=(db,calc)=>(db-calc)/calc*100;
+const lvl=p=>p<=3?"green":p<=7?"amber":"red";
+const PILL={green:"✓ Normal",amber:"◆ Watch",red:"▲ High"};
+const worst=s=>{let w=null;s.cores.forEach(c=>c.tests.forEach(t=>{if(!w||t.db>w.db)w={core:c.n,db:t.db}}));return w};
+const measured=s=>s.cores.filter(c=>c.tests.length).length;
+const free=s=>s.cut?0:s.cores.filter(c=>c.status==="Available").length;
+const total=s=>{const w=worst(s);return w?{db:w.db,calc:false}:s.calc!=null?{db:s.calc,calc:true}:null};
+const f2=v=>v.toFixed(2);
+const sign=v=>(v>0?"+":"")+v.toFixed(1)+"%";
+const $=id=>document.getElementById(id);
+
+let route=[],sel=null,filter="All",open=null;
+
+function findRoute(a,b){
+  const d={[a]:0},p={},done=new Set();
+  for(;;){let u=null;for(const k in d)if(!done.has(k)&&(u===null||d[k]<d[u]))u=k;
+    if(u===null)return null;if(u===b)break;done.add(u);
+    SPANS.filter(s=>!s.cut&&(s.a===u||s.b===u)).forEach(s=>{const v=s.a===u?s.b:s.a,w=d[u]+(s.km??50);if(d[v]===undefined||w<d[v]){d[v]=w;p[v]={u,id:s.id}}})}
+  const ids=[];for(let v=b;v!==a;v=p[v].u)ids.unshift(p[v].id);return ids;
+}
+function search(){
+  const a=$("a").value.trim().toUpperCase(),b=$("b").value.trim().toUpperCase();
+  route=SITES[a]&&SITES[b]&&a!==b?(findRoute(a,b)||[]):[];
+  routeA=a; sel=route[0]??null; open=null; filter="All"; draw();
+}
+let routeA="CYBJ";
+
+function drawChain(){
+  if(!route.length){$("chain").innerHTML='<span class="note">No route. Choose two sites from the list.</span>';$("totals").textContent="";return}
+  let at=routeA,h=`<span class="site">${SITES[at][2]}</span>`,km=0,dbs=0,allMeas=true,noDist=0;
+  route.forEach(id=>{const s=SPANS.find(x=>x.id===id),nx=s.a===at?s.b:s.a,w=worst(s),l=w&&s.calc?lvl(dev(w.db,s.calc)):null;
+    h+=`<button type="button" class="seg${s.cut?" cut":""}" aria-pressed="${id===sel}" data-id="${id}"><span class="ln"></span><span class="meta">${s.km==null?"No distance":s.km+" km"} <span class="free">${s.cut?"Cut":free(s)}</span>${l&&l!=="green"?`<span class="pill p-${l}" title="Loss ${PILL[l]}">${PILL[l][0]}</span>`:""}</span></button><span class="site">${SITES[nx][2]}</span>`;
+    at=nx; if(s.km==null){noDist++;return} km+=s.km; if(!w)allMeas=false; dbs+=w?w.db:s.calc});
+  $("chain").innerHTML=h;
+  $("chain").querySelectorAll(".seg").forEach(b=>b.onclick=()=>{sel=+b.dataset.id;open=null;filter="All";draw()});
+  $("totals").textContent=`${route.length} spans, ${km.toFixed(1)} km, total loss ${f2(dbs)} dB${allMeas?"":" (calculated where not measured)"}, average ${km?f2(dbs/km):"-"} dB/km${noDist?`, ${noDist} span without distance not counted`:""}`;
+}
+
+function drawMap(){
+  let h="";
+  SPANS.forEach(s=>{const[x1,y1]=SITES[s.a],[x2,y2]=SITES[s.b];
+    h+=`<line class="sl${route.includes(s.id)?" rt":""}${s.cut?" cut":""}${s.id===sel?" sel":""}" data-id="${s.id}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`});
+  Object.entries(SITES).forEach(([k,[x,y,n]])=>h+=`<circle class="dot" cx="${x}" cy="${y}" r="7"/><text class="st" x="${x+11}" y="${y-9}">${n}</text>`);
+  $("svg").innerHTML=h;
+  $("svg").querySelectorAll(".sl").forEach(l=>l.onclick=()=>{sel=+l.dataset.id;open=null;filter="All";draw()});
+}
+
+function drawIns(){
+  const s=SPANS.find(x=>x.id===sel);
+  if(!s){$("ins").innerHTML='<p class="empty">Search a route or click a span on the map.</p>';return}
+  const c=k=>s.cores.filter(x=>x.status===k).length,t=total(s),w=worst(s),l=w&&s.calc?lvl(dev(w.db,s.calc)):null;
+  $("ins").innerHTML=`
+    <h2>${s.name}</h2>
+    <div class="tags"><span>${s.type}</span><span>${s.route}</span><span>${s.km==null?"No distance":s.km+" km"}</span>${s.cut?'<span class="pill p-red">✕ Cut</span>':""}</div>
+    <div style="margin-top:16px;display:flex;align-items:baseline;gap:8px"><span class="big" style="color:${s.cut?"var(--red)":"var(--green)"}">${s.cut?"Cut":free(s)}</span><span class="lbl">free of ${s.n}</span></div>
+    <div class="stack"><span style="flex:${c("Available")};background:var(--green)"></span><span style="flex:${c("Requested")};background:#d99a1c"></span><span style="flex:${c("Reserved")};background:var(--blue)"></span><span style="flex:${c("In use")};background:var(--use)"></span></div>
+    <div class="keyrow"><span>○ ${c("Available")} Available</span><span>◐ ${c("Requested")} Requested</span><span>● ${c("Reserved")} Reserved</span><span>■ ${c("In use")} In service</span></div>
+    <div class="rows">
+      <div class="row"><span>Total loss</span><b>${t?`${f2(t.db)} dB${t.calc?" calculated":""}`:"No distance"}</b></div>
+      <div class="row"><span>Average loss per km</span><b>${t&&s.km?f2(t.db/s.km)+" dB/km":"No distance"}</b></div>
+      <div class="row"><span>Worst core</span><b>${w?`core ${w.core}, ${sign(dev(w.db,s.calc))} ${l?`<span class="pill p-${l}">${PILL[l]}</span>`:""}`:"Not measured"}</b></div>
+      <div class="row"><span>Cores measured</span><b>${measured(s)} of ${s.n}</b></div>
+    </div>
+    <button class="go" onclick="document.getElementById('cores').scrollIntoView({behavior:'smooth'})"><span>Cores</span><span>▼</span></button>`;
+}
+
+function drawCores(){
+  const s=SPANS.find(x=>x.id===sel);
+  $("cores").hidden=!s; if(!s)return;
+  $("ch").textContent=`Cores of ${s.name}`;
+  const cnt=k=>k==="All"?s.n:s.cores.filter(c=>c.status===k).length;
+  $("chips").innerHTML=["All","Available","Requested","Reserved","In use"].filter(k=>cnt(k)).map(k=>`<button type="button" class="chip" data-f="${k}" aria-pressed="${filter===k}">${k==="All"?"":ICON[k]+" "}${k==="All"?"All":LABEL[k]} <b>${cnt(k)}</b></button>`).join("");
+  $("chips").querySelectorAll(".chip").forEach(b=>b.onclick=()=>{filter=b.dataset.f;open=null;drawCores()});
+  const D='<span class="dash">-</span>';
+  $("tb").innerHTML=s.cores.filter(c=>filter==="All"||c.status===filter).map(c=>{
+    const t=c.tests[0],l=t?lvl(dev(t.db,s.calc)):null,k=c.status==="In use"?"In":c.status;
+    let h=`<tr class="r" data-n="${c.n}" aria-expanded="${open===c.n}">
+      <td><button type="button" class="cb" aria-label="Core ${c.n}, show details">${open===c.n?"▾":"▸"} ${c.n}</button></td>
+      <td class="s-${k}" style="font-weight:700">${ICON[c.status]} ${LABEL[c.status]}</td>
+      <td>${c.customer??D}</td><td>${c.planned??D}</td><td>${c.ports??(c.status==="Available"?D:'<span class="dash">No ports yet</span>')}</td>
+      <td>${t?`${f2(t.db)} dB <span class="pill p-${l}" title="${PILL[l]}">${PILL[l][0]}</span>`:D}</td></tr>`;
+    if(open===c.n)h+=`<tr class="sub"><td colspan="6">
+      <div style="display:flex;justify-content:space-between;align-items:center"><span><span class="lbl">Circuit ID</span> <b>${c.circuit??"-"}</b></span><button class="btn">History and actions</button></div>
+      ${c.tests.length?`<table style="margin-top:10px"><thead><tr><th>Tested</th><th>Measured</th><th>Difference</th><th>Method</th><th>Verified by</th></tr></thead><tbody>${c.tests.map(x=>`<tr><td><b>${x.on}</b></td><td>${f2(x.db)} dB</td><td>${sign(dev(x.db,s.calc))}</td><td>${x.m}</td><td>${x.by}</td></tr>`).join("")}</tbody></table>`
+       :`<p class="note" style="margin-top:10px">No loss test yet.${s.calc!=null?` Calculated loss for the span is ${f2(s.calc)} dB.`:""}</p>`}</td></tr>`;
+    return h}).join("");
+  $("tb").querySelectorAll("tr.r").forEach(r=>r.onclick=()=>{const n=+r.dataset.n;open=open===n?null:n;drawCores()});
+  $("unas").innerHTML=s.unas.map(u=>`◌ <b>${u.n} cores</b> requested, not assigned yet, ${u.cust}`).join("<br>");
+}
+
+function draw(){drawChain();drawMap();drawIns();drawCores()}
+$("sites").innerHTML=Object.entries(SITES).map(([k,v])=>`<option value="${k}">${v[2]}</option>`).join("");
+$("swap").onclick=()=>{const t=$("a").value;$("a").value=$("b").value;$("b").value=t;search()};
+search();
+</script>
+</body>
+</html>
