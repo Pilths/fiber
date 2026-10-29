@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Route and span detail mock</title>
+<style>
+:root{--bg:#f3f4f6;--card:#fff;--line:#d5d9e0;--rule:#e6e8ec;--ink:#14181f;--muted:#5d6675;--blue:#1d5fd1;--blue-bg:#e8f0fd;--green:#17703a;--green-bg:#e3f4e9;--amber:#8a5a00;--amber-bg:#fdf1d6;--red:#b3261e;--red-bg:#fbe5e3;--use:#4b3fa3;--use-bg:#ece9fa}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--ink);min-width:1200px}
+button,input,select{font:inherit;color:inherit}
+.page{max-width:1440px;margin:0 auto;padding:12px 16px 48px;display:grid;gap:12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:12px}
+h2{font-size:15px;font-weight:700}
+.lbl{font-size:12px;font-weight:600;color:var(--muted)}
+.field{height:36px;border:1px solid var(--line);border-radius:6px;padding:0 10px;background:#fff;width:100%}
+.btn{height:36px;padding:0 14px;border:1px solid var(--line);border-radius:6px;background:#fff;font-weight:600;cursor:pointer}
+.btn:hover{border-color:var(--ink)}
+.btn-p{background:var(--ink);color:#fff;border-color:var(--ink)}
+:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
+
+/* top bar */
+.bar{display:grid;grid-template-columns:1fr 36px 1fr auto auto;gap:8px;align-items:end}
+.bar label{display:grid;gap:4px}
+.swap{height:36px;width:36px;padding:0;display:grid;place-items:center}
+.found{font-weight:600;align-self:center;white-space:nowrap}
+
+/* map + inspector */
+.top{display:grid;grid-template-columns:1fr 420px;gap:12px;align-items:start}
+.map{padding:12px;height:520px}
+.map svg{width:100%;height:100%;border-radius:6px;background:#eaf0f6;display:block}
+.span-line{stroke-width:5;fill:none;cursor:pointer;stroke:#7b8797;stroke-linecap:round}
+.span-line.trunk{stroke:#1d5fd1}.span-line.metro{stroke:#2a8f8f}
+.span-line.route{stroke:#e07b00}
+.span-line.cut{stroke:#b3261e;stroke-dasharray:2 9}
+.span-line.sel{stroke:#14181f}
+.span-line:hover{stroke-width:8}
+.site{fill:#fff;stroke:#14181f;stroke-width:2.5}
+.site-t{font-size:12px;font-weight:700;fill:#14181f;paint-order:stroke;stroke:#eaf0f6;stroke-width:4px}
+.chip text{font-size:12px;font-weight:700;fill:#14181f}
+.chip rect{fill:#fff;stroke:var(--line)}
+.legend{position:absolute}
+.mapwrap{position:relative;height:100%}
+.legend{right:10px;top:10px;background:#fff;border:1px solid var(--line);border-radius:6px;padding:8px 10px;display:grid;grid-template-columns:auto auto;gap:4px 18px;font-size:12px}
+.legend i{display:inline-block;width:22px;height:0;border-top:4px solid;vertical-align:middle;margin-right:6px}
+
+.ins{height:520px;display:flex;flex-direction:column}
+.ins-h{display:flex;align-items:center;justify-content:space-between;gap:8px;height:36px}
+.ins-h h2{font-size:18px}
+.pill{display:inline-flex;align-items:center;gap:5px;height:24px;padding:0 9px;border-radius:999px;font-size:12px;font-weight:700}
+.p-red{background:var(--red-bg);color:var(--red)}.p-amber{background:var(--amber-bg);color:var(--amber)}.p-green{background:var(--green-bg);color:var(--green)}
+.rows{margin-top:10px;border-top:1px solid var(--rule)}
+.row{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--rule)}
+.row b{font-weight:700}
+.empty{margin:auto;color:var(--muted);text-align:center}
+.go{margin-top:auto;display:flex;align-items:center;justify-content:space-between;width:100%;height:44px;border:1px solid var(--ink);background:var(--ink);color:#fff;border-radius:6px;padding:0 14px;font-weight:700;cursor:pointer}
+.go:disabled{background:#c9cdd4;border-color:#c9cdd4;cursor:not-allowed}
+.rt-list{margin-top:8px;display:grid;gap:4px;max-height:210px;overflow:auto}
+.rt-list button{display:flex;justify-content:space-between;align-items:center;min-height:36px;border:0;border-bottom:1px solid var(--rule);border-left:3px solid transparent;background:none;padding:2px 8px;text-align:left;cursor:pointer}
+.rt-list button:hover{background:var(--bg)}
+.rt-list button[aria-pressed=true]{border-left-color:var(--blue);background:var(--blue-bg)}
+
+/* detail */
+.detail{display:grid;gap:12px;scroll-margin-top:12px}
+.metrics{display:grid;grid-template-columns:repeat(5,1fr);gap:16px;margin-top:10px}
+.metrics div+div{border-left:1px solid var(--rule);padding-left:16px}
+.big{font-size:24px;font-weight:700;line-height:32px}
+.cores-h{display:flex;justify-content:space-between;align-items:center}
+.keys{display:flex;gap:14px;font-size:12px;font-weight:600}
+.keys span{display:inline-flex;gap:5px;align-items:center}
+.grid{display:grid;grid-template-columns:repeat(12,1fr);gap:6px;margin-top:10px}
+.core{height:40px;border:1px solid var(--line);border-radius:6px;background:#fff;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;position:relative}
+.core:hover{border-color:var(--ink)}
+.core[aria-pressed=true]{outline:3px solid var(--blue);outline-offset:1px}
+.core.Available{color:var(--green)}
+.core.Requested{background:var(--amber-bg);color:var(--amber);border-style:dashed}
+.core.Reserved{background:var(--blue-bg);color:var(--blue)}
+.core.In{background:var(--use-bg);color:var(--use)}
+.core .dot{position:absolute;top:3px;right:4px;font-size:10px}
+.lossgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:10px}
+table{width:100%;border-collapse:collapse}
+th{font-size:12px;color:var(--muted);text-align:left;padding:6px 0;border-bottom:1px solid var(--rule)}
+td{padding:8px 0;border-bottom:1px solid var(--rule)}
+.note{margin-top:10px;background:var(--bg);border-radius:6px;padding:10px 12px;font-weight:600}
+.mt{margin-top:10px}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- 1. Route search on top of the map -->
+  <section class="card" aria-label="Route search">
+    <form class="bar" id="bar" onsubmit="return false">
+      <label><span class="lbl">Route A</span><input class="field" id="a" list="sites" value="KLIP" autocomplete="off"></label>
+      <button type="button" class="btn swap" id="swap" aria-label="Swap A and B">&#8646;</button>
+      <label><span class="lbl">Route B</span><input class="field" id="b" list="sites" value="KJNG" autocomplete="off"></label>
+      <button type="submit" class="btn btn-p" id="search">Search</button>
+      <span class="found" id="found"></span>
+      <datalist id="sites"></datalist>
+    </form>
+  </section>
+
+  <!-- 2. Map and Inspector -->
+  <div class="top">
+    <section class="card map" aria-label="Network map">
+      <div class="mapwrap">
+        <svg id="svg" viewBox="0 0 800 496" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Network map"></svg>
+        <div class="legend">
+          <span><i style="border-color:#1d5fd1"></i>Trunk</span><span><i style="border-color:#2a8f8f"></i>Metro</span>
+          <span><i style="border-color:#e07b00"></i>Route</span><span><i style="border-color:#b3261e;border-top-style:dotted"></i>Fiber cut</span>
+        </div>
+      </div>
+    </section>
+
+    <aside class="card ins" aria-label="Inspector" id="ins"></aside>
+  </div>
+
+  <!-- 3. Detail: span, cores, core loss -->
+  <div class="detail" id="detail" hidden>
+    <section class="card" aria-labelledby="d1">
+      <h2 id="d1"></h2>
+      <div class="metrics" id="metrics"></div>
+    </section>
+
+    <section class="card" aria-labelledby="d2">
+      <div class="cores-h">
+        <h2 id="d2">Cores</h2>
+        <div class="keys">
+          <span style="color:var(--green)">&#9675; Available</span>
+          <span style="color:var(--amber)">&#9680; Requested</span>
+          <span style="color:var(--blue)">&#9679; Reserved</span>
+          <span style="color:var(--use)">&#9670; In service</span>
+          <span>&#9650; Loss measured</span>
+        </div>
+      </div>
+      <div class="grid" id="grid" role="group" aria-label="Cores on this span"></div>
+    </section>
+
+    <section class="card" aria-labelledby="d3" id="loss" hidden>
+      <h2 id="d3"></h2>
+      <div class="lossgrid" id="lossgrid"></div>
+      <div id="lossnote"></div>
+    </section>
+  </div>
+</div>
+
+<script>
+// ---- fake data -------------------------------------------------------------
+const SITES = {KLIP:[130,380],SBYA:[300,250],SRDG:[470,120],KJNG:[640,330],SLGR:[260,430],PJYA:[520,430],MLKA:[110,170]};
+// id, a, b, km, type, route, cutFlag, surveyed cores
+const SPANS = [
+  {id:1,a:"KLIP",b:"SBYA",km:42,type:"Trunk",route:"R1",cut:false,n:24},
+  {id:2,a:"SBYA",b:"SRDG",km:28,type:"Trunk",route:"R1",cut:false,n:24},
+  {id:3,a:"SRDG",b:"KJNG",km:35,type:"Trunk",route:"R1",cut:false,n:24},
+  {id:4,a:"KLIP",b:"SLGR",km:19,type:"Metro",route:"R3",cut:false,n:12},
+  {id:5,a:"SLGR",b:"PJYA",km:26,type:"Metro",route:"R3",cut:true,n:12},
+  {id:6,a:"PJYA",b:"KJNG",km:31,type:"Metro",route:"R3",cut:false,n:12},
+  {id:7,a:"MLKA",b:"SBYA",km:23,type:"Metro",route:"R2",cut:false,n:12},
+];
+const ST=["Available","Requested","Reserved","In use"];
+const LABEL={Available:"Available",Requested:"Requested",Reserved:"Reserved","In use":"In service"};
+const ICON={Available:"○",Requested:"◐",Reserved:"●","In use":"◆"};
+const rnd=(s)=>{let x=Math.sin(s)*10000;return x-Math.floor(x)};
+SPANS.forEach(s=>{
+  s.name=s.a+"-"+s.b; s.calc=+(s.km*0.3).toFixed(2);
+  s.cores=Array.from({length:s.n},(_,i)=>{
+    const r=rnd(s.id*100+i), st=r<.5?"Available":r<.62?"Requested":r<.8?"Reserved":"In use";
+    const c={n:i+1,status:st,tests:[]};
+    if(rnd(s.id*7+i*3)<.35){ // measured cores; calculated is the span expected value
+      const k=1+Math.floor(rnd(i+s.id)*2);
+      for(let t=0;t<k;t++) c.tests.push({on:`2026-0${3+t*2}-${10+i%18}`,db:+(s.calc*(.85+rnd(i*5+t+s.id)*.5)).toFixed(2),method:["OTDR","Power meter"][t%2],by:["Field team 2","Field team 4"][(i+t)%2]});
+      c.tests.sort((x,y)=>y.on.localeCompare(x.on));
+    }
+    return c;
+  });
+});
+const pctOf=(db,calc)=>((db-calc)/calc*100);
+const lvl=(p)=>p>25?"red":p>10?"amber":"green";
+const worst=(s)=>{let w=null;s.cores.forEach(c=>{if(c.tests.length){const d=c.tests[0].db;if(!w||d>w.db)w={core:c.n,db:d}}});
+  if(w)w.p=pctOf(w.db,s.calc);return w};
+const measured=(s)=>s.cores.filter(c=>c.tests.length).length;
+const free=(s)=>s.cut?0:s.cores.filter(c=>c.status==="Available").length;
+
+// ---- state -----------------------------------------------------------------
+let sel=null, route=[], coreSel=null;
+const $=id=>document.getElementById(id);
+const sign=(v)=>(v>0?"+":"")+v.toFixed(1)+"%";
+
+// ---- map -------------------------------------------------------------------
+function drawMap(){
+  const svg=$("svg"); let h="";
+  SPANS.forEach(s=>{
+    const [x1,y1]=SITES[s.a],[x2,y2]=SITES[s.b];
+    const cls=["span-line",s.type.toLowerCase(),route.includes(s.id)&&"route",s.cut&&"cut",sel===s.id&&"sel"].filter(Boolean).join(" ");
+    h+=`<line class="${cls}" data-id="${s.id}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" tabindex="0" role="button" aria-label="Span ${s.name}"/>`;
+  });
+  SPANS.forEach(s=>{
+    const [x1,y1]=SITES[s.a],[x2,y2]=SITES[s.b],mx=(x1+x2)/2,my=(y1+y2)/2,t=s.cut?"Cut":String(free(s));
+    h+=`<g class="chip" transform="translate(${mx-17},${my-11})" pointer-events="none"><rect width="34" height="22" rx="11"/><text x="17" y="15" text-anchor="middle">${t}</text></g>`;
+  });
+  Object.entries(SITES).forEach(([k,[x,y]])=>{h+=`<circle class="site" cx="${x}" cy="${y}" r="7"/><text class="site-t" x="${x+11}" y="${y-9}">${k}</text>`});
+  svg.innerHTML=h;
+  svg.querySelectorAll(".span-line").forEach(l=>{
+    const go=()=>pick(+l.dataset.id);
+    l.addEventListener("click",go);l.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();go()}});
+  });
+}
+
+// ---- inspector -------------------------------------------------------------
+function drawIns(){
+  const el=$("ins");
+  const list=route.length?`<div class="lbl mt">Spans on route</div><div class="rt-list">${route.map(id=>{const s=SPANS.find(x=>x.id===id);return `<button type="button" data-r="${id}" aria-pressed="${id===sel}"><b>${s.name}</b><span class="lbl">${s.km} km</span></button>`}).join("")}</div>`:"";
+  if(!sel){el.innerHTML=`<div class="ins-h"><h2>Inspector</h2></div>${list}<p class="empty">Click a span on the map.</p><button class="go" disabled><span>Details</span><span>&#9660;</span></button>`;wire();return}
+  const s=SPANS.find(x=>x.id===sel),w=worst(s),m=measured(s);
+  const wl=w?lvl(w.p):null, pill=w?`<span class="pill p-${wl}">${wl==="red"?"▲ High loss":wl==="amber"?"◆ Watch":"● Normal"}</span>`:"";
+  el.innerHTML=`
+    <div class="ins-h"><h2>${s.name}</h2>${s.cut?'<span class="pill p-red">✕ Cut</span>':""}</div>
+    <div class="rows">
+      <div class="row"><span>Type and route</span><b>${s.type}, ${s.route}</b></div>
+      <div class="row"><span>Distance</span><b>${s.km} km</b></div>
+      <div class="row"><span>Free cores</span><b style="color:${s.cut?"var(--red)":free(s)<4?"var(--amber)":"var(--green)"}">${free(s)} of ${s.n}</b></div>
+      <div class="row"><span>Calculated loss</span><b>${s.calc.toFixed(2)} dB</b></div>
+      <div class="row"><span>Loss, worst core</span>${w?`<b style="text-align:right">core ${w.core}: ${w.db.toFixed(2)} dB<br><span class="lbl">${sign(w.p)}, ${m} of ${s.n} cores measured</span></b>`:`<b class="lbl">No core measured</b>`}</div>
+    </div>
+    ${list}
+    <button class="go" id="gobtn"><span>Details</span><span>&#9660;</span></button>`;
+  wire();
+}
+function wire(){
+  const g=$("gobtn"); if(g) g.onclick=openDetail;
+  document.querySelectorAll("[data-r]").forEach(b=>b.onclick=()=>pick(+b.dataset.r));
+}
+
+// ---- detail ----------------------------------------------------------------
+function openDetail(){
+  const s=SPANS.find(x=>x.id===sel); if(!s)return;
+  coreSel=null; $("detail").hidden=false; $("loss").hidden=true;
+  $("d1").textContent=s.name;
+  const w=worst(s),m=measured(s);
+  const M=(l,v,c="")=>`<div><div class="lbl">${l}</div><div class="big" style="${c}">${v}</div></div>`;
+  $("metrics").innerHTML=
+    M("Type and route",`${s.type}, ${s.route}`)+M("Distance",s.km+" km")+
+    M("Free cores",s.cut?"Cut":`${free(s)} of ${s.n}`,s.cut?"color:var(--red)":"")+
+    M("Calculated loss",s.calc.toFixed(2)+" dB")+
+    M("Worst core",w?`core ${w.core}: ${w.db.toFixed(2)} dB`:"Not measured");
+  $("grid").innerHTML=s.cores.map(c=>{
+    const k=c.status==="In use"?"In":c.status;
+    return `<button type="button" class="core ${k}" data-c="${c.n}" aria-pressed="false" aria-label="Core ${c.n}, ${LABEL[c.status]}${c.tests.length?", loss measured":""}">${ICON[c.status]} ${c.n}${c.tests.length?'<span class="dot" aria-hidden="true">▲</span>':""}</button>`}).join("");
+  document.querySelectorAll(".core").forEach(b=>b.onclick=()=>openCore(+b.dataset.c));
+  $("detail").scrollIntoView({behavior:"smooth",block:"start"});
+}
+function openCore(n){
+  const s=SPANS.find(x=>x.id===sel),c=s.cores.find(x=>x.n===n); coreSel=n;
+  document.querySelectorAll(".core").forEach(b=>b.setAttribute("aria-pressed",String(+b.dataset.c===n)));
+  $("loss").hidden=false;
+  $("d3").textContent=`Loss of core ${n} on ${s.name}`;
+  if(!c.tests.length){
+    $("lossgrid").innerHTML="";
+    $("lossnote").innerHTML=`<p class="note">This core has no loss test yet. Calculated loss for the span is ${s.calc.toFixed(2)} dB.</p>`;
+  }else{
+    const t=c.tests[0],p=pctOf(t.db,s.calc),l=lvl(p);
+    const M=(a,b)=>`<div><div class="lbl">${a}</div><div class="big">${b}</div></div>`;
+    $("lossgrid").innerHTML=M("Calculated",s.calc.toFixed(2)+" dB")+M("Latest measured",t.db.toFixed(2)+" dB")+M("Difference",sign(p))+
+      `<div><div class="lbl">Level</div><span class="pill p-${l}" style="margin-top:6px">${l==="red"?"▲ High loss":l==="amber"?"◆ Watch":"● Normal"}</span></div>`;
+    $("lossnote").innerHTML=`<table class="mt"><caption style="text-align:left;font-weight:700;padding-top:6px">Tests of this core</caption><thead><tr><th>Tested</th><th>Measured</th><th>Difference</th><th>Method</th><th>Verified by</th></tr></thead><tbody>${
+      c.tests.map(x=>`<tr><td><b>${x.on}</b></td><td>${x.db.toFixed(2)} dB</td><td>${sign(pctOf(x.db,s.calc))}</td><td>${x.method}</td><td>${x.by}</td></tr>`).join("")}</tbody></table>`;
+  }
+  $("loss").scrollIntoView({behavior:"smooth",block:"nearest"});
+}
+
+// ---- selection and route ---------------------------------------------------
+function pick(id){sel=id;drawMap();drawIns();if(!$("detail").hidden)openDetail()}
+// Dijkstra over spans by km, uncut only
+function findRoute(a,b){
+  const dist={[a]:0},prev={},done=new Set();
+  while(true){
+    let u=null;for(const k in dist)if(!done.has(k)&&(u===null||dist[k]<dist[u]))u=k;
+    if(u===null)return null; if(u===b)break; done.add(u);
+    SPANS.filter(s=>!s.cut&&(s.a===u||s.b===u)).forEach(s=>{const v=s.a===u?s.b:s.a,d=dist[u]+s.km;if(dist[v]===undefined||d<dist[v]){dist[v]=d;prev[v]={u,id:s.id}}});
+  }
+  const ids=[];for(let v=b;v!==a;v=prev[v].u)ids.unshift(prev[v].id);return {ids,km:dist[b]};
+}
+$("sites").innerHTML=Object.keys(SITES).map(k=>`<option value="${k}">`).join("");
+function search(){
+  const a=$("a").value.trim().toUpperCase(),b=$("b").value.trim().toUpperCase(),f=$("found");
+  if(!SITES[a]||!SITES[b]||a===b){route=[];f.textContent=a===b?"Choose two different sites":"Choose sites from the list";f.style.color="var(--red)";drawMap();drawIns();return}
+  const r=findRoute(a,b);
+  if(!r){route=[];f.textContent="No route without a cut span";f.style.color="var(--red)"}
+  else{route=r.ids;f.textContent=`${r.ids.length} spans, ${r.km} km`;f.style.color="var(--green)";sel=r.ids[0]}
+  drawMap();drawIns();
+}
+$("search").onclick=search;
+$("swap").onclick=()=>{const t=$("a").value;$("a").value=$("b").value;$("b").value=t;search()};
+
+drawMap();drawIns();search();
+</script>
+</body>
+</html>
