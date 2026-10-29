@@ -14,7 +14,8 @@ test("Inspector shows the worst core and how many cores are measured", async ({ 
   await signIn(page);
   await pick(page, SPANS.measured);
   const line = page.getByTestId("inspector-loss");
-  await expect(line).toContainText(/Worst corecore (\d+|not recorded)(, [+-][\d.]+%)?/);
+  await expect(page.getByTestId("span-facts")).toContainText(/Worst core(\d+|Not recorded)Difference[+−]?[\d.]+%/);
+  await expect(line.locator(".pill")).toHaveCount(0);
   await expect(page.getByTestId("span-facts")).toContainText(/Cores measured\d+ of \d+/);
 });
 
@@ -30,19 +31,20 @@ test("a measured core: its loss in the core table, its tests in the row detail",
   expect(await rows.count()).toBeGreaterThan(0);
   // the newest test is the latest measured value in the row
   await expect(rows.first().locator("td").first()).toHaveText(latest);
-  const r = await contrast(page, { pill: "tr[data-core] .pill" });
-  expect(r.pill).toBeGreaterThanOrEqual(4.5);
+  await expect(row.locator(".pill")).toHaveCount(0); // the level is the number's colour, no chip
+  await page.mouse.move(0, 0); // measured on the resting row, not the hover grey
+  const r = await contrast(page, { loss: "tr[data-core] td [data-level]" });
+  expect(r.loss).toBeGreaterThanOrEqual(4.5);
   await page.getByTestId("core-detail").scrollIntoViewIfNeeded();
   await page.screenshot({ path: "e2e/screenshots/core-loss.png" });
 });
 
-test("no distance span: says so and never shows 0 dB", async ({ page }) => {
+test("no distance span: dashes, never 0 dB", async ({ page }) => {
   await signIn(page);
   await pick(page, SPANS.noDistance);
-  await expect(page.getByTestId("inspector-loss")).toContainText("Not measured");
   const span = page.getByTestId("span-facts");
-  await expect(span).toContainText("No distance");
+  await expect(span).toContainText("Total loss-Average loss per km-Worst core-Difference-");
   await expect(span).not.toContainText("0.00 dB");
   await page.getByRole("button", { name: "Core 1 details" }).click();
-  await expect(page.getByTestId("core-no-loss")).toHaveText("No loss test yet. No distance, so no calculated loss.");
+  await expect(page.getByTestId("core-no-loss")).toHaveText("No loss test");
 });

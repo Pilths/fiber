@@ -74,5 +74,4 @@ export const EVENT_WORD: Record<string, string> = {
 type Loss = Pick<SpanLoss, "measured_db" | "calculated_db">;
 export const totalLoss = (l: Loss | null | undefined) =>
   l?.measured_db != null ? { db: l.measured_db, calc: false } : l?.calculated_db != null ? { db: l.calculated_db, calc: true } : null;
-export const lossText = (t: { db: number; calc: boolean } | null) => (t ? `${db(t.db)}${t.calc ? " calculated" : ""}` : "No distance");
 export const perKm = (dB: number, km: number) => `${(dB / km).toFixed(2)} dB/km`;

@@ -2,8 +2,8 @@ import type { ReactNode } from "react";
 import type { components } from "@/api/schema";
 import { Icon } from "@/components/Icon";
 import type { SpanFocus } from "@/components/AdminEdit";
-import { LossPill } from "@/components/LossCard";
-import { countBy, db, health, LEVEL, lossText, pct, perKm, spanName, totalLoss, type LossDetail } from "@/lib/status";
+import { LossNum } from "@/components/LossCard";
+import { countBy, db, health, LEVEL, pct, perKm, spanName, totalLoss, type LossDetail } from "@/lib/status";
 
 type Detail = components["schemas"]["SpanDetail"];
 
@@ -72,13 +72,10 @@ function Body({ d, loss, admin }: { d: Detail; loss: LossDetail | null; admin: A
     { k: "k-use", v: n["In use"], label: "In service" },
   ];
   // Loss alert strip: amber or worse, measured only. The card has one alert slot: a cut span shows the cut banner,
-  // and its loss stays visible in the red or amber Loss row.
+  // and its loss stays visible in the coloured Difference row.
   const lv = loss?.measured_db != null && loss.deviation_pct != null && loss.level && loss.level !== "green" ? loss.level : null;
   const high = lv === "red" || lv === "off_scale";
-  // Literal class names so Tailwind finds them.
-  const tone = high
-    ? { strip: "border-red-bd bg-red-bg text-red", row: "bg-red-bg shadow-[inset_3px_0_0_var(--red)]", text: "text-red" }
-    : { strip: "border-amber-bd bg-amber-bg text-amber", row: "bg-amber-bg shadow-[inset_3px_0_0_var(--amber)]", text: "text-amber" };
+  const strip = high ? "border-red-bd bg-red-bg text-red" : "border-amber-bd bg-amber-bg text-amber"; // literal for Tailwind
   return (
     <>
       <div className="ins-head">
@@ -112,7 +109,7 @@ function Body({ d, loss, admin }: { d: Detail; loss: LossDetail | null; admin: A
               </div>
             )}
             {lv && !cut && (
-              <p data-testid="loss-alert" data-level={lv} className={`flex items-center gap-2.5 rounded-md border px-3 py-1.5 ${tone.strip}`}>
+              <p data-testid="loss-alert" data-level={lv} className={`flex items-center gap-2.5 rounded-md border px-3 py-1.5 ${strip}`}>
                 <Icon name={LEVEL[lv].icon} />
                 <span className="min-w-0 flex-1"><b className="font-semibold">{high ? "High loss" : "Loss above calculated"}:</b> {db(loss!.measured_db!)} measured, {pct(loss!.deviation_pct!)} over calculated</span>
                 <span className="flex-none font-semibold">{LEVEL[lv].word}</span>
@@ -148,27 +145,20 @@ function Body({ d, loss, admin }: { d: Detail; loss: LossDetail | null; admin: A
           </>
         ) : admin ? (
           <div className="flex items-center gap-3 text-body">
-            <p className="flex-1 text-muted-foreground">Not surveyed: enter a survey count to make it bookable. Cable size {d.cable_size}.</p>
+            <p className="flex-1 font-semibold text-muted-foreground">Not surveyed</p>
             <button type="button" className="btn btn-sm flex-none" onClick={() => admin.onEditSpan("survey")}>Enter survey count</button>
           </div>
-        ) : <p className="text-body text-muted-foreground">Not surveyed, cannot be booked. Cable size {d.cable_size}.</p>}
+        ) : <p className="text-body font-semibold text-muted-foreground">Not surveyed</p>}
 
         {/* Span facts: total loss is the worst measured core, else the calculated loss (distance x 0.3 dB/km). */}
         <dl className="mt-4 border-t text-body [&>div]:flex [&>div]:min-h-10 [&>div]:items-center [&>div]:justify-between [&>div]:gap-3 [&>div]:border-b [&>div]:py-1.5 [&_dd]:text-right [&_dd]:font-semibold" data-testid="span-facts">
-          <div><dt>Total loss</dt><dd>{!loss ? "Loading..." : lossText(t)}</dd></div>
-          <div><dt>Average loss per km</dt><dd>{!loss ? "Loading..." : !km ? "No distance" : t ? perKm(t.db, km) : "-"}</dd></div>
-          <div className={lv ? `-mx-5 px-5 ${tone.row}` : ""} data-testid="inspector-loss" data-level={lv ?? undefined}>
-            <dt>Worst core</dt>
-            <dd className="flex min-w-0 items-center justify-end gap-2">
-              {!loss ? "Loading..." : loss.measured_db == null ? "Not measured" : (
-                <>
-                  <b className={`font-semibold ${lv ? tone.text : ""}`}>
-                    {loss.worst_core_number != null ? `core ${loss.worst_core_number}` : "core not recorded"}{loss.deviation_pct != null && `, ${pct(loss.deviation_pct)}`}
-                  </b>
-                  <LossPill l={loss} compact />
-                </>
-              )}
-            </dd>
+          <div><dt>Cable size</dt><dd>{d.cable_size}</dd></div>
+          <div><dt>{t?.calc ? "Calculated loss" : "Total loss"}</dt><dd>{!loss ? "Loading..." : t ? db(t.db) : "-"}</dd></div>
+          <div><dt>Average loss per km</dt><dd>{!loss ? "Loading..." : t && km ? perKm(t.db, km) : "-"}</dd></div>
+          <div><dt>Worst core</dt><dd>{!loss ? "Loading..." : loss.measured_db == null ? "-" : loss.worst_core_number ?? "Not recorded"}</dd></div>
+          <div data-testid="inspector-loss" data-level={loss?.level ?? undefined}>
+            <dt>Difference</dt>
+            <dd>{!loss ? "Loading..." : loss.measured_db != null && loss.deviation_pct != null ? <LossNum l={loss}>{pct(loss.deviation_pct)}</LossNum> : "-"}</dd>
           </div>
           <div><dt>Cores measured</dt><dd>{loss ? `${loss.measured_cores} of ${loss.total_cores}` : "Loading..."}</dd></div>
         </dl>

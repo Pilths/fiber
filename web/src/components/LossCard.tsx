@@ -5,6 +5,13 @@ import { db, LEVEL, pct, signedDb, type LossDetail, type SpanLoss } from "@/lib/
 // A blank table value with its meaning, muted: "Not recorded" (should exist, missing), "Not applicable", "No ports yet".
 export const Blank = ({ children = "Not recorded" }: { children?: string }) => <span className="font-normal text-muted-foreground">{children}</span>;
 
+// A loss number in its level's colour (no chip); the level word stays for screen readers.
+export function LossNum({ l, children }: { l: Pick<SpanLoss, "level" | "deviation_pct">; children: string }) {
+  if (!l.level) return <>{children}</>;
+  const word = l.level === "green" && (l.deviation_pct ?? 0) < 0 ? "Below calculated" : LEVEL[l.level].word;
+  return <span className={`font-semibold ${LEVEL[l.level].cls.replace("h-", "v-")}`} data-level={l.level}>{children}<span className="sr-only">, {word}</span></span>;
+}
+
 export function LossPill({ l, compact }: { l: Pick<SpanLoss, "level" | "deviation_pct">; compact?: boolean }) {
   if (!l.level) return null;
   const v = LEVEL[l.level];

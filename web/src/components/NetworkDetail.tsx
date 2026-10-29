@@ -2,7 +2,7 @@ import { Fragment, useEffect, useState, type FormEvent } from "react";
 import { api } from "@/api/client";
 import type { components } from "@/api/schema";
 import { Icon } from "@/components/Icon";
-import { Blank, LossPill } from "@/components/LossCard";
+import { Blank, LossNum } from "@/components/LossCard";
 import type { RouteOption } from "@/components/RoutePlanner";
 import { FreeBadge } from "@/components/FindCard";
 import { countBy, db, LEVEL, pct, perKm, spanName, totalLoss, STATUS, STATUS_ORDER, statusLabel, type CoreStatus, type LossDetail, type SpanLoss } from "@/lib/status";
@@ -67,45 +67,59 @@ export function SpanDiagram({ spans, found, d, loss, selectedId, onPick }: {
   const km = rows.reduce((n, r) => n + (r.s ? kmOf(r.s) ?? 0 : 0), 0);
   // Spans with a distance count: worst measured core if measured, else calculated. A span with no distance adds neither dB nor km.
   const used = rows.flatMap((r) => { const k = r.s ? kmOf(r.s) : null, t = k ? totalLoss(r.l) : null; return t ? [{ k: k!, ...t }] : []; });
-  const missing = rows.length - used.length;
   const total = used.length ? used.reduce((n, u) => n + u.db, 0) : null;
   const usedKm = used.reduce((n, u) => n + u.k, 0);
   const anyCalc = used.some((u) => u.calc);
+  const totals: [string, string][] = [
+    ["Spans", String(rows.length)],
+    ["Distance", km ? `${Number(km.toFixed(1))} km` : "-"],
+    [anyCalc ? "Calculated loss" : "Total loss", total == null ? "-" : db(total)],
+    ["Average loss per km", total != null && usedKm ? perKm(total, usedKm) : "-"],
+  ];
+  const cols = Math.min(rows.length, PER_ROW);
   return (
     <section className="card" aria-labelledby="diagram-h" data-testid="span-diagram">
       <h2 id="diagram-h" className="sr-only">{onRoute ? `Route ${chain[0].a} to ${chain[chain.length - 1].b}` : spanName(d)}</h2>
-      <ol aria-label="Spans on the route" className="flex flex-wrap items-center gap-y-4">
+      {/* Site, span, site ... in rows of up to PER_ROW spans; a row's last site starts the next row. */}
+      <ol aria-label="Spans on the route" className="grid gap-y-4 px-16" style={{ gridTemplateColumns: `repeat(${cols}, minmax(140px, 1fr))` }}>
         {rows.map((r, i) => {
           const cut = r.s?.fiber_cut, sel = r.id === selectedId, w = r.l?.level && r.l.level !== "green" ? LEVEL[r.l.level] : null;
           const k = r.s ? kmOf(r.s) : null;
           return (
-            <Fragment key={r.id}>
-              {i === 0 && <li className="font-semibold">{r.a}</li>}
-              <li>
-                <button type="button" aria-pressed={sel} onClick={() => onPick(r.id)}
-                  className="mx-2 flex min-w-36 flex-col items-stretch gap-1.5 rounded-md border border-transparent px-2 py-1.5 hover:bg-raised aria-pressed:border-blue aria-pressed:bg-blue-bg">
-                  <span className="sr-only">{r.a} - {r.b},</span>
-                  <span aria-hidden className={`block border-t-4 ${cut ? "border-dashed border-red" : "border-blue"}`} />
-                  <span className="flex items-center justify-center gap-2 text-body">
-                    <span className="font-semibold">{k == null ? "No distance" : `${k} km`}</span>
-                    {cut ? <span className="pill h-red"><Icon name="fl" />Cut</span> : r.s && <FreeBadge s={r.s} />}
-                    {w && <span className={`inline-flex items-center ${w.cls.replace("h-", "v-")}`} title={`Loss ${w.word}`} data-testid="loss-marker"><Icon name={w.icon} /><span className="sr-only">Loss {w.word}</span></span>}
-                  </span>
-                </button>
-              </li>
-              <li className="font-semibold">{r.b}</li>
-            </Fragment>
+            <li key={r.id} className="relative h-[100px]">
+              <button type="button" aria-pressed={sel} aria-label={`Span ${r.a} - ${r.b}`} onClick={() => onPick(r.id)}
+                className="mx-3 flex w-[calc(100%-24px)] cursor-pointer flex-col items-center gap-1 rounded-md border border-transparent py-1.5 hover:bg-raised aria-pressed:border-blue aria-pressed:bg-blue-bg">
+                <span className="h-5 text-body leading-5 font-semibold">{k == null ? "-" : `${k} km`}</span>
+                <span aria-hidden className="h-1" />
+                <span className="flex h-[22px] items-center gap-1.5">
+                  {cut ? <span className="pill h-red"><Icon name="fl" />Cut</span> : r.s && <FreeBadge s={r.s} />}
+                  {w && <span className={`inline-flex items-center ${w.cls.replace("h-", "v-")}`} title={`Loss ${w.word}`} data-testid="loss-marker"><Icon name={w.icon} /><span className="sr-only">Loss {w.word}</span></span>}
+                </span>
+              </button>
+              {/* The line runs node to node, over the button's tint; clicks pass through to the button. */}
+              <span aria-hidden className={`pointer-events-none absolute inset-x-0 top-[31px] border-t-4 ${cut ? "border-dashed border-red" : "border-blue"}`} />
+              <Site name={r.a} />
+              {(i % PER_ROW === PER_ROW - 1 || i === rows.length - 1) && <Site name={r.b} end />}
+            </li>
           );
         })}
       </ol>
-      <p className="mt-4 border-t pt-3 text-body" data-testid="route-totals">
-        {rows.length} {rows.length === 1 ? "span" : "spans"}, {Number(km.toFixed(1))} km, total loss {total == null ? "unknown" : `${db(total)}${anyCalc ? " (calculated where not measured)" : ""}`}
-        {total != null && usedKm > 0 && `, average ${perKm(total, usedKm)}`}
-        {total != null && missing > 0 && `, ${missing} ${missing === 1 ? "span" : "spans"} without distance not counted`}
-      </p>
+      <dl className="mt-2 flex flex-wrap gap-x-10 gap-y-2 border-t pt-3 text-body" data-testid="route-totals">
+        {totals.map(([k, v]) => <div key={k} className="flex gap-2"><dt className="text-muted-foreground">{k}</dt><dd className="font-semibold">{v}</dd></div>)}
+      </dl>
     </section>
   );
 }
+
+const PER_ROW = 6;
+// A site on the chain: a dark node on the line and its name under it, at the segment's start (or end).
+const Site = ({ name, end }: { name: string; end?: boolean }) => (
+  <>
+    <span aria-hidden className={`pointer-events-none absolute top-[27px] size-3 rounded-full bg-foreground ring-2 ring-white ${end ? "-right-1.5" : "-left-1.5"}`} />
+    <span title={name} className={`absolute top-[76px] max-w-[calc(100%-16px)] truncate text-center text-body font-semibold ${end ? "right-0 translate-x-1/2" : "left-0 -translate-x-1/2"}`}>{name}</span>
+  </>
+);
+
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return <div className="min-w-0"><dt className="lbl">{label}</dt><dd className="mt-0.5 font-semibold break-words">{children}</dd></div>;
@@ -155,7 +169,7 @@ export function CoresTable({ d, loss, focusCoreId, onActions }: { d: Detail; los
                     <td className="truncate">{(!free && c.customer) || <Dash />}</td>
                     <td className="whitespace-nowrap">{(!free && c.planned_date) || <Dash />}</td>
                     <td className="truncate">{ports(c)}</td>
-                    <td className="pr-0 whitespace-nowrap">{cl ? <span className="inline-flex items-center gap-2">{db(cl.measured_db)}<LossPill l={cl} compact /></span> : <Dash />}</td>
+                    <td className="pr-0 whitespace-nowrap">{cl ? <LossNum l={cl}>{db(cl.measured_db)}</LossNum> : <Dash />}</td>
                   </tr>
                   {open && (
                     <tr data-testid="core-detail">
@@ -165,9 +179,7 @@ export function CoresTable({ d, loss, focusCoreId, onActions }: { d: Detail; los
                           <button type="button" className="btn btn-sm" onClick={() => onActions(c)}>History and actions</button>
                         </div>
                         {!loss ? <p className="mt-2 text-body text-muted-foreground">Loading loss...</p> : !cl ? (
-                          <p role="status" className="mt-2 note px-3 py-2 text-body" data-testid="core-no-loss">
-                            No loss test yet. {calc != null ? `Calculated loss for the span is ${db(calc)}.` : "No distance, so no calculated loss."}
-                          </p>
+                          <p className="mt-2 text-body text-muted-foreground" data-testid="core-no-loss">No loss test</p>
                         ) : (
                           <table className="tbl mt-2 table-fixed" data-testid="core-tests">
                             <caption className="sr-only">Loss tests of core {c.number}, newest first</caption>
@@ -202,14 +214,14 @@ export function CoresTable({ d, loss, focusCoreId, onActions }: { d: Detail; los
   );
 }
 
-// One line per count-only reservation: cores requested but not yet assigned to specific cores.
+// One row per count-only reservation: cores requested but not yet assigned to specific cores.
 export const Unassigned = ({ d }: { d: Detail }) => d.unassigned.length > 0 && (
-  <ul className="mt-3 space-y-1 text-body" data-testid="unassigned">
+  <dl className="mt-3 text-body" data-testid="unassigned">
     {d.unassigned.map((u) => (
-      <li key={u.reservation_id} className="flex items-center gap-2">
-        <Icon name="co" className="ic text-use" />
-        <span><b className="font-semibold">{u.remaining} {u.remaining === 1 ? "core" : "cores"}</b> requested, not assigned yet{u.customer ? `, ${u.customer}` : ""}</span>
-      </li>
+      <div key={u.reservation_id} className="flex gap-3 py-0.5">
+        <dt className="w-28 flex-none text-muted-foreground">Unassigned</dt>
+        <dd className="font-semibold">{u.remaining} {u.remaining === 1 ? "core" : "cores"}{u.customer ? `, ${u.customer}` : ""}</dd>
+      </div>
     ))}
-  </ul>
+  </dl>
 );

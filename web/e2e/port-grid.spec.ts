@@ -125,7 +125,7 @@ test("each status has a distinct symbol and text, not colour alone", async ({ pa
 test("count-only reservation shows on the span and in My reservations; admin sees Approvals", async ({ page }) => {
   await signIn(page);
   await pickSpan(page, /^DEV Cyberjaya DC - DEV Bukit Jalil/);
-  await expect(page.getByTestId("unassigned")).toContainText("requested, not assigned yet");
+  await expect(page.getByTestId("unassigned")).toContainText(/Unassigned3 cores/);
   await page.getByRole("button", { name: /My reservations/ }).click();
   await expect(page.getByTestId("reservation").filter({ hasText: "3 not assigned yet" })).toBeVisible();
   await page.getByRole("button", { name: "Rejected" }).click();

@@ -5,6 +5,11 @@ import { signIn } from "./helpers";
 test.use({ viewport: { width: 1440, height: 900 } });
 
 test("route search, pick a span in the diagram: totals, Inspector loss facts, core table filter and row detail", async ({ page }) => {
+  // The option with the most spans first, so the diagram shows a long chain.
+  await page.route("**/api/routes?*", async (r) => {
+    const j = (await (await r.fetch()).json()) as { options: { spans: unknown[] }[] };
+    r.fulfill({ json: { ...j, options: j.options.toSorted((x, y) => y.spans.length - x.spans.length) } });
+  });
   await signIn(page);
   await expect(page.getByRole("region", { name: "Find" })).toHaveCount(0); // the Map page is view only
   const search = page.getByRole("region", { name: "Route search" });
@@ -17,17 +22,17 @@ test("route search, pick a span in the diagram: totals, Inspector loss facts, co
   const segs = diagram.getByRole("list", { name: "Spans on the route" }).getByRole("button");
   await expect(segs.first()).toHaveAttribute("aria-pressed", "true");
   const n = await segs.count();
-  await expect(diagram.getByTestId("route-totals")).toHaveText(new RegExp(`^${n} spans?, [\\d.]+ km, total loss [\\d.]+ dB( \\(calculated where not measured\\))?, average [\\d.]+ dB/km(, \\d+ spans? without distance not counted)?$`));
+  await expect(diagram.getByTestId("route-totals")).toHaveText(new RegExp(`^Spans${n}Distance[\\d.]+ km(Total|Calculated) loss[\\d.]+ dBAverage loss per km[\\d.]+ dB/km$`));
+  await expect(diagram).not.toContainText("No distance");
 
   const last = segs.filter({ hasText: /\d km/ }).last(); // a span with a distance, so it has a calculated loss
-  const name = (await last.locator(".sr-only").first().textContent())!.replace(/,$/, "");
+  const name = (await last.getAttribute("aria-label"))!.replace(/^Span /, "");
   await last.click();
   await expect(last).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator("#span-h")).toHaveText(name);
   await expect(page.getByTestId("span-card")).toHaveCount(0); // its facts live in the Inspector
   const card = page.getByTestId("span-facts");
-  await expect(card).toContainText(/Total loss[\d.]+ dB/);
-  await expect(card).toContainText(/Average loss per km([\d.]+ dB\/km|No distance)/);
+  await expect(card).toContainText(/^Cable size\d+(Total|Calculated) loss[\d.]+ dBAverage loss per km[\d.]+ dB\/kmWorst core(\d+|-|Not recorded)Difference/);
   await expect(card).toContainText(/Cores measured\d+ of \d+/);
   await expect(page.getByRole("region", { name: "Inspector" }).getByText("Spans on route")).toHaveCount(0);
 
