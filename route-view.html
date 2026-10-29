@@ -24,15 +24,20 @@ h2{font-size:16px;font-weight:700}
 /* search + diagram card */
 .bar{display:grid;grid-template-columns:1fr 36px 1fr auto;gap:8px;align-items:end}
 .bar label{display:grid;gap:4px}
-.chain{display:flex;flex-wrap:wrap;align-items:center;gap:6px 0;margin-top:14px;padding-top:14px;border-top:1px solid var(--rule)}
-.site{font-weight:700;padding:0 8px;white-space:nowrap}
-.seg{display:grid;justify-items:center;gap:4px;min-width:150px;padding:8px 12px;border:1px solid transparent;border-radius:6px;background:none;cursor:pointer}
+.chain{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;margin-top:14px;padding-top:14px;border-top:1px solid var(--rule)}
+.chain .cell{position:relative;padding-bottom:34px}
+.seg{position:relative;display:grid;justify-items:center;gap:4px;width:100%;height:64px;padding:4px 0;border:1px solid transparent;border-radius:6px;background:none;cursor:pointer}
 .seg:hover{background:var(--bg)}
 .seg[aria-pressed=true]{border-color:var(--blue);background:var(--blue-bg)}
-.seg .ln{width:100%;height:0;border-top:4px solid var(--blue)}
-.seg.cut .ln{border-top:4px dashed var(--red)}
-.seg .meta{display:flex;gap:6px;align-items:center;font-size:13px;font-weight:600}
-.totals{margin-top:10px;font-weight:600}
+.seg .km{font-weight:600}
+.seg .ln{position:absolute;left:0;right:0;top:31px;border-top:4px solid var(--blue)}
+.seg.cut .ln{border-top-style:dashed;border-color:var(--red)}
+.seg .free{position:absolute;top:38px}
+.node{position:absolute;top:27px;width:12px;height:12px;border-radius:50%;background:var(--ink);box-shadow:0 0 0 2px #fff;pointer-events:none}
+.sname{position:absolute;top:80px;font-weight:600;white-space:nowrap;transform:translateX(-50%)}
+.totals{display:flex;flex-wrap:wrap;gap:8px 40px;margin-top:6px;padding-top:12px;border-top:1px solid var(--rule)}
+.totals dt{color:var(--muted);display:inline;margin-right:8px}.totals dd{display:inline;font-weight:700}
+.lv-red{color:var(--red)}.lv-amber{color:#b45309}.lv-green{color:var(--green)}
 
 /* map + inspector */
 .top{display:grid;grid-template-columns:1fr 420px;gap:12px}
@@ -71,7 +76,9 @@ tr.r[aria-expanded=true]{background:var(--blue-bg)}
 .sub table{table-layout:auto}
 .sub th{position:static;background:none}
 .note{color:var(--muted);font-weight:600}
-.unas{margin-top:10px;font-size:13px}
+.dg{display:grid;grid-template-columns:repeat(3,1fr);gap:14px 24px;flex:1}
+.dg dt{font-size:12px;color:var(--muted);font-weight:600}.dg dd{font-weight:700;margin-top:2px}
+.unas{margin-top:10px;display:grid;gap:4px}.unas div{display:flex;gap:24px}.unas dt{color:var(--muted)}.unas dd{font-weight:700}
 </style>
 </head>
 <body>
@@ -87,7 +94,7 @@ tr.r[aria-expanded=true]{background:var(--blue-bg)}
       <datalist id="sites"></datalist>
     </form>
     <div class="chain" id="chain"></div>
-    <p class="totals" id="totals"></p>
+    <dl class="totals" id="totals"></dl>
   </section>
 
   <!-- 2. Map and Inspector (one span, every span fact lives here) -->
@@ -103,11 +110,11 @@ tr.r[aria-expanded=true]{background:var(--blue-bg)}
     <div class="tblwrap">
       <table>
         <caption class="lbl" style="position:absolute;left:-9999px">Cores on this span</caption>
-        <thead><tr><th style="width:8%">Core</th><th style="width:16%">Status</th><th style="width:22%">Customer</th><th style="width:14%">Planned date</th><th>Ports</th><th style="width:15%">Loss</th></tr></thead>
+        <thead><tr><th style="width:7%">Core</th><th style="width:14%">Status</th><th style="width:13%">Circuit ID</th><th style="width:17%">Customer</th><th style="width:12%">Planned date</th><th>Ports</th><th style="width:10%">Loss</th></tr></thead>
         <tbody id="tb"></tbody>
       </table>
     </div>
-    <p class="unas" id="unas"></p>
+    <dl class="unas" id="unas"></dl>
   </section>
 </div>
 
@@ -130,9 +137,9 @@ SPANS.forEach(s=>{
   s.name=`${SITES[s.a][2]} - ${SITES[s.b][2]}`; s.calc=s.km==null?null:s.km*0.3;
   s.cores=Array.from({length:s.n},(_,i)=>{
     const r=rnd(s.id*97+i),st=r<.6?"Available":r<.7?"Requested":r<.85?"Reserved":"In use",c={n:i+1,status:st,tests:[]};
-    if(st!=="Available"){c.customer=CUST[Math.floor(rnd(i*3+s.id)*4)];c.planned=`2026-${String(1+i%12).padStart(2,"0")}-${String(3+i%25).padStart(2,"0")}`}
+    if(st!=="Available"){c.srf=`SRF-${s.id}${String(i+1).padStart(2,"0")}`;c.planner=["DEV planner1","DEV planner2"][i%2];c.customer=CUST[Math.floor(rnd(i*3+s.id)*4)];c.planned=`2026-${String(1+i%12).padStart(2,"0")}-${String(3+i%25).padStart(2,"0")}`}
     if(st==="Reserved"||st==="In use"){c.ports=`${s.a} ODF-1/${10+i} to ${s.b} ODF-2/${10+i}`}
-    if(st==="In use")c.circuit=`CKT-${s.id}${100+i}`;
+    if(st==="In use"||st==="Reserved")c.circuit=`CKT-${s.id}${100+i}`;
     if(s.calc&&rnd(s.id*13+i*7)<.3){c.tests=[{on:"2026-10-"+String(1+i%28).padStart(2,"0"),db:s.calc*(.9+rnd(i+s.id)*.35),m:"OTDR",by:"Field team 2"}]}
     return c});
   s.unas=s.id===1?[{n:3,cust:"Bank Gamma"}]:[];
@@ -165,14 +172,16 @@ function search(){
 let routeA="CYBJ";
 
 function drawChain(){
-  if(!route.length){$("chain").innerHTML='<span class="note">No route. Choose two sites from the list.</span>';$("totals").textContent="";return}
-  let at=routeA,h=`<span class="site">${SITES[at][2]}</span>`,km=0,dbs=0,allMeas=true,noDist=0;
-  route.forEach(id=>{const s=SPANS.find(x=>x.id===id),nx=s.a===at?s.b:s.a,w=worst(s),l=w&&s.calc?lvl(dev(w.db,s.calc)):null;
-    h+=`<button type="button" class="seg${s.cut?" cut":""}" aria-pressed="${id===sel}" data-id="${id}"><span class="ln"></span><span class="meta">${s.km==null?"No distance":s.km+" km"} <span class="free">${s.cut?"Cut":free(s)}</span>${l&&l!=="green"?`<span class="pill p-${l}" title="Loss ${PILL[l]}">${PILL[l][0]}</span>`:""}</span></button><span class="site">${SITES[nx][2]}</span>`;
-    at=nx; if(s.km==null){noDist++;return} km+=s.km; if(!w)allMeas=false; dbs+=w?w.db:s.calc});
+  if(!route.length){$("chain").innerHTML='<span class="note">-</span>';$("totals").innerHTML="";return}
+  let at=routeA,h="",km=0,dbs=0,anyCalc=false;const n=route.length;
+  route.forEach((id,i)=>{const s=SPANS.find(x=>x.id===id),nx=s.a===at?s.b:s.a,w=worst(s),l=w&&s.calc?lvl(dev(w.db,s.calc)):null;
+    h+=`<div class="cell"><button type="button" class="seg${s.cut?" cut":""}" aria-pressed="${id===sel}" data-id="${id}" aria-label="Span ${s.name}"><span class="km">${s.km==null?"-":s.km+" km"}</span><span class="ln"></span><span class="free">${s.cut?"Cut":free(s)}</span></button>
+      <span class="node" style="left:-6px"></span><span class="sname" style="left:0">${SITES[at][2]}</span>${i===n-1?`<span class="node" style="right:-6px"></span><span class="sname" style="right:0;left:auto;transform:translateX(50%)">${SITES[nx][2]}</span>`:""}</div>`;
+    at=nx; if(s.km==null)return; km+=s.km; if(w)dbs+=w.db;else{dbs+=s.calc;anyCalc=true}});
   $("chain").innerHTML=h;
   $("chain").querySelectorAll(".seg").forEach(b=>b.onclick=()=>{sel=+b.dataset.id;open=null;filter="All";draw()});
-  $("totals").textContent=`${route.length} spans, ${km.toFixed(1)} km, total loss ${f2(dbs)} dB${allMeas?"":" (calculated where not measured)"}, average ${km?f2(dbs/km):"-"} dB/km${noDist?`, ${noDist} span without distance not counted`:""}`;
+  const T=(k,v)=>`<div><dt>${k}</dt><dd>${v}</dd></div>`;
+  $("totals").innerHTML=T("Spans",n)+T("Distance",km.toFixed(1)+" km")+T(anyCalc?"Calculated loss":"Total loss",f2(dbs)+" dB")+T("Average loss per km",km?f2(dbs/km)+" dB/km":"-");
 }
 
 function drawMap(){
@@ -186,21 +195,21 @@ function drawMap(){
 
 function drawIns(){
   const s=SPANS.find(x=>x.id===sel);
-  if(!s){$("ins").innerHTML='<p class="empty">Search a route or click a span on the map.</p>';return}
+  if(!s){$("ins").innerHTML='<p class="empty">-</p>';return}
   const c=k=>s.cores.filter(x=>x.status===k).length,t=total(s),w=worst(s),l=w&&s.calc?lvl(dev(w.db,s.calc)):null;
+  const R=(k,v)=>`<div class="row"><span>${k}</span><b>${v}</b></div>`;
   $("ins").innerHTML=`
     <h2>${s.name}</h2>
-    <div class="tags"><span>${s.type}</span><span>${s.route}</span><span>${s.km==null?"No distance":s.km+" km"}</span>${s.cut?'<span class="pill p-red">✕ Cut</span>':""}</div>
+    <div class="tags"><span>${s.route}</span><span>${s.type}</span>${s.km==null?"":`<span>${s.km} km</span>`}${s.cut?'<span class="pill p-red">\u2715 Cut</span>':""}</div>
     <div style="margin-top:16px;display:flex;align-items:baseline;gap:8px"><span class="big" style="color:${s.cut?"var(--red)":"var(--green)"}">${s.cut?"Cut":free(s)}</span><span class="lbl">free of ${s.n}</span></div>
     <div class="stack"><span style="flex:${c("Available")};background:var(--green)"></span><span style="flex:${c("Requested")};background:#d99a1c"></span><span style="flex:${c("Reserved")};background:var(--blue)"></span><span style="flex:${c("In use")};background:var(--use)"></span></div>
-    <div class="keyrow"><span>○ ${c("Available")} Available</span><span>◐ ${c("Requested")} Requested</span><span>● ${c("Reserved")} Reserved</span><span>■ ${c("In use")} In service</span></div>
+    <div class="keyrow"><span>\u25CB ${c("Available")} Available</span><span>\u25D0 ${c("Requested")} Requested</span><span>\u25CF ${c("Reserved")} Reserved</span><span>\u25A0 ${c("In use")} In service</span></div>
     <div class="rows">
-      <div class="row"><span>Total loss</span><b>${t?`${f2(t.db)} dB${t.calc?" calculated":""}`:"No distance"}</b></div>
-      <div class="row"><span>Average loss per km</span><b>${t&&s.km?f2(t.db/s.km)+" dB/km":"No distance"}</b></div>
-      <div class="row"><span>Worst core</span><b>${w?`core ${w.core}, ${sign(dev(w.db,s.calc))} ${l?`<span class="pill p-${l}">${PILL[l]}</span>`:""}`:"Not measured"}</b></div>
-      <div class="row"><span>Cores measured</span><b>${measured(s)} of ${s.n}</b></div>
+      ${R("Distance",s.km==null?"-":s.km+" km")}${R("Free cores",s.cut?`0 of ${s.n}`:`${free(s)} of ${s.n}`)}${R("Cable size",144)}
+      ${R(t&&t.calc?"Calculated loss":"Total loss",t?`<span class="${l?"lv-"+l:""}">${f2(t.db)} dB</span>`:"-")}
+      ${R("Average loss per km",t&&s.km?f2(t.db/s.km)+" dB/km":"-")}
     </div>
-    <button class="go" onclick="document.getElementById('cores').scrollIntoView({behavior:'smooth'})"><span>Cores</span><span>▼</span></button>`;
+    <button class="go" onclick="document.getElementById('cores').scrollIntoView({behavior:'smooth'})"><span>Cores</span><span>\u25BC</span></button>`;
 }
 
 function drawCores(){
@@ -210,21 +219,27 @@ function drawCores(){
   const cnt=k=>k==="All"?s.n:s.cores.filter(c=>c.status===k).length;
   $("chips").innerHTML=["All","Available","Requested","Reserved","In use"].filter(k=>cnt(k)).map(k=>`<button type="button" class="chip" data-f="${k}" aria-pressed="${filter===k}">${k==="All"?"":ICON[k]+" "}${k==="All"?"All":LABEL[k]} <b>${cnt(k)}</b></button>`).join("");
   $("chips").querySelectorAll(".chip").forEach(b=>b.onclick=()=>{filter=b.dataset.f;open=null;drawCores()});
-  const D='<span class="dash">-</span>';
+  const D='<span class="dash">-</span>',V=v=>v==null||v===""?D:v;
   $("tb").innerHTML=s.cores.filter(c=>filter==="All"||c.status===filter).map(c=>{
     const t=c.tests[0],l=t?lvl(dev(t.db,s.calc)):null,k=c.status==="In use"?"In":c.status;
+    const pa=c.ports?c.ports.split(" to ")[0]:null,pb=c.ports?c.ports.split(" to ")[1]:null;
     let h=`<tr class="r" data-n="${c.n}" aria-expanded="${open===c.n}">
-      <td><button type="button" class="cb" aria-label="Core ${c.n}, show details">${open===c.n?"▾":"▸"} ${c.n}</button></td>
+      <td><button type="button" class="cb" aria-label="Core ${c.n}, show details">${open===c.n?"\u25BE":"\u25B8"} ${c.n}</button></td>
       <td class="s-${k}" style="font-weight:700">${ICON[c.status]} ${LABEL[c.status]}</td>
-      <td>${c.customer??D}</td><td>${c.planned??D}</td><td>${c.ports??(c.status==="Available"?D:'<span class="dash">No ports yet</span>')}</td>
-      <td>${t?`${f2(t.db)} dB <span class="pill p-${l}" title="${PILL[l]}">${PILL[l][0]}</span>`:D}</td></tr>`;
-    if(open===c.n)h+=`<tr class="sub"><td colspan="6">
-      <div style="display:flex;justify-content:space-between;align-items:center"><span><span class="lbl">Circuit ID</span> <b>${c.circuit??"-"}</b></span><button class="btn">History and actions</button></div>
-      ${c.tests.length?`<table style="margin-top:10px"><thead><tr><th>Tested</th><th>Measured</th><th>Difference</th><th>Method</th><th>Verified by</th></tr></thead><tbody>${c.tests.map(x=>`<tr><td><b>${x.on}</b></td><td>${f2(x.db)} dB</td><td>${sign(dev(x.db,s.calc))}</td><td>${x.m}</td><td>${x.by}</td></tr>`).join("")}</tbody></table>`
-       :`<p class="note" style="margin-top:10px">No loss test yet.${s.calc!=null?` Calculated loss for the span is ${f2(s.calc)} dB.`:""}</p>`}</td></tr>`;
+      <td>${V(c.circuit)}</td><td>${V(c.customer)}</td><td>${V(c.planned)}</td><td>${c.ports?c.ports.replace(/ ODF-\d\//g," ").replace(" to "," to "):D}</td>
+      <td>${t?`<b class="lv-${l}">${f2(t.db)} dB</b>`:D}</td></tr>`;
+    if(open===c.n){
+      const F=(k,v)=>`<div><dt>${k}</dt><dd>${v}</dd></div>`,t0=c.tests[0],km=s.km;
+      h+=`<tr class="sub"><td colspan="7"><div style="display:flex;gap:16px;align-items:flex-start"><dl class="dg">
+        ${F("SRF ID",V(c.srf))}${F("Customer",V(c.customer))}${F("Planner",V(c.planner))}
+        ${F("Planned date",V(c.planned))}${F("Status",`<span class="s-${k}">${ICON[c.status]} ${LABEL[c.status]}</span>`)}${F("Port A",V(pa))}
+        ${F("Port B",V(pb))}${F("Circuit ID",V(c.circuit))}${F("Loss",t0?`<span class="lv-${lvl(dev(t0.db,s.calc))}">${f2(t0.db)} dB</span>`:"-")}
+        ${F("Average loss per km",t0&&km?f2(t0.db/km)+" dB/km":"-")}${F("Difference vs calculated",t0?`<span class="lv-${lvl(dev(t0.db,s.calc))}">${sign(dev(t0.db,s.calc))}</span>`:"-")}
+        </dl><button class="btn">History and actions</button></div>
+      ${c.tests.length?`<table style="margin-top:12px"><thead><tr><th>Tested</th><th>Measured</th><th>Difference</th><th>Method</th><th>Verified by</th></tr></thead><tbody>${c.tests.map(x=>`<tr><td><b>${x.on}</b></td><td>${f2(x.db)} dB</td><td>${sign(dev(x.db,s.calc))}</td><td>${x.m}</td><td>${x.by}</td></tr>`).join("")}</tbody></table>`:`<p class="note" style="margin-top:12px">No loss test</p>`}</td></tr>`}
     return h}).join("");
   $("tb").querySelectorAll("tr.r").forEach(r=>r.onclick=()=>{const n=+r.dataset.n;open=open===n?null:n;drawCores()});
-  $("unas").innerHTML=s.unas.map(u=>`◌ <b>${u.n} cores</b> requested, not assigned yet, ${u.cust}`).join("<br>");
+  $("unas").innerHTML=s.unas.map(u=>`<div><dt>Unassigned</dt><dd>${u.n} cores, ${u.cust}, SRF-${s.id}00, DEV planner1</dd></div>`).join("");
 }
 
 function draw(){drawChain();drawMap();drawIns();drawCores()}
