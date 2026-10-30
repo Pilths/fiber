@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reserve view mock</title><style>
+:root{--bg:#f3f4f6;--card:#fff;--line:#d5d9e0;--rule:#e6e8ec;--ink:#14181f;--muted:#5d6675;--blue:#1d5fd1;--blue-bg:#e8f0fd;--green:#17703a;--green-bg:#e3f4e9;--amber:#8a5a00;--amber-bg:#fdf1d6;--red:#b3261e;--red-bg:#fbe5e3;--use:#4b3fa3;--use-bg:#ece9fa}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--ink);min-width:1200px}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
+.page{max-width:1440px;margin:0 auto;padding:12px 16px 48px;display:grid;gap:12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:14px 16px}
+h2{font-size:16px;font-weight:700}
+.lbl{font-size:12px;font-weight:600;color:var(--muted)}
+.field{height:36px;border:1px solid var(--line);border-radius:6px;padding:0 10px;background:#fff;width:100%}
+.btn{height:36px;padding:0 14px;border:1px solid var(--line);border-radius:6px;background:#fff;font-weight:600;cursor:pointer}
+.btn-p{background:var(--ink);color:#fff;border-color:var(--ink)}
+.pill{display:inline-flex;align-items:center;gap:4px;height:22px;padding:0 8px;border-radius:999px;font-size:12px;font-weight:700}
+.p-red{background:var(--red-bg);color:var(--red)}.p-amber{background:var(--amber-bg);color:var(--amber)}.p-green{background:var(--green-bg);color:var(--green)}
+.free{display:inline-flex;min-width:30px;justify-content:center;height:22px;align-items:center;border-radius:999px;background:var(--green-bg);color:var(--green);font-size:12px;font-weight:700;padding:0 7px}
+
+/* search + diagram card */
+.bar{display:grid;grid-template-columns:1fr 36px 1fr auto;gap:8px;align-items:end}
+.bar label{display:grid;gap:4px}
+.chain{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;margin-top:14px;padding-top:14px;border-top:1px solid var(--rule)}
+.chain .cell{position:relative;padding-bottom:34px}
+.seg{position:relative;display:grid;justify-items:center;gap:4px;width:100%;height:64px;padding:4px 0;border:1px solid transparent;border-radius:6px;background:none;cursor:pointer}
+.seg:hover{background:var(--bg)}
+.seg[aria-pressed=true]{border-color:var(--blue);background:var(--blue-bg)}
+.seg .km{font-weight:600}
+.seg .ln{position:absolute;left:0;right:0;top:31px;border-top:4px solid var(--blue)}
+.seg.cut .ln{border-top-style:dashed;border-color:var(--red)}
+.seg .free{position:absolute;top:38px}
+.node{position:absolute;top:27px;width:12px;height:12px;border-radius:50%;background:var(--ink);box-shadow:0 0 0 2px #fff;pointer-events:none}
+.sname{position:absolute;top:80px;font-weight:600;white-space:nowrap;transform:translateX(-50%)}
+.totals{display:flex;flex-wrap:wrap;gap:8px 40px;margin-top:6px;padding-top:12px;border-top:1px solid var(--rule)}
+.totals dt{color:var(--muted);display:inline;margin-right:8px}.totals dd{display:inline;font-weight:700}
+.lv-red{color:var(--red)}.lv-amber{color:#b45309}.lv-green{color:var(--green)}
+
+/* map + inspector */
+.top{display:grid;grid-template-columns:1fr 420px;gap:12px}
+.map{padding:12px;height:560px}
+.map svg{width:100%;height:100%;border-radius:6px;background:#eaf0f6;display:block}
+.sl{stroke:#9aa4b2;stroke-width:4;fill:none;stroke-linecap:round;cursor:pointer}
+.sl.rt{stroke:var(--blue);stroke-width:5}.sl.sel{stroke:var(--ink);stroke-width:7}.sl.cut{stroke:var(--red);stroke-dasharray:2 9}
+.dot{fill:#fff;stroke:var(--ink);stroke-width:2.5}
+.st{font-size:12px;font-weight:700;fill:var(--ink);paint-order:stroke;stroke:#eaf0f6;stroke-width:4px}
+.ins{height:560px;display:flex;flex-direction:column}
+.ins h2{font-size:19px;line-height:1.25}
+.tags{display:flex;gap:12px;font-weight:600;margin-top:4px}
+.big{font-size:30px;font-weight:800;line-height:1}
+.stack{display:flex;height:10px;border-radius:3px;overflow:hidden;margin-top:10px;gap:2px}
+.keyrow{display:flex;gap:12px;font-size:12px;margin-top:6px}
+.rows{margin-top:14px;border-top:1px solid var(--rule)}
+.row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--rule);gap:12px}
+.row b{text-align:right}
+.go{margin-top:auto;display:flex;justify-content:space-between;align-items:center;height:44px;border:0;border-radius:6px;background:var(--ink);color:#fff;padding:0 14px;font-weight:700;cursor:pointer;width:100%}
+.empty{margin:auto;color:var(--muted)}
+
+/* cores table */
+.chips{display:flex;gap:8px;margin-top:12px}
+.chip{height:32px;padding:0 12px;border:1px solid var(--line);border-radius:6px;background:#fff;font-weight:600;cursor:pointer;display:inline-flex;gap:6px;align-items:center}
+.chip[aria-pressed=true]{background:var(--ink);color:#fff;border-color:var(--ink)}
+.tblwrap{max-height:480px;overflow:auto;margin-top:12px}
+table{width:100%;border-collapse:collapse;table-layout:fixed}
+th{position:sticky;top:0;background:#fff;font-size:12px;color:var(--muted);text-align:left;padding:8px 6px;border-bottom:1px solid var(--line)}
+td{padding:9px 6px;border-bottom:1px solid var(--rule);vertical-align:middle}
+tr.r{cursor:pointer}tr.r:hover{background:var(--bg)}
+tr.r[aria-expanded=true]{background:var(--blue-bg)}
+.cb{border:0;background:none;font-weight:700;cursor:pointer;display:inline-flex;gap:6px;align-items:center}
+.s-Available{color:var(--green)}.s-Requested{color:var(--amber)}.s-Reserved{color:var(--blue)}.s-In{color:var(--use)}
+.dash{color:var(--muted)}
+.sub td{background:#fafbfc;padding:12px 16px}
+.sub table{table-layout:auto}
+.sub th{position:static;background:none}
+.note{color:var(--muted);font-weight:600}
+.dg{display:grid;grid-template-columns:repeat(3,1fr);gap:14px 24px;flex:1}
+.dg dt{font-size:12px;color:var(--muted);font-weight:600}.dg dd{font-weight:700;margin-top:2px}
+.unas{margin-top:10px;display:grid;gap:4px}.unas div{display:flex;gap:24px}.unas dt{color:var(--muted)}.unas dd{font-weight:700}
+
+.need{display:flex;align-items:center;gap:8px}.need input{width:64px}
+.form{display:grid;grid-template-columns:1.4fr 1fr 1fr auto;gap:12px;align-items:end;margin-top:12px}
+.form label{display:grid;gap:4px}
+.sumrow{display:flex;gap:40px}
+.sumrow dt{color:var(--muted);display:inline;margin-right:8px}.sumrow dd{display:inline;font-weight:700}
+.ck{width:18px;height:18px;accent-color:var(--blue);cursor:pointer}
+.btn-p:disabled{background:#c9cdd4;border-color:#c9cdd4;cursor:not-allowed}
+.seg .chosen{position:absolute;top:62px;font-size:12px;font-weight:700;color:var(--blue)}
+</style></head>
+<body><div class="page">
+
+<section class="card" aria-label="Route">
+  <form class="bar" onsubmit="search();return false">
+    <label><span class="lbl">Route A</span><input class="field" id="a" list="sites" value="CYBJ"></label>
+    <button type="button" class="btn" id="swap" aria-label="Swap A and B" style="padding:0">&#8646;</button>
+    <label><span class="lbl">Route B</span><input class="field" id="b" list="sites" value="KTNH"></label>
+    <button class="btn btn-p">Search</button><datalist id="sites"></datalist>
+  </form>
+  <div class="chain" id="chain"></div>
+  <dl class="totals" id="totals"></dl>
+</section>
+
+<section class="card" id="cores" aria-labelledby="ch">
+  <div style="display:flex;justify-content:space-between;align-items:center">
+    <h2 id="ch"></h2>
+    <label class="need"><span class="lbl">Cores needed per span</span><input class="field" id="need" type="number" min="1" max="24" value="2"></label>
+  </div>
+  <div class="tblwrap"><table>
+    <caption style="position:absolute;left:-9999px">Cores on this span</caption>
+    <thead><tr><th style="width:5%"><span style="position:absolute;left:-9999px">Choose</span></th><th style="width:7%">Core</th><th style="width:14%">Status</th><th style="width:13%">Circuit ID</th><th style="width:17%">Customer</th><th style="width:12%">Planned date</th><th>Ports</th></tr></thead>
+    <tbody id="tb"></tbody></table></div>
+  <dl class="unas" id="unas"></dl>
+</section>
+
+<section class="card" aria-label="Reserve">
+  <dl class="sumrow" id="sum"></dl>
+  <form class="form" onsubmit="return false">
+    <label><span class="lbl">Customer (required)</span><input class="field" id="cust"></label>
+    <label><span class="lbl">SRF ID (optional)</span><input class="field" id="srf"></label>
+    <label><span class="lbl">Planned date</span><input class="field" type="date" id="pd"></label>
+    <button class="btn btn-p" id="go" disabled>Reserve</button>
+  </form>
+</section>
+</div>
+<script>
+const SITES={CYBJ:[150,420,"Cyberjaya DC"],BKJL:[330,250,"Bukit Jalil TOC"],KTNH:[640,140,"Kuantan Hut"],KLDC:[200,110,"Kuala Lumpur DC"],PTJY:[480,430,"Putrajaya Hub"],SPNG:[650,400,"Seremban Node"]};
+const SPANS=[
+ {id:1,a:"CYBJ",b:"BKJL",km:18.2,type:"Metro",route:"R3",cut:false,n:24},
+ {id:2,a:"BKJL",b:"KTNH",km:null,type:"Trunk",route:"R1",cut:false,n:24},
+ {id:3,a:"KLDC",b:"BKJL",km:12,type:"Metro",route:"R3",cut:false,n:24},
+ {id:4,a:"CYBJ",b:"PTJY",km:22.5,type:"Metro",route:"R2",cut:false,n:12},
+ {id:5,a:"PTJY",b:"SPNG",km:31,type:"Trunk",route:"R2",cut:true,n:12},
+ {id:6,a:"SPNG",b:"KTNH",km:96,type:"Trunk",route:"R1",cut:false,n:24},
+ {id:7,a:"KLDC",b:"KTNH",km:205,type:"Trunk",route:"R1",cut:false,n:24},
+];
+const LABEL={Available:"Available",Requested:"Requested",Reserved:"Reserved","In use":"In service"};
+const ICON={Available:"○",Requested:"◐",Reserved:"●","In use":"■"};
+const rnd=s=>{const x=Math.sin(s)*10000;return x-Math.floor(x)};
+const CUST=["Telco Alpha","Beta Networks","Gamma Cloud","Delta Mobile"];
+SPANS.forEach(s=>{
+  s.name=`${SITES[s.a][2]} - ${SITES[s.b][2]}`; s.calc=s.km==null?null:s.km*0.3;
+  s.cores=Array.from({length:s.n},(_,i)=>{
+    const r=rnd(s.id*97+i),st=r<.6?"Available":r<.7?"Requested":r<.85?"Reserved":"In use",c={n:i+1,status:st,tests:[]};
+    if(st!=="Available"){c.srf=`SRF-${s.id}${String(i+1).padStart(2,"0")}`;c.planner=["DEV planner1","DEV planner2"][i%2];c.customer=CUST[Math.floor(rnd(i*3+s.id)*4)];c.planned=`2026-${String(1+i%12).padStart(2,"0")}-${String(3+i%25).padStart(2,"0")}`}
+    if(st==="Reserved"||st==="In use"){c.ports=`${s.a} ODF-1/${10+i} to ${s.b} ODF-2/${10+i}`}
+    if(st==="In use"||st==="Reserved")c.circuit=`CKT-${s.id}${100+i}`;
+    if(s.calc&&rnd(s.id*13+i*7)<.3){c.tests=[{on:"2026-10-"+String(1+i%28).padStart(2,"0"),db:s.calc*(.9+rnd(i+s.id)*.35),m:"OTDR",by:"Field team 2"}]}
+    return c});
+  s.unas=s.id===1?[{n:3,cust:"Bank Gamma"}]:[];
+});
+const dev=(db,calc)=>(db-calc)/calc*100;
+const lvl=p=>p<=3?"green":p<=7?"amber":"red";
+const PILL={green:"✓ Normal",amber:"◆ Watch",red:"▲ High"};
+const worst=s=>{let w=null;s.cores.forEach(c=>c.tests.forEach(t=>{if(!w||t.db>w.db)w={core:c.n,db:t.db}}));return w};
+const measured=s=>s.cores.filter(c=>c.tests.length).length;
+const free=s=>s.cut?0:s.cores.filter(c=>c.status==="Available").length;
+const total=s=>{const w=worst(s);return w?{db:w.db,calc:false}:s.calc!=null?{db:s.calc,calc:true}:null};
+const f2=v=>v.toFixed(2);
+const sign=v=>(v>0?"+":"")+v.toFixed(1)+"%";
+const $=id=>document.getElementById(id);
+
+
+let route=[],sel=null,picks={},routeA="CYBJ";   // picks: spanId -> Set of core numbers
+const need=()=>Math.max(1,+$("need").value||1);
+const pickFirst=s=>{if(s.cut||picks[s.id])return;picks[s.id]=new Set(s.cores.filter(c=>c.status==="Available").slice(0,need()).map(c=>c.n))};
+function findRoute(a,b){const d={[a]:0},p={},done=new Set();
+  for(;;){let u=null;for(const k in d)if(!done.has(k)&&(u===null||d[k]<d[u]))u=k;if(u===null)return null;if(u===b)break;done.add(u);
+    SPANS.filter(s=>!s.cut&&(s.a===u||s.b===u)).forEach(s=>{const v=s.a===u?s.b:s.a,w=d[u]+(s.km??50);if(d[v]===undefined||w<d[v]){d[v]=w;p[v]={u,id:s.id}}})}
+  const ids=[];for(let v=b;v!==a;v=p[v].u)ids.unshift(p[v].id);return ids}
+function search(){const a=$("a").value.trim().toUpperCase(),b=$("b").value.trim().toUpperCase();
+  route=SITES[a]&&SITES[b]&&a!==b?(findRoute(a,b)||[]):[];routeA=a;picks={};route.forEach(id=>pickFirst(SPANS.find(s=>s.id===id)));sel=route[0]??null;draw()}
+const count=()=>Object.values(picks).reduce((n,s)=>n+s.size,0);
+function drawChain(){
+  if(!route.length){$("chain").innerHTML='<span class="note">-</span>';$("totals").innerHTML="";return}
+  let at=routeA,h="",km=0;const n=route.length;
+  route.forEach((id,i)=>{const s=SPANS.find(x=>x.id===id),nx=s.a===at?s.b:s.a,k=(picks[id]||new Set()).size;
+    h+=`<div class="cell"><button type="button" class="seg${s.cut?" cut":""}" aria-pressed="${id===sel}" data-id="${id}" aria-label="Span ${s.name}"><span class="km">${s.km==null?"-":s.km+" km"}</span><span class="ln"></span><span class="free">${s.cut?"Cut":free(s)}</span><span class="chosen">${k?k+" chosen":""}</span></button>
+      <span class="node" style="left:-6px"></span><span class="sname" style="left:0">${SITES[at][2]}</span>${i===n-1?`<span class="node" style="right:-6px"></span><span class="sname" style="right:0;left:auto;transform:translateX(50%)">${SITES[nx][2]}</span>`:""}</div>`;
+    at=nx;if(s.km!=null)km+=s.km});
+  $("chain").innerHTML=h;
+  $("chain").querySelectorAll(".seg").forEach(b=>b.onclick=()=>{sel=+b.dataset.id;draw()});
+  const T=(k,v)=>`<div><dt>${k}</dt><dd>${v}</dd></div>`;$("totals").innerHTML=T("Spans",n)+T("Distance",km.toFixed(1)+" km");
+}
+function drawCores(){
+  const s=SPANS.find(x=>x.id===sel);$("cores").hidden=!s;if(!s)return;
+  $("ch").textContent=`Cores of ${s.name}`;
+  const P=picks[s.id]||new Set(),D='<span class="dash">-</span>',V=v=>v==null||v===""?D:v;
+  $("tb").innerHTML=s.cores.map(c=>{const k=c.status==="In use"?"In":c.status,av=c.status==="Available"&&!s.cut,on=P.has(c.n);
+    return `<tr style="${on?"background:var(--blue-bg)":""}"><td>${av?`<input class="ck" type="checkbox" data-n="${c.n}" ${on?"checked":""} aria-label="Choose core ${c.n}">`:""}</td>
+      <td><b>${c.n}</b></td><td class="s-${k}" style="font-weight:700">${ICON[c.status]} ${LABEL[c.status]}</td><td>${V(c.circuit)}</td><td>${V(c.customer)}</td><td>${V(c.planned)}</td><td>${c.ports?c.ports.replace(/ ODF-\d\//g," "):D}</td></tr>`}).join("");
+  $("tb").querySelectorAll(".ck").forEach(b=>b.onchange=()=>{const set=picks[s.id]||(picks[s.id]=new Set()),n=+b.dataset.n;b.checked?set.add(n):set.delete(n);draw()});
+  $("unas").innerHTML=s.unas.map(u=>`<div><dt>Unassigned</dt><dd>${u.n} cores, ${u.cust}</dd><button class="btn" style="height:28px;padding:0 10px">Assign cores</button></div>`).join("");
+}
+function drawSum(){const n=count(),sp=Object.values(picks).filter(x=>x.size).length;
+  $("sum").innerHTML=`<div><dt>Cores chosen</dt><dd>${n}</dd></div><div><dt>Spans</dt><dd>${sp}</dd></div>`;
+  $("go").textContent=n?`Reserve ${n} ${n===1?"core":"cores"}`:"Reserve";$("go").disabled=!(n&&$("cust").value.trim())}
+function draw(){drawChain();drawCores();drawSum()}
+$("sites").innerHTML=Object.entries(SITES).map(([k,v])=>`<option value="${k}">${v[2]}</option>`).join("");
+$("swap").onclick=()=>{const t=$("a").value;$("a").value=$("b").value;$("b").value=t;search()};
+$("need").onchange=()=>{picks={};route.forEach(id=>pickFirst(SPANS.find(s=>s.id===id)));draw()};
+$("cust").oninput=drawSum;
+search();
+</script></body></html>
