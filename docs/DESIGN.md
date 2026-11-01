@@ -11,7 +11,7 @@ Status: 1 November 2026. Section 3 agreed with the owner.
 - Desktop only (office computers). Minimum width 1200px; check at 1280, 1440 and 1920. Main check: 1440x900.
 - WCAG 2.1 AA. Text at least 11px, text contrast at least 4.5:1, non-text contrast at least 3:1. Light theme only.
 - Status and warning levels are never shown by colour alone: symbol, pattern or word.
-- Everything works without the map: search and lists reach every span and route.
+- Everything works without the map: search and lists reach every segment and route.
 - The selection is in the URL hash (`#span=...`, `#route=...`).
 
 ## 2. Style tokens
@@ -20,12 +20,12 @@ Source of truth: `web/src/index.css`. Summary:
 
 - Fonts: Geist (UI), Geist Mono (circuit IDs only), self-hosted. Tabular numerals for every number.
 - Ground #f2f4f7. White cards, 1px border #e2e5ea, radius 8px, no shadows, 16px gutters, 20px card padding.
-- Type: span title 32px/700 (Inspector), metric numbers 40px/700, section titles 16px/600, labels 12px/500.
-- Colour only where it carries meaning: blue #1d5fbf (primary, Chosen), green #1a7f4b (free 10 or more),
+- Type: segment title 32px/700, metric numbers 40px/700, section titles 16px/600, labels 12px/500.
+- Colour only where it carries meaning: blue #1d5fbf (primary), green #1a7f4b (free 10 or more),
   amber #b45309 on #fff7ed (Requested, low 1 to 9 free, stale, warnings), red #b42318 on #fef3f2 (cut, zero free,
   errors), slate (In service), dark ink (Reserved).
 - Map: data center is a square, other site a diamond (circle in the current build). Line weight by route type:
-  Trunk thick, Metro thin dashed. Each span line carries a free-core number chip.
+  Trunk thick, Metro thin dashed. Each segment line carries a free-core number chip.
 
 ## 3. Information architecture (agreed 1 Nov 2026, mock "8 Final")
 
@@ -39,14 +39,14 @@ Tabs: **Inventory | My reservations**. There is no Reserve tab; reserving opens 
 | Slot | Content |
 |---|---|
 | Top left, 8 of 12 columns | Map, full size. Never shrunk to make room for other content. |
-| Top right, 4 columns, map height | Span list: search, Region and Type filters, rows of span name, km and free count (0 in red). |
-| Under the map, full width | Span diagram: keep the one the web app has now (`SpanDiagram` in `web/src/components/NetworkDetail.tsx`), not the simplified line in the FigCraft mock. "Reserve cores" button at its right end. |
+| Top right, 4 columns, map height | Segment list: search, Region and Type filters, rows of segment name, km and free count (0 in red). |
+| Under the map, full width | Segment diagram: keep the one the web app has now (`SpanDiagram` in `web/src/components/NetworkDetail.tsx`), not the simplified line in the FigCraft mock. "Reserve cores" button at its right end. |
 | Below, full width | Cores table (see below). Rows of holders come first, so every holder is above the fold. |
 
-Span facts are only the two site names and the distance. No numbers row, no loss, no region or type on the span
-(region and type live in the span list filters).
+Segment facts are only the two site names and the distance. No numbers row, no loss, no region or type on the segment
+(region and type live in the segment list filters).
 
-### Cores table (one table; replaces the old core table and Allocations)
+### Cores table (one table)
 
 - Filter chips with counts, the only place the counts appear: All, Free, In use, Unassigned.
 - Columns: Cores, Status, Customer, Planner, SRF, Planned, Age, Ports. No loss column.
@@ -59,9 +59,9 @@ Span facts are only the two site names and the distance. No numbers row, no loss
 
 ### Reserve box (modal over Inventory)
 
-- Opens from "Reserve cores" on the span diagram. Page behind is dimmed; map and table stay in place.
+- Opens from "Reserve cores" on the segment diagram. Page behind is dimmed; map and table stay in place.
 - About 1040 wide with compact spacing (about 20px padding, 36px rows); the core list scrolls inside.
-- Header: span line, free count, close. Body: "Cores needed" stepper that ticks the first N available cores;
+- Header: segment line, free count, close. Body: "Cores needed" stepper that ticks the first N available cores;
   list of Available cores only: tick, core, ports (both ends), "Calculated loss", "Measured loss" ("Not tested"
   when none; measured above calculated shows a triangle and bold amber). Even, fixed column widths. Footer: Customer (required), Planned date, SRF ID (optional), "Reserve N cores".
 - Closing with cores ticked asks "Discard N chosen cores?" (Keep editing, Discard).
@@ -70,7 +70,7 @@ Span facts are only the two site names and the distance. No numbers row, no loss
 
 ### My reservations
 
-Separate tab: all spans, only the planner's own reservations, with chips (All, Action needed, Pending, Stale).
+Separate tab: all segments, only the planner's own reservations, with chips (All, Action needed, Pending, Stale).
 
 ### Words
 
@@ -87,9 +87,9 @@ Never label a value just "Loss": always "Calculated loss" or "Measured loss".
 
 ### Later
 
-Sites and data centres: when `sites.details` has data, the span list gets a Spans | Sites switch and a site
-gets its own detail view (Overview, Racks, 3D). Global search: results grouped as Customers, Spans, Cores,
-Circuits; a core result opens its span and highlights the row.
+Sites and data centres: when `sites.details` has data, the segment list gets a Segments | Sites switch and a site
+gets its own detail view (Overview, Racks, 3D). Global search: results grouped as Customers, Segments, Cores,
+Circuits; a core result opens its segment and highlights the row.
 
 ## 4. Patterns (agreed)
 
@@ -101,12 +101,11 @@ Circuits; a core result opens its span and highlights the row.
 ## 5. Decided (dated)
 
 - 26 Oct 2026: simplicity first, then visibility. Rejected: Impeccable navy and teal theme, decorative tube ring
-  icons, span list in a left navigation.
+  icons, segment list in a left navigation.
 - 31 Oct 2026: density A: key facts and the main action above the fold, tables below.
-- 31 Oct 2026: Allocations columns: Cores, Status, Customer, Planner, SRF, Planned date, Age, Ports.
+- 31 Oct 2026: Cores table columns: Cores, Status, Customer, Planner, SRF, Planned date, Age, Ports.
   Age is computed (`age_days` from the API), never stored.
-- 1 Nov 2026: the Inspector does not show a "worst measured core" row.
-- 1 Nov 2026: a bottom-sheet span drawer was considered and rejected (mobile pattern, hides the map).
+- 1 Nov 2026: a bottom-sheet segment drawer was considered and rejected (mobile pattern, hides the map).
 - 1 Nov 2026: rejected layouts: one page with no map, full-screen map with floating panels, reserve inside the
   Inventory card with a shrunk map, a separate Reserve tab. Agreed: section 3.
 
@@ -116,8 +115,6 @@ Circuits; a core result opens its span and highlights the row.
 - Loss section: field tests carry type, date and team; a fuller loss view may come later. For now loss shows only
   as the two per-core values and in core details.
 
-- Doc edits that follow from section 3: PRD story 2 (count-first picker), `CLAUDE.md` UI rules (no Reserve tab,
-  reserve box) and loss rule (per-core loss in core details), PRD "Design decisions" moved here.
 - Empty Planner and SRF cells: blank, or "Not recorded".
 
 ## 7. References

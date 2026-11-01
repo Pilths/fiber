@@ -42,7 +42,7 @@ and the worktrees `/home/user1/project/fiber-pd` and `/home/user1/project/fiber-
       `/home/user1/project/fiber-main` holds `main`; to update it, extract `git archive dev` there with the same
       excludes (CLAUDE.md, docs, api/tests, web/e2e, pytest.ini, requirements-dev.lock, certs/README.md,
       pyrightconfig.json, .oxlintrc.json, playwright.config.ts) and strip lint, gen:api, test:e2e and their packages.
-- [ ] 2. Docs on `dev`: CLAUDE.md, PRD, DESIGN.md, architecture, workflow reworded (segment, route) and old
+- [x] 2. Docs on `dev`: CLAUDE.md, PRD, DESIGN.md, architecture, workflow reworded (segment, route) and old
       wording removed. Test: `grep -rniw "span\|spans" CLAUDE.md docs/*.md` finds only intended uses.
 - [ ] 3. Database: one fresh baseline migration with `segments` (was `spans`), `routes` (was `segments`),
       `route_segments` (was `segment_spans`), `segment_id` columns, views, indexes, constraint names, and
@@ -54,6 +54,11 @@ and the worktrees `/home/user1/project/fiber-pd` and `/home/user1/project/fiber-
       upload"), URL hash `#segment=` (also accept old `#span=`). Do not touch HTML `<span>` tags.
       Test: `docker compose exec web npm run lint`, typecheck, `npm run test:e2e`.
 - [ ] 6. Final sweep: grep for leftover "span" (skip `<span>`), full test run, copy app to `main`.
+
+## Open after the rename
+
+- PRD and architecture still describe a per-core "Faulty" status (F7, story 8, workbook columns); CLAUDE.md says there
+  is none (a cut is a segment state). Clean up in a later docs pass.
 
 ## Reminders for the website build
 

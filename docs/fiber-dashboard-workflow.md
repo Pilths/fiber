@@ -2,7 +2,7 @@
 
 How to use this file: Claude (chat or Claude Code) reads it to know which step the project is on, which tool to use, and what the output of each step is. Update the status checklist at the bottom as steps finish.
 
-Constraints: 11 days from 20 October 2026, MVP by 31 October. Cut order from the PRD: email digest first, then the MapLibre basemap (plain SVG map of sites and straight span lines as fallback), then span and site editing. Core status editing stays. Mock designs were made in this project (`docs/mockups/comparison/`); on 26 October the owner chose the map page (`map/index.html`) as the one main page, with `v4/index.html` as the style source. The v6 mock is not built, but its listed features are taken (see the PRD, Design decisions). UI work goes to Opus 5.5 or Fable subagents. Keep the skill set small, because overlapping skills give conflicting instructions.
+Constraints: 11 days from 20 October 2026, MVP by 31 October. Cut order from the PRD: email digest first, then the MapLibre basemap (plain SVG map of sites and straight segment lines as fallback), then segment and site editing. Core status editing stays. Mock designs were made in this project (`docs/mockups/comparison/`); on 26 October the owner chose the map page (`map/index.html`) as the one main page, with `v4/index.html` as the style source. The v6 mock is not built, but its listed features are taken (see the PRD, Design decisions). UI work goes to Opus 5.5 or Fable subagents. Keep the skill set small, because overlapping skills give conflicting instructions.
 
 ## Flowchart
 
@@ -54,34 +54,34 @@ FastAPI generates an OpenAPI spec for free, so the UI never needs a throwaway mo
 The order builds the last-to-be-cut items first.
 
 - Session 0: Docker Compose (PostGIS, FastAPI, Vite) and `CLAUDE.md`.
-- Session 1: Schema and Alembic. Reservations are insert-only events. Internal span ID is the key. Circuit ID is an optional field on the core. Measurements per span. `user_id` on every write. Edit history with reasons. Seed from the mock Excel.
-- Session 2: Search, span and core endpoints. Generate the TypeScript client. A dev-only header stands in for the acting user.
-- Session 3: Span list, port grid and the Reserve side panel. UI session, runs Step 7. Done; the page structure is reworked into the one-page map layout by TASK-073 to TASK-079 (Session 10).
-- Session 4: Approval flow: request, approve, reject, withdraw, release request. Action needed list and waiting counts. Also migration 0004 (cable size, count-only reservations, `assign` action) and the free to reserve limit.
+- Session 1: Schema and Alembic. Reservations are insert-only events. Internal segment ID is the key. Circuit ID is an optional field on the core. Measurements per core. `user_id` on every write. Edit history with reasons. Seed from the mock Excel.
+- Session 2: Search, segment and core endpoints. Generate the TypeScript client. A dev-only header stands in for the acting user.
+- Session 3: Segment list, Cores table and the reserve box. UI session, runs Step 7. Done; the page structure is reworked into the one-page map layout by TASK-073 to TASK-079 (Session 10).
+- Session 4: Approval flow: request, approve, reject, withdraw, release request. Action needed list and waiting counts. Also migration 0004 (total cores, count-only reservations, `assign` action) and the Free limit.
 - Session 5: Minimal login: local accounts, planner and admin roles, forced password change, deactivate. Replaces the dev header. Admins reach the users screen from "Users" in the account menu.
-- Session 6: Loss warning levels per span (green 0 to 3%, amber 3 to 7%, red 7 to 10%). The form is open: chart, small scrollable list, or both. A segment shows x of y spans measured. No distance shown instead of 0 dB. Shown in the bottom section of the map page (route loss line under the ribbon; single-span Loss block after the held table), not in an Inspector tab. UI session.
+- Session 6: Loss warning levels per core (green 0 to 3%, amber 3 to 7%, red 7 to 10%). The form is open: chart, small scrollable list, or both. A route shows x of y segments measured. No distance shown instead of 0 dB. Shown per core in core details and the reserve box, not on the map or the segment diagram. UI session.
 - Session 7: Admin upload in three steps: Upload, Preview, Confirm. Protected edits, first import of reservations, upload log. Also the site master replace-file upload (its own workbook, separate from the Reservation workbook; sites and DC sheets found by headers; Added, Changed, Missing, Problem; current file).
-- Session 8: Admin editing. Core status first (stays in MVP), then span and site details (third cut).
+- Session 8: Admin editing. Core status first (stays in MVP), then segment and site details (third cut).
 - Session 9: NetworkX routing. Up to 3 options, Optimise for shortest distance or most free cores.
-- Session 10: Map page (the home page: map, Find card, Inspector, cores section, route ribbon, URL hash selection, reservation history endpoint), map time-boxed. Spans are straight lines; one mock route with a drawn shape (TASK-084) proves the shape path. Fall back to a plain SVG map of sites and straight span lines, without a basemap, if it overruns (second cut).
+- Session 10: Inventory page (the home page: map, segment list, segment diagram, Cores table, reserve box, route ribbon, URL hash selection, reservation history endpoint), map time-boxed. Segments are straight lines; one mock route with a drawn shape (TASK-084) proves the shape path. Fall back to a plain SVG map of sites and straight segment lines, without a basemap, if it overruns (second cut).
 - Session 11: Email digest, admin request emails and the in-app scheduler (first cut).
 
 After Session 1, run a second grill in Claude Code against the real Alembic migrations.
 
 ## Step 7 trial (Session 3)
 
-Before committing to Impeccable, run a 30 minute trial on the port grid. Give Claude the chosen mocks (`map/index.html`, `v4/index.html`, `route/index.html`) and the PRD acceptance criteria, build the component, then run `/impeccable audit`. If it fails the criteria, swap the skill.
+Before committing to Impeccable, run a 30 minute trial on the Cores table. Give Claude the chosen mocks (`map/index.html`, `v4/index.html`, `route/index.html`) and the PRD acceptance criteria, build the component, then run `/impeccable audit`. If it fails the criteria, swap the skill.
 
 Checks the UI must pass:
 - Status is never shown by colour alone.
 - Text contrast is at least 4.5:1.
-- The port grid is keyboard operable.
+- The Cores table is keyboard operable.
 - The page works at 1200, 1280, 1440 and 1920px (desktop only, light theme).
 
 ## Agents (only these two)
 
 - Reviewer: read-only, fresh context, reviews the diff without the bias of having written it. File: `.claude/agents/reviewer.md`.
-- UI verifier: drives the app with Playwright and checks the port grid against the PRD rules above. File: `.claude/agents/ui-verifier.md`.
+- UI verifier: drives the app with Playwright and checks the Cores table against the PRD rules above. File: `.claude/agents/ui-verifier.md`.
 
 Do not create a separate agent per phase. Make an agent only when it needs a different context, different tools, or an independent opinion.
 
@@ -91,8 +91,8 @@ Do not create a separate agent per phase. Make an agent only when it needs a dif
 - Every write is attributable to a user, and every data edit needs a reason and is kept as history.
 - Nothing is deleted. Accounts are deactivated.
 - After the first import the dashboard database is the source of truth and the Excel is a feed. A field edited in the dashboard is protected from uploads.
-- Internal span ID is the key. Circuit ID comes from another system and is an optional field on the core, because one span carries many circuits.
-- Measurements are stored per span. Distance comes from the Excel.
+- Internal segment ID is the key. Circuit ID comes from another system and is an optional field on the core, because one segment carries many circuits.
+- Measurements are stored per core. Distance comes from the Excel.
 - Site is the general term for a site, building or equipment location.
 
 ## Decisions closed in Step 0
@@ -102,16 +102,16 @@ Do not create a separate agent per phase. Make an agent only when it needs a dif
 - A release request shows in Approvals and the bell count. Cores stay Reserved until an admin releases them. A declined release needs a reason.
 - Accounts are deactivated, never deleted. Their pending requests stay in the admin queue and their digests go to all admins.
 - Login stays in the MVP and is built right after the approval flow.
-- Uploads match spans by the two sites (two sites have at most one span), and ports by Port ID. A circuit ID in a row attaches to its core. Rows missing from a file are left untouched (except the site master, where a missing site is marked inactive, never deleted). Conflicts with a Requested or Reserved core go to Needs review.
-- One span carries many circuits, so circuit ID lives on the core.
-- Link loss coverage counts spans with a reading.
+- Uploads match segments by the two sites (two sites have at most one segment), and ports by Port ID. A circuit ID in a row attaches to its core. Rows missing from a file are left untouched (except the site master, where a missing site is marked inactive, never deleted). Conflicts with a Requested or Reserved core go to Needs review.
+- One segment carries many circuits, so circuit ID lives on the core.
+- Loss coverage counts segments with a reading.
 - Layout is decided (26 October): one map page as the home, top bar navigation, no left sidebar, desktop only, light theme only. The PRD, Design decisions, holds the details.
-- Decided 26 October: loss shows in the bottom section of the map page; Users is in the account menu (admin only); KMZ shapes are not in the MVP map (straight lines plus one mock route with a drawn shape); no site master undo in the MVP (previous uploads kept); the site master is a separate workbook from the Reservation workbook.
-- Admins can edit core status (Faulty or Available), span details and site details. The daily job is an in-app scheduler (APScheduler) that records its last run.
+- Decided 26 October: loss shows per core (core details, reserve box); Users is in the account menu (admin only); KMZ shapes are not in the MVP map (straight lines plus one mock route with a drawn shape); no site master undo in the MVP (previous uploads kept); the site master is a separate workbook from the Reservation workbook.
+- Admins can edit core status (Faulty or Available), segment details and site details. The daily job is an in-app scheduler (APScheduler) that records its last run.
 
 ## Still open
 
-- Whether two sites can have more than one span of the same route type (to confirm with the data owners).
+- Whether two sites can have more than one segment of the same route type (to confirm with the data owners).
 - KMZ route name format, until real files are seen (real KMZ import is Later).
 - SMTP relay access.
 - Whether the UI rework (TASK-073 to TASK-075) moves earlier than Phase 11 (RISK-010); whether real rows have blank core assignments (run `excel_check` on the real file); how an upload may "modify" a reservation. Full list: `docs/plan.md`, section 9.

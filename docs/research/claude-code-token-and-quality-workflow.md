@@ -1,3 +1,5 @@
+> Historical document: it uses the old words (span = today's segment, segment = today's route).
+
 # Cutting Claude Code token cost without cutting quality
 
 Researched 2026-10-31. Convention check: `docs/` is flat (PRD.md, architecture.md, plan.md, fiber-dashboard-workflow.md) with no research folder, so this note creates `docs/research/`.

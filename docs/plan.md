@@ -8,6 +8,9 @@ status: 'Planned'
 tags: [feature, architecture, mvp]
 ---
 
+> Historical document: it uses the old words (span = today's segment, segment = today's route).
+
+
 # Introduction
 
 ![Status: Planned](https://img.shields.io/badge/status-Planned-blue)
