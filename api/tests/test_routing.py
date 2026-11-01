@@ -69,7 +69,7 @@ def test_012_km_order_max_three_and_shape(client, g):
     assert first["segments"][1]["measured"] is False
     assert first["fewest_free"] == 1 and first["bottleneck_segment_id"] == g["BD"]
     assert (first["measured_segments"], first["total_segments"]) == (1, 2)
-    assert first["estimated_db"] == pytest.approx(1.8) and first["insufficient"] is False
+    assert first["estimated_db"] == pytest.approx(3.66) and first["insufficient"] is False
     assert first["best_match"] is True
 
 

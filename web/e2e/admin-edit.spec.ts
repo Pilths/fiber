@@ -76,9 +76,9 @@ test("taken-cores table tags stale cores", async ({ page }) => {
 test("admin edits segment distance with a reason; calculated loss follows; then reverts", async ({ page }) => {
   await signIn(page, "admin1");
   await pick(page, CJBJ);
-  await openCore(page, 1); // core 1's newest test: 5.593 dB against the calculated 18.2 x 0.3 = 5.46 dB
+  await openCore(page, 1); // core 1's newest test: 6.13 dB against the calculated 6.01 dB (18.2 km)
   const loss = page.getByTestId("core-tests").locator("tbody tr").first().locator("td").nth(1); // Difference
-  await expect(loss).toHaveText("+2.4%");
+  await expect(loss).toHaveText("+2.0%");
 
   const edit = async (km: string, reason: string) => {
     await page.getByRole("region", { name: "Inspector" }).getByRole("button", { name: "Edit segment" }).click();
@@ -94,12 +94,12 @@ test("admin edits segment distance with a reason; calculated loss follows; then 
   await page.screenshot({ path: "e2e/screenshots/edit-segment.png" });
   await dlg.getByRole("button", { name: "Save" }).click();
   await expect(dlg).toBeHidden();
-  await expect(loss).toHaveText("+1.8%"); // calculated 5.49 dB
+  await expect(loss).toHaveText("+1.7%"); // calculated 6.03 dB
 
   dlg = await edit("18.2", "E2E: revert");
   await dlg.getByRole("button", { name: "Save" }).click();
   await expect(dlg).toBeHidden();
-  await expect(loss).toHaveText("+2.4%");
+  await expect(loss).toHaveText("+2.0%");
   await page.getByRole("region", { name: "Inspector" }).getByRole("button", { name: "Edit segment" }).click();
   await page.getByRole("dialog", { name: /^Edit segment/ }).getByText(/^History/).click();
   await expect(page.getByTestId("edit-history").getByRole("listitem").first()).toContainText("Reason: E2E: revert");

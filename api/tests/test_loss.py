@@ -25,7 +25,7 @@ def test_008_exact_boundary_from_loss_values():
 
 def test_008_missing_distance_gives_no_loss_not_zero():
     assert calculated_loss_db(None) is None
-    assert calculated_loss_db(D(10)) == D("3.0")
+    assert calculated_loss_db(D(10)) == D("3.75")
     assert deviation_pct(D(5), None) is None and deviation_pct(None, D(3)) is None
     assert deviation_pct(D(5), D(0)) is None
     assert warning_level(None) is None
@@ -64,16 +64,16 @@ def test_loss_requires_sign_in(client, segments):
 
 def test_latest_measurement_wins_and_statuses(client, db, segments):
     a, b, c = segments
-    measure(db, a, 3.0, "now() - interval '2 days'")
-    measure(db, a, 3.3, "now() - interval '1 day'")  # 3.3 vs 3.0 = +10% -> red
+    measure(db, a, 3.75, "now() - interval '2 days'")
+    measure(db, a, 4.12, "now() - interval '1 day'")  # 4.12 vs 3.75 = +9.87% -> red
     rows = {r["segment_id"]: r for r in client.get("/api/loss/segments", headers=H()).json()}
-    assert rows[a]["measured_db"] == 3.3 and rows[a]["level"] == "red" and rows[a]["deviation_pct"] == 10.0
-    assert rows[a]["calculated_db"] == 3.0 and rows[a]["status"] == "measured" and rows[a]["difference_db"] == 0.3
+    assert rows[a]["measured_db"] == 4.12 and rows[a]["level"] == "red" and rows[a]["deviation_pct"] == 9.9
+    assert rows[a]["calculated_db"] == 3.75 and rows[a]["status"] == "measured" and rows[a]["difference_db"] == 0.37
     assert rows[a]["segment_name"] == "A - B" and rows[a]["test_method"] == "OTDR"
-    assert rows[b]["status"] == "calculated_only" and rows[b]["calculated_db"] == 6.0 and rows[b]["level"] is None
+    assert rows[b]["status"] == "calculated_only" and rows[b]["calculated_db"] == 6.5 and rows[b]["level"] is None
     assert rows[c]["status"] == "no_distance" and rows[c]["calculated_db"] is None
     d = client.get(f"/api/loss/segments/{a}", headers=H()).json()
-    assert [h["loss_db"] for h in d["history"]] == [3.3, 3.0]
+    assert [h["loss_db"] for h in d["history"]] == [4.12, 3.75]
     assert client.get("/api/loss/segments/999999", headers=H()).status_code == 404
     assert [r["segment_id"] for r in client.get("/api/loss/segments?region=South", headers=H()).json()] == [c]
 
@@ -99,14 +99,14 @@ def test_coverage_counts(client, db, segments):
 
 def test_route_totals_and_worst_level(client, db, segments):
     a, b, c = segments
-    measure(db, a, 3.0)  # green
+    measure(db, a, 3.75)  # green
     url = f"/api/loss/route?segment_ids={b},{a}"
     r = client.get(url, headers=H()).json()
     assert [x["segment_id"] for x in r["segments"]] == [b, a]
-    assert r["total_calculated_db"] == 9.0 and r["total_measured_db"] is None and r["level"] == "green"
-    measure(db, b, 7.0)  # +16.7% off_scale
+    assert r["total_calculated_db"] == 10.25 and r["total_measured_db"] is None and r["level"] == "green"
+    measure(db, b, 7.6)  # +16.9% off_scale
     r = client.get(url, headers=H()).json()
-    assert r["total_measured_db"] == 10.0 and r["level"] == "off_scale"
+    assert r["total_measured_db"] == 11.35 and r["level"] == "off_scale"
     r = client.get(f"/api/loss/route?segment_ids={a},{c}", headers=H()).json()
     assert r["total_calculated_db"] is None  # a segment with no distance never counts as 0
     assert client.get("/api/loss/route?segment_ids=999999", headers=H()).status_code == 404
@@ -125,19 +125,19 @@ def measure_core(db, segment, core, loss, at="now()"):
 
 def test_worst_core_wins_and_detail_cores(client, db, segments):
     from sqlalchemy import text
-    a = segments[0]  # 10 km -> calculated 3.0
+    a = segments[0]  # 10 km -> calculated 3.75
     db.execute(text("UPDATE segments SET survey_cores = 4 WHERE id = :s"), {"s": a})
     c1, c2 = mk_cores(db, a)
     measure_core(db, a, c1, 3.6, "now() - interval '3 days'")  # old, superseded
-    measure_core(db, a, c1, 3.0, "now() - interval '1 day'")
-    measure_core(db, a, c2, 3.2)  # +6.7% amber, the worst latest
+    measure_core(db, a, c1, 3.75, "now() - interval '1 day'")
+    measure_core(db, a, c2, 4.0)  # +6.7% amber, the worst latest
     row = {r["segment_id"]: r for r in client.get("/api/loss/segments", headers=H()).json()}[a]
-    assert row["measured_db"] == 3.2 and row["level"] == "amber" and row["worst_core_number"] == 2
+    assert row["measured_db"] == 4.0 and row["level"] == "amber" and row["worst_core_number"] == 2
     assert row["measured_cores"] == 2 and row["total_cores"] == 4
     d = client.get(f"/api/loss/segments/{a}", headers=H()).json()
     assert [c["core_number"] for c in d["cores"]] == [1, 2]
-    assert d["cores"][0]["measured_db"] == 3.0 and [h["loss_db"] for h in d["cores"][0]["history"]] == [3.0, 3.6]
-    assert d["cores"][1]["level"] == "amber" and d["cores"][1]["calculated_db"] == 3.0
+    assert d["cores"][0]["measured_db"] == 3.75 and [h["loss_db"] for h in d["cores"][0]["history"]] == [3.75, 3.6]
+    assert d["cores"][1]["level"] == "amber" and d["cores"][1]["calculated_db"] == 3.75
     assert len(d["history"]) == 3 and d["history"][0]["core_number"] == 2
 
 
@@ -158,3 +158,11 @@ def test_null_core_measurement_still_works(client, db, segments):
 def test_measurement_core_column_and_index(db):
     assert one(db, "SELECT count(*) FROM information_schema.columns WHERE table_name='measurements' AND column_name='core_id'") == 1
     assert one(db, "SELECT count(*) FROM pg_indexes WHERE tablename='measurements' AND indexname='measurements_core_ix'") == 1
+
+
+def test_calculated_loss_formula():
+    from decimal import Decimal
+    from app.loss.service import calculated_loss_db
+    assert calculated_loss_db(Decimal("32.5")) == Decimal("9.94")
+    assert calculated_loss_db(Decimal(0)) == Decimal("1.00")  # connectors only
+    assert calculated_loss_db(None) is None

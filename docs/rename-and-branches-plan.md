@@ -76,5 +76,5 @@ and the worktrees `/home/user1/project/fiber-pd` and `/home/user1/project/fiber-
 
 ## Reminders for the website build
 
-- Ask the owner for the calculated-loss formula (per core) before building loss UI.
+- [x] Ask the owner for the calculated-loss formula (per core) before building loss UI. Done: formula received 2 Nov, see CLAUDE.md.
 - Keep the current `SegmentDiagram` component's look (renamed from `SpanDiagram`).

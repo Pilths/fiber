@@ -6,9 +6,10 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.db import engine
+from app.loss.service import calculated_loss_db
 
 TAG = "DEV-LOSS"  # field_team marker; rows carrying it are never added twice
-# factor vs calculated (distance * 0.3): below, green, amber, red, off_scale
+# factor vs calculated (calculated_loss_db(km)): below, green, amber, red, off_scale
 FACTORS = [("below calculated", 0.9), ("green", 1.02), ("amber", 1.05), ("red", 1.085), ("off_scale", 1.2)]
 
 
@@ -32,7 +33,7 @@ def main() -> None:
                     continue
                 db.execute(text("INSERT INTO measurements (segment_id, core_id, loss_db, tested_on, test_method, field_team) "
                                 "VALUES (:s, :c, :l, (now() AT TIME ZONE 'Asia/Kuala_Lumpur')::date - :a, 'OTDR', :t)"),
-                           {"s": sid, "c": None if ci is None else cores[ci], "l": round(float(km) * 0.3 * fac, 3), "a": ago, "t": TAG})
+                           {"s": sid, "c": None if ci is None else cores[ci], "l": round(float(calculated_loss_db(km)) * fac, 3), "a": ago, "t": TAG})
             print(f"segment {sid}: {label}")
         db.commit()
 

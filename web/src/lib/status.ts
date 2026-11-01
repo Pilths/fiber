@@ -70,7 +70,7 @@ export const EVENT_WORD: Record<string, string> = {
   release_requested: "Release requested", released: "Released", release_declined: "Release declined", corrected: "Corrected", assigned: "Cores assigned",
 };
 
-// Total loss of a segment: its worst measured core (dB); not measured -> the calculated loss (distance x 0.3 dB/km), flagged.
+// Total loss of a segment: its worst measured core (dB); not measured -> the calculated loss (see docs: km x 0.25 + splices + connectors), flagged.
 type Loss = Pick<SegmentLoss, "measured_db" | "calculated_db">;
 export const totalLoss = (l: Loss | null | undefined) =>
   l?.measured_db != null ? { db: l.measured_db, calc: false } : l?.calculated_db != null ? { db: l.calculated_db, calc: true } : null;

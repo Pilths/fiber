@@ -94,7 +94,7 @@ To confirm against the mock files arriving 22 October 2026: KMZ lines are named 
    - A daily email digest per planner repeats until each is kept or released; the digest moves to v1.1 first if time runs short, while the in-app list and count badges stay.
    - The Cores table tags reservations past the stale rule above as "Stale".
 4. As a planner, I want to compare calculated and measured loss per core, so that I can find high-loss cores.
-   - Loss is per core. Each core has a Calculated loss, from a formula the owner will provide (distance x 0.3 dB per km is the placeholder until then), and a Measured loss, from a physical field test with test type, date and field team. The formula lives in backend code, so it can change later, for example to add splice and connector losses. Distance comes from the Excel, per segment; a route's distance is the sum of its segments. A segment with no distance has no Calculated loss and shows no distance, never 0 dB.
+   - Loss is per core. Each core has a Calculated loss, from this formula: Calculated loss (dB) = distance_km x 0.25 + 0.1 x splices + 0.5 x connectors, with splices = distance_km / 4 (exact) and connectors = 2 per segment, rounded to 2 decimals (32.5 km = 9.94 dB); a route sums its segments' values; it is the same for every core on a segment, and a Measured loss, from a physical field test with test type, date and field team. The formula lives in one backend function, so it can change later. Distance comes from the Excel, per segment; a route's distance is the sum of its segments. A segment with no distance has no Calculated loss and shows no distance, never 0 dB.
    - Every measurement is kept as history; the latest is shown. Measurements are stored per core. A route shows how many of its segments are measured (x of y); how it summarises its segments' levels is left to design.
    - For each measured core, planners see Calculated loss, Measured loss and the deviation in percent of measured from calculated, with a warning level: green 0 to 3%, amber 3 to 7%, red 7 to 10%, and anything above 10% red and marked off-scale. The form is open: a chart, a list of cores sorted with the highest warning first, or both. The user must be able to see every core in the list, none hidden or cut off.
    - Per-core loss shows in the core details and in the reserve box list. It is never labelled just "Loss". A fuller loss view may come later.
@@ -108,7 +108,7 @@ To confirm against the mock files arriving 22 October 2026: KMZ lines are named 
    - Options are ranked by the Optimise for choice: shortest km, or most free cores (the fewest free cores on any segment of the path, higher is better). Options without enough cores come last, and the best option carries a "Best match" tag.
    - The user must be able to see every option returned (up to 3), none hidden or cut off. A selected route shows as the 2D route ribbon (see Design decisions).
    - From and To list all sites, so any site can route to any site, including starting or ending a route inside a route.
-   - A route option's Calculated loss comes from the same formula applied to its total km.
+   - A route option's Calculated loss is the sum of its segments' Calculated loss (each segment counts its own 2 connectors).
    - Each option shows loss confidence, as measured segments out of segments on the path.
    - An option with fewer free cores than needed is flagged.
    - Invalid input clears the results and shows an inline error on the field.

@@ -150,7 +150,7 @@ function Body({ d, loss, admin }: { d: Detail; loss: LossDetail | null; admin: A
           </div>
         ) : <p className="text-body font-semibold text-muted-foreground">Not surveyed</p>}
 
-        {/* Segment facts: total loss is the worst measured core, else the calculated loss (distance x 0.3 dB/km). */}
+        {/* Segment facts: total loss is the worst measured core, else the calculated loss (see docs: km x 0.25 + splices + connectors). */}
         <dl className="mt-4 border-t text-body [&>div]:flex [&>div]:min-h-10 [&>div]:items-center [&>div]:justify-between [&>div]:gap-3 [&>div]:border-b [&>div]:py-1.5 [&_dd]:text-right [&_dd]:font-semibold" data-testid="segment-facts">
           <div><dt>Distance</dt><dd>{km ? `${km} km` : "-"}</dd></div>
           <div><dt>Free cores</dt><dd>{surveyed ? `${cut ? 0 : d.free_to_reserve} of ${d.survey_cores}` : "-"}</dd></div>

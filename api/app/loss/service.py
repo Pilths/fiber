@@ -1,17 +1,26 @@
 """Link loss: calculated vs measured. Pure rules first, then the queries. Rounding happens in schemas only."""
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Literal
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-DB_PER_KM = Decimal("0.3")
+DB_PER_KM = Decimal("0.25")
+DB_PER_SPLICE = Decimal("0.1")
+DB_PER_CONNECTOR = Decimal("0.5")
+KM_PER_SPLICE = Decimal(4)  # one splice every 4 km, exact fraction
+CONNECTORS_PER_SEGMENT = 2
 Level = Literal["green", "amber", "red", "off_scale"]
 LEVELS: tuple[Level, ...] = ("green", "amber", "red", "off_scale")  # worst last
 
 
 def calculated_loss_db(distance_km: Decimal | None) -> Decimal | None:
-    return None if distance_km is None else Decimal(distance_km) * DB_PER_KM
+    """Owner formula: km x 0.25 + 0.1 x (km / 4) + 0.5 x 2 connectors, 2 decimals. Same for every core."""
+    if distance_km is None:
+        return None
+    km = Decimal(distance_km)
+    db = km * DB_PER_KM + DB_PER_SPLICE * (km / KM_PER_SPLICE) + DB_PER_CONNECTOR * CONNECTORS_PER_SEGMENT
+    return db.quantize(Decimal("0.01"), ROUND_HALF_UP)
 
 
 def deviation_pct(measured: Decimal | None, calculated: Decimal | None) -> Decimal | None:

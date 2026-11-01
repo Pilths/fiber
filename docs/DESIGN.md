@@ -80,7 +80,7 @@ Separate tab: all segments, only the planner's own reservations, with chips (All
 | In use | Requested, Reserved, In service and Unassigned |
 | Verified | cores confirmed by the onsite survey (`segments.survey_cores`) |
 | Total cores | cores in the cable (`segments.cable_size`), never shown as cells |
-| Calculated loss | per core, from a formula the owner will provide (today's code uses distance x 0.3 dB/km as a placeholder); never drawn on the map or diagram |
+| Calculated loss | per core, from the owner's formula (km x 0.25 + 0.1 x km/4 + 0.5 x 2 connectors, 2 decimals); never drawn on the map or diagram |
 | Measured loss | per core, from a physical field test by the field team (test type, date, team kept with it) |
 
 Never label a value just "Loss": always "Calculated loss" or "Measured loss".

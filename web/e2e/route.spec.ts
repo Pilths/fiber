@@ -64,10 +64,10 @@ test("route options: up to 3, a Best match, every field shown", async ({ page })
   await noOldWords(page);
   // screenshot a 3-segment option when the dev data has one
   const three = (await options(page).allTextContents()).findIndex((t) => /\b3 segments/.test(t));
-  // Dev seed: calculated loss is km x 0.3. Hold the new option's loss fetch: while it is in flight the previous option's
+  // Dev seed: calculated loss is km x 0.25 + 0.1 x km/4 + 1.0 (owner formula). Hold the new option's loss fetch: while it is in flight the previous option's
   // rows must never show on this option's segments (they were once matched by position), only "–" or the segment's own value.
   const rowsAll = table.locator("tbody tr");
-  const calc = (kmText: string) => (Number(kmText) * 0.3).toFixed(2);
+  const calc = (kmText: string) => (Number(kmText) * 0.275 + 1).toFixed(2);
   if (three >= 0) {
     let release!: () => void;
     const gate = new Promise<void>((r) => (release = r));

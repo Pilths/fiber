@@ -44,9 +44,9 @@ def test_011_distance_edit_changes_calculated_loss(client, w):
     assert post(client, f"segments/{s}", distance_km="10", reason="from the file").status_code == 200
     calc = lambda: client.get(f"/api/loss/segments/{s}", headers=H("planner1")).json()["calculated_db"]
     first = float(calc())
-    assert first == pytest.approx(3.0)
+    assert first == pytest.approx(3.75)
     assert post(client, f"segments/{s}", distance_km="20", reason="resurveyed").status_code == 200
-    assert float(calc()) == pytest.approx(6.0)
+    assert float(calc()) == pytest.approx(6.5)
 
 
 # ---------- segment edits (TASK-047) ----------
