@@ -5,7 +5,7 @@ import { Changes, Chip, Dialog, FilePick, Note, PAGE_SIZE, Pager } from "@/compo
 import { plural, uploadError, when } from "@/lib/utils";
 
 // The Reservation workbook endpoints return plain JSON (no response models), so their shapes are written here.
-type Group = "new" | "changed" | "unchanged" | "missing" | "reservations" | "conflicts" | "already_imported" | "ignored" | "faulty" | "needs_review" | "rejected";
+type Group = "new" | "changed" | "unchanged" | "missing" | "reservations" | "conflicts" | "already_imported" | "ignored" | "needs_review" | "rejected";
 type Warning = { kind: string; message: string; rows: number[] };
 type Preview = { upload_id: number; filename: string; counts: Record<Group, number>; warnings: Warning[]; switch_closed: boolean };
 type Change = { field: "region" | "distance_km" | "survey_cores"; old: unknown; new: unknown; protected: boolean; note?: string; blocked?: string };
@@ -27,11 +27,10 @@ const GROUP: Record<Group, { label: string; icon: IconName; cls: string; word: s
   conflicts: { label: "Conflicts", icon: "fl", cls: "h-red", word: "Conflict, skipped" },
   already_imported: { label: "Already imported", icon: "ch", cls: "h-ns", word: "Already imported" },
   ignored: { label: "Ignored", icon: "ns", cls: "h-ns", word: "Ignored" },
-  faulty: { label: "Faulty", icon: "fl", cls: "h-red", word: "Marks Faulty" },
   needs_review: { label: "Needs review", icon: "lo", cls: "h-amber", word: "Needs review" },
   rejected: { label: "Rejected", icon: "fl", cls: "h-red", word: "Rejected" },
 };
-const OTHER: Group[] = ["new", "changed", "unchanged", "missing", "conflicts", "already_imported", "ignored", "faulty", "needs_review", "rejected"];
+const OTHER: Group[] = ["new", "changed", "unchanged", "missing", "conflicts", "already_imported", "ignored", "needs_review", "rejected"];
 const SPAN_GROUPS: Group[] = ["new", "changed", "unchanged", "missing"];
 const FIELD: Record<string, string> = { region: "Region", distance_km: "Distance (km)", survey_cores: "Surveyed cores" };
 
@@ -65,7 +64,6 @@ function ImportSwitch({ state, onClosed }: { state: Switch | null; onClosed: (s:
     return (
       <p data-testid="import-switch" role="status" className="text-body">
         <span className="inline-flex items-center gap-1.5 font-semibold text-amber"><Icon name="lo" />Reservation import closed on {when(state.closed_at)} by {state.closed_by}: {state.reason}</span>
-        <span className="text-muted-foreground"> · Reservation rows in uploads are ignored with a warning; new reservations are made only in the dashboard. This cannot be reopened.</span>
       </p>
     );
   }
@@ -82,8 +80,7 @@ function ImportSwitch({ state, onClosed }: { state: Switch | null; onClosed: (s:
   return (
     <div data-testid="import-switch" className="flex items-center gap-3 text-body">
       <span className="inline-flex items-center gap-1.5 font-semibold text-green"><Icon name="ch" />Import open</span>
-      <p className="flex-1 text-muted-foreground">Uploads import approved reservation rows whose cores are free. Closing is optional and one-time.</p>
-      <button type="button" className="btn btn-sm" onClick={() => { setOpen(true); setReason(""); setError(null); }}>Close reservation import…</button>
+      <button type="button" className="btn btn-sm ml-auto" onClick={() => { setOpen(true); setReason(""); setError(null); }}>Close reservation import…</button>
       {open && (
         <Dialog title="Close reservation import?" onClose={() => setOpen(false)}>
           <form onSubmit={submit} noValidate>
@@ -110,7 +107,6 @@ function Reservations({ uploadId, total }: { uploadId: number; total: number }) 
     <section aria-labelledby="ru-res-h" data-testid="ru-reservations">
       <div className="mb-2 flex flex-wrap items-baseline gap-x-3">
         <h3 id="ru-res-h" className="text-[15px] font-semibold">Reservations to import <span className="font-normal text-muted-foreground">({total.toLocaleString("en-GB")})</span></h3>
-        <span className="text-body text-muted-foreground">Imported as approved. Existing reservations are never changed; a row whose core is already taken is skipped.</span>
       </div>
       {error && <p role="alert" className="text-body font-semibold text-red">{error}</p>}
       {data && (data.total === 0 ? <p className="text-body text-muted-foreground">No reservation rows will be imported.</p> : (
@@ -254,7 +250,6 @@ export function ReservationUpload() {
     <section className="card" aria-labelledby="ru-h">
       <div className="card-h">
         <h2 id="ru-h">Reservation workbook</h2>
-        <small className="hint">Spans, survey counts, loss results and reservations. Rows missing from the file are left untouched.</small>
       </div>
       <div className="space-y-4">
         <FilePick label="Upload a Reservation workbook" busy={busy} onFile={pick} />
@@ -265,8 +260,7 @@ export function ReservationUpload() {
             <Note tone="green" title="Upload confirmed">
               <p>
                 {plural(result.counts.reservations, "reservation")} imported, {plural(result.counts.spans, "new span")}, {plural(result.counts.span_updates, "span field")} updated,{" "}
-                {plural(result.counts.cores, "core")}, {plural(result.counts.ports, "port")} and {plural(result.counts.customers, "customer")} added, {plural(result.counts.measurements, "measurement")} appended,{" "}
-                {plural(result.counts.faulty_cores, "core")} marked Faulty{result.ignored_reservation_rows ? `, ${plural(result.ignored_reservation_rows, "reservation row")} ignored (import closed)` : ""}.
+                {plural(result.counts.cores, "core")}, {plural(result.counts.ports, "port")} and {plural(result.counts.customers, "customer")} added, {plural(result.counts.measurements, "measurement")} appended{result.ignored_reservation_rows ? `, ${plural(result.ignored_reservation_rows, "reservation row")} ignored (import closed)` : ""}.
               </p>
               {result.skipped.length > 0 && (
                 <><p className="mt-2 font-semibold">Skipped rows</p><ul className="list-disc pl-4">{result.skipped.map((s) => <li key={s.row_number}>Row {s.row_number}: {s.reason}</li>)}</ul></>
@@ -284,7 +278,6 @@ export function ReservationUpload() {
       <section aria-labelledby="ru-prev-h" className="card" data-testid="ru-preview">
         <div className="card-h">
           <h2 id="ru-prev-h" className="truncate">Preview of {preview.filename}</h2>
-          <small className="hint flex-none">Nothing is saved until you confirm.</small>
         </div>
         <div className="space-y-6">
           <p className="-mt-2 text-body">
@@ -305,7 +298,6 @@ export function ReservationUpload() {
           <ul className="mt-3 list-disc space-y-1 pl-4 text-body">
             <li>Import <b>{plural(c.reservations, "reservation")}</b> as approved.</li>
             <li>Add <b>{c.new}</b> new spans; update <b>{c.changed}</b> changed spans{wins.size ? ` (Excel value used for ${wins.size} dashboard-edited ${wins.size === 1 ? "field" : "fields"})` : " (dashboard-edited fields keep the dashboard value)"}.</li>
-            {c.faulty > 0 && <li>Mark cores Faulty from <b>{c.faulty}</b> rows.</li>}
             <li>Skip <b>{c.conflicts}</b> conflicts; <b>{notImported}</b> rows are not imported (already imported, ignored, needs review, rejected).</li>
             <li><b>{c.missing}</b> spans not in this file stay as they are.</li>
           </ul>

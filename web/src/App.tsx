@@ -2,22 +2,22 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, ApiError, authEvents, setDevUser } from "@/api/client";
 import { ChangePassword, Login } from "@/components/Auth";
 import type { components } from "@/api/schema";
-import { EditSiteDialog, EditSpanDialog } from "@/components/AdminEdit";
+import { EditSiteDialog, EditSpanDialog, type SpanFocus } from "@/components/AdminEdit";
 import { ChosenBar } from "@/components/ChosenBar";
 import { CoreDrawer } from "@/components/CoreDrawer";
 import { FindCard } from "@/components/FindCard";
 import { Header, type View } from "@/components/Header";
 import { HeldTable } from "@/components/HeldTable";
 import { Icon } from "@/components/Icon";
-import { LossCard } from "@/components/LossCard";
-import { Facts, Inspector } from "@/components/Inspector";
+import { Inspector } from "@/components/Inspector";
+import { CoresTable, RouteSearch, SpanDiagram, Unassigned, type Found } from "@/components/NetworkDetail";
 import { NetworkMap } from "@/components/NetworkMap";
 import { PortGrid } from "@/components/PortGrid";
 import { RouteForm, RouteSection, RouteSummary, useRoutePlanner } from "@/components/RoutePlanner";
 import { Upload } from "@/components/Upload";
 import { Users } from "@/components/Users";
 import { Approvals, MyReservations, NeedsReview } from "@/components/Reservations";
-import { countBy, inFilter, NO_FILTER, spanName, STATUS, STATUS_ORDER, type LossDetail, type SpanFilter, type SpanLoss } from "@/lib/status";
+import { countBy, NO_FILTER, spanName, STATUS, STATUS_ORDER, statusLabel, type LossDetail, type SpanFilter, type SpanLoss } from "@/lib/status";
 
 type Span = components["schemas"]["SpanSummary"];
 type Detail = components["schemas"]["SpanDetail"];
@@ -75,19 +75,19 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
   const [detail, setDetail] = useState<Detail | null>(null);
   const [focusCoreId, setFocusCoreId] = useState<number | null>(null);
   const [selected, setSelected] = useState<Set<number>>(new Set());
-  const [view, setViewState] = useState<View>(location.hash === "#users" ? "users" : "map");
+  const [view, setViewState] = useState<View>(location.hash === "#users" ? "users" : location.hash.startsWith("#route=") ? "reserve" : "map");
   const [bell, setBell] = useState<Bell | null>(null);
   const [stale, setStale] = useState(0);
   const [loss, setLoss] = useState<LossDetail | null>(null);
   const [lossList, setLossList] = useState<SpanLoss[]>([]);
   const [version, setVersion] = useState(0); // bumped after a booking or edit so the span list and grid reload
   const [drawerCore, setDrawerCore] = useState<number | null>(null);
-  const [editSpan, setEditSpan] = useState<{ focus?: "survey" } | null>(null);
+  const [found, setFound] = useState<Found | null>(null); // route search result
+  const [editSpan, setEditSpan] = useState<{ focus?: SpanFocus } | null>(null);
   const [editSite, setEditSite] = useState<number | null>(null);
   const [filter, setFilter] = useState<SpanFilter>(NO_FILTER);
-  const routeOf = useMemo(() => new Map(spans?.map((s) => [s.id, s.route])), [spans]); // map features carry no route
   const [mode, setModeState] = useState<"span" | "route">(location.hash.startsWith("#route=") ? "route" : "span");
-  const rp = useRoutePlanner(mode === "route" && view === "map", version);
+  const rp = useRoutePlanner(mode === "route" && view === "reserve", version);
   // Upload stays mounted once opened (hidden on other views) so a staged preview and its choices survive tab changes.
   const [uploadSeen, setUploadSeen] = useState(false);
   if (view === "upload" && !uploadSeen) setUploadSeen(true);
@@ -108,12 +108,12 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
   const setView = useCallback((v: View) => {
     setViewState(v);
     if (v === "users") history.replaceState(null, "", "#users");
-    else if (location.hash === "#users") history.replaceState(null, "", location.pathname);
+    else if (location.hash === "#users" || (v !== "reserve" && location.hash.startsWith("#route="))) history.replaceState(null, "", location.pathname);
   }, []);
   useEffect(() => {
     const sync = () => {
       if (location.hash === "#users") setViewState("users");
-      if (location.hash.startsWith("#route=")) { setViewState("map"); setMode("route"); }
+      if (location.hash.startsWith("#route=")) { setViewState("reserve"); setMode("route"); }
     };
     addEventListener("hashchange", sync);
     return () => removeEventListener("hashchange", sync);
@@ -125,7 +125,7 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
   }, [version, view]);
   // Loss is read-only here; one load per visit to the map is enough.
   useEffect(() => {
-    if (view !== "map") return;
+    if (view !== "map" && view !== "reserve") return;
     api.get("/api/loss/spans").then(setLossList).catch(() => {});
   }, [view, version]);
 
@@ -139,15 +139,15 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
 
   const spanRef = useRef(spanId);
   useEffect(() => { spanRef.current = spanId; }, [spanId]);
+  // Selects a span on the current view (Map or Reserve); the Map and Reserve tabs share the selection.
   const open = useCallback((id: number, coreId: number | null = null) => {
-    setView("map");
     setModeState("span");
     setDetail((d) => (d?.id === id ? d : null));
     setSpanId(id);
     setFocusCoreId(coreId);
     setSelected((s) => (s.size ? new Set() : s));
     setDrawerCore(null);
-  }, [setView]);
+  }, []);
 
   // Hash -> selection, on load and when the hash changes (back button, pasted link).
   useEffect(() => {
@@ -169,15 +169,10 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
 
   const toggle = (id: number) => setSelected((s) => { const n = new Set(s); if (!n.delete(id)) n.add(id); return n; });
   const chosen = detail?.cores.filter((c) => selected.has(c.id)) ?? [];
-  const goToCores = () => {
-    const cell = document.querySelector<HTMLElement>('[role=gridcell][data-status="Available"]') ?? document.querySelector<HTMLElement>("[role=gridcell]");
-    cell?.scrollIntoView({ block: "center" });
-    cell?.focus({ preventScroll: true });
-  };
   const changed = () => { setVersion((v) => v + 1); refreshBell(); };
   const drawn = detail?.cores.find((c) => c.id === drawerCore);
   const admin = me.role === "admin" && spanId != null ? {
-    onEditSpan: (focus?: "survey") => setEditSpan({ focus }),
+    onEditSpan: (focus?: SpanFocus) => setEditSpan({ focus }),
     onEditSite: (end: "a" | "b") => {
       api.get("/api/admin/spans/{sid}", { path: { sid: spanId } }).then((x) => setEditSite(end === "a" ? x.site_a_id : x.site_b_id)).catch(() => setError("Could not load the span."));
     },
@@ -187,31 +182,24 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
     h?.scrollIntoView({ block: "start" });
     h?.focus({ preventScroll: true });
   };
-  const planRoute = (site: string) => { setMode("route"); rp.setFrom(site); rp.setTo(""); };
-  // Map: a site click lists its spans in Find (span mode) or fills From, then To (route mode); Esc clears the selection.
-  const mapSite = (name: string) => {
-    if (mode === "span") setFilter((f) => ({ ...f, q: name }));
-    else if (!rp.from || rp.to) { rp.setFrom(name); rp.setTo(""); }
-    else rp.setTo(name);
-  };
+  // Map: Esc clears the selection and the searched route.
   const clearSelection = () => {
-    if (mode === "route") { rp.clear(); return; }
-    setSpanId(null); setDetail(null); setSelected(new Set()); setDrawerCore(null);
+    setSpanId(null); setDetail(null); setSelected(new Set()); setDrawerCore(null); setFound(null);
     if (location.hash.startsWith("#span=")) history.replaceState(null, "", location.pathname);
   };
   const routeName = rp.option && `${rp.option.spans[0].site_a} to ${rp.option.spans[rp.option.spans.length - 1].site_b}`;
-  const goTo = (id: string) => () => {
-    const h = document.getElementById(id);
-    h?.scrollIntoView({ block: "start" });
-    h?.focus({ preventScroll: true });
-  };
+  const mapIds = found ? [...found.ids, ...(spanId != null && !found.ids.includes(spanId) ? [spanId] : [])]
+    : spanId != null ? [spanId] : [];
+  const spanLoss = loss?.span_id === spanId ? loss : null;
+  const measured = useMemo(() => new Set(spanLoss?.cores.map((c) => c.core_id)), [spanLoss]);
+  const toCores = () => document.getElementById("cores")?.scrollIntoView({ behavior: "smooth", block: "start" });
 
   return (
     <div className="min-h-screen">
-      <Header onPick={(r) => r.span_id != null && open(r.span_id, r.core_id ?? null)} view={view} onView={setView} me={me}
+      <Header onPick={(r) => { if (r.span_id != null) { setView("map"); open(r.span_id, r.core_id ?? null); } }} view={view} onView={setView} me={me}
         approvals={me.role === "admin" ? bell?.approvals ?? null : null} stale={stale} onSignOut={onSignOut} onChangePassword={onChangePassword} />
       {error && <p role="alert" className="mx-6 mt-4 rounded-md border border-red bg-red-bg px-4 py-2 font-semibold text-red">{error}</p>}
-      {view !== "map" && view !== "upload" && (
+      {view !== "map" && view !== "reserve" && view !== "upload" && (
         <main className="space-y-4 px-6 pt-6 pb-10">
           {view === "mine" && (
             <>
@@ -228,61 +216,70 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
       )}
       {view === "map" && (
         <main className="grid grid-cols-12 gap-4 px-6 pt-6 pb-10">
-          <section className="card col-span-8 flex flex-col" aria-labelledby="map-h">
-            <div className="card-h">
-              <h2 id="map-h">Network map</h2>
-              <small className="hint">{mode === "route" ? (routeName ? `Route ${routeName} selected` : "No route selected") : detail ? `${spanName(detail)} selected` : "Nothing selected"}</small>
-            </div>
-            <NetworkMap version={version} onSelectSpan={(id) => open(id)} onSite={mapSite} onClear={clearSelection}
-              selectedIds={mode === "route" ? rp.option?.spans.map((s) => s.span_id) ?? [] : spanId != null ? [spanId] : []}
-              routeKey={mode === "route" && rp.option ? `${rp.idx}-${routeName}` : null} visible={(p) => inFilter({ ...p, route: routeOf.get(p.span_id) }, filter)} />
+          <RouteSearch onFound={(f) => { setFound(f); if (f) open(f.ids[0]); }} />
+          <section className="card col-span-8 flex flex-col p-3" aria-label="Network map" aria-describedby="map-instr">
+            {/* ponytail: site clicks do nothing on the view-only map; wire them to Route A/B if planners ask */}
+            <NetworkMap version={version} onSelectSpan={(id) => open(id)} onSite={() => {}} onClear={clearSelection}
+              selectedIds={mapIds} routeKey={found ? `found-${found.ids.join(",")}` : null} visible={() => true} />
           </section>
-          <div className="col-span-4 flex min-w-0 flex-col gap-4">
-            <FindCard spans={spans} selectedId={spanId} onSelect={(id) => open(id)} loss={lossList} mode={mode} onMode={setMode} route={<RouteForm rp={rp} />} filter={filter} onFilter={setFilter} />
-            <Inspector detail={detail} loading={spanId != null && !detail} onGoToCores={goToCores} loss={loss?.span_id === spanId ? loss : null} onSeeLoss={goTo("loss-h")} onSeeHeld={goTo("held-h")} admin={admin}
-              onPlanRoute={planRoute} route={mode === "route" ? <RouteSummary key={`${rp.idx}-${routeName}`} rp={rp} onGo={goToRoute} /> : undefined} />
+          {/* The Inspector fills the map card's height (absolute), so the map alone sets the row height. */}
+          <div className="relative col-span-4 min-w-0">
+            <Inspector detail={detail} loading={spanId != null && !detail} loss={spanLoss} admin={admin} onCores={toCores} fill />
           </div>
-
-          {mode === "route" && rp.option && <RouteSection rp={rp} spans={spans} onDone={changed} />}
-          {mode === "span" && detail && (
+          {detail && (
             <div className="col-span-12 space-y-4">
-              <section className={`card ${detail.survey_cores != null ? "ccard" : ""}`} aria-labelledby="cores-h">
-                <div className="card-h items-center">
-                  <div className="flex min-w-0 flex-wrap items-baseline gap-x-5 gap-y-1">
-                    <h2 id="cores-h" className="text-2xl! leading-8! font-bold! tracking-tight">Cores of {spanName(detail)}</h2>
-                    <span className="flex flex-wrap gap-x-4 text-body text-muted-foreground">
-                      <Facts d={detail} />
-                      {detail.survey_cores != null && <span><b className="font-semibold text-foreground">{detail.survey_cores}</b> surveyed of {detail.cable_size}</span>}
-                    </span>
-                  </div>
-                </div>
+              <SpanDiagram spans={spans} found={found} d={detail} loss={lossList} selectedId={detail.id} onPick={(id) => open(id)} />
+              <section id="cores" className="card scroll-mt-4" aria-labelledby="cores-h">
+                <div className="card-h items-center"><h2 id="cores-h">Cores of {spanName(detail)}</h2></div>
                 {detail.survey_cores == null
-                  ? (
-                    <div role="status" data-testid="capacity" className="flex items-center gap-3 text-body">
-                      <p>{admin ? "Not surveyed: enter a survey count to make it bookable." : "Not surveyed, cannot be booked."} No cores to show. Cable size {detail.cable_size}.</p>
-                      {admin && <button type="button" className="btn btn-sm" onClick={() => admin.onEditSpan("survey")}>Enter survey count</button>}
-                    </div>
-                  )
-                  : <Cores d={detail} selected={selected} chosen={chosen} toggle={toggle} focusCoreId={focusCoreId} onOpen={(c) => setDrawerCore(c.id)}
-                      onClear={() => setSelected(new Set())}
-                      onDone={() => { setSelected(new Set()); setVersion((v) => v + 1); refreshBell(); }} />}
+                  ? <NotSurveyed d={detail} admin={admin} />
+                  : <CoresTable key={`${detail.id}-${focusCoreId}`} d={detail} loss={spanLoss} focusCoreId={focusCoreId} onActions={(c) => setDrawerCore(c.id)} />}
               </section>
-              <HeldTable d={detail} admin={me.role === "admin"} onOpen={(c) => setDrawerCore(c.id)} onChanged={changed} />
-              <LossCard key={detail.id} loss={loss?.span_id === detail.id ? loss : null} />
             </div>
           )}
-          {detail && drawn && <CoreDrawer key={drawn.id} core={drawn} span={spanName(detail)} ends={[detail.site_a, detail.site_b]} me={me} onClose={() => setDrawerCore(null)} onChanged={changed} />}
-          {editSpan && spanId != null && <EditSpanDialog spanId={spanId} focus={editSpan.focus} onClose={() => setEditSpan(null)} onSaved={changed} />}
-          {editSite != null && <EditSiteDialog siteId={editSite} onClose={() => setEditSite(null)} onSaved={changed} />}
         </main>
       )}
+      {view === "reserve" && (
+        <main className="grid grid-cols-12 items-start gap-4 px-6 pt-6 pb-10">
+          <div className="col-span-4 flex min-w-0 flex-col gap-4">
+            <FindCard spans={spans} selectedId={spanId} onSelect={(id) => open(id)} loss={lossList} mode={mode} onMode={setMode} route={<RouteForm rp={rp} />} filter={filter} onFilter={setFilter} />
+            {mode === "route" && <Inspector detail={null} loading={false} loss={null} admin={null} onCores={() => {}}
+              route={<RouteSummary key={`${rp.idx}-${routeName}`} rp={rp} onGo={goToRoute} />} />}
+          </div>
+          <div className="col-span-8 min-w-0 space-y-4">
+            {mode === "route" ? rp.option && <RouteSection rp={rp} spans={spans} onDone={changed} />
+              : !detail ? <p className="card empty px-4 py-10 text-center text-body text-muted-foreground">{spanId != null ? "Loading span..." : "Choose a span from the list in Find."}</p>
+              : (
+                <>
+                  <section className={`card ${detail.survey_cores != null ? "ccard" : ""}`} aria-labelledby="cores-h">
+                    <div className="card-h items-center">
+                      <div className="flex min-w-0 flex-wrap items-baseline gap-x-5 gap-y-1">
+                        <h2 id="cores-h">Cores</h2>
+                        {detail.survey_cores != null && <span className="text-body text-muted-foreground"><b className="font-semibold text-foreground">{detail.survey_cores}</b> surveyed of {detail.cable_size}</span>}
+                      </div>
+                    </div>
+                    {detail.survey_cores == null
+                      ? <NotSurveyed d={detail} admin={admin} />
+                      : <Cores d={detail} selected={selected} chosen={chosen} toggle={toggle} focusCoreId={focusCoreId} onOpen={(c) => setDrawerCore(c.id)} measured={measured} current={drawerCore}
+                          onClear={() => setSelected(new Set())}
+                          onDone={() => { setSelected(new Set()); setVersion((v) => v + 1); refreshBell(); }} />}
+                  </section>
+                  <HeldTable d={detail} admin={me.role === "admin"} onOpen={(c) => setDrawerCore(c.id)} onChanged={changed} />
+                </>
+              )}
+          </div>
+        </main>
+      )}
+      {detail && drawn && <CoreDrawer key={drawn.id} core={drawn} span={spanName(detail)} ends={[detail.site_a, detail.site_b]} me={me} onClose={() => setDrawerCore(null)} onChanged={changed} />}
+      {editSpan && spanId != null && <EditSpanDialog spanId={spanId} focus={editSpan.focus} onClose={() => setEditSpan(null)} onSaved={changed} />}
+      {editSite != null && <EditSiteDialog siteId={editSite} onClose={() => setEditSite(null)} onSaved={changed} />}
     </div>
   );
 }
 
-function Cores({ d, selected, chosen, toggle, focusCoreId, onOpen, onClear, onDone }: {
+function Cores({ d, selected, chosen, toggle, focusCoreId, onOpen, onClear, onDone, measured, current }: {
   d: Detail; selected: Set<number>; chosen: Detail["cores"]; toggle: (id: number) => void; focusCoreId: number | null;
-  onOpen: (c: Detail["cores"][number]) => void; onClear: () => void; onDone: () => void;
+  onOpen: (c: Detail["cores"][number]) => void; onClear: () => void; onDone: () => void; measured: Set<number>; current: number | null;
 }) {
   const n = countBy(d);
   return (
@@ -293,17 +290,31 @@ function Cores({ d, selected, chosen, toggle, focusCoreId, onOpen, onClear, onDo
           return (
             <li key={s} className="flex items-center gap-2" data-key={s}>
               <span aria-hidden className={`core sw ${st.cls} ${s === "Chosen" ? "sw-chosen" : ""}`}><Icon name={s === "Chosen" ? "ch" : st.icon} /></span>
-              {s} <b className="font-bold text-foreground">{s === "Chosen" ? chosen.length : n[s]}</b>
+              {statusLabel(s)} <b className="font-bold text-foreground">{s === "Chosen" ? chosen.length : n[s]}</b>
             </li>
           );
         })}
+        <li className="flex items-center gap-2" data-key="measured"><span aria-hidden className="text-foreground">&#9650;</span>Loss measured</li>
       </ul>
-      <PortGrid cores={d.cores} selected={selected} onToggle={toggle} onOpen={onOpen} focusCoreId={focusCoreId} />
-      <ChosenBar key={d.id} cores={chosen.map((c) => ({ id: c.id, number: c.number }))} free={d.free_to_reserve} onClear={onClear} onDone={onDone} />
-      {chosen.length > 0 && <p className="mt-3 flex items-center gap-2 note px-3 py-2 text-body">
-        <Icon name="lo" className="ic flex-none text-amber" />
-        <span><b className="font-semibold text-amber">Stale after 3 months.</b> An approved reservation not kept for 3 months is flagged Stale. Keep or release it in My reservations.</span>
-      </p>}
+      <PortGrid cores={d.cores} selected={selected} onToggle={toggle} onOpen={onOpen} focusCoreId={focusCoreId} measured={measured} current={current} />
+      <Unassigned d={d} />
+      {/* The stale note sticks with the chosen bar, directly above it, so the bar never covers it. */}
+      <div className="cstick">
+        {chosen.length > 0 && <p className="mx-5 mb-3 flex items-center gap-2 note px-3 py-2 text-body" data-testid="stale-note">
+          <Icon name="lo" className="ic flex-none text-amber" />
+          <span><b className="font-semibold text-amber">Stale after 3 months.</b> An approved reservation not kept for 3 months is flagged Stale. Keep or release it in My reservations.</span>
+        </p>}
+        <ChosenBar key={d.id} cores={chosen.map((c) => ({ id: c.id, number: c.number }))} free={d.free_to_reserve} onClear={onClear} onDone={onDone} />
+      </div>
     </>
+  );
+}
+
+function NotSurveyed({ d, admin }: { d: Detail; admin: { onEditSpan: (focus?: SpanFocus) => void } | null }) {
+  return (
+    <div role="status" data-testid="capacity" className="flex items-center gap-3 text-body">
+      <p>{admin ? "Not surveyed: enter a survey count to make it bookable." : "Not surveyed, cannot be booked."} No cores to show. Cable size {d.cable_size}.</p>
+      {admin && <button type="button" className="btn btn-sm" onClick={() => admin.onEditSpan("survey")}>Enter survey count</button>}
+    </div>
   );
 }

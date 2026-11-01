@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, errorText, resAction, type Action } from "@/api/client";
 import type { components } from "@/api/schema";
-import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/Icon";
 import { EVENT_WORD, inputCls, when } from "@/lib/status";
 
@@ -133,25 +132,25 @@ function Card({ r, me, onChanged }: { r: Res; me: Me; onChanged: () => void }) {
       <div className="flex flex-wrap gap-2">
         {mode ? (
           <>
-            <Button size="sm" disabled={busy || (needsReason && !reason.trim()) || (mode === "request-release" && held.length > 0 && pick.size === 0)}
+            <button type="button" className="btn btn-p btn-sm" disabled={busy || (needsReason && !reason.trim()) || (mode === "request-release" && held.length > 0 && pick.size === 0)}
               onClick={() => run(mode, needsReason ? { reason: reason.trim() } : { cores: [...pick] })}>
               Confirm {mode === "reject" ? "rejection" : mode === "decline-release" ? "decline" : "release request"}
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => { setMode(null); setMsg(null); }}>Cancel</Button>
+            </button>
+            <button type="button" className="btn btn-sm" onClick={() => { setMode(null); setMsg(null); }}>Cancel</button>
           </>
         ) : (
           <>
-            {admin && r.awaiting === "approval" && <Button size="sm" disabled={busy} onClick={() => run("approve")}>Approve</Button>}
-            {admin && r.awaiting === "approval" && <Button size="sm" variant="outline" onClick={() => setMode("reject")}>Reject</Button>}
+            {admin && r.awaiting === "approval" && <button type="button" className="btn btn-p btn-sm" disabled={busy} onClick={() => run("approve")}>Approve</button>}
+            {admin && r.awaiting === "approval" && <button type="button" className="btn btn-sm" onClick={() => setMode("reject")}>Reject</button>}
             {admin && r.awaiting === "release" && (
-              <Button size="sm" disabled={busy} onClick={() => run("release", { cores: r.release_requested_cores })}>Release requested cores</Button>
+              <button type="button" className="btn btn-p btn-sm" disabled={busy} onClick={() => run("release", { cores: r.release_requested_cores })}>Release requested cores</button>
             )}
-            {admin && r.awaiting === "release" && <Button size="sm" variant="outline" onClick={() => setMode("decline-release")}>Decline release</Button>}
-            {own && r.status === "pending" && <Button size="sm" variant="outline" disabled={busy} onClick={() => run("withdraw")}>Withdraw</Button>}
+            {admin && r.awaiting === "release" && <button type="button" className="btn btn-sm" onClick={() => setMode("decline-release")}>Decline release</button>}
+            {own && r.status === "pending" && <button type="button" className="btn btn-sm" disabled={busy} onClick={() => run("withdraw")}>Withdraw</button>}
             {(own || admin) && r.status === "approved" && r.awaiting !== "release" && (
               <>
-                <Button size="sm" variant="outline" disabled={busy} onClick={() => run("keep")}>Keep</Button>
-                <Button size="sm" variant="outline" onClick={() => setMode("request-release")}>Request release</Button>
+                <button type="button" className="btn btn-sm" disabled={busy} onClick={() => run("keep")}>Keep</button>
+                <button type="button" className="btn btn-sm" onClick={() => setMode("request-release")}>Request release</button>
               </>
             )}
           </>
@@ -186,7 +185,7 @@ export function MyReservations({ me, onChanged }: { me: Me; onChanged: () => voi
       <h2 id="mine-h" className="text-base leading-6 font-semibold">My reservations</h2>
       <div role="group" aria-label="Filter by status" className="flex gap-2">
         {FILTERS.map(([label, v]) => (
-          <Button key={label} size="sm" variant={status === v ? "secondary" : "outline"} aria-pressed={status === v} onClick={() => setStatus(v)}>{label}</Button>
+          <button key={label} type="button" className="chip" aria-pressed={status === v} onClick={() => setStatus(v)}>{label}</button>
         ))}
       </div>
       {error && <p role="alert">Could not load reservations.</p>}
@@ -214,7 +213,6 @@ export function Approvals({ me, onChanged }: { me: Me; onChanged: () => void }) 
     <section aria-labelledby="appr-h" className="card mx-auto w-full max-w-6xl">
       <div className="card-h">
         <h2 id="appr-h">Approvals{data ? ` (${data.length})` : ""}</h2>
-        <small className="hint">New requests and release requests, oldest first.</small>
       </div>
       {me.role !== "admin" && <p role="alert">Admins only.</p>}
       {error && me.role === "admin" && <p role="alert">Could not load approvals.</p>}
@@ -312,7 +310,6 @@ export function NeedsReview({ me, onChanged }: { me: Me; onChanged: () => void }
   return (
     <section aria-labelledby="nr-h" className="card mx-auto w-full max-w-4xl space-y-3">
       <h2 id="nr-h" className="text-base leading-6 font-semibold">Action needed{data ? ` (${data.length})` : ""}</h2>
-      <p className="text-sm text-muted-foreground">Stale reservations, release requests and taken cores that went faulty.</p>
       {error && <p role="alert">Could not load the list.</p>}
       {data && data.length === 0 && <p>Nothing needs action.</p>}
       <div className="space-y-3">

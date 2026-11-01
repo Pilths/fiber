@@ -16,7 +16,7 @@ router = APIRouter(prefix="/api/admin", dependencies=[Depends(require_admin)])
 DB = Annotated[Session, Depends(get_db)]
 Admin = Annotated[CurrentUser, Depends(require_admin)]
 MAX_BYTES = 20 * 1024 * 1024
-Group = Literal["new", "changed", "unchanged", "missing", "reservations", "conflicts", "already_imported", "ignored", "faulty",
+Group = Literal["new", "changed", "unchanged", "missing", "reservations", "conflicts", "already_imported", "ignored",
                 "needs_review", "rejected"]
 
 

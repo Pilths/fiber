@@ -37,10 +37,16 @@ def worst(levels: list[Level | None]) -> Level | None:
 
 _ROWS = """
 SELECT s.id AS span_id, a.name || ' - ' || b.name AS span_name, s.region, s.route_type, s.distance_km,
-       m.loss_db AS measured_db, m.test_method, m.field_team,
+       m.loss_db AS measured_db, m.test_method, m.field_team, c.number AS worst_core_number,
+       (SELECT count(DISTINCT core_id) FROM measurements WHERE span_id = s.id) AS measured_cores,
+       coalesce(s.survey_cores, 0) AS total_cores,
        coalesce(m.tested_on, (m.created_at AT TIME ZONE 'Asia/Kuala_Lumpur')::date) AS last_test_date
 FROM spans s JOIN sites a ON a.id = s.site_a_id JOIN sites b ON b.id = s.site_b_id
-LEFT JOIN LATERAL (SELECT * FROM measurements WHERE span_id = s.id ORDER BY coalesce(tested_on, (created_at AT TIME ZONE 'Asia/Kuala_Lumpur')::date) DESC, created_at DESC, id DESC LIMIT 1) m ON true
+LEFT JOIN LATERAL (
+  SELECT * FROM (SELECT DISTINCT ON (coalesce(core_id, -1)) * FROM measurements WHERE span_id = s.id
+                 ORDER BY coalesce(core_id, -1), coalesce(tested_on, (created_at AT TIME ZONE 'Asia/Kuala_Lumpur')::date) DESC, created_at DESC, id DESC) l
+  ORDER BY loss_db DESC, coalesce(tested_on, (created_at AT TIME ZONE 'Asia/Kuala_Lumpur')::date) DESC, id DESC LIMIT 1) m ON true
+LEFT JOIN cores c ON c.id = m.core_id
 WHERE (CAST(:span_id AS bigint) IS NULL OR s.id = :span_id)
   AND (CAST(:region AS text) IS NULL OR s.region = :region)
   AND (CAST(:route_type AS text) IS NULL OR s.route_type = :route_type)
@@ -64,9 +70,28 @@ def span_rows(db: Session, span_id: int | None = None, region: str | None = None
 
 def history(db: Session, span_id: int) -> list[dict]:
     rs = db.execute(text(
-        "SELECT loss_db, tested_on, created_at, test_method, field_team FROM measurements "
-        "WHERE span_id = :s ORDER BY coalesce(tested_on, (created_at AT TIME ZONE 'Asia/Kuala_Lumpur')::date) DESC, created_at DESC, id DESC"), {"s": span_id})
+        "SELECT m.loss_db, m.tested_on, m.created_at, m.test_method, m.field_team, m.core_id, c.number AS core_number "
+        "FROM measurements m LEFT JOIN cores c ON c.id = m.core_id WHERE m.span_id = :s "
+        "ORDER BY coalesce(m.tested_on, (m.created_at AT TIME ZONE 'Asia/Kuala_Lumpur')::date) DESC, m.created_at DESC, m.id DESC"),
+        {"s": span_id})
     return [dict(r) for r in rs.mappings()]
+
+
+def core_losses(db: Session, span_id: int, calculated: Decimal | None) -> list[dict]:
+    """One entry per core with measurements, by core number; history newest first. Anonymous (no core) rows are left out."""
+    by_core: dict[int, list[dict]] = {}
+    for h in history(db, span_id):
+        if h["core_id"] is not None:
+            by_core.setdefault(h["core_id"], []).append(h)
+    out = []
+    for hs in by_core.values():
+        latest = hs[0]
+        dev = deviation_pct(latest["loss_db"], calculated)
+        out.append({"core_id": latest["core_id"], "core_number": latest["core_number"], "calculated_db": calculated,
+                    "measured_db": latest["loss_db"], "difference_db": None if calculated is None else latest["loss_db"] - calculated,
+                    "deviation_pct": dev, "level": warning_level(dev), "tested_on": latest["tested_on"],
+                    "test_method": latest["test_method"], "field_team": latest["field_team"], "history": hs})
+    return sorted(out, key=lambda c: c["core_number"])
 
 
 def coverage(db: Session) -> dict:

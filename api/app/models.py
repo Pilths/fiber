@@ -91,7 +91,7 @@ class Span(Base):
     __tablename__ = "spans"
     __table_args__ = (
         CheckConstraint("site_a_id <> site_b_id", name="spans_sites_differ_ck"),
-        _in("route_type", ("Bespoke", "Trunk", "Metro"), "spans_route_type_ck"),
+        _in("route_type", ("Trunk", "Metro"), "spans_route_type_ck"),
         _in("region", ("North", "Central", "South", "East Coast"), "spans_region_ck"),
         CheckConstraint("distance_km >= 0", name="spans_distance_ck"),
         CheckConstraint("cable_size > 0", name="spans_cable_size_ck"),
@@ -107,6 +107,7 @@ class Span(Base):
     distance_km: Mapped[Decimal | None] = mapped_column(Numeric(10, 3))
     survey_cores: Mapped[int | None] = mapped_column(Integer)
     cable_size: Mapped[int] = mapped_column(Integer, server_default=text("144"))
+    fiber_cut: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))  # whole cable out; set by an admin
     created_at: Mapped[datetime] = _created()
 
 
@@ -178,6 +179,7 @@ class Reservation(Base):
     cv_ready_date: Mapped[date | None] = mapped_column(Date)
     contractor: Mapped[str | None] = mapped_column(Text)
     remark: Mapped[str | None] = mapped_column(Text)
+    srf_id: Mapped[str | None] = mapped_column(Text)
     port_info_raw: Mapped[str | None] = mapped_column(Text)
     monitoring_code: Mapped[str | None] = mapped_column(Text)
     fiber_monitored: Mapped[str | None] = mapped_column(Text)
@@ -271,7 +273,7 @@ class UploadRow(Base):
 
 class Measurement(Base):
     __tablename__ = "measurements"
-    __table_args__ = (Index("measurements_span_created_ix", "span_id", "created_at"),)
+    __table_args__ = (Index("measurements_span_created_ix", "span_id", "created_at"), Index("measurements_core_ix", "core_id"))
     id: Mapped[int] = _id()
     span_id: Mapped[int] = _fk("spans")
     loss_db: Mapped[Decimal] = mapped_column(Numeric(8, 3))
@@ -280,6 +282,7 @@ class Measurement(Base):
     created_at: Mapped[datetime] = _created()
     test_method: Mapped[str | None] = mapped_column(Text)
     field_team: Mapped[str | None] = mapped_column(Text)
+    core_id: Mapped[int | None] = _fk("cores", True)
 
 
 class DataEdit(Base):

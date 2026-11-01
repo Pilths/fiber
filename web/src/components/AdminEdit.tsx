@@ -12,7 +12,7 @@ type Site = { id: number; name: string };
 const REGIONS = ["Central", "East Coast", "North", "South"];
 const FIELD: Record<string, string> = {
   distance_km: "Distance (km)", route_type: "Route type", region: "Region", site_a_id: "Site A (id)", site_b_id: "Site B (id)",
-  survey_cores: "Survey count", cable_size: "Cable size", name: "Name", location: "Location", active: "Active", status: "Status",
+  survey_cores: "Survey count", cable_size: "Cable size", fiber_cut: "Fiber cut", name: "Name", location: "Location", active: "Active", status: "Status",
 };
 const lbl = "lbl mb-1 block text-body! text-foreground!";
 
@@ -40,15 +40,15 @@ export function EditHistory({ rows }: { rows: Row[] }) {
 function editError(e: unknown) {
   const d = e instanceof ApiError ? (e.detail as { detail?: { blocking_core_numbers?: number[] } } | null)?.detail : null;
   const ns = d && typeof d === "object" ? d.blocking_core_numbers : undefined;
-  if (ns?.length) return `Cores ${ns.join(", ")} are in use or have history and cannot be removed. The survey count stays as it is.`;
+  if (ns?.length) return `Cores ${ns.join(", ")} are allocated or have history and cannot be removed. The survey count stays as it is.`;
   if (e instanceof ApiError && e.status === 400) return "Nothing changed.";
   return errorText(e, "Could not save. Try again.");
 }
 
-function Reason({ value, onChange, missing }: { value: string; onChange: (v: string) => void; missing: boolean }) {
+function Reason({ value, onChange, missing, autoFocus }: { value: string; onChange: (v: string) => void; missing: boolean; autoFocus?: boolean }) {
   return (
     <label className="col-span-2 block"><span className={lbl}>Reason (required)</span>
-      <input className="field" value={value} onChange={(e) => onChange(e.target.value)} aria-invalid={missing} />
+      <input className="field" autoFocus={autoFocus} value={value} onChange={(e) => onChange(e.target.value)} aria-invalid={missing} />
       {missing && <span role="alert" className="mt-1 block text-body font-semibold text-red">Enter a reason: every edit is kept as history.</span>}
     </label>
   );
@@ -87,9 +87,12 @@ function Buttons({ busy, onClose }: { busy: boolean; onClose: () => void }) {
   );
 }
 
-export function EditSpanDialog({ spanId, focus, onClose, onSaved }: { spanId: number; focus?: "survey"; onClose: () => void; onSaved: () => void }) {
+// "restore": opened from the Fiber cut banner, box unticked and focus on the reason.
+export type SpanFocus = "survey" | "restore";
+
+export function EditSpanDialog({ spanId, focus, onClose, onSaved }: { spanId: number; focus?: SpanFocus; onClose: () => void; onSaved: () => void }) {
   const [s, setS] = useState<SpanEdit | null>(null);
-  const [f, setF] = useState({ distance: "", route: "", region: "", survey: "", cable: "", reason: "" });
+  const [f, setF] = useState({ distance: "", route: "", region: "", survey: "", cable: "", reason: "", cut: false });
   const [a, setA] = useState<Site | null>(null);
   const [b, setB] = useState<Site | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -103,12 +106,12 @@ export function EditSpanDialog({ spanId, focus, onClose, onSaved }: { spanId: nu
       if (stale) return;
       setS(x);
       setF({ distance: x.distance_km == null ? "" : String(Number(x.distance_km)), route: x.route_type ?? "", region: x.region ?? "",
-        survey: x.survey_cores == null ? "" : String(x.survey_cores), cable: String(x.cable_size), reason: "" });
+        survey: x.survey_cores == null ? "" : String(x.survey_cores), cable: String(x.cable_size), reason: "", cut: focus !== "restore" && x.fiber_cut });
       setA({ id: x.site_a_id, name: x.site_a });
       setB({ id: x.site_b_id, name: x.site_b });
     }).catch((e) => !stale && setError(errorText(e, "Could not load the span.")));
     return () => { stale = true; };
-  }, [spanId]);
+  }, [spanId, focus]);
   useEffect(() => { if (s && focus === "survey") survey.current?.focus(); }, [s, focus]);
 
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setF((o) => ({ ...o, [k]: e.target.value }));
@@ -119,12 +122,13 @@ export function EditSpanDialog({ spanId, focus, onClose, onSaved }: { spanId: nu
     // Only changed fields are sent.
     const body: components["schemas"]["SpanBody"] = { reason: f.reason.trim() };
     if (f.distance !== "" && (s.distance_km == null || Number(f.distance) !== Number(s.distance_km))) body.distance_km = f.distance;
-    if (f.route && f.route !== s.route_type) body.route_type = f.route as "Bespoke" | "Trunk" | "Metro";
+    if (f.route && f.route !== s.route_type) body.route_type = f.route as "Trunk" | "Metro";
     if (f.region && f.region !== s.region) body.region = f.region;
     if (a.id !== s.site_a_id) body.site_a_id = a.id;
     if (b.id !== s.site_b_id) body.site_b_id = b.id;
     if (f.survey !== "" && Number(f.survey) !== s.survey_cores) body.survey_cores = Number(f.survey);
     if (f.cable !== "" && Number(f.cable) !== s.cable_size) body.cable_size = Number(f.cable);
+    if (f.cut !== s.fiber_cut) body.fiber_cut = f.cut;
     if (Object.keys(body).length === 1) { setError("Nothing changed."); return; }
     setBusy(true);
     setError(null);
@@ -148,7 +152,7 @@ export function EditSpanDialog({ spanId, focus, onClose, onSaved }: { spanId: nu
             <label><span className={lbl}>Route type</span>
               <select className="field" value={f.route} onChange={set("route")}>
                 {!s.route_type && <option value="">Not set</option>}
-                {["Bespoke", "Trunk", "Metro"].map((r) => <option key={r}>{r}</option>)}
+                {["Trunk", "Metro"].map((r) => <option key={r}>{r}</option>)}
               </select>
             </label>
             <label><span className={lbl}>Region</span>
@@ -164,10 +168,11 @@ export function EditSpanDialog({ spanId, focus, onClose, onSaved }: { spanId: nu
               <input ref={survey} className="field" type="number" min="0" step="1" value={f.survey} onChange={set("survey")} placeholder="Not surveyed" />
             </label>
             <label><span className={lbl}>Cable size</span><input className="field" type="number" min="1" step="1" value={f.cable} onChange={set("cable")} /></label>
-            <p className="col-span-2 -mt-1 text-body text-muted-foreground">
-              Survey count sets how many cores can be booked. Cable size is information only. Lowering the survey count is refused while a removed core is reserved, in use, faulty or has history. Changing sites is refused while the span has active reservations.
-            </p>
-            <Reason value={f.reason} onChange={(v) => setF((o) => ({ ...o, reason: v }))} missing={tried && !f.reason.trim()} />
+            <label className="col-span-2 flex items-start gap-2 text-body">
+              <input type="checkbox" className="mt-0.5 size-4" checked={f.cut} onChange={(e) => setF((o) => ({ ...o, cut: e.target.checked }))} />
+              <span className="font-semibold">Fiber cut</span>
+            </label>
+            <Reason value={f.reason} onChange={(v) => setF((o) => ({ ...o, reason: v }))} missing={tried && !f.reason.trim()} autoFocus={focus === "restore"} />
           </div>
           <Buttons busy={busy} onClose={onClose} />
           <EditHistory rows={s.history} />

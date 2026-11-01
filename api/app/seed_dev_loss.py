@@ -21,10 +21,18 @@ def main() -> None:
             return
         # newest test date wins; today (KL) beats every seed_dev date, so these override the older random ones from seed_dev
         spans = db.execute(text("SELECT id, distance_km FROM spans WHERE distance_km IS NOT NULL ORDER BY id")).all()
-        for (sid, km), (label, f) in zip(spans, FACTORS):
-            db.execute(text("INSERT INTO measurements (span_id, loss_db, tested_on, test_method, field_team) "
-                            "VALUES (:s, :l, (now() AT TIME ZONE 'Asia/Kuala_Lumpur')::date, 'OTDR', :t)"),
-                       {"s": sid, "l": round(float(km) * 0.3 * f, 3), "t": TAG})
+        for k, ((sid, km), (label, f)) in enumerate(zip(spans, FACTORS)):
+            cores = db.execute(text("SELECT id FROM cores WHERE span_id = :s ORDER BY number LIMIT 3"), {"s": sid}).scalars().all()
+            # (core index or None, factor, days ago): the labelled level sits on the worst core; extra cores are milder.
+            # span 1: three cores; span 2: core 1 tested twice (old bad, new ok); span 3: no core (like an Excel import)
+            plan = [(0, f, 0), (1, 0.95, 0), (2, 0.97, 0)] if k == 1 else \
+                   [(0, f, 0), (0, 1.15, 30)] if k == 2 else [(None, f, 0)] if k == 3 else [(0, f, 0), (1, 0.96, 0)]
+            for ci, fac, ago in plan:
+                if ci is not None and ci >= len(cores):
+                    continue
+                db.execute(text("INSERT INTO measurements (span_id, core_id, loss_db, tested_on, test_method, field_team) "
+                                "VALUES (:s, :c, :l, (now() AT TIME ZONE 'Asia/Kuala_Lumpur')::date - :a, 'OTDR', :t)"),
+                           {"s": sid, "c": None if ci is None else cores[ci], "l": round(float(km) * 0.3 * fac, 3), "a": ago, "t": TAG})
             print(f"span {sid}: {label}")
         db.commit()
 

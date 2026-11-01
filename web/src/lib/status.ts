@@ -9,13 +9,15 @@ export const STATUS: Record<CoreStatus, { icon: IconName; cls: string; tone: str
   Requested: { icon: "rq", cls: "core-requested", tone: "text-amber" },
   Reserved: { icon: "rs", cls: "core-reserved", tone: "text-foreground" },
   "In use": { icon: "iu", cls: "core-inuse", tone: "text-use" },
-  Faulty: { icon: "fl", cls: "core-faulty", tone: "text-red" },
 };
 export const STATUS_ORDER = Object.keys(STATUS) as CoreStatus[];
+// The API and the data keep "In use"; the screens say "In service".
+export const statusLabel = (s: string) => (s === "In use" ? "In service" : s);
 
 type Health = { cls: string; icon: IconName; word: string; value: string };
-// Free-to-reserve health: green 10+, amber 1-9, red 0 (full), grey dashed when not surveyed.
-export function health(s: { survey_cores: number | null; free_to_reserve: number }): Health {
+// Free-to-reserve health: red "Cut" when the cable is cut, green 10+, amber 1-9, red 0 (full), grey dashed when not surveyed.
+export function health(s: { survey_cores: number | null; free_to_reserve: number; fiber_cut?: boolean }): Health {
+  if (s.fiber_cut) return { cls: "h-red", icon: "fl", word: "Cut", value: "0 cut" };
   if (s.survey_cores == null) return { cls: "h-ns", icon: "ns", word: "Not surveyed", value: "not surveyed" };
   const n = s.free_to_reserve;
   if (n >= 10) return { cls: "h-green", icon: "ch", word: "Healthy", value: String(n) };
@@ -24,7 +26,7 @@ export function health(s: { survey_cores: number | null; free_to_reserve: number
 }
 
 export const countBy = (d: { cores: { status: CoreStatus }[] }) => {
-  const n: Record<CoreStatus, number> = { Available: 0, Requested: 0, Reserved: 0, "In use": 0, Faulty: 0 };
+  const n: Record<CoreStatus, number> = { Available: 0, Requested: 0, Reserved: 0, "In use": 0 };
   for (const c of d.cores) n[c.status]++;
   return n;
 };
@@ -67,3 +69,9 @@ export const EVENT_WORD: Record<string, string> = {
   requested: "Requested", approved: "Approved", rejected: "Rejected", withdrawn: "Withdrawn", kept: "Kept",
   release_requested: "Release requested", released: "Released", release_declined: "Release declined", corrected: "Corrected", assigned: "Cores assigned",
 };
+
+// Total loss of a span: its worst measured core (dB); not measured -> the calculated loss (distance x 0.3 dB/km), flagged.
+type Loss = Pick<SpanLoss, "measured_db" | "calculated_db">;
+export const totalLoss = (l: Loss | null | undefined) =>
+  l?.measured_db != null ? { db: l.measured_db, calc: false } : l?.calculated_db != null ? { db: l.calculated_db, calc: true } : null;
+export const perKm = (dB: number, km: number) => `${(dB / km).toFixed(2)} dB/km`;

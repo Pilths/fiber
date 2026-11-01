@@ -29,10 +29,10 @@ from app.routing.graph import invalidate as invalidate_routes
 
 REASON = "reservation upload"
 SPAN_FIELDS = ("region", "distance_km", "survey_cores")
-GROUPS = ("new", "changed", "unchanged", "missing", "reservations", "conflicts", "already_imported", "ignored", "faulty",
+GROUPS = ("new", "changed", "unchanged", "missing", "reservations", "conflicts", "already_imported", "ignored",
           "needs_review", "rejected")
 ROW_GROUP = {"new": "new", "changed": "changed", "missing": "missing", "unchanged": "unchanged", "reservations": "new",
-             "conflicts": "conflict", "already_imported": "unchanged", "ignored": "unchanged", "faulty": "changed",
+             "conflicts": "conflict", "already_imported": "unchanged", "ignored": "unchanged",
              "needs_review": "needs_review", "rejected": "rejected"}
 SPAN_GROUPS = ("new", "changed", "unchanged", "missing")
 
@@ -212,8 +212,6 @@ def _set(r: Row, group: str, reason: str | None = None) -> None:
 def _reservation_row(db: Session, r: Row, sp: SpanItem, sites: dict[str, int], closed: bool, claims: dict[tuple, int],
                      count_rows: dict[tuple, int]) -> None:
     p = r.p
-    if p.get("core_status") == "Faulty":
-        return _faulty_row(r)
     if closed:
         return _set(r, "ignored", "reservation import is closed; reservation rows are ignored")
     r.extra["cores"] = 0
@@ -238,11 +236,6 @@ def _reservation_row(db: Session, r: Row, sp: SpanItem, sites: dict[str, int], c
     count_rows[ident] = r.n
     sp.used += n
     _set(r, "reservations")
-
-
-def _faulty_row(r: Row) -> None:
-    # Core assignment is not imported, so a Faulty mark cannot name cores; an admin marks them in the dashboard.
-    _set(r, "needs_review", "marks cores Faulty but Core assignment is not imported; mark them in the dashboard")
 
 
 def evaluate(db: Session, rows: list[Row], wins: set[tuple[str, str]] = frozenset()) -> Eval:  # type: ignore[assignment]
@@ -322,7 +315,7 @@ def stage(db: Session, admin_id: int, filename: str, results: list[RowResult], i
     out = []
     for r in ev.rows:
         out.append({"u": uid, "g": ROW_GROUP[r.group], "e": "reservation" if r.group in ("reservations", "conflicts", "already_imported", "ignored")
-                    else "core_fault" if r.group == "faulty" else "row", "p": json.dumps(_row_payload(r)), "w": json.dumps(r.warnings),
+                    else "row", "p": json.dumps(_row_payload(r)), "w": json.dumps(r.warnings),
                     "sh": r.sheet, "n": r.n, "st": r.status, "r": r.reason, "raw": json.dumps(r.raw)})
     first = {r.extra["span_key"]: r for r in reversed(ev.rows) if r.extra.get("span_key")}
     for sp in ev.spans.values():
@@ -375,7 +368,7 @@ def confirm(db: Session, admin_id: int, upload_id: int, excel_wins: list[dict[st
             raise ApplyError(422, f"{key}: '{f}' is not a protected field that differs in the file")
     why = f"{REASON} {up['filename']} #{upload_id}"
     counts: dict[str, int] = {"spans": 0, "cores": 0, "ports": 0, "customers": 0, "reservations": 0, "span_updates": 0,
-                              "measurements": 0, "faulty_cores": 0}
+                              "measurements": 0}
     skipped: list[dict[str, Any]] = []
     sites = dict(db.execute(text("SELECT name, id FROM sites WHERE name = ANY(CAST(:n AS text[]))"),
                             {"n": sorted({n for s in ev.spans.values() for n in (s.a, s.b)})}).all())

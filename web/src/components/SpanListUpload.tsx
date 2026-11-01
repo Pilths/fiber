@@ -119,13 +119,9 @@ export function SpanListUpload() {
       <section className="card" aria-labelledby="sl-h">
         <div className="card-h">
           <h2 id="sl-h">Span list</h2>
-          <small className="hint">Creates and updates spans from a list of links (AAAA-BBBB). Sites must already be in the dashboard. Nothing is deleted.</small>
-        </div>
-        <div className="space-y-4">
-          <div>
-            <FilePick label="Upload a span list" busy={busy} onFile={pick} />
-            <p className="mt-1.5 text-xs text-muted-foreground">Columns: Link, Distance (required); Route, Section, Type (optional). Other columns are ignored.</p>
           </div>
+        <div className="space-y-4">
+          <FilePick label="Upload a span list" busy={busy} onFile={pick} />
           {error && <Note tone="red" role="alert" title={error} />}
           <div aria-live="polite" data-testid="sl-result">
             {result && (
@@ -143,7 +139,6 @@ export function SpanListUpload() {
         <section aria-labelledby="sl-prev-title" className="card" data-testid="sl-preview">
           <div className="card-h">
             <h2 id="sl-prev-title" className="truncate">Preview of {staged.filename}</h2>
-            <small className="hint flex-none">Nothing is saved until you apply it.</small>
           </div>
           <div className="space-y-4">
             <p className="text-body text-muted-foreground">
@@ -155,8 +150,8 @@ export function SpanListUpload() {
               <>
                 <Rows key={staged.upload_id} staged={staged} />
                 <div className="flex flex-wrap items-center gap-4 border-t pt-4">
-                  <button type="button" className="btn btn-p" disabled={nothing} aria-describedby="sl-why" onClick={() => setConfirming(true)}>Apply span list…</button>
-                  <p id="sl-why" className="text-body text-muted-foreground">{nothing ? "Nothing new or changed to apply." : "Ready to apply."}</p>
+                  <button type="button" className="btn btn-p" disabled={nothing} aria-describedby={nothing ? "sl-why" : undefined} onClick={() => setConfirming(true)}>Apply span list…</button>
+                  {nothing && <p id="sl-why" className="text-body text-muted-foreground">Nothing new or changed to apply.</p>}
                 </div>
               </>
             )}

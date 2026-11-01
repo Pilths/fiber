@@ -67,9 +67,7 @@ function Files({ data }: { data: { current: FileInfo | null; previous: FileInfo[
           </table>
         </div>
       )}
-      <p className="mt-1.5 text-xs text-muted-foreground">
-        Previous uploads are kept for comparison; there is no undo.{data.previous.length > 5 && ` Showing the latest 5 of ${data.previous.length}.`}
-      </p>
+      {data.previous.length > 5 && <p className="mt-1.5 text-xs text-muted-foreground">Showing the latest 5 of {data.previous.length} previous uploads.</p>}
     </section>
   );
 }
@@ -182,7 +180,7 @@ function SheetPanel({ uploadId, s, override, onOverride, applied, children }: {
 function Renames({ list, decisions, onDecide }: { list: Rename[]; decisions: Record<number, "rename" | "separate">; onDecide: (id: number, d: "rename" | "separate") => void }) {
   return (
     <section aria-labelledby="sm-ren-h">
-      <h3 id="sm-ren-h" className="text-[15px] font-semibold">Possible renames <span className="font-normal text-muted-foreground">({list.length}, each needs a choice)</span></h3>
+      <h3 id="sm-ren-h" className="text-[15px] font-semibold">Possible renames <span className="font-normal text-muted-foreground">({list.length})</span></h3>
       <p className="mb-3 text-body text-muted-foreground">A DC is missing from the file and a new DC has the same LRD and coordinates. Rename keeps the existing DC and its history under the new name; Keep separate adds the new DC and sets the missing one inactive.</p>
       <ul className="tbox divide-y divide-rule">
         {list.map((r) => (
@@ -301,7 +299,7 @@ export function SiteMasterUpload() {
           )}
           <button type="button" className="btn btn-p" disabled={!!w} aria-describedby={`sm-${k}-why`} onClick={() => setConfirming(k)}>Apply {SHEET_LABEL[k]}…</button>
           <div id={`sm-${k}-why`} className="text-body text-muted-foreground">
-            <p>{w ?? "Ready to apply."}</p>
+            {w && <p>{w}</p>}
             {k === "dcs" && sitesPending && <p>Apply Site Location first: DCs whose LRD site is not saved yet are skipped.</p>}
           </div>
         </div>
@@ -315,7 +313,6 @@ export function SiteMasterUpload() {
     <section className="card" aria-labelledby="sm-h">
       <div className="card-h">
         <h2 id="sm-h">Site master workbook</h2>
-        <small className="hint">Sites and DCs. The file replaces the site list: rows missing from it are set inactive, never deleted.</small>
       </div>
       <div className="space-y-4">
         <FilePick label="Upload a site master workbook" busy={busy} onFile={pick} />
@@ -324,7 +321,7 @@ export function SiteMasterUpload() {
             <input type="checkbox" className="size-4" checked={addOnly} onChange={(e) => setAddOnly(e.target.checked)} aria-describedby="sm-add-only-hint" />
             Add and update only
           </label>
-          <p id="sm-add-only-hint" className="mt-0.5 pl-6 text-xs text-muted-foreground">Use for a hand-picked list. Sites that are not in the file stay active.</p>
+          <p id="sm-add-only-hint" className="sr-only">Use for a hand-picked list. Sites that are not in the file stay active.</p>
         </div>
         {error && <Note tone="red" role="alert" title={error} />}
         <div aria-live="polite" data-testid="sm-result">
@@ -346,7 +343,6 @@ export function SiteMasterUpload() {
       <section aria-labelledby="sm-prev-title" className="card" data-testid="sm-preview">
         <div className="card-h">
           <h2 id="sm-prev-title" className="truncate">Preview of {staged.filename}</h2>
-          <small className="hint flex-none">Each sheet is applied on its own. Nothing is saved until you apply it.</small>
         </div>
         <div className="space-y-6">
           {staged.add_only && <p className="text-body text-muted-foreground">Add and update only: sites not in this file are kept.</p>}

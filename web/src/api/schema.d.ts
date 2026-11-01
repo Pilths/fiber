@@ -761,23 +761,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/admin/cores/{cid}/status": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Set Core Status */
-        post: operations["set_core_status_api_admin_cores__cid__status_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/admin/cores/{core_id}/ports": {
         parameters: {
             query?: never;
@@ -1088,7 +1071,7 @@ export interface components {
              * Status
              * @enum {string}
              */
-            status: "Available" | "Requested" | "Reserved" | "In use" | "Faulty";
+            status: "Available" | "Requested" | "Reserved" | "In use";
             /** Customer */
             customer: string | null;
             /** Circuit Id */
@@ -1108,6 +1091,12 @@ export interface components {
             stale: boolean;
             /** Stale Since */
             stale_since?: string | null;
+            /** Srf Id */
+            srf_id?: string | null;
+            /** Planner */
+            planner?: string | null;
+            /** Age Days */
+            age_days?: number | null;
         };
         /** CoreHistoryItem */
         CoreHistoryItem: {
@@ -1147,7 +1136,7 @@ export interface components {
              * Status
              * @enum {string}
              */
-            status: "Available" | "Requested" | "Reserved" | "In use" | "Faulty";
+            status: "Available" | "Requested" | "Reserved" | "In use";
             /** Circuit Id */
             circuit_id: string | null;
             /** Port A */
@@ -1167,6 +1156,31 @@ export interface components {
             /** Cores */
             cores?: number[];
         };
+        /** CoreLoss */
+        CoreLoss: {
+            /** Core Id */
+            core_id: number;
+            /** Core Number */
+            core_number: number;
+            /** Calculated Db */
+            calculated_db: number | null;
+            /** Measured Db */
+            measured_db: number;
+            /** Difference Db */
+            difference_db: number | null;
+            /** Deviation Pct */
+            deviation_pct: number | null;
+            /** Level */
+            level: ("green" | "amber" | "red" | "off_scale") | null;
+            /** Tested On */
+            tested_on: string | null;
+            /** Test Method */
+            test_method: string | null;
+            /** Field Team */
+            field_team: string | null;
+            /** History */
+            history: components["schemas"]["MeasurementOut"][];
+        };
         /** CorePortsBody */
         CorePortsBody: {
             /** Port A */
@@ -1184,16 +1198,6 @@ export interface components {
             number: number;
             /** Span Id */
             span_id: number;
-        };
-        /** CoreStatusBody */
-        CoreStatusBody: {
-            /**
-             * Status
-             * @enum {string}
-             */
-            status: "Faulty" | "Available";
-            /** Reason */
-            reason: string;
         };
         /** CorrectBody */
         CorrectBody: {
@@ -1346,6 +1350,12 @@ export interface components {
             stale: boolean;
             /** Stale Since */
             stale_since: string | null;
+            /** Srf Id */
+            srf_id?: string | null;
+            /** Planner */
+            planner?: string | null;
+            /** Age Days */
+            age_days: number;
             owner: components["schemas"]["Owner"];
             /** Is Mine */
             is_mine: boolean;
@@ -1372,6 +1382,8 @@ export interface components {
             test_method: string | null;
             /** Field Team */
             field_team: string | null;
+            /** Core Number */
+            core_number?: number | null;
         };
         /** NeedsReviewItem */
         NeedsReviewItem: {
@@ -1379,7 +1391,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "stale" | "release_requested" | "faulty_held";
+            kind: "stale" | "release_requested" | "fiber_cut";
             /** Detail */
             detail: string;
             reservation: components["schemas"]["ReservationOut"];
@@ -1456,6 +1468,8 @@ export interface components {
             planned_date?: string | null;
             /** Cores */
             cores: number[];
+            /** Srf Id */
+            srf_id?: string | null;
         };
         /** ReservationOut */
         ReservationOut: {
@@ -1633,7 +1647,7 @@ export interface components {
             /** Distance Km */
             distance_km?: number | string | null;
             /** Route Type */
-            route_type?: ("Bespoke" | "Trunk" | "Metro") | null;
+            route_type?: ("Trunk" | "Metro") | null;
             /** Region */
             region?: string | null;
             /** Site A Id */
@@ -1644,6 +1658,8 @@ export interface components {
             survey_cores?: number | null;
             /** Cable Size */
             cable_size?: number | null;
+            /** Fiber Cut */
+            fiber_cut?: boolean | null;
         };
         /** SpanDetail */
         SpanDetail: {
@@ -1679,6 +1695,8 @@ export interface components {
             unassigned_reserved: number;
             /** Free To Reserve */
             free_to_reserve: number;
+            /** Fiber Cut */
+            fiber_cut: boolean;
             /** Cores */
             cores: components["schemas"]["CoreDetail"][];
             /**
@@ -1709,6 +1727,8 @@ export interface components {
             survey_cores: number | null;
             /** Cable Size */
             cable_size: number;
+            /** Fiber Cut */
+            fiber_cut: boolean;
             /** History */
             history: components["schemas"]["HistoryRow"][];
         };
@@ -1740,6 +1760,18 @@ export interface components {
             test_method: string | null;
             /** Field Team */
             field_team: string | null;
+            /** Worst Core Number */
+            worst_core_number?: number | null;
+            /**
+             * Measured Cores
+             * @default 0
+             */
+            measured_cores: number;
+            /**
+             * Total Cores
+             * @default 0
+             */
+            total_cores: number;
             /**
              * Status
              * @enum {string}
@@ -1774,6 +1806,18 @@ export interface components {
             test_method: string | null;
             /** Field Team */
             field_team: string | null;
+            /** Worst Core Number */
+            worst_core_number?: number | null;
+            /**
+             * Measured Cores
+             * @default 0
+             */
+            measured_cores: number;
+            /**
+             * Total Cores
+             * @default 0
+             */
+            total_cores: number;
             /**
              * Status
              * @enum {string}
@@ -1781,6 +1825,8 @@ export interface components {
             status: "measured" | "calculated_only" | "no_distance";
             /** History */
             history: components["schemas"]["MeasurementOut"][];
+            /** Cores */
+            cores: components["schemas"]["CoreLoss"][];
         };
         /** SpanSummary */
         SpanSummary: {
@@ -1816,6 +1862,8 @@ export interface components {
             unassigned_reserved: number;
             /** Free To Reserve */
             free_to_reserve: number;
+            /** Fiber Cut */
+            fiber_cut: boolean;
         };
         /** UnassignedHold */
         UnassignedHold: {
@@ -1827,6 +1875,12 @@ export interface components {
             remaining: number;
             /** Planned Date */
             planned_date: string | null;
+            /** Srf Id */
+            srf_id?: string | null;
+            /** Planner */
+            planner?: string | null;
+            /** Age Days */
+            age_days: number;
         };
         /** UserCreate */
         UserCreate: {
@@ -3574,7 +3628,7 @@ export interface operations {
     rows_api_admin_uploads__upload_id__rows_get: {
         parameters: {
             query: {
-                group: "new" | "changed" | "unchanged" | "missing" | "reservations" | "conflicts" | "already_imported" | "ignored" | "faulty" | "needs_review" | "rejected";
+                group: "new" | "changed" | "unchanged" | "missing" | "reservations" | "conflicts" | "already_imported" | "ignored" | "needs_review" | "rejected";
                 page?: number;
                 page_size?: number;
             };
@@ -3750,47 +3804,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HistoryRow"][];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    set_core_status_api_admin_cores__cid__status_post: {
-        parameters: {
-            query?: never;
-            header?: {
-                "x-dev-user"?: string | null;
-            };
-            path: {
-                cid: number;
-            };
-            cookie?: {
-                fiber_session?: string | null;
-            };
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CoreStatusBody"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
                 };
             };
             /** @description Validation Error */

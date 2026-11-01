@@ -11,6 +11,7 @@ class ReservationCreate(BaseModel):
     customer_id: int
     planned_date: date | None = None
     cores: list[int] = Field(min_length=1)
+    srf_id: str | None = None
 
 
 class CoreIds(BaseModel):
@@ -61,7 +62,7 @@ class ReservationOut(BaseModel):
 
 
 class NeedsReviewItem(BaseModel):
-    kind: Literal["stale", "release_requested", "faulty_held"]
+    kind: Literal["stale", "release_requested", "fiber_cut"]
     detail: str
     reservation: ReservationOut
 

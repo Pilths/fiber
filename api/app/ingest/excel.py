@@ -104,6 +104,9 @@ def _reservations(ws: Any, known: set[str]) -> list[RowResult]:
     return out
 
 
+_SRF = ("srf", "srf id", "srf no", "srf number", "srf ref")  # optional header, any one
+
+
 def _reservation(r: RowResult, f: dict[str, Any], label: str | None, known: set[str]) -> None:
     reasons: list[str] = []
     no_customer = checks.check_requestor(f.get("fiber core requestor"))
@@ -133,6 +136,7 @@ def _reservation(r: RowResult, f: dict[str, Any], label: str | None, known: set[
             reasons.append(f"No of core requested '{count}' is not a whole number of 1 or more")
     p["customer"] = _text(f.get("fiber core requestor"))
     p["contractor"], p["remark"] = _text(f.get("contractor")), _text(f.get("remark"))
+    p["srf_id"] = _text(next((f[k] for k in _SRF if k in f), None))
     p["port_info_raw"] = _text(f.get("port info"))
     p["monitoring_code"] = _text(f.get("fiber core monitoring"))
     fm = _text(f.get("fiber montiored y/n/wip", f.get("fiber monitored y/n/wip")))
@@ -148,17 +152,13 @@ def _reservation(r: RowResult, f: dict[str, Any], label: str | None, known: set[
             reasons.append(f"cannot read {col} '{f.get(col)}'")
     if p["survey_cores"] is not None:
         p["survey_cores"] = int(p["survey_cores"])
-    # optional columns (not in the sample workbook): a test result for the span, and a core fault mark
+    # optional columns (not in the sample workbook): a test result for the span
     for key, col, conv in [("loss_db", "loss (db)", _float), ("tested_on", "tested on", _date)]:
         try:
             p[key] = conv(f.get(col, f.get(col.replace(" (", "("))))
         except ValueError:
             p[key] = None
             reasons.append(f"cannot read {col} '{f.get(col)}'")
-    cs = _text(f.get("core status"))
-    p["core_status"] = cs and cs.capitalize()
-    if cs and p["core_status"] != "Faulty":
-        reasons.append(f"core status '{cs}' is not Faulty")
     if no_customer:
         reasons.insert(0, no_customer)
     _finish(r, reasons, reject=bool(no_customer))

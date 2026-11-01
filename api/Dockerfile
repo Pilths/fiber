@@ -2,14 +2,15 @@ FROM python:3.14.8-slim
 
 WORKDIR /app
 
-# Optional corporate CA (see certs/README.md), used only while installing packages.
+# Optional corporate CA (put corporate-ca.crt in certs/), used only while installing packages.
 COPY --from=certs . /tmp/certs/
-COPY requirements.lock .
+COPY requirements* ./
 RUN if [ -f /tmp/certs/corporate-ca.crt ]; then \
       cat /etc/ssl/certs/ca-certificates.crt /tmp/certs/corporate-ca.crt > /tmp/certs/bundle.pem; \
       export PIP_CERT=/tmp/certs/bundle.pem; \
     fi; \
-    pip install --no-cache-dir --root-user-action=ignore --disable-pip-version-check -r requirements.lock
+    pip install --no-cache-dir --root-user-action=ignore --disable-pip-version-check -r requirements.lock; \
+    if [ -f requirements-dev.lock ]; then pip install --no-cache-dir --root-user-action=ignore --disable-pip-version-check -r requirements-dev.lock; fi
 
 COPY . .
 

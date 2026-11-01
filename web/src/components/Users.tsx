@@ -129,10 +129,7 @@ export function Users({ me }: { me: Me }) {
   return (
     <section className="card" aria-labelledby="users-h">
       <div className="card-h items-center">
-        <div className="flex items-baseline gap-3">
-          <h2 id="users-h">Users</h2>
-          <small className="hint">Nothing is deleted: deactivate an account to stop it signing in.</small>
-        </div>
+        <h2 id="users-h">Users</h2>
         {!adding && <button type="button" className="btn btn-p" onClick={() => { setAdding(true); setTemp(null); }}>Add user</button>}
       </div>
       {error && <p role="alert" className="mb-4 rounded-md border border-red bg-red-bg px-3 py-2 text-body font-semibold text-red">{error}</p>}

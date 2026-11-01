@@ -4,7 +4,7 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-CoreStatus = Literal["Available", "Requested", "Reserved", "In use", "Faulty"]
+CoreStatus = Literal["Available", "Requested", "Reserved", "In use"]
 
 
 class SearchResult(BaseModel):
@@ -29,7 +29,8 @@ class SpanSummary(BaseModel):
     cable_size: int
     not_surveyed: int | None  # cable_size - survey_cores
     unassigned_reserved: int  # cores reserved by count only, ports not assigned yet
-    free_to_reserve: int  # free_cores - unassigned_reserved (0 when not surveyed)
+    free_to_reserve: int  # free_cores - unassigned_reserved (0 when not surveyed or cut)
+    fiber_cut: bool  # whole cable out; cannot be booked or routed until an admin restores it
 
 
 class CoreDetail(BaseModel):
@@ -44,6 +45,9 @@ class CoreDetail(BaseModel):
     reservation_id: int | None = None  # holder, when the core is held
     stale: bool = False
     stale_since: date | None = None  # date the 3-month stale clock started (latest keep, else approval)
+    srf_id: str | None = None
+    planner: str | None = None  # display name of the planner who made the reservation
+    age_days: int | None = None  # days since requested (Asia/Kuala_Lumpur dates)
 
 
 class Owner(BaseModel):
@@ -59,6 +63,9 @@ class Holder(BaseModel):
     state: Literal["requested", "approved", "release_requested"]
     stale: bool
     stale_since: date | None
+    srf_id: str | None = None
+    planner: str | None = None
+    age_days: int
     owner: Owner
     is_mine: bool
 
@@ -81,6 +88,9 @@ class UnassignedHold(BaseModel):
     customer: str | None
     remaining: int
     planned_date: date | None
+    srf_id: str | None = None
+    planner: str | None = None
+    age_days: int
 
 
 class SpanDetail(SpanSummary):

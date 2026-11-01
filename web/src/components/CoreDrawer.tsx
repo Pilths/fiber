@@ -2,8 +2,9 @@ import { useCallback, useEffect, useState } from "react";
 import { api, errorText, resAction } from "@/api/client";
 import type { components } from "@/api/schema";
 import { Icon } from "@/components/Icon";
+import { Blank } from "@/components/LossCard";
 import { Dialog } from "@/components/upload-parts";
-import { EVENT_WORD, STATUS, when } from "@/lib/status";
+import { EVENT_WORD, STATUS, statusLabel, when } from "@/lib/status";
 
 type Core = components["schemas"]["CoreDetail"];
 type Holder = components["schemas"]["Holder"];
@@ -12,7 +13,7 @@ type Me = components["schemas"]["CurrentUser"];
 
 const line = (h: Item) =>
   h.kind === "data_edit"
-    ? `${h.type === "status" ? `Marked ${h.new_value ?? "-"}` : `${h.type} changed to ${h.new_value ?? "blank"}`} by ${h.user}`
+    ? `${h.type === "status" ? `Marked ${h.new_value == null ? "-" : statusLabel(h.new_value)}` : `${h.type} changed to ${h.new_value ?? "blank"}`} by ${h.user}`
     : `${EVENT_WORD[h.type] ?? h.type} by ${h.user}`;
 
 // Core detail: right-side drawer on the native <dialog> (Esc closes, focus returns to the cell or row that opened it).
@@ -24,9 +25,6 @@ export function CoreDrawer({ core, span, ends, me, onClose, onChanged }: {
   const [res, setRes] = useState<Holder | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [mode, setMode] = useState<"status" | null>(null);
-  const [reason, setReason] = useState("");
-  const [tried, setTried] = useState(false);
   const [ports, setPorts] = useState(false);
   const admin = me.role === "admin";
 
@@ -41,9 +39,6 @@ export function CoreDrawer({ core, span, ends, me, onClose, onChanged }: {
     setError(null);
     try {
       await fn();
-      setMode(null);
-      setReason("");
-      setTried(false);
       onChanged();
       load();
     } catch (e) {
@@ -51,13 +46,6 @@ export function CoreDrawer({ core, span, ends, me, onClose, onChanged }: {
     } finally {
       setBusy(false);
     }
-  };
-  const target = core.status === "Faulty" ? "Available" : "Faulty";
-  const setStatus = (e: React.FormEvent) => {
-    e.preventDefault();
-    setTried(true);
-    if (!reason.trim()) return;
-    act(() => api.post("/api/admin/cores/{cid}/status", { path: { cid: core.id }, body: { status: target, reason: reason.trim() } }));
   };
 
   const st = STATUS[core.status];
@@ -68,12 +56,13 @@ export function CoreDrawer({ core, span, ends, me, onClose, onChanged }: {
     const r = (await api.get("/api/reservations")).find((x) => x.id === rid);
     return resAction(rid, "release", { cores: r?.release_requested_cores ?? [] });
   };
+  const na = core.status === "Available" ? <Blank>Not applicable</Blank> : <Blank />;
   const facts: [string, React.ReactNode][] = [
-    ["Customer", core.customer ?? "-"],
-    ["Reserved by", res ? `${res.owner.display_name}, reservation #${res.reservation_id}` : "-"],
-    ["Ports", core.port_a || core.port_b ? `${core.port_a ?? "-"} to ${core.port_b ?? "-"}` : "-"],
-    ["Circuit", core.circuit_id ? <span key="c" className="font-mono">{core.circuit_id}</span> : "-"],
-    ["Planned date", core.planned_date ?? "-"],
+    ["Customer", core.customer ?? na],
+    ["Reserved by", res ? `${res.owner.display_name}, reservation #${res.reservation_id}` : <Blank key="r">Not applicable</Blank>],
+    ["Ports", core.port_a || core.port_b ? <span key="p">{core.port_a ?? <Blank />} to {core.port_b ?? <Blank />}</span> : <Blank key="p">No ports yet</Blank>],
+    ["Circuit", core.circuit_id ? <span key="c" className="font-mono">{core.circuit_id}</span> : <Blank key="c">{core.status === "Available" ? "Not applicable" : "Not recorded"}</Blank>],
+    ["Planned date", core.planned_date ?? na],
   ];
 
   return (
@@ -81,7 +70,7 @@ export function CoreDrawer({ core, span, ends, me, onClose, onChanged }: {
       cls="fixed inset-y-0 right-0 left-auto m-0 h-dvh max-h-dvh w-[460px] max-w-none overflow-y-auto rounded-none border-y-0 border-r-0 [&>h2]:pr-20">
       <button type="button" className="btn btn-sm absolute top-4 right-4" onClick={onClose} aria-label="Close core detail">Close</button>
       <div className="mt-3 flex flex-wrap items-center gap-2" data-testid="core-status">
-        <span className={`inline-flex items-center gap-1.5 font-semibold ${st.tone}`}><Icon name={st.icon} />{core.status}</span>
+        <span className={`inline-flex items-center gap-1.5 font-semibold ${st.tone}`}><Icon name={st.icon} />{statusLabel(core.status)}</span>
         {res?.stale && <span className="pill h-amber"><Icon name="lo" />Stale</span>}
         {res?.state === "release_requested" && <span className="pill h-blue"><Icon name="ex" />Release requested</span>}
       </div>
@@ -90,7 +79,6 @@ export function CoreDrawer({ core, span, ends, me, onClose, onChanged }: {
       </dl>
       {admin && <button type="button" className="btn btn-sm mt-3" onClick={() => setPorts(true)}>{core.port_a || core.port_b ? "Edit ports" : "Add ports"}</button>}
       {ports && <PortsDialog core={core} ends={ends} onClose={() => setPorts(false)} onSaved={() => { onChanged(); load(); }} />}
-      {res?.stale && <p className="mt-3 text-body text-amber">Stale: no approval or keep for over 3 months. Keep it or request release.</p>}
 
       {error && <p role="alert" className="mt-4 rounded-md border border-red bg-red-bg px-3 py-2 text-body font-semibold text-red">{error}</p>}
 
@@ -99,32 +87,6 @@ export function CoreDrawer({ core, span, ends, me, onClose, onChanged }: {
           {canKeep && <button type="button" className="btn" disabled={busy} onClick={() => act(() => resAction(res.reservation_id, "keep"))}>Keep</button>}
           {canKeep && <button type="button" className="btn" disabled={busy} onClick={() => act(() => resAction(res.reservation_id, "request-release", { cores: [core.id] }))}>Request release of core {core.number}</button>}
           {canRelease && <button type="button" className="btn btn-p" disabled={busy} onClick={() => act(() => release(res.reservation_id))}>Release requested cores</button>}
-        </div>
-      )}
-
-      {admin && (
-        <div className="mt-4 border-t pt-4">
-          {mode !== "status" ? (
-            <>
-              <button type="button" className="btn" onClick={() => setMode("status")}>Mark {target}</button>
-              <p className="mt-1.5 text-body text-muted-foreground">
-                {target === "Faulty"
-                  ? core.status === "Available" ? "Faulty cores cannot be booked." : "Its reservation goes to Action needed. In use and Reserved are not set here: they come from the Excel and the reservation flow."
-                  : "Only a Faulty core can be marked Available here."}
-              </p>
-            </>
-          ) : (
-            <form onSubmit={setStatus} noValidate aria-label={`Mark core ${core.number} ${target}`}>
-              <label className="block"><span className="lbl mb-1 block text-body! text-foreground!">Reason (required)</span>
-                <input className="field" value={reason} onChange={(e) => setReason(e.target.value)} autoFocus aria-invalid={tried && !reason.trim()} />
-              </label>
-              {tried && !reason.trim() && <p role="alert" className="mt-1.5 text-body font-semibold text-red">Enter a reason: every edit is kept as history.</p>}
-              <div className="mt-3 flex gap-2">
-                <button type="submit" className="btn btn-p" disabled={busy}>Mark {target}</button>
-                <button type="button" className="btn" onClick={() => { setMode(null); setTried(false); }}>Cancel</button>
-              </div>
-            </form>
-          )}
         </div>
       )}
 

@@ -108,25 +108,27 @@ def approvals(db: Session) -> list[ReservationOut]:
 
 
 def needs_review(db: Session, user: CurrentUser) -> list[NeedsReviewItem]:
-    faulty: dict[int, list[int]] = {}
-    for rid, number in db.execute(text(
-            "SELECT h.reservation_id, c.number FROM core_holds h JOIN core_status_v v ON v.core_id = h.core_id "
-            "JOIN cores c ON c.id = h.core_id WHERE v.status = 'Faulty' ORDER BY c.span_id, c.number")):
-        faulty.setdefault(rid, []).append(number)
+    cut: dict[int, list[str]] = {}  # reservation -> names of cut spans it holds cores or a count on
+    for rid, name in db.execute(text(
+            "SELECT x.rid, a.name || ' - ' || b.name FROM ("
+            " SELECT h.reservation_id AS rid, c.span_id FROM core_holds h JOIN cores c ON c.id = h.core_id"
+            " UNION SELECT u.reservation_id, u.span_id FROM reservation_unassigned_v u WHERE u.remaining > 0) x "
+            "JOIN spans s ON s.id = x.span_id AND s.fiber_cut JOIN sites a ON a.id = s.site_a_id JOIN sites b ON b.id = s.site_b_id "
+            "ORDER BY x.rid, s.id")):
+        cut.setdefault(rid, []).append(name)
     where = ("(st.is_stale OR (st.status = 'approved' AND st.last_event = 'release_requested') "
-             "OR r.id = ANY(CAST(:faulty AS bigint[])))")
+             "OR r.id = ANY(CAST(:cut AS bigint[])))")
     if user.role != "admin":
         where += " AND r.planner_id = :uid"
     items = []
-    for r in load(db, where, "st.last_event_at, r.id", faulty=list(faulty), uid=user.id):
+    for r in load(db, where, "st.last_event_at, r.id", cut=list(cut), uid=user.id):
         if r.stale:
             items.append(NeedsReviewItem(kind="stale", reservation=r,
                                          detail=f"Stale: {r.age_days} days since last event. Keep it or request release."))
         if r.awaiting == "release":
             items.append(NeedsReviewItem(kind="release_requested", reservation=r, detail="Release requested, waiting for an admin."))
-        if r.id in faulty:
-            items.append(NeedsReviewItem(kind="faulty_held", reservation=r,
-                                         detail="Faulty core taken: " + ", ".join(map(str, faulty[r.id]))))
+        if r.id in cut:
+            items.append(NeedsReviewItem(kind="fiber_cut", reservation=r, detail="Fiber cut: " + ", ".join(cut[r.id])))
     return items
 
 
@@ -203,6 +205,8 @@ def _check_book(db: Session, core_ids: list[int]) -> list[dict[str, Any]]:
         assert span is not None
         n = sum(r["span_id"] == sid for r in rows)
         label = f"{span.site_a} - {span.site_b}"
+        if span.fiber_cut:
+            raise conflict(f"{label} has a fiber cut and cannot be booked until an admin restores it.")
         if span.survey_cores is None:
             raise conflict(f"{label} is not surveyed yet; it cannot be booked.")
         if n > span.free_to_reserve:
@@ -213,15 +217,16 @@ def _check_book(db: Session, core_ids: list[int]) -> list[dict[str, Any]]:
 
 # ---------- planner / any user ----------
 
-def create(db: Session, user: CurrentUser, customer_id: int, planned_date: date | None, core_ids: list[int]) -> ReservationOut:
+def create(db: Session, user: CurrentUser, customer_id: int, planned_date: date | None, core_ids: list[int],
+           srf_id: str | None = None) -> ReservationOut:
     core_ids = sorted(set(core_ids))
     if not db.execute(text("SELECT 1 FROM customers WHERE id = :c"), {"c": customer_id}).first():
         raise HTTPException(422, "Unknown customer")
     _check_book(db, core_ids)
     rid = db.execute(text(
-        "INSERT INTO reservations (customer_id, planner_id, planned_date, is_new_customer) VALUES "
-        "(:c, :u, :d, NOT EXISTS (SELECT 1 FROM reservations WHERE customer_id = :c)) RETURNING id"),
-        {"c": customer_id, "u": user.id, "d": planned_date}).scalar_one()
+        "INSERT INTO reservations (customer_id, planner_id, planned_date, is_new_customer, srf_id) VALUES "
+        "(:c, :u, :d, NOT EXISTS (SELECT 1 FROM reservations WHERE customer_id = :c), :srf) RETURNING id"),
+        {"c": customer_id, "u": user.id, "d": planned_date, "srf": (srf_id or "").strip() or None}).scalar_one()
     _event(db, rid, "requested", user)
     _hold(db, rid, core_ids)
     db.commit()
@@ -284,15 +289,9 @@ def request_release(db: Session, user: CurrentUser, rid: int, core_ids: list[int
 
 # ---------- admin ----------
 
-def _admin_count(db: Session) -> int:
-    return db.execute(text("SELECT count(*) FROM users WHERE role = 'admin' AND active")).scalar_one()
-
-
 def approve(db: Session, user: CurrentUser, rid: int) -> ReservationOut:
     row = _lock(db, rid)
     _require(row, "pending")
-    if row["planner_id"] == user.id and _admin_count(db) > 1:
-        raise HTTPException(403, "You cannot approve your own request while another admin can")
     _event(db, rid, "approved", user)
     db.commit()
     return get(db, rid)

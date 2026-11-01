@@ -2,7 +2,9 @@ import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import { api, ApiError, errorText } from "@/api/client";
 import type { components } from "@/api/schema";
 import { useCustomerPicker } from "@/components/ChosenBar";
+import { FreeBadge } from "@/components/FindCard";
 import { Icon } from "@/components/Icon";
+import { Placeholder } from "@/components/Inspector";
 import { db } from "@/lib/status";
 
 // Route planner (TASK-051, TASK-076, route loss line of TASK-040). The routes API returns plain dicts, so the shapes live here.
@@ -148,19 +150,20 @@ export function RouteForm({ rp }: { rp: RoutePlanner }) {
     const err = pickErr(k);
     const site = k === "from" ? rp.from : rp.to;
     const text = k === "from" ? rp.fromText : rp.toText;
+    const fid = k === "from" ? "route-from" : `${id}-${k}`; // fixed id: the "Choose From" button in the Inspector focuses it
     return (
       <div className="grid min-w-0 gap-1">
-        <label htmlFor={`${id}-${k}`} className="lbl">{label}</label>
+        <label htmlFor={fid} className="lbl">{label}</label>
         <div className="relative">
           <Shape kind={site?.kind} className={`pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 ${site ? "" : "opacity-0"}`} />
-          <input id={`${id}-${k}`} list={`${id}-sites`} className="field pl-8" autoComplete="off" placeholder={blank === k ? text : "Type a site"}
+          <input id={fid} list={`${id}-sites`} className="field pl-8" autoComplete="off" placeholder={blank === k ? text : "Type a site"}
             value={blank === k ? "" : text} aria-invalid={!!err} aria-describedby={err ? `${id}-${k}-e` : `${id}-${k}-k`}
             onChange={(e) => { setBlank(null); (k === "from" ? rp.setFrom : rp.setTo)(e.target.value); }}
             onFocus={() => { setLeft((l) => ({ ...l, [k]: false })); if (site) setBlank(k); }}
             onBlur={() => { setBlank(null); setLeft((l) => ({ ...l, [k]: true })); }} />
         </div>
         {err ? <p id={`${id}-${k}-e`} className="text-body font-semibold text-red">{err}</p>
-          : <p id={`${id}-${k}-k`} className="text-xs text-muted-foreground">{site ? cap(kindWord(site.kind)) : "Data centre or site"}</p>}
+          : <p id={`${id}-${k}-k`} className="sr-only">{site ? cap(kindWord(site.kind)) : "Data centre or site"}</p>}
       </div>
     );
   };
@@ -196,7 +199,6 @@ export function RouteForm({ rp }: { rp: RoutePlanner }) {
           : rp.res && o.length === 0 ? <p className="empty px-4 py-3 text-body"><b className="block font-semibold">{rp.res.message ?? "No route found"}</b>Pick other sites.</p>
           : o.length > 0 && (
             <>
-              <p className="lbl mb-1.5">{o.length} {o.length === 1 ? "option" : "options"}, {rp.sort === "km" ? "shortest first" : "most free cores first"}</p>
               <ul aria-label="Route options" className="grid gap-2">
                 {o.map((op, i) => <li key={i}><OptionCard op={op} i={i} need={need} pressed={rp.idx === i} onClick={() => rp.select(i)} /></li>)}
               </ul>
@@ -230,38 +232,50 @@ function OptionCard({ op, i, need, pressed, onClick }: { op: RouteOption; i: num
   );
 }
 
-// ---------- Inspector, route state ----------
+// ---------- Inspector, route state (same fixed card parts as the span state) ----------
 export function RouteSummary({ rp, onGo }: { rp: RoutePlanner; onGo: () => void }) {
   const op = rp.option;
-  if (!op) {
-    return (
-      <p className="empty px-4 py-5 text-center text-body text-muted-foreground">
-        <b className="mb-0.5 block text-sm font-semibold text-foreground">No route selected</b>
-        Choose From and To in Find, then pick an option.
-      </p>
-    );
-  }
+  if (!op) return <Placeholder title="No route selected" text="Choose From and To in Find, then pick a route option."
+    actions={<button type="button" className="btn btn-sm" onClick={() => document.getElementById("route-from")?.focus()}>Choose From</button>} />;
   const need = rp.need ?? 0;
   const short = op.insufficient ? op.spans.find((s) => isShort(s, need)) : undefined;
+  const name = `${op.spans[0].site_a} to ${op.spans[op.spans.length - 1].site_b}`;
   return (
-    <div className="flex flex-1 flex-col" data-testid="route-summary">
-      <p className="lbl">Route, option {(rp.idx ?? 0) + 1}</p>
-      <h3 className="text-2xl leading-[30px] font-bold tracking-tight">{op.spans[0].site_a} to {op.spans[op.spans.length - 1].site_b}</h3>
-      <p className="mt-1 text-body text-muted-foreground"><b className="text-foreground">{need}</b> {need === 1 ? "core" : "cores"} needed per span</p>
-      <dl className="mt-4 grid grid-cols-3 rounded-md border">
-        <div className="p-3"><dt className="lbl">Spans</dt><dd className="text-2xl font-bold">{op.total_spans}</dd></div>
-        <div className="border-l p-3"><dt className="lbl">Distance</dt><dd className="text-2xl font-bold">{totalKm(op)}<small className="ml-1 text-xs font-normal text-muted-foreground">km</small></dd></div>
-        <div className="border-l p-3"><dt className="lbl">dB estimate</dt>
-          <dd className="text-2xl font-bold">{op.estimated_db == null ? "–" : op.estimated_db.toFixed(2)}{op.estimated_db != null && <small className="ml-1 text-xs font-normal text-muted-foreground">dB</small>}</dd>
-        </div>
-      </dl>
-      {short && (
-        <p className="mt-3 flex gap-2 rounded-md border border-l-3 border-red-bd border-l-red bg-red-bg px-3 py-2.5 text-body font-medium text-red">
-          <Icon name="fl" className="ic mt-[3px]" /><span>{shortText(short, need)}. Pick another option or lower the cores needed.</span>
+    <div className="flex min-h-0 flex-1 flex-col" data-testid="route-summary">
+      <div className="ins-head">
+        <h3 className={`ins-title ${name.length > 22 ? "long" : ""}`}>{name}</h3>
+        <p className="ins-facts">
+          <span>Option <b className="font-semibold text-foreground">{(rp.idx ?? 0) + 1}</b></span>
+          <span><b className="font-semibold text-foreground">{need}</b> {need === 1 ? "core" : "cores"} needed per span</span>
         </p>
-      )}
-      <div className="-mx-5 mt-auto border-t px-5 pt-5">
-        <button type="button" className="btn w-full" onClick={onGo}>Go to route table and Reserve</button>
+      </div>
+      <div className="ins-body">
+        <dl className="grid grid-cols-3 rounded-md border">
+          <div className="px-3 py-2"><dt className="sr-only">Spans</dt>
+            <dd className="text-xl font-bold">{op.total_spans}<small className="ml-1 text-xs font-normal text-muted-foreground">{op.total_spans === 1 ? "span" : "spans"}</small></dd></div>
+          <div className="border-l px-3 py-2"><dt className="sr-only">Distance</dt><dd className="text-xl font-bold">{totalKm(op)}<small className="ml-1 text-xs font-normal text-muted-foreground">km</small></dd></div>
+          <div className="border-l px-3 py-2"><dt className="sr-only">dB estimate</dt>
+            <dd className="text-xl font-bold">{op.estimated_db == null ? "–" : op.estimated_db.toFixed(2)}<small className="ml-1 text-xs font-normal text-muted-foreground">{op.estimated_db == null ? "no dB estimate" : "dB est."}</small></dd>
+          </div>
+        </dl>
+        {short && (
+          <p className="mt-3 flex gap-2 rounded-md border border-l-3 border-red-bd border-l-red bg-red-bg px-3 py-2.5 text-body font-medium text-red">
+            <Icon name="fl" className="ic mt-[3px]" /><span>{shortText(short, need)}. Pick another option or lower the cores needed.</span>
+          </p>
+        )}
+        <p className="lbl mt-3">Spans on this route</p>
+        <ol aria-label="Spans on this route" className="text-body">
+          {op.spans.map((s, i) => (
+            <li key={s.span_id} className="grid grid-cols-[20px_minmax(0,1fr)_auto] items-center gap-2 border-b border-rule py-1.5 last:border-0">
+              <span className="text-muted-foreground">{i + 1}</span>
+              <b className="min-w-0 truncate font-semibold" title={s.name}>{s.name}</b>
+              <FreeBadge s={{ survey_cores: s.surveyed ? 1 : null, free_to_reserve: s.free_to_reserve }} />
+            </li>
+          ))}
+        </ol>
+      </div>
+      <div className="ins-foot">
+        <button type="button" className="btn flex-1" onClick={onGo}>Go to route table and Reserve</button>
       </div>
     </div>
   );
@@ -294,7 +308,7 @@ export function RouteSection({ rp, spans, onDone }: { rp: RoutePlanner; spans: S
       <section className="card" aria-labelledby="route-t">
         <div className="card-h"><h2 id="route-t">Spans on this path</h2></div>
         {/* v4 .tw: full card width, cells never wrap, long names scroll inside this box */}
-        <div tabIndex={0} role="region" aria-label="Spans on this path, scrolls sideways" className="overflow-x-auto rounded-md border" data-testid="route-table-box">
+        <div tabIndex={0} role="region" aria-label="Spans on this path, scrolls sideways" className="relative overflow-x-auto rounded-md border" data-testid="route-table-box">
             <table className="tbl [&_tbody_th]:h-10 [&_td]:h-10 [&_td]:px-3! [&_th]:px-3! [&_td]:whitespace-nowrap [&_th]:whitespace-nowrap" data-testid="route-table">
               <caption className="sr-only">Spans on this route, in travel order, with loss and free cores</caption>
               <thead className="[&_th]:bg-subtle"><tr>
@@ -394,7 +408,7 @@ function Diagram({ rp, op, need, type, loss }: { rp: RoutePlanner; op: RouteOpti
                 className="rd-g cursor-pointer" onClick={() => { setCur(i); rp.setSpanIdx(i); }} onFocus={() => setCur(i)}>
                 <title>{s.name}</title>
                 <rect className="hit" x={a + 4} y={y - 46} width={b - a - 8} height={92} rx={4} fill={sel ? "var(--blue-bg)" : "transparent"} />
-                <line x1={a} y1={y} x2={b} y2={y} stroke="var(--blue)" strokeWidth={tt === "trunk" ? 5 : 3} strokeDasharray={tt === "bespoke" ? "7 5" : undefined} />
+                <line x1={a} y1={y} x2={b} y2={y} stroke="var(--blue)" strokeWidth={tt === "trunk" ? 5 : 3} />
                 <text x={m} y={y - 30} textAnchor="middle" className="fill-current text-[11px] text-muted-foreground">{t}</text>
                 <text x={m} y={y - 13} textAnchor="middle" className="fill-current text-xs font-semibold text-foreground">{fit(s.name, step - 24, 6.6)}</text>
                 <text x={m} y={y + 23} textAnchor="middle" className="fill-current text-xs text-foreground">{dist(s, d)}</text>
@@ -428,7 +442,6 @@ function Diagram({ rp, op, need, type, loss }: { rp: RoutePlanner; op: RouteOpti
       <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
         <span className="inline-flex items-center gap-1.5"><Shape kind="data_center" className="scale-75" />Data centre</span>
         <span className="inline-flex items-center gap-1.5"><Shape kind="site" className="scale-75" />Site</span>
-        <span>Above the line: span and route type. Below: distance, estimated loss, free cores.</span>
       </p>
     </>
   );
@@ -437,6 +450,7 @@ function Diagram({ rp, op, need, type, loss }: { rp: RoutePlanner; op: RouteOpti
 function ReserveBox({ op, need, onDone }: { op: RouteOption; need: number; onDone: () => void }) {
   const id = useId();
   const [date, setDate] = useState("");
+  const [srf, setSrf] = useState("");
   const [tried, setTried] = useState(false);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
@@ -452,7 +466,7 @@ function ReserveBox({ op, need, onDone }: { op: RouteOption; need: number; onDon
     try {
       const p = await api.get("/api/routes/pick", { query: { span_ids: op.spans.map((s) => s.span_id), cores_needed: need } }) as unknown as
         { spans: { name: string; cores: { number: number }[] }[]; core_ids: number[] };
-      const r = await api.post("/api/reservations", { body: { customer_id: customer.id, planned_date: date || null, cores: p.core_ids } });
+      const r = await api.post("/api/reservations", { body: { customer_id: customer.id, planned_date: date || null, ...(srf.trim() && { srf_id: srf.trim() }), cores: p.core_ids } });
       setMsg({ ok: true, text: `Request #${r.id} sent (${r.status}): ${p.spans.map((s) => `${s.name} cores ${s.cores.map((c) => c.number).join(", ")}`).join("; ")}. Nothing is reserved until an admin approves.` });
       setTried(false);
       onDone();
@@ -466,12 +480,15 @@ function ReserveBox({ op, need, onDone }: { op: RouteOption; need: number; onDon
   return (
     <section className="card" aria-labelledby={`${id}-h`} data-testid="route-reserve">
       <div className="card-h"><h2 id={`${id}-h`}>Reserve on this route</h2></div>
-      <div className="flex items-end gap-6">
-      <p className="max-w-[380px] flex-1 self-center text-body text-muted-foreground">
+      <div className="flex flex-wrap items-end gap-6">
+      <p className="max-w-[380px] min-w-[200px] flex-1 self-center text-body text-muted-foreground">
         <b className="text-foreground">{need}</b> {need === 1 ? "core" : "cores"} on each of <b className="text-foreground">{op.total_spans}</b> spans, <b className="text-foreground">{total}</b> in total. Cores are assigned from the first free cores on each span.
       </p>
       <form className="flex flex-1 items-end justify-end gap-3" onSubmit={submit} noValidate>
         {field}
+        <label className="grid w-[140px] min-w-[90px] gap-1"><span className="lbl">SRF ID</span>
+          <input className="field" value={srf} onChange={(e) => setSrf(e.target.value)} autoComplete="off" />
+        </label>
         <label className="grid w-[170px] shrink-0 gap-1"><span className="lbl">Planned date</span>
           <input type="date" className="field" value={date} onChange={(e) => setDate(e.target.value)} />
         </label>
@@ -487,7 +504,6 @@ function ReserveBox({ op, need, onDone }: { op: RouteOption; need: number; onDon
       {warning}
       {tried && !customer && <p role="alert" className="mt-2.5 text-body font-bold text-red">Choose a customer before submitting.</p>}
       {msg && <p role={msg.ok ? "status" : "alert"} className={`mt-2.5 text-body ${msg.ok ? "font-semibold" : "font-bold text-red"}`}>{msg.text}</p>}
-      <p className="mt-2 text-xs text-muted-foreground">Goes to an admin for approval.</p>
     </section>
   );
 }

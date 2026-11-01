@@ -67,33 +67,6 @@ def get_history(db: DB, entity: Entity, id: int) -> list[HistoryRow]:
     return history(db, entity, id)
 
 
-# ---------- core status ----------
-
-class CoreStatusBody(BaseModel):
-    status: Literal["Faulty", "Available"]
-    reason: Reason
-
-
-@router.post("/cores/{cid}/status")
-def set_core_status(db: DB, admin: Admin, cid: int, body: CoreStatusBody) -> dict[str, Any]:
-    found = db.execute(text("SELECT c.span_id, (s.survey_cores IS NOT NULL AND c.number > s.survey_cores) FROM cores c "
-                            "JOIN spans s ON s.id = c.span_id WHERE c.id = :c"), {"c": cid}).first()
-    if found is None:
-        raise HTTPException(404, "Core not found")
-    span, hidden = found
-    if hidden:
-        raise conflict("Core is beyond the span's surveyed count.")
-    db.execute(text("SELECT id FROM spans WHERE id = :s FOR UPDATE"), {"s": span})
-    old = db.execute(text("SELECT status FROM core_status_v WHERE core_id = :c"), {"c": cid}).scalar_one()
-    if body.status == "Faulty" and old == "Faulty":
-        raise conflict("Core is already Faulty.")
-    if body.status == "Available" and old != "Faulty":
-        raise conflict(f"Core is {old}, not Faulty. In use comes from the Excel and Reserved from the reservation flow.")
-    _log(db, admin, "core", cid, [("status", old, body.status)], body.reason)
-    db.commit()
-    return {"core_id": cid, "status": db.execute(text("SELECT status FROM core_status_v WHERE core_id = :c"), {"c": cid}).scalar_one()}
-
-
 # ---------- core ports (typed by hand; the reservation upload does not import ports) ----------
 
 class CorePortsBody(BaseModel):
@@ -140,12 +113,13 @@ def set_core_ports(db: DB, admin: Admin, core_id: int, body: CorePortsBody) -> C
 class SpanBody(BaseModel):
     reason: Reason
     distance_km: Decimal | None = Field(None, ge=0, max_digits=10, decimal_places=3)
-    route_type: Literal["Bespoke", "Trunk", "Metro"] | None = None
+    route_type: Literal["Trunk", "Metro"] | None = None
     region: str | None = None
     site_a_id: int | None = None
     site_b_id: int | None = None
     survey_cores: int | None = Field(None, ge=0)
     cable_size: int | None = Field(None, gt=0)
+    fiber_cut: bool | None = None
 
 
 class SpanEdit(BaseModel):
@@ -159,11 +133,12 @@ class SpanEdit(BaseModel):
     distance_km: Decimal | None
     survey_cores: int | None
     cable_size: int
+    fiber_cut: bool
     history: list[HistoryRow]
 
 
 SPAN_Q = ("SELECT s.id, s.site_a_id, s.site_b_id, a.name AS site_a, b.name AS site_b, s.route_type, s.region, s.distance_km, "
-          "s.survey_cores, s.cable_size FROM spans s JOIN sites a ON a.id = s.site_a_id JOIN sites b ON b.id = s.site_b_id "
+          "s.survey_cores, s.cable_size, s.fiber_cut FROM spans s JOIN sites a ON a.id = s.site_a_id JOIN sites b ON b.id = s.site_b_id "
           "WHERE s.id = :i")
 
 
@@ -190,7 +165,7 @@ def _resize(db: Session, sid: int, new: int) -> None:
         {"s": sid, "n": new}).all()
     if blocking:
         nums = [n for _, n in blocking]
-        raise conflict(f"Cannot lower to {new}: cores {', '.join(map(str, nums))} are reserved, in use, faulty, have ports "
+        raise conflict(f"Cannot lower to {new}: cores {', '.join(map(str, nums))} are reserved, in use, have ports "
                        "or have reservation history.", blocking_core_numbers=nums, blocking_core_ids=[i for i, _ in blocking])
     free_after = db.execute(text("SELECT count(*) FROM cores c JOIN core_status_v v ON v.core_id = c.id "
                                  "WHERE c.span_id = :s AND c.number <= :n AND v.status = 'Available'"), {"s": sid, "n": new}).scalar_one()
@@ -238,9 +213,9 @@ def edit_span(db: DB, admin: Admin, sid: int, body: SpanBody) -> Edited:
     if "site_a_id" in changes or "site_b_id" in changes:  # one statement: a swap passes the differ check only as a pair
         db.execute(text("UPDATE spans SET site_a_id = :a, site_b_id = :b WHERE id = :i"),
                    {"a": changes.get("site_a_id", old["site_a_id"]), "b": changes.get("site_b_id", old["site_b_id"]), "i": sid})
-    done = _log(db, admin, "span", sid, [(f, old[f], v) for f, v in changes.items()], body.reason)
+    done = _log(db, admin, "span", sid, [(f, old[f], v) if f != "fiber_cut" else (f, str(old[f]).lower(), str(v).lower()) for f, v in changes.items()], body.reason)
     db.commit()
-    invalidate_routes()  # distance or site change alters the routing graph
+    invalidate_routes()  # distance, site or fiber cut change alters the routing graph
     return Edited(id=sid, changed=done, history=history(db, "span", sid, 10))
 
 
