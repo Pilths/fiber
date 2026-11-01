@@ -32,7 +32,7 @@ The layout, page structure, patterns and style tokens live in `docs/DESIGN.md`. 
 - Status and warning levels are never shown by colour alone.
 - Light theme only (dark theme is Later / parked).
 - Text at least 11px; text contrast at least 4.5:1; non-text contrast at least 3:1.
-- The selection is written to the URL hash (`#span=AABB-BBCC`, `#route=AABB-DDEE`).
+- The selection is written to the URL hash (`#segment=AABB-BBCC`, `#route=AABB-DDEE`).
 - Everything works without the map: search and lists reach every segment and route.
 - UI and design work is done by Opus or Fable subagents (see `CLAUDE.md`).
 
@@ -59,7 +59,7 @@ To confirm against the mock files arriving 22 October 2026: KMZ lines are named 
    - Global search matches customer, segment, circuit ID and core.
    - Segments are labelled by their two sites and show their free cores and status mix; planners can filter by region and route type.
    - Each core's status is visible at a glance, and status is never shown by colour alone (for example hatched for Reserved, outlined for Available).
-   - Only surveyed cores are shown. A cable is usually 144 cores, but the data knows only the cores found at the onsite survey (Excel "Core Secured", stored as `spans.survey_cores`). A segment gets one core row per surveyed core, numbered 1 to the survey count. Cores with known port ranges show their port labels; the others have blank ports until known. The total cores of the cable (`spans.cable_size`, default 144, admin-editable) is info only, shown as "Total cores", and never shown as core rows.
+   - Only surveyed cores are shown. A cable is usually 144 cores, but the data knows only the cores found at the onsite survey (Excel "Core Secured", stored as `segments.survey_cores`). A segment gets one core row per surveyed core, numbered 1 to the survey count. Cores with known port ranges show their port labels; the others have blank ports until known. The total cores of the cable (`segments.cable_size`, default 144, admin-editable) is info only, shown as "Total cores", and never shown as core rows.
    - A segment with no survey count is "not surveyed" and cannot be booked until an admin enters a count (a segment edit with a reason). When the admin raises the count, more cores appear; nothing is rebuilt.
    - The Cores table shows one row per core. Consecutive cores of one reservation, and runs of Available cores, are grouped into one expandable row. Filter chips All, Free, In use and Unassigned show counts. A count-only reservation shows as an "Unassigned" row. Columns: Cores, Status, Customer, Planner, SRF, Planned date, Age, Ports. Circuit ID and loss are in the core details.
    - The "Free" figure (in the Free chip and the segment list) is Available cores minus the remaining unassigned cores of active reservations on that segment.
@@ -227,7 +227,7 @@ Files enter through the Admin page, the Python API validates and stores them, an
 
 **Data Model Foundation**
 
-The planning side comes first: reservations, customers and planners as separate tables, with reservations as insert-only rows. Around it: sites (data centers and TOCs), segments with route type (Trunk, Metro) and region (North, Central, South, East Coast), routes (several segments end to end), cores, ports, and measurements kept as history. Site names are unique across all regions, and many sites can share a region. A site has an active flag: a site missing from a site master upload is marked inactive, never deleted. The four regions stay as they are; new values come by migration when real data shows them. Measurements also store test method and field team. Ports connect through cores to another site. The app assigns its own internal ID to every site, segment and route. A circuit ID comes from another system and is an optional field on the core, because one segment carries many circuits; uploads match segments by the two sites, and ports by Port ID. Site is the general term for a site, a building or the equipment in it, and measurements are stored per core. Migration 0004 is part of Session 4 (Phase 5): `spans.cable_size` (default 144, info only), `reservations.unassigned_cores` (int, not null, default 0, set at insert) and the event type 'assigned'. After the first import the dashboard database is the source of truth and the Excel is a feed; fields edited in the dashboard are protected from later uploads, and every edit is kept as history with a reason.
+The planning side comes first: reservations, customers and planners as separate tables, with reservations as insert-only rows. Around it: sites (data centers and TOCs), segments with route type (Trunk, Metro) and region (North, Central, South, East Coast), routes (several segments end to end), cores, ports, and measurements kept as history. Site names are unique across all regions, and many sites can share a region. A site has an active flag: a site missing from a site master upload is marked inactive, never deleted. The four regions stay as they are; new values come by migration when real data shows them. Measurements also store test method and field team. Ports connect through cores to another site. The app assigns its own internal ID to every site, segment and route. A circuit ID comes from another system and is an optional field on the core, because one segment carries many circuits; uploads match segments by the two sites, and ports by Port ID. Site is the general term for a site, a building or the equipment in it, and measurements are stored per core. Migration 0004 is part of Session 4 (Phase 5): `segments.cable_size` (default 144, info only), `reservations.unassigned_cores` (int, not null, default 0, set at insert) and the event type 'assigned'. After the first import the dashboard database is the source of truth and the Excel is a feed; fields edited in the dashboard are protected from later uploads, and every edit is kept as history with a reason.
 
 **Sample Excel workbook**
 
@@ -267,7 +267,7 @@ DC List sheet (the DC sheet; found by its headers): columns No, State, City, Clu
 
 **Non-Functional Requirements**
 
-- Up to 50 concurrent users. About 36,000 sites, about 100 DCs, hundreds of sites with segments, and up to about 100,000 cores. This is small for PostgreSQL with indexes (pg_trgm GIN on site names, btree on `cores.span_id`, GiST on site location).
+- Up to 50 concurrent users. About 36,000 sites, about 100 DCs, hundreds of sites with segments, and up to about 100,000 cores. This is small for PostgreSQL with indexes (pg_trgm GIN on site names, btree on `cores.segment_id`, GiST on site location).
 - Time zone: all date logic (the 3-month stale rule, the daily digest's "today") and date display use Asia/Kuala_Lumpur. Timestamps are stored in UTC (timestamptz).
 - Desktop only, minimum width 1200px, checked at 1280, 1440 and 1920. Light theme only. Text contrast of at least 4.5:1 and non-text contrast of at least 3:1 (WCAG 2.1 AA).
 - Keyboard-operable navigation, controls and panels. Automated tests cover the reservation flow (request, approve, reject, release, correct), upload validation and the loss bands; the UI also gets a manual check at the four widths.

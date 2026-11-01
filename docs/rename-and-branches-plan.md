@@ -67,7 +67,7 @@ and the worktrees `/home/user1/project/fiber-pd` and `/home/user1/project/fiber-
 - 2 Nov: step 5 done (SegmentDiagram, SegmentListUpload, `#segment=` with old `#span=` redirected). Dev seed now
       attaches its measurements to core 1. e2e 62 passed; port-grid.spec.ts:125 failed once in a full run and
       passed alone and on the rerun (order-dependent flake, watch it).
-- [ ] 6. Final sweep: grep for leftover "span" (skip `<span>`), full test run, copy app to `main`.
+- [x] 6. Final sweep: grep for leftover "span" (skip `<span>`), full test run, copy app to `main`.
 
 ## Open after the rename
 
@@ -77,4 +77,4 @@ and the worktrees `/home/user1/project/fiber-pd` and `/home/user1/project/fiber-
 ## Reminders for the website build
 
 - Ask the owner for the calculated-loss formula (per core) before building loss UI.
-- Keep the current `SpanDiagram` component's look (it will be renamed with the code).
+- Keep the current `SegmentDiagram` component's look (renamed from `SpanDiagram`).

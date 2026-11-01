@@ -12,7 +12,7 @@ Status: 1 November 2026. Section 3 agreed with the owner.
 - WCAG 2.1 AA. Text at least 11px, text contrast at least 4.5:1, non-text contrast at least 3:1. Light theme only.
 - Status and warning levels are never shown by colour alone: symbol, pattern or word.
 - Everything works without the map: search and lists reach every segment and route.
-- The selection is in the URL hash (`#span=...`, `#route=...`).
+- The selection is in the URL hash (`#segment=...`, `#route=...`).
 
 ## 2. Style tokens
 
@@ -40,7 +40,7 @@ Tabs: **Inventory | My reservations**. There is no Reserve tab; reserving opens 
 |---|---|
 | Top left, 8 of 12 columns | Map, full size. Never shrunk to make room for other content. |
 | Top right, 4 columns, map height | Segment list: search, Region and Type filters, rows of segment name, km and free count (0 in red). |
-| Under the map, full width | Segment diagram: keep the one the web app has now (`SpanDiagram` in `web/src/components/NetworkDetail.tsx`), not the simplified line in the FigCraft mock. "Reserve cores" button at its right end. |
+| Under the map, full width | Segment diagram: keep the one the web app has now (`SegmentDiagram` in `web/src/components/NetworkDetail.tsx`), not the simplified line in the FigCraft mock. "Reserve cores" button at its right end. |
 | Below, full width | Cores table (see below). Rows of holders come first, so every holder is above the fold. |
 
 Segment facts are only the two site names and the distance. No numbers row, no loss, no region or type on the segment
@@ -78,8 +78,8 @@ Separate tab: all segments, only the planner's own reservations, with chips (All
 |---|---|
 | Free | cores that can be booked now (Available minus Unassigned holds) |
 | In use | Requested, Reserved, In service and Unassigned |
-| Verified | cores confirmed by the onsite survey (`spans.survey_cores`) |
-| Total cores | cores in the cable (`spans.cable_size`), never shown as cells |
+| Verified | cores confirmed by the onsite survey (`segments.survey_cores`) |
+| Total cores | cores in the cable (`segments.cable_size`), never shown as cells |
 | Calculated loss | per core, from a formula the owner will provide (today's code uses distance x 0.3 dB/km as a placeholder); never drawn on the map or diagram |
 | Measured loss | per core, from a physical field test by the field team (test type, date, team kept with it) |
 
