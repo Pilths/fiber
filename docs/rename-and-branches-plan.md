@@ -23,15 +23,15 @@ Tick a step only after its test passes. Each session: read this file first, do t
 | `dev` | Development and testing: everything in `main` plus docs, tests, dev tools. All work happens here and is copied to `main` when it is ready. |
 | `pictures` | Mockups, screenshots and design files (today's `docs/mockups/`, FigCraft exports). |
 
-Branches to delete once the owner confirms: `PD`, `demo`, `ui-trim-notes`, `mock-route-view` (local, remote,
+Branches deleted (owner confirmed 1 Nov; remote deletes run by the owner): `PD`, `demo`, `ui-trim-notes`, `mock-route-view` (local, remote,
 and the worktrees `/home/user1/project/fiber-pd` and `/home/user1/project/fiber-demo`).
 
 ## Steps
 
-- [ ] 1. Branches: commit current work on `dev`; create `pictures` (mockups and FigCraft files) and remove
+- [x] 1. Branches: commit current work on `dev`; create `pictures` (mockups and FigCraft files) and remove
       `docs/mockups/` from `dev`; delete `PD`, `demo`, `ui-trim-notes`, `mock-route-view` (local, remote,
       worktrees). Test: `git branch -a` shows only main, dev, pictures; `dev` still runs.
-- [ ] 1b. Trim dependencies on `dev`: remove unused pandas, numpy, APScheduler (api); remove lucide-react,
+- [x] 1b. Trim dependencies on `dev`: remove unused pandas, numpy, APScheduler (api); remove lucide-react,
       shadcn, @base-ui/react, class-variance-authority, tw-animate-css and the `cn` package (web), replacing
       the one `Button` and `cn` with plain local code; move pytest and httpx into a dev-only requirements file.
       Test: `docker compose up -d --build`, `docker compose exec api pytest`, web lint, typecheck, e2e.

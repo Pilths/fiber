@@ -1,6 +1,5 @@
 import { ApiError, errorText } from "@/api/client";
 
-export { cn } from "cn"
 
 export const when = (iso: string | null | undefined) =>
   iso ? new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Kuala_Lumpur", day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(iso)) : "—";
