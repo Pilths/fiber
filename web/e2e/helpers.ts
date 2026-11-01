@@ -51,10 +51,10 @@ export function contrast(page: Page, sel: Record<string, string>) {
 export const tab = (page: Page, name: "Map" | "Reserve") =>
   page.getByRole("navigation", { name: "Main" }).getByRole("button", { name, exact: true }).click();
 
-// The Map page has no span list: pick the span from Find on the Reserve tab, then come back. The tabs share the selection.
-export async function pickSpan(page: Page, name: RegExp | string) {
+// The Map page has no segment list: pick the segment from Find on the Reserve tab, then come back. The tabs share the selection.
+export async function pickSegment(page: Page, name: RegExp | string) {
   await tab(page, "Reserve");
-  await page.getByRole("list", { name: "Spans" }).getByRole("button", { name: typeof name === "string" ? new RegExp(name) : name }).click();
+  await page.getByRole("list", { name: "Segments" }).getByRole("button", { name: typeof name === "string" ? new RegExp(name) : name }).click();
   await tab(page, "Map");
-  await expect(page.locator("#span-h")).toHaveText(name);
+  await expect(page.locator("#segment-h")).toHaveText(name);
 }

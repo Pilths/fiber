@@ -1,27 +1,27 @@
 import { expect, test, type Page } from "@playwright/test";
-import { contrast, pickSpan, signIn } from "./helpers";
+import { contrast, pickSegment, signIn } from "./helpers";
 
 // Loss belongs to a core. Dev seed: KL DC - Bukit Jalil has a measured core; Bukit Jalil - Kuantan has no distance.
-const SPANS = {
+const SEGMENTS = {
   measured: /^DEV Kuala Lumpur DC - DEV Bukit Jalil TOC/,
   noDistance: /^DEV Bukit Jalil TOC - DEV Kuantan Hut/,
 };
-const pick = (page: Page, name: RegExp) => pickSpan(page, name);
+const pick = (page: Page, name: RegExp) => pickSegment(page, name);
 
 test.use({ viewport: { width: 1440, height: 900 } });
 
 test("Inspector shows total loss in its level colour, no worst core", async ({ page }) => {
   await signIn(page);
-  await pick(page, SPANS.measured);
+  await pick(page, SEGMENTS.measured);
   const line = page.getByTestId("inspector-loss");
   await expect(line).toContainText(/^Total loss[\d.]+ dB/);
   await expect(line.locator(".pill")).toHaveCount(0);
-  await expect(page.getByTestId("span-facts")).not.toContainText(/Worst core|Cores measured|Difference/);
+  await expect(page.getByTestId("segment-facts")).not.toContainText(/Worst core|Cores measured|Difference/);
 });
 
 test("a measured core: its loss in the core table, its tests in the row detail", async ({ page }) => {
   await signIn(page);
-  await pick(page, SPANS.measured);
+  await pick(page, SEGMENTS.measured);
   await page.getByRole("button", { name: "Go to cores" }).click();
   const row = page.locator("tr[data-core]:has([data-level])").first();
   const n = await row.getAttribute("data-core");
@@ -39,13 +39,13 @@ test("a measured core: its loss in the core table, its tests in the row detail",
   await page.screenshot({ path: "e2e/screenshots/core-loss.png" });
 });
 
-test("no distance span: dashes, never 0 dB", async ({ page }) => {
+test("no distance segment: dashes, never 0 dB", async ({ page }) => {
   await signIn(page);
-  await pick(page, SPANS.noDistance);
-  const span = page.getByTestId("span-facts");
-  await expect(span).toContainText("Distance-");
-  await expect(span).toContainText("Total loss-Average loss per km-");
-  await expect(span).not.toContainText("0.00 dB");
+  await pick(page, SEGMENTS.noDistance);
+  const segment = page.getByTestId("segment-facts");
+  await expect(segment).toContainText("Distance-");
+  await expect(segment).toContainText("Total loss-Average loss per km-");
+  await expect(segment).not.toContainText("0.00 dB");
   await page.getByRole("button", { name: "Core 1 details" }).click();
   await expect(page.getByTestId("core-no-loss")).toHaveText("No loss test");
 });

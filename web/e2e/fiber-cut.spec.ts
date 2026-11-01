@@ -1,33 +1,33 @@
 import { expect, test, type Page } from "@playwright/test";
-import { contrast, pickSpan, signIn } from "./helpers";
+import { contrast, pickSegment, signIn } from "./helpers";
 
-// Inspector alerts: fiber cut (span state) and high loss. Responses are mocked, so dev data never changes.
+// Inspector alerts: fiber cut (segment state) and high loss. Responses are mocked, so dev data never changes.
 const KLBJ = /^DEV Kuala Lumpur DC - DEV Bukit Jalil TOC/;
 
 test.use({ viewport: { width: 1440, height: 900 } });
-// A save reloads the span; let mocked fetches still in flight end quietly.
+// A save reloads the segment; let mocked fetches still in flight end quietly.
 test.afterEach(({ page }) => page.unrouteAll({ behavior: "ignoreErrors" }));
 
 const inspector = (page: Page) => page.getByRole("region", { name: "Inspector" });
 
-// Patch the real span detail, admin span and loss responses with the given fields.
-async function mock(page: Page, span: object, loss?: object) {
-  await page.route(/\/api\/spans\/\d+$/, async (r) => r.fulfill({ json: { ...(await (await r.fetch()).json()), ...span } }));
-  await page.route(/\/api\/admin\/spans\/\d+$/, async (r) =>
-    r.request().method() === "GET" ? r.fulfill({ json: { ...(await (await r.fetch()).json()), ...span } }) : r.fallback());
-  if (loss) await page.route(/\/api\/loss\/spans\/\d+$/, async (r) => r.fulfill({ json: { ...(await (await r.fetch()).json()), ...loss } }));
+// Patch the real segment detail, admin segment and loss responses with the given fields.
+async function mock(page: Page, segment: object, loss?: object) {
+  await page.route(/\/api\/segments\/\d+$/, async (r) => r.fulfill({ json: { ...(await (await r.fetch()).json()), ...segment } }));
+  await page.route(/\/api\/admin\/segments\/\d+$/, async (r) =>
+    r.request().method() === "GET" ? r.fulfill({ json: { ...(await (await r.fetch()).json()), ...segment } }) : r.fallback());
+  if (loss) await page.route(/\/api\/loss\/segments\/\d+$/, async (r) => r.fulfill({ json: { ...(await (await r.fetch()).json()), ...loss } }));
 }
-const pick = (page: Page) => pickSpan(page, KLBJ);
+const pick = (page: Page) => pickSegment(page, KLBJ);
 const measured = (level: string, db: number, pct: number) => ({ status: "measured", level, measured_db: db, deviation_pct: pct, worst_core_number: 12, measured_cores: 3, total_cores: 24 });
 
-test("no alert for a normal span", async ({ page }) => {
+test("no alert for a normal segment", async ({ page }) => {
   await mock(page, { fiber_cut: false }, measured("green", 3.5, 1.2));
   await signIn(page);
   await pick(page);
   const i = inspector(page);
-  await expect(i.getByTestId("span-facts")).toContainText("Total loss3.50 dB");
-  await expect(i.getByTestId("span-facts").locator(".pill")).toHaveCount(0); // level shows in the number's colour only
-  await expect(i.getByTestId("span-facts")).not.toContainText("Worst core");
+  await expect(i.getByTestId("segment-facts")).toContainText("Total loss3.50 dB");
+  await expect(i.getByTestId("segment-facts").locator(".pill")).toHaveCount(0); // level shows in the number's colour only
+  await expect(i.getByTestId("segment-facts")).not.toContainText("Worst core");
   await expect(i.getByTestId("fiber-cut")).toHaveCount(0);
   await expect(i.getByTestId("loss-alert")).toHaveCount(0);
   await expect(i.locator("dl").first()).not.toContainText("Fiber cut");
@@ -70,7 +70,7 @@ test("fiber cut: banner, 0 Cut, one red bar, Fiber cut key row; planner has no R
   const i = inspector(page);
   const banner = i.getByTestId("fiber-cut");
   await expect(banner).toContainText("Fiber cut");
-  await expect(banner).toContainText("All cores on this span are unavailable.");
+  await expect(banner).toContainText("All cores on this segment are unavailable.");
   await expect(banner.getByRole("button", { name: "Restore" })).toHaveCount(0);
   await expect(i.locator(".pill.h-red").first()).toHaveText("Cut");
   await expect(i.locator(".v-red").first()).toHaveText("0"); // the big number reads 0, red; the title chip says Cut
@@ -81,10 +81,10 @@ test("fiber cut: banner, 0 Cut, one red bar, Fiber cut key row; planner has no R
   await i.screenshot({ path: "e2e/screenshots/inspector-cut.png" });
 });
 
-test("fiber cut: admin Restore opens the span dialog unticked with focus on the reason", async ({ page }) => {
+test("fiber cut: admin Restore opens the segment dialog unticked with focus on the reason", async ({ page }) => {
   await mock(page, { fiber_cut: true, free_to_reserve: 0 });
   let posted: unknown = null;
-  await page.route(/\/api\/admin\/spans\/\d+$/, (r) => {
+  await page.route(/\/api\/admin\/segments\/\d+$/, (r) => {
     if (r.request().method() !== "POST") return r.fallback();
     posted = r.request().postDataJSON();
     return r.fulfill({ json: {} });
@@ -92,7 +92,7 @@ test("fiber cut: admin Restore opens the span dialog unticked with focus on the 
   await signIn(page, "admin1");
   await pick(page);
   await inspector(page).getByTestId("fiber-cut").getByRole("button", { name: "Restore" }).click();
-  const dlg = page.getByRole("dialog", { name: /^Edit span/ });
+  const dlg = page.getByRole("dialog", { name: /^Edit segment/ });
   const reason = dlg.getByLabel("Reason (required)");
   await expect(reason).toBeFocused();
   await expect(dlg.getByRole("checkbox", { name: /Fiber cut/ })).not.toBeChecked();
@@ -102,18 +102,18 @@ test("fiber cut: admin Restore opens the span dialog unticked with focus on the 
   expect(posted).toEqual({ reason: "E2E: repaired", fiber_cut: false });
 });
 
-test("Edit span: ticking Fiber cut sends fiber_cut true with the reason", async ({ page }) => {
+test("Edit segment: ticking Fiber cut sends fiber_cut true with the reason", async ({ page }) => {
   await mock(page, { fiber_cut: false });
   let posted: unknown = null;
-  await page.route(/\/api\/admin\/spans\/\d+$/, (r) => {
+  await page.route(/\/api\/admin\/segments\/\d+$/, (r) => {
     if (r.request().method() !== "POST") return r.fallback();
     posted = r.request().postDataJSON();
     return r.fulfill({ json: {} });
   });
   await signIn(page, "admin1");
   await pick(page);
-  await inspector(page).getByRole("button", { name: "Edit span" }).click();
-  const dlg = page.getByRole("dialog", { name: /^Edit span/ });
+  await inspector(page).getByRole("button", { name: "Edit segment" }).click();
+  const dlg = page.getByRole("dialog", { name: /^Edit segment/ });
   const box = dlg.getByRole("checkbox", { name: /Fiber cut/ });
   await expect(box).not.toBeChecked();
   await box.check();

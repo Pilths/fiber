@@ -50,6 +50,7 @@ and the worktrees `/home/user1/project/fiber-pd` and `/home/user1/project/fiber-
       `docker compose exec api pytest`.
 - [x] 4. Backend: models, SQL, schemas, routers (`/api/segments`), JSON keys (`segment_id`), seeds, tests.
       Test: `docker compose exec api pytest` all green.
+- 2 Nov: migrations squashed into 0001_baseline; databases rebuilt (no data kept).
 - Steps 3 and 4 were done together (2 Nov) as migration `0014_rename_segment` (rename, with downgrade) instead
       of a fresh baseline; pytest 205 passed. 0014 also renames uploads.kind 'span_list' to 'segment_list' and the
       upload_rows payload key span_id to segment_id. API changes for step 5 (old -> new):
@@ -60,9 +61,12 @@ and the worktrees `/home/user1/project/fiber-pd` and `/home/user1/project/fiber-
         measured_spans, total_spans); "spans" arrays -> "segments"; search type 'span' -> 'segment'.
       - The old route-level keys: segment_id -> route_id, "segments: SegmentCount[]" -> "routes: RouteCount[]",
         segment_label -> route_label. Watch the mixed meaning: "segments"/segment_id now mean the old spans.
-- [ ] 5. Frontend: regenerate `web/src/api/schema.d.ts`, rename identifiers and labels ("Segment list
+- [x] 5. Frontend: regenerate `web/src/api/schema.d.ts`, rename identifiers and labels ("Segment list
       upload"), URL hash `#segment=` (also accept old `#span=`). Do not touch HTML `<span>` tags.
       Test: `docker compose exec web npm run lint`, typecheck, `npm run test:e2e`.
+- 2 Nov: step 5 done (SegmentDiagram, SegmentListUpload, `#segment=` with old `#span=` redirected). Dev seed now
+      attaches its measurements to core 1. e2e 62 passed; port-grid.spec.ts:125 failed once in a full run and
+      passed alone and on the rerun (order-dependent flake, watch it).
 - [ ] 6. Final sweep: grep for leftover "span" (skip `<span>`), full test run, copy app to `main`.
 
 ## Open after the rename

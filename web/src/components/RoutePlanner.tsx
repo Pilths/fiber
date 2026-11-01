@@ -8,17 +8,17 @@ import { Placeholder } from "@/components/Inspector";
 import { db } from "@/lib/status";
 
 // Route planner (TASK-051, TASK-076, route loss line of TASK-040). The routes API returns plain dicts, so the shapes live here.
-type Span = components["schemas"]["SpanSummary"];
+type Segment = components["schemas"]["SegmentSummary"];
 type RouteLoss = components["schemas"]["RouteLoss"];
 type Sort = "km" | "free_cores";
 type Endpoint = { id: number; name: string; kind: string };
-export type RouteSpan = {
-  span_id: number; name: string; site_a: string; site_b: string; km: number | null; free_to_reserve: number;
-  surveyed: boolean; segment_label: string | null; measured: boolean;
+export type RouteSegment = {
+  segment_id: number; name: string; site_a: string; site_b: string; km: number | null; free_to_reserve: number;
+  surveyed: boolean; route_label: string | null; measured: boolean;
 };
 export type RouteOption = {
-  spans: RouteSpan[]; total_km: number; distance_incomplete: boolean; estimated_db: number | null;
-  measured_spans: number; total_spans: number; insufficient: boolean; best_match: boolean;
+  segments: RouteSegment[]; total_km: number; distance_incomplete: boolean; estimated_db: number | null;
+  measured_segments: number; total_segments: number; insufficient: boolean; best_match: boolean;
 };
 type Result = { options: RouteOption[]; message: string | null };
 type Errs = Partial<Record<"from" | "to" | "cores_needed" | "form", string>>;
@@ -47,11 +47,11 @@ function fieldErrors(e: unknown): Errs {
   return out;
 }
 
-const isShort = (s: RouteSpan, need: number) => !s.surveyed || s.free_to_reserve < need;
-const shortText = (s: RouteSpan, need: number) =>
+const isShort = (s: RouteSegment, need: number) => !s.surveyed || s.free_to_reserve < need;
+const shortText = (s: RouteSegment, need: number) =>
   s.surveyed ? `Not enough free cores on ${s.name}: ${s.free_to_reserve} free, ${need} needed` : `${s.name} is not surveyed`;
-// Match loss rows by span id, never by position: while a new option's fetch is in flight, `loss` still holds the previous option's rows.
-const lossOf = (loss: RouteLoss | null, id: number) => loss?.spans.find((x) => x.span_id === id);
+// Match loss rows by segment id, never by position: while a new option's fetch is in flight, `loss` still holds the previous option's rows.
+const lossOf = (loss: RouteLoss | null, id: number) => loss?.segments.find((x) => x.segment_id === id);
 const totalKm = (op: RouteOption) => `${km(op.total_km)}${op.distance_incomplete ? "+" : ""}`;
 
 export function useRoutePlanner(active: boolean, version: number) {
@@ -61,7 +61,7 @@ export function useRoutePlanner(active: boolean, version: number) {
   const [cores, setCores] = useState("2");
   const [sort, setSort] = useState<Sort>("km");
   const [idx, setIdx] = useState<number | null>(null);
-  const [spanIdx, setSpanIdx] = useState(0);
+  const [segmentIdx, setSegmentIdx] = useState(0);
   const [epsErr, setEpsErr] = useState(false);
   const [got, setGot] = useState<{ key: string; res: Result | null; errs: Errs } | null>(null);
 
@@ -72,7 +72,7 @@ export function useRoutePlanner(active: boolean, version: number) {
       const h = routeHash(), list = epsRef.current;
       if (!h || !list.length) return;
       const name = (id: number) => list.find((e) => e.id === id)?.name ?? "";
-      setFromText(name(h.from)); setToText(name(h.to)); setCores(h.cores); setSort(h.sort); setIdx(h.idx); setSpanIdx(0);
+      setFromText(name(h.from)); setToText(name(h.to)); setCores(h.cores); setSort(h.sort); setIdx(h.idx); setSegmentIdx(0);
     };
     let live = true;
     api.get("/api/routes/endpoints").then((r) => {
@@ -114,10 +114,10 @@ export function useRoutePlanner(active: boolean, version: number) {
     if (h ? location.hash !== h : location.hash.startsWith("#route=")) history.replaceState(null, "", h || location.pathname + location.search);
   }, [active, eps, idx, res, cur, option, both, fromId, toId, need, sort]);
 
-  const reset = () => { setIdx(null); setSpanIdx(0); };
+  const reset = () => { setIdx(null); setSegmentIdx(0); };
   return {
     clear: reset,
-    eps, fromText, toText, cores, sort, need, from, to, res, errs, loading, option, idx, spanIdx, setSpanIdx,
+    eps, fromText, toText, cores, sort, need, from, to, res, errs, loading, option, idx, segmentIdx, setSegmentIdx,
     setFrom: (t: string) => { setFromText(t); reset(); },
     setTo: (t: string) => { setToText(t); reset(); },
     setCores: (t: string) => { setCores(t); reset(); },
@@ -125,7 +125,7 @@ export function useRoutePlanner(active: boolean, version: number) {
     select: (i: number) => {
       const o = res?.options[i];
       setIdx(i);
-      setSpanIdx(Math.max(0, o ? o.spans.findIndex((s) => isShort(s, need ?? 0)) : 0)); // the short span, if any
+      setSegmentIdx(Math.max(0, o ? o.segments.findIndex((s) => isShort(s, need ?? 0)) : 0)); // the short segment, if any
     },
   };
 }
@@ -185,7 +185,7 @@ export function RouteForm({ rp }: { rp: RoutePlanner }) {
         </div>
       </div>
       <div className="mt-3 flex items-center justify-between gap-3">
-        <label htmlFor={`${id}-need`}>Cores needed per span</label>
+        <label htmlFor={`${id}-need`}>Cores needed per segment</label>
         <input id={`${id}-need`} type="number" min={1} step={1} inputMode="numeric" className="field w-24! text-right" value={rp.cores}
           aria-invalid={!!rp.errs.cores_needed} aria-describedby={rp.errs.cores_needed ? `${id}-need-e` : undefined}
           onChange={(e) => rp.setCores(e.target.value)} />
@@ -210,7 +210,7 @@ export function RouteForm({ rp }: { rp: RoutePlanner }) {
 }
 
 function OptionCard({ op, i, need, pressed, onClick }: { op: RouteOption; i: number; need: number; pressed: boolean; onClick: () => void }) {
-  const short = op.spans.find((s) => isShort(s, need));
+  const short = op.segments.find((s) => isShort(s, need));
   return (
     <button type="button" aria-pressed={pressed} onClick={onClick} data-testid="route-option"
       className="block w-full rounded-md border border-l-3 border-border border-l-transparent px-3.5 py-2.5 text-left text-body hover:bg-ground focus-visible:-outline-offset-3 aria-pressed:border-l-blue aria-pressed:bg-blue-bg">
@@ -219,10 +219,10 @@ function OptionCard({ op, i, need, pressed, onClick }: { op: RouteOption; i: num
         {op.best_match && <span className="pill h-blue">Best match</span>}
       </span>
       <span className="block text-muted-foreground">
-        <b className="text-foreground">{op.total_spans}</b> {op.total_spans === 1 ? "span" : "spans"}, <b className="text-foreground">{totalKm(op)}</b> km,{" "}
+        <b className="text-foreground">{op.total_segments}</b> {op.total_segments === 1 ? "segment" : "segments"}, <b className="text-foreground">{totalKm(op)}</b> km,{" "}
         {op.estimated_db == null ? "no dB estimate" : <><b className="text-foreground">{db(op.estimated_db)}</b> estimated</>}
       </span>
-      <span className="block text-muted-foreground">{op.measured_spans} of {op.total_spans} spans measured</span>
+      <span className="block text-muted-foreground">{op.measured_segments} of {op.total_segments} segments measured</span>
       {op.insufficient && short && (
         <span className="mt-0.5 flex items-start gap-1.5 font-semibold text-red" data-testid="route-short">
           <Icon name="fl" className="ic mt-[3px]" /><span>{shortText(short, need)}</span>
@@ -232,27 +232,27 @@ function OptionCard({ op, i, need, pressed, onClick }: { op: RouteOption; i: num
   );
 }
 
-// ---------- Inspector, route state (same fixed card parts as the span state) ----------
+// ---------- Inspector, route state (same fixed card parts as the segment state) ----------
 export function RouteSummary({ rp, onGo }: { rp: RoutePlanner; onGo: () => void }) {
   const op = rp.option;
   if (!op) return <Placeholder title="No route selected" text="Choose From and To in Find, then pick a route option."
     actions={<button type="button" className="btn btn-sm" onClick={() => document.getElementById("route-from")?.focus()}>Choose From</button>} />;
   const need = rp.need ?? 0;
-  const short = op.insufficient ? op.spans.find((s) => isShort(s, need)) : undefined;
-  const name = `${op.spans[0].site_a} to ${op.spans[op.spans.length - 1].site_b}`;
+  const short = op.insufficient ? op.segments.find((s) => isShort(s, need)) : undefined;
+  const name = `${op.segments[0].site_a} to ${op.segments[op.segments.length - 1].site_b}`;
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid="route-summary">
       <div className="ins-head">
         <h3 className={`ins-title ${name.length > 22 ? "long" : ""}`}>{name}</h3>
         <p className="ins-facts">
           <span>Option <b className="font-semibold text-foreground">{(rp.idx ?? 0) + 1}</b></span>
-          <span><b className="font-semibold text-foreground">{need}</b> {need === 1 ? "core" : "cores"} needed per span</span>
+          <span><b className="font-semibold text-foreground">{need}</b> {need === 1 ? "core" : "cores"} needed per segment</span>
         </p>
       </div>
       <div className="ins-body">
         <dl className="grid grid-cols-3 rounded-md border">
-          <div className="px-3 py-2"><dt className="sr-only">Spans</dt>
-            <dd className="text-xl font-bold">{op.total_spans}<small className="ml-1 text-xs font-normal text-muted-foreground">{op.total_spans === 1 ? "span" : "spans"}</small></dd></div>
+          <div className="px-3 py-2"><dt className="sr-only">Segments</dt>
+            <dd className="text-xl font-bold">{op.total_segments}<small className="ml-1 text-xs font-normal text-muted-foreground">{op.total_segments === 1 ? "segment" : "segments"}</small></dd></div>
           <div className="border-l px-3 py-2"><dt className="sr-only">Distance</dt><dd className="text-xl font-bold">{totalKm(op)}<small className="ml-1 text-xs font-normal text-muted-foreground">km</small></dd></div>
           <div className="border-l px-3 py-2"><dt className="sr-only">dB estimate</dt>
             <dd className="text-xl font-bold">{op.estimated_db == null ? "–" : op.estimated_db.toFixed(2)}<small className="ml-1 text-xs font-normal text-muted-foreground">{op.estimated_db == null ? "no dB estimate" : "dB est."}</small></dd>
@@ -263,10 +263,10 @@ export function RouteSummary({ rp, onGo }: { rp: RoutePlanner; onGo: () => void 
             <Icon name="fl" className="ic mt-[3px]" /><span>{shortText(short, need)}. Pick another option or lower the cores needed.</span>
           </p>
         )}
-        <p className="lbl mt-3">Spans on this route</p>
-        <ol aria-label="Spans on this route" className="text-body">
-          {op.spans.map((s, i) => (
-            <li key={s.span_id} className="grid grid-cols-[20px_minmax(0,1fr)_auto] items-center gap-2 border-b border-rule py-1.5 last:border-0">
+        <p className="lbl mt-3">Segments on this route</p>
+        <ol aria-label="Segments on this route" className="text-body">
+          {op.segments.map((s, i) => (
+            <li key={s.segment_id} className="grid grid-cols-[20px_minmax(0,1fr)_auto] items-center gap-2 border-b border-rule py-1.5 last:border-0">
               <span className="text-muted-foreground">{i + 1}</span>
               <b className="min-w-0 truncate font-semibold" title={s.name}>{s.name}</b>
               <FreeBadge s={{ survey_cores: s.surveyed ? 1 : null, free_to_reserve: s.free_to_reserve }} />
@@ -281,51 +281,51 @@ export function RouteSummary({ rp, onGo }: { rp: RoutePlanner; onGo: () => void 
   );
 }
 
-// ---------- Bottom section, route state: v4 "End-to-end span diagram" card, then the "Spans on this path" card ----------
-export function RouteSection({ rp, spans, onDone }: { rp: RoutePlanner; spans: Span[] | null; onDone: () => void }) {
+// ---------- Bottom section, route state: v4 "End-to-end segment diagram" card, then the "Segments on this path" card ----------
+export function RouteSection({ rp, segments, onDone }: { rp: RoutePlanner; segments: Segment[] | null; onDone: () => void }) {
   const op = rp.option!;
   const need = rp.need ?? 0;
   const [loss, setLoss] = useState<RouteLoss | null>(null);
-  const ids = op.spans.map((s) => s.span_id).join(",");
-  const freeSum = op.spans.reduce((n, s) => n + s.free_to_reserve, 0);
+  const ids = op.segments.map((s) => s.segment_id).join(",");
+  const freeSum = op.segments.reduce((n, s) => n + s.free_to_reserve, 0);
   useEffect(() => {
     let stale = false;
-    api.get("/api/loss/route", { query: { span_ids: ids } }).then((r) => !stale && setLoss(r)).catch(() => !stale && setLoss(null));
+    api.get("/api/loss/route", { query: { segment_ids: ids } }).then((r) => !stale && setLoss(r)).catch(() => !stale && setLoss(null));
     return () => { stale = true; };
   }, [ids, freeSum]);
-  const type = (id: number) => spans?.find((s) => s.id === id)?.route_type ?? "–";
-  const first = op.spans[0].site_a, last = op.spans[op.spans.length - 1].site_b;
+  const type = (id: number) => segments?.find((s) => s.id === id)?.route_type ?? "–";
+  const first = op.segments[0].site_a, last = op.segments[op.segments.length - 1].site_b;
   return (
     <div className="col-span-12 min-w-0 space-y-4" data-testid="route-section">
       <section className="card" aria-labelledby="route-h">
         <div className="card-h">
           <h2 id="route-h" tabIndex={-1} className="outline-offset-4">
-            End-to-end span diagram<span className="sr-only">, route option {(rp.idx ?? 0) + 1}, {first} to {last}</span>
+            End-to-end segment diagram<span className="sr-only">, route option {(rp.idx ?? 0) + 1}, {first} to {last}</span>
           </h2>
         </div>
         <Diagram rp={rp} op={op} need={need} type={type} loss={loss} />
       </section>
       <section className="card" aria-labelledby="route-t">
-        <div className="card-h"><h2 id="route-t">Spans on this path</h2></div>
+        <div className="card-h"><h2 id="route-t">Segments on this path</h2></div>
         {/* v4 .tw: full card width, cells never wrap, long names scroll inside this box */}
-        <div tabIndex={0} role="region" aria-label="Spans on this path, scrolls sideways" className="relative overflow-x-auto rounded-md border" data-testid="route-table-box">
+        <div tabIndex={0} role="region" aria-label="Segments on this path, scrolls sideways" className="relative overflow-x-auto rounded-md border" data-testid="route-table-box">
             <table className="tbl [&_tbody_th]:h-10 [&_td]:h-10 [&_td]:px-3! [&_th]:px-3! [&_td]:whitespace-nowrap [&_th]:whitespace-nowrap" data-testid="route-table">
-              <caption className="sr-only">Spans on this route, in travel order, with loss and free cores</caption>
+              <caption className="sr-only">Segments on this route, in travel order, with loss and free cores</caption>
               <thead className="[&_th]:bg-subtle"><tr>
-                <th scope="col" className="w-px">#</th><th scope="col">Span</th><th scope="col" className="w-px">Type</th><th scope="col">From → to</th>
+                <th scope="col" className="w-px">#</th><th scope="col">Segment</th><th scope="col" className="w-px">Type</th><th scope="col">From → to</th>
                 <th scope="col" className="w-px text-right!">km</th><th scope="col" className="w-px text-right!">Est. loss (dB)</th>
                 <th scope="col" className="w-px text-right!">Measured</th><th scope="col" className="w-px text-right!">Free cores</th>
               </tr></thead>
               <tbody>
-                {op.spans.map((s, i) => {
-                  const sh = isShort(s, need), l = lossOf(loss, s.span_id), sel = i === rp.spanIdx;
+                {op.segments.map((s, i) => {
+                  const sh = isShort(s, need), l = lossOf(loss, s.segment_id), sel = i === rp.segmentIdx;
                   return (
-                    <tr key={s.span_id} aria-selected={sel} className={sel ? "bg-blue-bg [&>td:first-child]:shadow-[inset_3px_0_0_var(--blue)]" : ""}>
+                    <tr key={s.segment_id} aria-selected={sel} className={sel ? "bg-blue-bg [&>td:first-child]:shadow-[inset_3px_0_0_var(--blue)]" : ""}>
                       <td className="text-muted-foreground">{i + 1}</td>
                       <th scope="row" className="text-left">
-                        <button type="button" className="text-left font-semibold underline decoration-line underline-offset-4 hover:text-blue" onClick={() => rp.setSpanIdx(i)}>{s.name}</button>
+                        <button type="button" className="text-left font-semibold underline decoration-line underline-offset-4 hover:text-blue" onClick={() => rp.setSegmentIdx(i)}>{s.name}</button>
                       </th>
-                      <td>{type(s.span_id)}</td>
+                      <td>{type(s.segment_id)}</td>
                       <td>{s.site_a} → {s.site_b}</td>
                       <td className="text-right whitespace-nowrap">{s.km == null ? "–" : km(s.km)}</td>
                       <td className="text-right whitespace-nowrap">{l?.calculated_db == null ? "–" : l.calculated_db.toFixed(2)}</td>
@@ -340,10 +340,10 @@ export function RouteSection({ rp, spans, onDone }: { rp: RoutePlanner; spans: S
               </tbody>
               <tfoot className="font-semibold [&_td]:border-t [&_td]:border-b-0 [&_td]:whitespace-nowrap">
                 <tr>
-                  <td colSpan={4}>Total, {op.total_spans} {op.total_spans === 1 ? "span" : "spans"}</td>
-                  <td className="text-right">{totalKm(op)}{op.distance_incomplete && <span className="sr-only"> (some spans have no distance)</span>}</td>
+                  <td colSpan={4}>Total, {op.total_segments} {op.total_segments === 1 ? "segment" : "segments"}</td>
+                  <td className="text-right">{totalKm(op)}{op.distance_incomplete && <span className="sr-only"> (some segments have no distance)</span>}</td>
                   <td className="text-right">{op.estimated_db == null ? "–" : op.estimated_db.toFixed(2)}</td>
-                  <td className="text-right">{op.measured_spans} of {op.total_spans} measured</td>
+                  <td className="text-right">{op.measured_segments} of {op.total_segments} measured</td>
                   <td />
                 </tr>
               </tfoot>
@@ -358,8 +358,8 @@ export function RouteSection({ rp, spans, onDone }: { rp: RoutePlanner; spans: S
 // Cut a label to fit `px` at about `cw` px per character; the full text stays in <title> and aria-label.
 const fit = (s: string, px: number, cw: number) => (s.length * cw <= px ? s : `${s.slice(0, Math.max(1, Math.floor(px / cw) - 1))}…`);
 
-// Port of v4 lineSVG(): one straight line, sites evenly spaced, one focusable group per span.
-// One tab stop (roving tabindex); arrows/Home/End move focus, Enter/Space or click selects the span's table row.
+// Port of v4 lineSVG(): one straight line, sites evenly spaced, one focusable group per segment.
+// One tab stop (roving tabindex); arrows/Home/End move focus, Enter/Space or click selects the segment's table row.
 function Diagram({ rp, op, need, type, loss }: { rp: RoutePlanner; op: RouteOption; need: number; type: (id: number) => string; loss: RouteLoss | null }) {
   const box = useRef<HTMLDivElement>(null);
   const [boxW, setBoxW] = useState(0);
@@ -369,43 +369,43 @@ function Diagram({ rp, op, need, type, loss }: { rp: RoutePlanner; op: RouteOpti
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
-  const [cur, setCur] = useState(rp.spanIdx);
-  const [seen, setSeen] = useState(rp.spanIdx);
-  if (seen !== rp.spanIdx) { setSeen(rp.spanIdx); setCur(rp.spanIdx); } // follow selections made in the table
-  const n = op.spans.length;
+  const [cur, setCur] = useState(rp.segmentIdx);
+  const [seen, setSeen] = useState(rp.segmentIdx);
+  if (seen !== rp.segmentIdx) { setSeen(rp.segmentIdx); setCur(rp.segmentIdx); } // follow selections made in the table
+  const n = op.segments.length;
   // v4 width rule, widened to the card so text draws at 1:1 instead of scaling up
   const W = Math.max(640, 120 + n * 170, boxW), H = 140, y = 68, x0 = 60, x1 = W - 60;
   const X = (k: number) => x0 + (k * (x1 - x0)) / n, step = (x1 - x0) / n;
-  const sites = [op.spans[0].site_a, ...op.spans.map((s) => s.site_b)];
+  const sites = [op.segments[0].site_a, ...op.segments.map((s) => s.site_b)];
   const kind = (name: string) => rp.eps.find((e) => e.name === name)?.kind;
   const go = (i: number) => { setCur(i); box.current?.querySelector<SVGGElement>(`[data-i="${i}"]`)?.focus(); };
   const key = (e: KeyboardEvent) => {
-    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); rp.setSpanIdx(cur); return; }
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); rp.setSegmentIdx(cur); return; }
     const to = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
     const i = e.key === "Home" ? 0 : e.key === "End" ? n - 1 : to != null ? Math.min(n - 1, Math.max(0, cur + to)) : null;
     if (i == null) return;
     e.preventDefault();
     go(i);
   };
-  const dist = (s: RouteSpan, d: number | null | undefined) => (s.km == null ? "no distance" : `${km(s.km)} km${d == null ? "" : ` · ${d.toFixed(2)} dB`}`);
+  const dist = (s: RouteSegment, d: number | null | undefined) => (s.km == null ? "no distance" : `${km(s.km)} km${d == null ? "" : ` · ${d.toFixed(2)} dB`}`);
   const end = `End · ${totalKm(op)} km · ${op.estimated_db == null ? "No dB estimate" : `${op.estimated_db.toFixed(2)} dB total`}`;
-  const text = (s: RouteSpan) => [`span ${s.name}`, s.km == null ? "no distance" : `${km(s.km)} km`,
+  const text = (s: RouteSegment) => [`segment ${s.name}`, s.km == null ? "no distance" : `${km(s.km)} km`,
     s.surveyed ? `${s.free_to_reserve} cores free` : "not surveyed", isShort(s, need) && `short, need ${need}`].filter(Boolean).join(", ");
   return (
     <>
-      <div ref={box} tabIndex={0} role="region" aria-label="Span diagram, scrolls sideways" className="overflow-x-auto rounded-md" data-testid="route-diagram">
-        <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} role="group" aria-label="Route drawn as a straight line from start to end. Arrow keys move between spans, Enter selects."
+      <div ref={box} tabIndex={0} role="region" aria-label="Segment diagram, scrolls sideways" className="overflow-x-auto rounded-md" data-testid="route-diagram">
+        <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} role="group" aria-label="Route drawn as a straight line from start to end. Arrow keys move between segments, Enter selects."
           className="block font-sans" onKeyDown={key}>
           <text x={x0} y={14} className="fill-current text-[11px] text-muted-foreground">Start</text>
           <text x={x1} y={14} textAnchor="end" className="fill-current text-[11px] text-muted-foreground">{end}</text>
-          {op.spans.map((s, i) => {
-            const a = X(i), b = X(i + 1), m = (a + b) / 2, sh = isShort(s, need), t = type(s.span_id), d = lossOf(loss, s.span_id)?.calculated_db;
-            const tt = t.toLowerCase(), sel = i === rp.spanIdx;
-            const label = [`Span ${s.name}`, t, s.km == null ? "no distance" : `${km(s.km)} km`, d == null ? "no dB estimate" : `${d.toFixed(2)} dB`,
+          {op.segments.map((s, i) => {
+            const a = X(i), b = X(i + 1), m = (a + b) / 2, sh = isShort(s, need), t = type(s.segment_id), d = lossOf(loss, s.segment_id)?.calculated_db;
+            const tt = t.toLowerCase(), sel = i === rp.segmentIdx;
+            const label = [`Segment ${s.name}`, t, s.km == null ? "no distance" : `${km(s.km)} km`, d == null ? "no dB estimate" : `${d.toFixed(2)} dB`,
               s.surveyed ? `${s.free_to_reserve} free cores` : "not surveyed", sh && "short"].filter(Boolean).join(", ");
             return (
-              <g key={s.span_id} data-i={i} role="button" tabIndex={i === cur ? 0 : -1} aria-label={label} aria-pressed={sel}
-                className="rd-g cursor-pointer" onClick={() => { setCur(i); rp.setSpanIdx(i); }} onFocus={() => setCur(i)}>
+              <g key={s.segment_id} data-i={i} role="button" tabIndex={i === cur ? 0 : -1} aria-label={label} aria-pressed={sel}
+                className="rd-g cursor-pointer" onClick={() => { setCur(i); rp.setSegmentIdx(i); }} onFocus={() => setCur(i)}>
                 <title>{s.name}</title>
                 <rect className="hit" x={a + 4} y={y - 46} width={b - a - 8} height={92} rx={4} fill={sel ? "var(--blue-bg)" : "transparent"} />
                 <line x1={a} y1={y} x2={b} y2={y} stroke="var(--blue)" strokeWidth={tt === "trunk" ? 5 : 3} />
@@ -436,7 +436,7 @@ function Diagram({ rp, op, need, type, loss }: { rp: RoutePlanner; op: RouteOpti
       </div>
       <ol className="sr-only" aria-label="Route as text">
         {sites.map((name, i) => (
-          <li key={i}>Site {name}, {kindWord(kind(name))}{i < n && `; then ${text(op.spans[i])}`}</li>
+          <li key={i}>Site {name}, {kindWord(kind(name))}{i < n && `; then ${text(op.segments[i])}`}</li>
         ))}
       </ol>
       <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
@@ -455,8 +455,8 @@ function ReserveBox({ op, need, onDone }: { op: RouteOption; need: number; onDon
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const { customer, field, warning } = useCustomerPicker((text) => setMsg({ text, ok: false }));
-  const short = op.spans.find((s) => isShort(s, need));
-  const total = need * op.total_spans;
+  const short = op.segments.find((s) => isShort(s, need));
+  const total = need * op.total_segments;
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setTried(true);
@@ -464,10 +464,10 @@ function ReserveBox({ op, need, onDone }: { op: RouteOption; need: number; onDon
     setBusy(true);
     setMsg(null);
     try {
-      const p = await api.get("/api/routes/pick", { query: { span_ids: op.spans.map((s) => s.span_id), cores_needed: need } }) as unknown as
-        { spans: { name: string; cores: { number: number }[] }[]; core_ids: number[] };
+      const p = await api.get("/api/routes/pick", { query: { segment_ids: op.segments.map((s) => s.segment_id), cores_needed: need } }) as unknown as
+        { segments: { name: string; cores: { number: number }[] }[]; core_ids: number[] };
       const r = await api.post("/api/reservations", { body: { customer_id: customer.id, planned_date: date || null, ...(srf.trim() && { srf_id: srf.trim() }), cores: p.core_ids } });
-      setMsg({ ok: true, text: `Request #${r.id} sent (${r.status}): ${p.spans.map((s) => `${s.name} cores ${s.cores.map((c) => c.number).join(", ")}`).join("; ")}. Nothing is reserved until an admin approves.` });
+      setMsg({ ok: true, text: `Request #${r.id} sent (${r.status}): ${p.segments.map((s) => `${s.name} cores ${s.cores.map((c) => c.number).join(", ")}`).join("; ")}. Nothing is reserved until an admin approves.` });
       setTried(false);
       onDone();
     } catch (err) {
@@ -482,7 +482,7 @@ function ReserveBox({ op, need, onDone }: { op: RouteOption; need: number; onDon
       <div className="card-h"><h2 id={`${id}-h`}>Reserve on this route</h2></div>
       <div className="flex flex-wrap items-end gap-6">
       <p className="max-w-[380px] min-w-[200px] flex-1 self-center text-body text-muted-foreground">
-        <b className="text-foreground">{need}</b> {need === 1 ? "core" : "cores"} on each of <b className="text-foreground">{op.total_spans}</b> spans, <b className="text-foreground">{total}</b> in total. Cores are assigned from the first free cores on each span.
+        <b className="text-foreground">{need}</b> {need === 1 ? "core" : "cores"} on each of <b className="text-foreground">{op.total_segments}</b> segments, <b className="text-foreground">{total}</b> in total. Cores are assigned from the first free cores on each segment.
       </p>
       <form className="flex flex-1 items-end justify-end gap-3" onSubmit={submit} noValidate>
         {field}

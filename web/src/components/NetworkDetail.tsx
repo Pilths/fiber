@@ -5,11 +5,11 @@ import { Icon } from "@/components/Icon";
 import { Blank, LossNum } from "@/components/LossCard";
 import type { RouteOption } from "@/components/RoutePlanner";
 import { FreeBadge } from "@/components/FindCard";
-import { countBy, db, LEVEL, pct, perKm, spanName, totalLoss, STATUS, STATUS_ORDER, statusLabel, type CoreStatus, type LossDetail, type SpanLoss } from "@/lib/status";
+import { countBy, db, LEVEL, pct, perKm, segmentName, totalLoss, STATUS, STATUS_ORDER, statusLabel, type CoreStatus, type LossDetail, type SegmentLoss } from "@/lib/status";
 
-type Detail = components["schemas"]["SpanDetail"];
+type Detail = components["schemas"]["SegmentDetail"];
 type Core = Detail["cores"][number];
-type Span = components["schemas"]["SpanSummary"];
+type Segment = components["schemas"]["SegmentSummary"];
 type Endpoint = { id: number; name: string };
 export type Found = { ids: number[]; km: number; sites: string[] }; // sites in travel order, one more than ids
 
@@ -31,8 +31,8 @@ export function RouteSearch({ onFound }: { onFound: (f: Found | null) => void })
       const r = (await api.get("/api/routes", { query: { from: from.id, to: to.id, cores_needed: 1, sort: "km" } })) as unknown as { options: RouteOption[] };
       const op = r.options[0];
       if (!op) return fail("No route found");
-      setMsg({ text: `${op.spans.length} ${op.spans.length === 1 ? "span" : "spans"}, ${Number(op.total_km.toFixed(1))} km`, ok: true });
-      onFound({ ids: op.spans.map((s) => s.span_id), km: op.total_km, sites: [op.spans[0].site_a, ...op.spans.map((s) => s.site_b)] });
+      setMsg({ text: `${op.segments.length} ${op.segments.length === 1 ? "segment" : "segments"}, ${Number(op.total_km.toFixed(1))} km`, ok: true });
+      onFound({ ids: op.segments.map((s) => s.segment_id), km: op.total_km, sites: [op.segments[0].site_a, ...op.segments.map((s) => s.site_b)] });
     } catch { fail("Could not load the route. Try again."); }
   };
   const submit = (e: FormEvent) => { e.preventDefault(); search(); };
@@ -55,39 +55,39 @@ export function RouteSearch({ onFound }: { onFound: (f: Found | null) => void })
 
 const kmOf = (s: { distance_km: string | null }) => (s.distance_km ? Number(s.distance_km) : null);
 
-// Route (or the one selected span) as a horizontal chain: site, span, site ... Each span is a button that selects it.
-export function SpanDiagram({ spans, found, d, loss, selectedId, onPick }: {
-  spans: Span[] | null; found: Found | null; d: Detail; loss: SpanLoss[]; selectedId: number; onPick: (id: number) => void;
+// Route (or the one selected segment) as a horizontal chain: site, segment, site ... Each segment is a button that selects it.
+export function SegmentDiagram({ segments, found, d, loss, selectedId, onPick }: {
+  segments: Segment[] | null; found: Found | null; d: Detail; loss: SegmentLoss[]; selectedId: number; onPick: (id: number) => void;
 }) {
   const onRoute = found?.ids.includes(d.id) ? found : null;
   const chain = onRoute
-    ? onRoute.ids.map((id, i) => ({ s: spans?.find((x) => x.id === id), a: onRoute.sites[i], b: onRoute.sites[i + 1], id }))
+    ? onRoute.ids.map((id, i) => ({ s: segments?.find((x) => x.id === id), a: onRoute.sites[i], b: onRoute.sites[i + 1], id }))
     : [{ s: d, a: d.site_a, b: d.site_b, id: d.id }];
-  const rows = chain.map((c) => ({ ...c, l: loss.find((x) => x.span_id === c.id) }));
+  const rows = chain.map((c) => ({ ...c, l: loss.find((x) => x.segment_id === c.id) }));
   const km = rows.reduce((n, r) => n + (r.s ? kmOf(r.s) ?? 0 : 0), 0);
-  // Spans with a distance count: worst measured core if measured, else calculated. A span with no distance adds neither dB nor km.
+  // Segments with a distance count: worst measured core if measured, else calculated. A segment with no distance adds neither dB nor km.
   const used = rows.flatMap((r) => { const k = r.s ? kmOf(r.s) : null, t = k ? totalLoss(r.l) : null; return t ? [{ k: k!, ...t }] : []; });
   const total = used.length ? used.reduce((n, u) => n + u.db, 0) : null;
   const usedKm = used.reduce((n, u) => n + u.k, 0);
   const anyCalc = used.some((u) => u.calc);
   const totals: [string, string][] = [
-    ["Spans", String(rows.length)],
+    ["Segments", String(rows.length)],
     ["Distance", km ? `${Number(km.toFixed(1))} km` : "-"],
     [anyCalc ? "Calculated loss" : "Total loss", total == null ? "-" : db(total)],
     ["Average loss per km", total != null && usedKm ? perKm(total, usedKm) : "-"],
   ];
   const cols = Math.min(rows.length, PER_ROW);
   return (
-    <section className="card" aria-labelledby="diagram-h" data-testid="span-diagram">
-      <h2 id="diagram-h" className="sr-only">{onRoute ? `Route ${chain[0].a} to ${chain[chain.length - 1].b}` : spanName(d)}</h2>
-      {/* Site, span, site ... in rows of up to PER_ROW spans; a row's last site starts the next row. */}
-      <ol aria-label="Spans on the route" className="grid gap-y-4 px-16" style={{ gridTemplateColumns: `repeat(${cols}, minmax(140px, 1fr))` }}>
+    <section className="card" aria-labelledby="diagram-h" data-testid="segment-diagram">
+      <h2 id="diagram-h" className="sr-only">{onRoute ? `Route ${chain[0].a} to ${chain[chain.length - 1].b}` : segmentName(d)}</h2>
+      {/* Site, segment, site ... in rows of up to PER_ROW segments; a row's last site starts the next row. */}
+      <ol aria-label="Segments on the route" className="grid gap-y-4 px-16" style={{ gridTemplateColumns: `repeat(${cols}, minmax(140px, 1fr))` }}>
         {rows.map((r, i) => {
           const cut = r.s?.fiber_cut, sel = r.id === selectedId, w = r.l?.level && r.l.level !== "green" ? LEVEL[r.l.level] : null;
           const k = r.s ? kmOf(r.s) : null;
           return (
             <li key={r.id} className="relative h-[100px]">
-              <button type="button" aria-pressed={sel} aria-label={`Span ${r.a} - ${r.b}`} onClick={() => onPick(r.id)}
+              <button type="button" aria-pressed={sel} aria-label={`Segment ${r.a} - ${r.b}`} onClick={() => onPick(r.id)}
                 className="mx-3 flex w-[calc(100%-24px)] cursor-pointer flex-col items-center gap-1 rounded-md border border-transparent py-1.5 hover:bg-raised aria-pressed:border-blue aria-pressed:bg-blue-bg">
                 <span className="h-5 text-body leading-5 font-semibold">{k == null ? "-" : `${k} km`}</span>
                 <span aria-hidden className="h-1" />
@@ -129,7 +129,7 @@ const Dash = () => <Blank>-</Blank>;
 const ports = (c: Core) => c.status === "Available" ? <Dash />
   : c.port_a || c.port_b ? <>{c.port_a ?? <Dash />} to {c.port_b ?? <Dash />}</> : <Blank>No ports yet</Blank>;
 
-// View-only table of the span's cores; a row opens its detail (circuit, loss tests) right under it.
+// View-only table of the segment's cores; a row opens its detail (circuit, loss tests) right under it.
 export function CoresTable({ d, loss, focusCoreId, onActions }: { d: Detail; loss: LossDetail | null; focusCoreId: number | null; onActions: (c: Core) => void }) {
   const [filter, setFilter] = useState<CoreStatus | "All">("All");
   const [openId, setOpenId] = useState<number | null>(focusCoreId);
@@ -148,7 +148,7 @@ export function CoresTable({ d, loss, focusCoreId, onActions }: { d: Detail; los
       </div>
       <div className="max-h-[480px] overflow-auto" data-testid="cores-box">
         <table className="tbl table-fixed [&_thead_th]:sticky [&_thead_th]:top-0 [&_thead_th]:z-1 [&_thead_th]:bg-white">
-          <caption className="sr-only">Cores of {spanName(d)}</caption>
+          <caption className="sr-only">Cores of {segmentName(d)}</caption>
           <thead><tr>
             <th scope="col" className="w-[7%]">Core</th><th scope="col" className="w-[14%]">Status</th><th scope="col" className="w-[13%]">Circuit ID</th><th scope="col" className="w-[17%]">Customer</th>
             <th scope="col" className="w-[12%]">Planned date</th><th scope="col">Ports</th><th scope="col" className="w-[11%] pr-0!">Loss</th>

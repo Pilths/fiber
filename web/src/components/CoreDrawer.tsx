@@ -18,8 +18,8 @@ const line = (h: Item) =>
 
 // Core detail: right-side drawer on the native <dialog> (Esc closes, focus returns to the cell or row that opened it).
 // The holder comes from GET /api/cores/{id}: everyone sees who holds a core; actions follow holder.is_mine or admin.
-export function CoreDrawer({ core, span, ends, me, onClose, onChanged }: {
-  core: Core; span: string; ends: [string, string]; me: Me; onClose: () => void; onChanged: () => void;
+export function CoreDrawer({ core, segment, ends, me, onClose, onChanged }: {
+  core: Core; segment: string; ends: [string, string]; me: Me; onClose: () => void; onChanged: () => void;
 }) {
   const [items, setItems] = useState<Item[] | null>(null);
   const [res, setRes] = useState<Holder | null>(null);
@@ -66,7 +66,7 @@ export function CoreDrawer({ core, span, ends, me, onClose, onChanged }: {
   ];
 
   return (
-    <Dialog title={`Core ${core.number} on ${span}`} onClose={onClose}
+    <Dialog title={`Core ${core.number} on ${segment}`} onClose={onClose}
       cls="fixed inset-y-0 right-0 left-auto m-0 h-dvh max-h-dvh w-[460px] max-w-none overflow-y-auto rounded-none border-y-0 border-r-0 [&>h2]:pr-20">
       <button type="button" className="btn btn-sm absolute top-4 right-4" onClick={onClose} aria-label="Close core detail">Close</button>
       <div className="mt-3 flex flex-wrap items-center gap-2" data-testid="core-status">

@@ -72,7 +72,7 @@ test("new user: temporary password, forced change, deactivate blocks, activate r
   await user.reload();
   await expect(user.getByRole("heading", { name: "Change password" })).toBeVisible();
   await expect(user.getByRole("navigation", { name: "Main" })).toHaveCount(0);
-  expect((await user.request.get("/api/spans")).status()).toBe(403);
+  expect((await user.request.get("/api/segments")).status()).toBe(403);
   const newPw = `${DEV_PASSWORD}-new`;
   await user.getByLabel("Current password").fill(temp);
   await user.getByLabel("New password", { exact: true }).fill("short");

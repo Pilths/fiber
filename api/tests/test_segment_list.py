@@ -3,11 +3,9 @@ import io
 
 import openpyxl
 import pytest
-from conftest import alembic_cfg
 from sqlalchemy import text
 from test_auth import login, mkuser
 
-from alembic import command
 
 URL = "/api/admin/segment-list"
 HEAD = ["Link", "Site A", "Route", "Section", "Type", "Distance", "lat"]
@@ -212,18 +210,6 @@ def test_segment_api_shows_route_section_and_route_filter(client, admin, sites, 
     got = client.get("/api/segments", params={"route": "rX"}).json()
     assert len(got) == 1 and got[0]["route"] == "Rx" and got[0]["section"] == "Sx"
     assert client.get(f"/api/segments/{got[0]['id']}").json()["section"] == "Sx"
-
-
-def test_migration_0008_roundtrip(engine, db):
-    cfg = alembic_cfg()
-    command.downgrade(cfg, "0007")
-    assert not db.execute(text("SELECT 1 FROM information_schema.columns WHERE table_name = 'segments' AND column_name = 'route'")).first()
-    command.upgrade(cfg, "head")
-    u = db.execute(text("INSERT INTO users (username, display_name, role) VALUES ('u','U','admin') RETURNING id")).scalar_one()
-    db.execute(text("INSERT INTO uploads (user_id, filename, kind) VALUES (:u, 'f.xlsx', 'segment_list')"), {"u": u})
-    db.execute(text("INSERT INTO sites (name, kind) VALUES ('A','site'), ('B','site')"))
-    db.execute(text("INSERT INTO segments (site_a_id, site_b_id, route, section) SELECT a.id, b.id, 'r', 's' FROM sites a, sites b "
-                    "WHERE a.name = 'A' AND b.name = 'B'"))
 
 
 def test_bespoke_type_is_no_longer_accepted(client, admin, sites):

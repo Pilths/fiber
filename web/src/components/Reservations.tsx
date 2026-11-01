@@ -48,7 +48,7 @@ const STATUS_LABEL: Record<Res["status"], string> = {
 
 function groupCores(r: Res) {
   const by = new Map<string, Res["cores"]>();
-  for (const c of r.cores) by.set(c.span, [...(by.get(c.span) ?? []), c]);
+  for (const c of r.cores) by.set(c.segment, [...(by.get(c.segment) ?? []), c]);
   return [...by.entries()];
 }
 
@@ -101,10 +101,10 @@ function Card({ r, me, onChanged }: { r: Res; me: Me; onChanged: () => void }) {
       {r.stale && <p className="text-sm font-medium">Stale: no approval or keep for over 3 months.</p>}
       {r.last_reason && <p className="text-sm font-medium" role="note">{r.status === "rejected" ? "Rejection reason" : "Release declined"}: {r.last_reason}</p>}
       {r.unassigned_cores > 0 && (
-        <p className="text-sm">{r.unassigned_cores} cores reserved by count on {r.unassigned_span}; <strong>{r.remaining_unassigned} not assigned yet</strong>.</p>
+        <p className="text-sm">{r.unassigned_cores} cores reserved by count on {r.unassigned_segment}; <strong>{r.remaining_unassigned} not assigned yet</strong>.</p>
       )}
-      {groupCores(r).map(([span, cores]) => (
-        <p key={span} className="text-sm">{span}: cores {cores.map((c) => c.held ? c.number : `${c.number} (released)`).join(", ")}</p>
+      {groupCores(r).map(([segment, cores]) => (
+        <p key={segment} className="text-sm">{segment}: cores {cores.map((c) => c.held ? c.number : `${c.number} (released)`).join(", ")}</p>
       ))}
       {r.release_requested_cores.length > 0 && (
         <p className="text-sm">Release requested for cores {r.cores.filter((c) => r.release_requested_cores.includes(c.core_id)).map((c) => c.number).join(", ")}.</p>
@@ -116,7 +116,7 @@ function Card({ r, me, onChanged }: { r: Res; me: Me; onChanged: () => void }) {
           {held.length === 0 && <p>No named cores; the whole count will be released.</p>}
           {held.map((c) => (
             <label key={c.core_id} className="mr-3 inline-flex items-center gap-1">
-              <input type="checkbox" checked={pick.has(c.core_id)} onChange={() => toggle(c.core_id)} /> {c.span}: {c.number}
+              <input type="checkbox" checked={pick.has(c.core_id)} onChange={() => toggle(c.core_id)} /> {c.segment}: {c.number}
             </label>
           ))}
         </fieldset>
@@ -197,11 +197,11 @@ export function MyReservations({ me, onChanged }: { me: Me; onChanged: () => voi
 
 const day = (iso: string | null) => iso ? new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Kuala_Lumpur", day: "numeric", month: "short", year: "numeric" }).format(new Date(iso)) : "—";
 
-// Span or route of a request: one span name, or the first span and how many more (all of them in the details row).
-function spanText(r: Res) {
-  const spans = groupCores(r).map(([s]) => s);
-  if (!spans.length) return r.unassigned_span ?? "—";
-  return spans.length === 1 ? spans[0] : `${spans[0]} +${spans.length - 1} more`;
+// Segment or route of a request: one segment name, or the first segment and how many more (all of them in the details row).
+function segmentText(r: Res) {
+  const segments = groupCores(r).map(([s]) => s);
+  if (!segments.length) return r.unassigned_segment ?? "—";
+  return segments.length === 1 ? segments[0] : `${segments[0]} +${segments.length - 1} more`;
 }
 
 // Approvals (admin): one table of waiting requests, oldest first. Approve / Reject (or Release / Decline for a release
@@ -224,7 +224,7 @@ export function Approvals({ me, onChanged }: { me: Me; onChanged: () => void }) 
             <thead><tr>
               <th scope="col" className="w-px"><span className="sr-only">Details</span></th>
               <th scope="col" className="w-px">Requested</th><th scope="col" className="w-px">Type</th><th scope="col">Planner</th><th scope="col">Customer</th>
-              <th scope="col">Span or route</th><th scope="col" className="num w-px">Cores</th><th scope="col" className="w-px">Planned</th>
+              <th scope="col">Segment or route</th><th scope="col" className="num w-px">Cores</th><th scope="col" className="w-px">Planned</th>
               <th scope="col" className="w-px text-right!"><span className="sr-only">Actions</span></th>
             </tr></thead>
             {data.map((r) => <ApprovalRow key={r.id} r={r} onChanged={() => { reload(); onChanged(); }} />)}
@@ -258,7 +258,7 @@ function ApprovalRow({ r, onChanged }: { r: Res; onChanged: () => void }) {
           {r.customer}
           {r.is_new_customer && <span className="ml-2 inline-flex items-center gap-1 text-xs font-semibold text-amber"><Icon name="lo" />New customer</span>}
         </th>
-        <td className="max-w-[320px] truncate" title={groupCores(r).map(([s]) => s).join(", ") || undefined}>{spanText(r)}</td>
+        <td className="max-w-[320px] truncate" title={groupCores(r).map(([s]) => s).join(", ") || undefined}>{segmentText(r)}</td>
         <td className="num">{cores}{!release && r.unassigned_cores > 0 && <span className="text-muted-foreground"> by count</span>}</td>
         <td>{r.planned_date ?? "—"}</td>
         <td className="text-right">
@@ -282,8 +282,8 @@ function ApprovalRow({ r, onChanged }: { r: Res; onChanged: () => void }) {
         <td colSpan={8} className="h-auto! py-3! whitespace-normal!">
           <div className="space-y-1.5 text-body">
             <p className="text-muted-foreground">Request #{r.id}{r.imported && ", imported"}. Last event: {r.last_event ?? "none"}, {r.age_days} days ago.{r.stale && " Stale: no approval or keep for over 3 months."}</p>
-            {r.unassigned_cores > 0 && <p>{r.unassigned_cores} cores reserved by count on {r.unassigned_span}; {r.remaining_unassigned} not assigned yet.</p>}
-            {groupCores(r).map(([span, cs]) => <p key={span}>{span}: cores {cs.map((c) => c.held ? c.number : `${c.number} (released)`).join(", ")}</p>)}
+            {r.unassigned_cores > 0 && <p>{r.unassigned_cores} cores reserved by count on {r.unassigned_segment}; {r.remaining_unassigned} not assigned yet.</p>}
+            {groupCores(r).map(([segment, cs]) => <p key={segment}>{segment}: cores {cs.map((c) => c.held ? c.number : `${c.number} (released)`).join(", ")}</p>)}
             {release && <p>Release requested for cores {r.cores.filter((c) => r.release_requested_cores.includes(c.core_id)).map((c) => c.number).join(", ") || "unassigned"}.</p>}
             {r.last_reason && <p role="note">{r.status === "rejected" ? "Rejection reason" : "Release declined"}: {r.last_reason}</p>}
             {mode && (

@@ -11,7 +11,7 @@ export const GLYPH_PROBE = "/map/fonts/Noto Sans Regular/0-255.pbf";
 setWorkerUrl(workerUrl);
 addProtocol("pmtiles", new Protocol().tile);
 
-// Light style from the UI tokens (index.css): quiet greys so span colours stay the loudest thing on the map.
+// Light style from the UI tokens (index.css): quiet greys so segment colours stay the loudest thing on the map.
 // Protomaps v4 layers used: earth, water, landuse, roads, buildings, boundaries, places, pois. The extract stops at
 // zoom 14; MapLibre overzooms those tiles up to the map's maxZoom, so buildings and streets stay drawn when zoomed in.
 // Labels (places, street names, a few landmark POIs) only when the glyphs are installed.

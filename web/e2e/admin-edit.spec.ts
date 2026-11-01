@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { pickSpan, signIn, tab } from "./helpers";
+import { pickSegment, signIn, tab } from "./helpers";
 
 // Session 8: core detail drawer, admin edits (TEST-011) and reservation history (TEST-021).
 // Every edit here is reversed in the same test; nothing is deleted, so the history rows stay.
@@ -9,12 +9,12 @@ const CJBJ = /^DEV Cyberjaya DC - DEV Bukit Jalil TOC/; // distance 18.2 km, cha
 
 test.use({ viewport: { width: 1440, height: 900 } });
 
-// Map page: the span is picked on the Reserve tab (Find), then shown on the Map.
-const pick = (page: Page, name: RegExp) => pickSpan(page, name);
+// Map page: the segment is picked on the Reserve tab (Find), then shown on the Map.
+const pick = (page: Page, name: RegExp) => pickSegment(page, name);
 // Reserve tab: Find list, core grid and Allocations.
 const pickToReserve = async (page: Page, name: RegExp) => {
   await tab(page, "Reserve");
-  await page.getByRole("list", { name: "Spans" }).getByRole("button", { name }).click();
+  await page.getByRole("list", { name: "Segments" }).getByRole("button", { name }).click();
   await expect(page.getByRole("heading", { name: /^Allocations/ })).toBeVisible();
 };
 const openCore = (page: Page, n: number) => page.getByRole("button", { name: `Core ${n} details`, exact: true }).click();
@@ -58,7 +58,7 @@ test("planner sees no Keep on others' cores and no edit buttons", async ({ page 
   await expect(d.getByRole("button", { name: /Request release/ })).toHaveCount(0);
   await d.getByRole("button", { name: "Close core detail" }).click();
   const inspector = page.getByRole("region", { name: "Inspector" });
-  await expect(inspector.getByRole("button", { name: "Edit span" })).toHaveCount(0);
+  await expect(inspector.getByRole("button", { name: "Edit segment" })).toHaveCount(0);
   await expect(inspector.getByRole("button", { name: /^Edit site/ })).toHaveCount(0);
 });
 
@@ -67,22 +67,22 @@ test("taken-cores table tags stale cores", async ({ page }) => {
   const rs: { stale: boolean; cores: { core_id: number; held: boolean }[] }[] = await (await page.request.get("/api/reservations")).json();
   const core = rs.filter((r) => r.stale).flatMap((r) => r.cores).find((c) => c.held);
   test.skip(!core, "Dev data has no stale reservation holding a core; not faking one by changing server data.");
-  const c: { number: number; span_name: string } = await (await page.request.get(`/api/cores/${core!.core_id}`)).json();
-  await pickToReserve(page, new RegExp(`^${c.span_name}`));
-  const row = page.getByRole("table", { name: "Allocations on this span" }).getByRole("row").filter({ has: page.getByRole("button", { name: `Core ${c.number} details` }) });
+  const c: { number: number; segment_name: string } = await (await page.request.get(`/api/cores/${core!.core_id}`)).json();
+  await pickToReserve(page, new RegExp(`^${c.segment_name}`));
+  const row = page.getByRole("table", { name: "Allocations on this segment" }).getByRole("row").filter({ has: page.getByRole("button", { name: `Core ${c.number} details` }) });
   await expect(row).toContainText(/Stale: no keep for over 3 months since /);
 });
 
-test("admin edits span distance with a reason; calculated loss follows; then reverts", async ({ page }) => {
+test("admin edits segment distance with a reason; calculated loss follows; then reverts", async ({ page }) => {
   await signIn(page, "admin1");
   await pick(page, CJBJ);
-  await openCore(page, 1); // core 1's test: 5.57 dB against the calculated 18.2 x 0.3 = 5.46 dB
+  await openCore(page, 1); // core 1's newest test: 5.593 dB against the calculated 18.2 x 0.3 = 5.46 dB
   const loss = page.getByTestId("core-tests").locator("tbody tr").first().locator("td").nth(1); // Difference
-  await expect(loss).toHaveText("+2.0%");
+  await expect(loss).toHaveText("+2.4%");
 
   const edit = async (km: string, reason: string) => {
-    await page.getByRole("region", { name: "Inspector" }).getByRole("button", { name: "Edit span" }).click();
-    const dlg = page.getByRole("dialog", { name: /^Edit span/ });
+    await page.getByRole("region", { name: "Inspector" }).getByRole("button", { name: "Edit segment" }).click();
+    const dlg = page.getByRole("dialog", { name: /^Edit segment/ });
     await dlg.getByLabel("Distance (km)").fill(km);
     await dlg.getByRole("button", { name: "Save" }).click();
     await expect(dlg.getByRole("alert")).toContainText("Enter a reason"); // reason empty: blocked before sending
@@ -91,25 +91,25 @@ test("admin edits span distance with a reason; calculated loss follows; then rev
   };
   let dlg = await edit("18.3", "E2E: re-measured route");
   await dlg.getByText(/^History/).click();
-  await page.screenshot({ path: "e2e/screenshots/edit-span.png" });
+  await page.screenshot({ path: "e2e/screenshots/edit-segment.png" });
   await dlg.getByRole("button", { name: "Save" }).click();
   await expect(dlg).toBeHidden();
-  await expect(loss).toHaveText("+1.5%"); // calculated 5.49 dB
+  await expect(loss).toHaveText("+1.8%"); // calculated 5.49 dB
 
   dlg = await edit("18.2", "E2E: revert");
   await dlg.getByRole("button", { name: "Save" }).click();
   await expect(dlg).toBeHidden();
-  await expect(loss).toHaveText("+2.0%");
-  await page.getByRole("region", { name: "Inspector" }).getByRole("button", { name: "Edit span" }).click();
-  await page.getByRole("dialog", { name: /^Edit span/ }).getByText(/^History/).click();
+  await expect(loss).toHaveText("+2.4%");
+  await page.getByRole("region", { name: "Inspector" }).getByRole("button", { name: "Edit segment" }).click();
+  await page.getByRole("dialog", { name: /^Edit segment/ }).getByText(/^History/).click();
   await expect(page.getByTestId("edit-history").getByRole("listitem").first()).toContainText("Reason: E2E: revert");
 });
 
 test("lowering the survey count below taken cores is refused in plain words", async ({ page }) => {
   await signIn(page, "admin1");
   await pick(page, KLCJ);
-  await page.getByRole("region", { name: "Inspector" }).getByRole("button", { name: "Edit span" }).click();
-  const dlg = page.getByRole("dialog", { name: /^Edit span/ });
+  await page.getByRole("region", { name: "Inspector" }).getByRole("button", { name: "Edit segment" }).click();
+  const dlg = page.getByRole("dialog", { name: /^Edit segment/ });
   await dlg.getByLabel("Survey count").fill("1");
   await dlg.getByLabel("Reason (required)").fill("E2E: should be refused");
   await dlg.getByRole("button", { name: "Save" }).click();
@@ -126,12 +126,12 @@ test("admin opens a site from the Inspector: fields, reason required, history", 
   await expect(dlg.getByLabel("Name")).toHaveValue("DEV Cyberjaya DC");
   await expect(dlg.getByLabel("Latitude")).toHaveValue("2.9213");
   await dlg.getByLabel("Active").uncheck();
-  await expect(dlg).toContainText("A site used by a span cannot be deactivated");
+  await expect(dlg).toContainText("A site used by a segment cannot be deactivated");
   await dlg.getByRole("button", { name: "Save" }).click();
   await expect(dlg.getByRole("alert")).toContainText("Enter a reason");
   await dlg.getByLabel("Reason (required)").fill("E2E: try to deactivate");
   await dlg.getByRole("button", { name: "Save" }).click();
-  await expect(dlg.getByRole("alert").first()).toContainText("used by a span");
+  await expect(dlg.getByRole("alert").first()).toContainText("used by a segment");
   await dlg.getByText(/^History/).click();
   await page.screenshot({ path: "e2e/screenshots/edit-site.png" });
   await page.keyboard.press("Escape");
@@ -183,7 +183,7 @@ test("admin edits a core's ports with a reason, then puts them back", async ({ p
 test("one Unassigned row per reservation; admin assign dialog limits the choice", async ({ page }) => {
   await signIn(page, "admin1");
   await pickToReserve(page, CJBJ);
-  const table = page.getByRole("table", { name: "Allocations on this span" });
+  const table = page.getByRole("table", { name: "Allocations on this segment" });
   const rows = table.getByTestId("unassigned-row");
   const n = await rows.count();
   expect(n).toBeGreaterThan(0);
@@ -195,7 +195,7 @@ test("one Unassigned row per reservation; admin assign dialog limits the choice"
   const dlg = page.getByRole("dialog", { name: /^Assign cores to / });
   await expect(dlg).toContainText(`Choose up to ${remaining}`);
   const cores = dlg.getByRole("group", { name: "Available cores" }).getByRole("button");
-  test.skip(await cores.count() <= remaining, "Not enough Available cores on this span to test the limit.");
+  test.skip(await cores.count() <= remaining, "Not enough Available cores on this segment to test the limit.");
   for (let i = 0; i < remaining; i++) await cores.nth(i).click();
   await expect(cores.nth(remaining)).toBeDisabled();
   await expect(cores.nth(0)).toHaveAttribute("aria-pressed", "true");

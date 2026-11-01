@@ -1,22 +1,22 @@
 import { expect, test, type Page } from "@playwright/test";
 import { contrast, signIn, tab } from "./helpers";
 
-const SPAN = "DEV Kuala Lumpur DC - DEV Cyberjaya DC"; // dev seed: has Available, Reserved and In use cores
+const SEGMENT = "DEV Kuala Lumpur DC - DEV Cyberjaya DC"; // dev seed: has Available, Reserved and In use cores
 
 // Choosing cores lives on the Reserve tab.
-const pickSpan = async (page: Page, name: string | RegExp) => {
+const pickSegment = async (page: Page, name: string | RegExp) => {
   await tab(page, "Reserve");
-  await page.getByRole("list", { name: "Spans" }).getByRole("button", { name: typeof name === "string" ? new RegExp(name) : name }).click();
+  await page.getByRole("list", { name: "Segments" }).getByRole("button", { name: typeof name === "string" ? new RegExp(name) : name }).click();
 };
 
-async function openSpan(page: Page) {
+async function openSegment(page: Page) {
   await signIn(page);
-  await pickSpan(page, SPAN);
+  await pickSegment(page, SEGMENT);
   await expect(page.getByRole("grid", { name: "Cores" })).toBeVisible();
 }
 
 test("keyboard: roving tabindex, arrows, Space/Enter select only Available", async ({ page }) => {
-  await openSpan(page);
+  await openSegment(page);
   const cells = page.getByRole("gridcell");
   expect(await cells.count()).toBe(24);
   await expect(page.getByRole("region", { name: "Cores", exact: true })).toContainText("24 surveyed of 144");
@@ -53,7 +53,7 @@ test("keyboard: roving tabindex, arrows, Space/Enter select only Available", asy
 });
 
 test("chosen bar: counts chosen cores, blocks without customer, Clear resets", async ({ page }) => {
-  await openSpan(page);
+  await openSegment(page);
   const bar = page.getByTestId("chosen-bar");
   await expect(bar).toContainText("No cores chosen");
   await expect(bar.getByRole("button", { name: "Reserve" })).toBeDisabled();
@@ -76,7 +76,7 @@ test("chosen bar: counts chosen cores, blocks without customer, Clear resets", a
 });
 
 test("each status has a distinct symbol and text, not colour alone", async ({ page }) => {
-  await openSpan(page);
+  await openSegment(page);
   const key = page.getByRole("list", { name: "Status key" });
   const items = await key.getByRole("listitem").allInnerTexts();
   const icons = await key.locator("svg[data-icon]").evaluateAll((els) => els.map((e) => e.getAttribute("data-icon")));
@@ -102,19 +102,19 @@ test("each status has a distinct symbol and text, not colour alone", async ({ pa
 
 { // light theme only (PRD: dark theme is parked)
   test("contrast >= 4.5", async ({ page }) => {
-    await openSpan(page);
+    await openSegment(page);
     const ratios = await contrast(page, {
       body: "body",
       header: "header h1",
       search: "header input",
-      spanMuted: "[aria-label=Spans] button span.text-muted-foreground",
+      segmentMuted: "[aria-label=Segments] button span.text-muted-foreground",
       captionHint: "[data-testid=grid-caption]",
       tableHead: "thead th",
       tableCell: "tbody td",
       button: "main button.btn-p",
       navCurrent: "nav button[aria-current]",
       later: ".later",
-      badge: "[aria-label=Spans] .pill",
+      badge: "[aria-label=Segments] .pill",
       ...Object.fromEntries(["Available", "Requested", "Reserved", "In use"].map((st) => [`cell ${st}`, `[role=gridcell][data-status="${st}"]`])),
     });
     expect(Object.keys(ratios).length).toBeGreaterThan(8);
@@ -122,9 +122,9 @@ test("each status has a distinct symbol and text, not colour alone", async ({ pa
   });
 }
 
-test("count-only reservation shows on the span and in My reservations; admin sees Approvals", async ({ page }) => {
+test("count-only reservation shows on the segment and in My reservations; admin sees Approvals", async ({ page }) => {
   await signIn(page);
-  await pickSpan(page, /^DEV Cyberjaya DC - DEV Bukit Jalil/);
+  await pickSegment(page, /^DEV Cyberjaya DC - DEV Bukit Jalil/);
   await expect(page.getByTestId("unassigned")).toContainText(/Unassigned3 cores/);
   await page.getByRole("button", { name: /My reservations/ }).click();
   await expect(page.getByTestId("reservation").filter({ hasText: "3 not assigned yet" })).toBeVisible();
@@ -135,7 +135,7 @@ test("count-only reservation shows on the span and in My reservations; admin see
 test("planner books and withdraws a core request, admin sees Approvals", async ({ browser }) => {
   const planner = await (await browser.newContext({ viewport: { width: 1280, height: 900 } })).newPage();
   await signIn(planner, "planner2");
-  await pickSpan(planner, /DEV Bukit Jalil TOC - DEV Kuantan Hut/);
+  await pickSegment(planner, /DEV Bukit Jalil TOC - DEV Kuantan Hut/);
   await planner.locator('[role=gridcell][data-status="Available"]').first().click();
   const bar = planner.getByTestId("chosen-bar");
   await bar.getByLabel("Search customers").fill("DEV Telco Alpha");

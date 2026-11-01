@@ -361,7 +361,7 @@ export function SiteMasterUpload() {
       {c && staged && (
         <Dialog title={`Apply ${SHEET_LABEL[c.kind]}?`} onClose={() => setConfirming(null)} wide>
           <ul className="mt-3 space-y-2 text-body">
-            <li>Add {c.counts.added}, update {c.counts.changed}; {c.counts.missing} missing are set inactive unless a span or reservation uses them (those stay active with a warning); {c.counts.problem} problem rows are not applied.{c.needs_override ? " Row-count block overridden." : ""}</li>
+            <li>Add {c.counts.added}, update {c.counts.changed}; {c.counts.missing} missing are set inactive unless a segment or reservation uses them (those stay active with a warning); {c.counts.problem} problem rows are not applied.{c.needs_override ? " Row-count block overridden." : ""}</li>
             {c.kind === "dcs" && renames.length > 0 && (
               <li><b className="font-semibold">Possible renames:</b> {renames.filter((r) => decisions[r.missing_dc_id] === "rename").length} renamed, {renames.filter((r) => decisions[r.missing_dc_id] === "separate").length} kept separate.</li>
             )}

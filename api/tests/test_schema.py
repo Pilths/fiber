@@ -1,9 +1,7 @@
 import pytest
-from conftest import alembic_cfg
 from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError, IntegrityError
 
-from alembic import command
 
 
 def one(db, sql, **p):
@@ -20,12 +18,6 @@ def ids(db):
     cust = one(db, "INSERT INTO customers (name) VALUES ('X') RETURNING id")
     res = one(db, "INSERT INTO reservations (customer_id, planner_id) VALUES (:c,:u) RETURNING id", c=cust, u=u)
     return {"user": u, "a": a, "b": b, "segment": segment, "core": core, "res": res}
-
-
-def test_migration_roundtrip(engine):
-    cfg = alembic_cfg()
-    command.downgrade(cfg, "base")
-    command.upgrade(cfg, "head")
 
 
 @pytest.mark.parametrize("table", ["reservation_events", "measurements", "data_edits"])

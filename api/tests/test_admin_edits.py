@@ -414,34 +414,3 @@ def test_fiber_cut_needs_review_and_existing_actions_not_blocked(client, w, db):
     assert [i["reservation"]["id"] for i in client.get("/api/needs-review", headers=H("planner1")).json()] == [counted]
 
 
-def test_migration_0009_roundtrip(engine, db):
-    from conftest import alembic_cfg
-
-    from alembic import command
-    cfg = alembic_cfg()
-    command.downgrade(cfg, "0008")
-    assert one(db, "SELECT count(*) FROM information_schema.columns WHERE table_name = 'segments' AND column_name = 'fiber_cut'") == 0
-    command.upgrade(cfg, "head")
-    a, b = (one(db, "INSERT INTO sites (name, kind) VALUES (:n,'site') RETURNING id", n=n) for n in "AB")
-    assert one(db, "INSERT INTO segments (site_a_id, site_b_id) VALUES (:a,:b) RETURNING fiber_cut", a=a, b=b) is False
-
-
-def test_migration_0010_roundtrip(engine, db):
-    from conftest import alembic_cfg
-
-    from alembic import command
-    cfg = alembic_cfg()
-    view = "SELECT pg_get_viewdef('core_status_v'::regclass)"
-    command.downgrade(cfg, "0009")
-    with engine.connect() as c:  # own connection: a lock held by `db` would block the renames in 0014
-        assert "Faulty" in one(c, view)  # previous view restored
-    command.upgrade(cfg, "head")
-    with engine.connect() as c:
-        assert "Faulty" not in one(c, view)
-    a, b = (one(db, "INSERT INTO sites (name, kind) VALUES (:n,'site') RETURNING id", n=n) for n in "AB")
-    sp = one(db, "INSERT INTO segments (site_a_id, site_b_id) VALUES (:a,:b) RETURNING id", a=a, b=b)
-    core = one(db, "INSERT INTO cores (segment_id, number) VALUES (:s, 1) RETURNING id", s=sp)
-    u = one(db, "INSERT INTO users (username, display_name, role) VALUES ('m10','m10','admin') RETURNING id")
-    db.execute(text("INSERT INTO data_edits (entity, entity_id, field, new_value, reason, user_id) "
-                    "VALUES ('core', :c, 'status', 'Faulty', 'old', :u)"), {"c": core, "u": u})
-    assert one(db, "SELECT status FROM core_status_v WHERE core_id = :c", c=core) == "Available"  # old edit drives nothing

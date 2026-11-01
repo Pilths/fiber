@@ -25,7 +25,7 @@ async function plan(page: Page, cores = "2", from = FROM, to = TO) {
   await page.getByRole("radio", { name: "Route A to B" }).check({ force: true });
   await page.getByLabel("From", { exact: true }).fill(from);
   await page.getByLabel("To", { exact: true }).fill(to);
-  await page.getByLabel("Cores needed per span").fill(cores);
+  await page.getByLabel("Cores needed per segment").fill(cores);
   await expect(options(page).first()).toBeVisible();
 }
 
@@ -39,8 +39,8 @@ test("route options: up to 3, a Best match, every field shown", async ({ page })
   expect(n).toBeLessThanOrEqual(3);
   await expect(options(page).first()).toContainText("Best match");
   await expect(options(page).first()).toContainText(/Option 1/);
-  await expect(options(page).first()).toContainText(/\d+ spans?, [\d.]+\+? km, ([\d.]+ dB estimated|no dB estimate)/);
-  await expect(options(page).first()).toContainText(/\d+ of \d+ spans measured/);
+  await expect(options(page).first()).toContainText(/\d+ segments?, [\d.]+\+? km, ([\d.]+ dB estimated|no dB estimate)/);
+  await expect(options(page).first()).toContainText(/\d+ of \d+ segments measured/);
   await expect(options(page).first().getByTestId("route-short")).toHaveCount(0);
   await expect(page.getByTestId("route-form")).toContainText("Data centre"); // kind of the picked site
   await page.screenshot({ path: "e2e/screenshots/route-options.png" });
@@ -48,24 +48,24 @@ test("route options: up to 3, a Best match, every field shown", async ({ page })
   await options(page).first().click();
   await expect(page).toHaveURL(new RegExp(`${await routeHash(page)}$`));
   await expect(page.getByTestId("route-summary")).toContainText(`${FROM} to`);
-  const table = page.getByRole("table", { name: /Spans on this route/ });
-  await expect(table.locator("thead th")).toHaveText(["#", "Span", "Type", "From → to", "km", "Est. loss (dB)", "Measured", "Free cores"]);
-  await expect(table.locator("tfoot")).toContainText(/Total, \d+ spans/);
+  const table = page.getByRole("table", { name: /Segments on this route/ });
+  await expect(table.locator("thead th")).toHaveText(["#", "Segment", "Type", "From → to", "km", "Est. loss (dB)", "Measured", "Free cores"]);
+  await expect(table.locator("tfoot")).toContainText(/Total, \d+ segments/);
   await expect(table.locator("tfoot")).toContainText(/\d+ of \d+ measured/);
   const section = page.getByTestId("route-section");
-  await expect(section.getByRole("heading", { level: 2 })).toHaveText([/^End-to-end span diagram/, "Spans on this path", "Reserve on this route"]);
-  // diagram: a node per site, a span group per span, End total
+  await expect(section.getByRole("heading", { level: 2 })).toHaveText([/^End-to-end segment diagram/, "Segments on this path", "Reserve on this route"]);
+  // diagram: a node per site, a segment group per segment, End total
   const rows = await table.locator("tbody tr").count();
   await expect(groups(page)).toHaveCount(rows);
   await expect(diagram(page).locator("g[aria-hidden=true]")).toHaveCount(rows + 1);
   await expect(diagram(page)).toContainText(/End · [\d.]+\+? km · ([\d.]+ dB total|No dB estimate)/);
-  await expect(groups(page).first()).toHaveAttribute("aria-label", /^Span DEV .+ - DEV .+, (Trunk|Metro|–), ([\d.]+ km|no distance), ([\d.]+ dB|no dB estimate), (\d+ free cores|not surveyed)$/);
+  await expect(groups(page).first()).toHaveAttribute("aria-label", /^Segment DEV .+ - DEV .+, (Trunk|Metro|–), ([\d.]+ km|no distance), ([\d.]+ dB|no dB estimate), (\d+ free cores|not surveyed)$/);
   await expect(page.getByRole("list", { name: "Route as text" })).toContainText(`Site ${FROM}`);
   await noOldWords(page);
-  // screenshot a 3-span option when the dev data has one
-  const three = (await options(page).allTextContents()).findIndex((t) => /\b3 spans/.test(t));
+  // screenshot a 3-segment option when the dev data has one
+  const three = (await options(page).allTextContents()).findIndex((t) => /\b3 segments/.test(t));
   // Dev seed: calculated loss is km x 0.3. Hold the new option's loss fetch: while it is in flight the previous option's
-  // rows must never show on this option's spans (they were once matched by position), only "–" or the span's own value.
+  // rows must never show on this option's segments (they were once matched by position), only "–" or the segment's own value.
   const rowsAll = table.locator("tbody tr");
   const calc = (kmText: string) => (Number(kmText) * 0.3).toFixed(2);
   if (three >= 0) {
@@ -85,7 +85,7 @@ test("route options: up to 3, a Best match, every field shown", async ({ page })
     await lossRes;
     await page.unroute("**/api/loss/route*");
   }
-  // Every span with a distance shows its calculated dB in the table and the diagram; Measured is a dB or "Not measured".
+  // Every segment with a distance shows its calculated dB in the table and the diagram; Measured is a dB or "Not measured".
   for (let i = 0; i < (await rowsAll.count()); i++) {
     const cells = rowsAll.nth(i).locator("td");
     const kmText = (await cells.nth(3).textContent())!;
@@ -102,7 +102,7 @@ test("route options: up to 3, a Best match, every field shown", async ({ page })
   for (const h of heights) expect(h).toBeLessThanOrEqual(44);
   const tbox = page.getByTestId("route-table-box");
   expect(await tbox.evaluate((el) => [getComputedStyle(el).overflowX, el.tabIndex])).toEqual(["auto", 0]);
-  await expect(tbox).toHaveAccessibleName("Spans on this path, scrolls sideways");
+  await expect(tbox).toHaveAccessibleName("Segments on this path, scrolls sideways");
   const card = (await page.locator("section", { has: table }).boundingBox())!;
   expect((await tbox.boundingBox())!.width).toBeGreaterThan(card.width - 48);
   await toSection(page);
@@ -128,14 +128,14 @@ test("Most free cores sends sort=free_cores and re-ranks", async ({ page }) => {
   for (let i = 1; i < fewest.length; i++) expect(fewest[i - 1]).toBeGreaterThanOrEqual(fewest[i]);
 });
 
-test("too many cores: options short, diagram span short, Reserve off naming the span", async ({ page }) => {
+test("too many cores: options short, diagram segment short, Reserve off naming the segment", async ({ page }) => {
   await signIn(page);
   await plan(page, "200");
   await expect(options(page).first().getByTestId("route-short")).toContainText(/Not enough free cores on DEV .+: \d+ free, 200 needed/);
   await expect(options(page).first()).not.toContainText("Best match");
   await options(page).first().click();
   const g = groups(page).first();
-  await expect(g).toHaveAttribute("aria-label", /^Span DEV .+ - DEV .+, .+, ([\d.]+ km|no distance), ([\d.]+ dB|no dB estimate), (\d+ free cores|not surveyed), short$/);
+  await expect(g).toHaveAttribute("aria-label", /^Segment DEV .+ - DEV .+, .+, ([\d.]+ km|no distance), ([\d.]+ dB|no dB estimate), (\d+ free cores|not surveyed), short$/);
   const shortText = g.getByTestId("route-diagram-short");
   await expect(shortText).toHaveText(/^✕ (\d+ free cores|not surveyed) · short$/);
   await expect(shortText.locator('[data-icon="fl"]')).toHaveCount(1);
@@ -166,7 +166,7 @@ test("from equal to to shows the inline error", async ({ page }) => {
   await expect(page.getByLabel("To", { exact: true })).toHaveAttribute("aria-invalid", "true");
 });
 
-test("#route= restores the selection; arrow keys move between diagram spans, Enter selects", async ({ page }) => {
+test("#route= restores the selection; arrow keys move between diagram segments, Enter selects", async ({ page }) => {
   await signIn(page);
   const h = await routeHash(page);
   await page.goto(`/${h}`);
@@ -175,7 +175,7 @@ test("#route= restores the selection; arrow keys move between diagram spans, Ent
   const links = groups(page);
   await expect(links.first()).toBeVisible();
   const n = await links.count();
-  const row = (i: number) => page.getByRole("table", { name: /Spans on this route/ }).locator("tbody tr").nth(i);
+  const row = (i: number) => page.getByRole("table", { name: /Segments on this route/ }).locator("tbody tr").nth(i);
   // one tab stop; Home/End jump, arrows move one at a time; moving does not select, Enter/Space does
   await expect(diagram(page).locator('g[tabindex="0"]')).toHaveCount(1);
   await diagram(page).locator('g[tabindex="0"]').focus();
@@ -197,20 +197,20 @@ test("#route= restores the selection; arrow keys move between diagram spans, Ent
   // click selects too
   await links.nth(1).click();
   await expect(row(1)).toHaveAttribute("aria-selected", "true");
-  // #span= still works and switches back to span mode
+  // #segment= still works and switches back to segment mode
   await page.goto("/");
   await tab(page, "Reserve");
-  await page.getByRole("list", { name: "Spans" }).getByRole("button").first().click();
-  await expect(page).toHaveURL(/#span=/);
+  await page.getByRole("list", { name: "Segments" }).getByRole("button").first().click();
+  await expect(page).toHaveURL(/#segment=/);
 });
 
 test("Reserve on a sufficient route sends one request (then withdrawn)", async ({ page }) => {
   await signIn(page);
-  // KL DC -> Ipoh -> Penang: spans no other spec books, so parallel workers do not race for the same first free core
+  // KL DC -> Ipoh -> Penang: segments no other spec books, so parallel workers do not race for the same first free core
   await plan(page, "1", "DEV Kuala Lumpur DC", "DEV Penang Tower");
   await options(page).first().click();
   const box = page.getByTestId("route-reserve");
-  await expect(box).toContainText(/1 core on each of \d+ spans, \d+ in total\. Cores are assigned from the first free cores on each span\./);
+  await expect(box).toContainText(/1 core on each of \d+ segments, \d+ in total\. Cores are assigned from the first free cores on each segment\./);
   await box.getByLabel("Search customers").fill("DEV Telco Alpha");
   await box.getByRole("button", { name: "DEV Telco Alpha", exact: true }).click();
   await box.getByLabel("SRF ID").fill("SRF-E2E");
@@ -228,11 +228,11 @@ test("Reserve on a sufficient route sends one request (then withdrawn)", async (
 // Plan a route from here was removed: the route search bar above the map replaces it.
 test.fixme("Plan a route from here prefills From with site A", async ({ page }) => {
   await signIn(page);
-  await page.getByRole("list", { name: "Spans" }).getByRole("button", { name: /^DEV Kuala Lumpur DC - DEV Cyberjaya DC/ }).click();
+  await page.getByRole("list", { name: "Segments" }).getByRole("button", { name: /^DEV Kuala Lumpur DC - DEV Cyberjaya DC/ }).click();
   await page.getByRole("button", { name: "Plan a route from here" }).click();
   await expect(page.getByRole("radio", { name: "Route A to B" })).toBeChecked();
   await expect(page.getByLabel("From", { exact: true })).toHaveValue("DEV Kuala Lumpur DC");
-  await expect(page).not.toHaveURL(/#span=/);
+  await expect(page).not.toHaveURL(/#segment=/);
 });
 
 test("route state has no horizontal scroll at 1200, 1280, 1440, 1920", async ({ page }) => {
@@ -251,10 +251,10 @@ test("route state has no horizontal scroll at 1200, 1280, 1440, 1920", async ({ 
       expect(tall, `option ${idx + 1}, width ${width}, rows single-line`).toBeLessThanOrEqual(44);
     }
   }
-  // A long route (3+ spans) at 1200: the diagram is at least v4's width and any overflow scrolls inside its own focusable box.
+  // A long route (3+ segments) at 1200: the diagram is at least v4's width and any overflow scrolls inside its own focusable box.
   const opts = await options(page).allTextContents();
-  const long = opts.findIndex((t) => /\b([3-9]|\d\d) spans/.test(t));
-  expect(long, "dev data has a 3+ span option").toBeGreaterThanOrEqual(0);
+  const long = opts.findIndex((t) => /\b([3-9]|\d\d) segments/.test(t));
+  expect(long, "dev data has a 3+ segment option").toBeGreaterThanOrEqual(0);
   await page.goto(`/${await routeHash(page, 2, "km", long)}`);
   await page.setViewportSize({ width: 1200, height: 900 });
   await expect(groups(page).nth(2)).toBeVisible();

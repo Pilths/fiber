@@ -5,12 +5,12 @@ import { signIn } from "./helpers";
 // dev data stays as seeded.
 test.use({ viewport: { width: 1440, height: 900 } });
 
-const SPAN = "DEV Bukit Jalil TOC - DEV Kuantan Hut";
+const SEGMENT = "DEV Bukit Jalil TOC - DEV Kuantan Hut";
 
 async function request(req: APIRequestContext) {
-  const spans = await (await req.get("/api/spans")).json() as { id: number; site_a: string; site_b: string }[];
-  const span = spans.find((s) => `${s.site_a} - ${s.site_b}` === SPAN)!;
-  const detail = await (await req.get(`/api/spans/${span.id}`)).json() as { cores: { id: number; status: string }[] };
+  const segments = await (await req.get("/api/segments")).json() as { id: number; site_a: string; site_b: string }[];
+  const segment = segments.find((s) => `${s.site_a} - ${s.site_b}` === SEGMENT)!;
+  const detail = await (await req.get(`/api/segments/${segment.id}`)).json() as { cores: { id: number; status: string }[] };
   const cores = detail.cores.filter((c) => c.status === "Available").slice(0, 2).map((c) => c.id);
   const customer = (await (await req.get("/api/customers?q=DEV Telco Alpha")).json() as { id: number }[])[0];
   const r = await req.post("/api/reservations", { data: { customer_id: customer.id, planned_date: "2026-12-01", cores } });
@@ -29,7 +29,7 @@ test("approvals: one table row per request, details open, reject asks for a reas
     const table = page.getByTestId("approvals-table");
     const row = table.getByTestId("approval").filter({ has: page.getByRole("button", { name: `Details of request #${rid}` }) });
     await expect(row.getByRole("row").first()).toContainText("DEV Telco Alpha");
-    await expect(row.getByRole("row").first()).toContainText(SPAN);
+    await expect(row.getByRole("row").first()).toContainText(SEGMENT);
     await expect(row.getByRole("row").first()).toContainText("2026-12-01");
     await expect(row.getByRole("button", { name: "Approve" })).toBeVisible();
     await page.screenshot({ path: "e2e/screenshots/approvals-clean.png", fullPage: true });
@@ -37,7 +37,7 @@ test("approvals: one table row per request, details open, reject asks for a reas
     const more = row.getByRole("button", { name: `Details of request #${rid}` });
     await more.click();
     await expect(more).toHaveAttribute("aria-expanded", "true");
-    await expect(row).toContainText(`${SPAN}: cores`);
+    await expect(row).toContainText(`${SEGMENT}: cores`);
     await row.getByRole("button", { name: "Reject" }).click();
     await expect(row.getByLabel("Reason (required)")).toBeFocused();
     await expect(row.getByRole("button", { name: "Confirm rejection" })).toBeDisabled();

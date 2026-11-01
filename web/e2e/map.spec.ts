@@ -1,12 +1,12 @@
 import { expect, test, type Page } from "@playwright/test";
 import { signIn, tab } from "./helpers";
 
-// Map card (TASK-054, TASK-055). Dev seed: 5 spans with coordinates (KL-CJ and CJ-BJ shaped), 2 not drawn (Kuantan Hut).
-const SPAN = "DEV Kuala Lumpur DC - DEV Cyberjaya DC"; // shaped, in the dense KL cluster
+// Map card (TASK-054, TASK-055). Dev seed: 5 segments with coordinates (KL-CJ and CJ-BJ shaped), 2 not drawn (Kuantan Hut).
+const SEGMENT = "DEV Kuala Lumpur DC - DEV Cyberjaya DC"; // shaped, in the dense KL cluster
 const FAR = "DEV Ipoh Exchange - DEV Penang Tower"; // alone in the north: its chip is never decluttered
 const map = (page: Page) => page.getByTestId("network-map");
 const chips = (page: Page) => map(page).getByTestId("map-chip");
-const chip = (page: Page, name: string) => map(page).getByRole("button", { name: new RegExp(`^Span ${name},`) });
+const chip = (page: Page, name: string) => map(page).getByRole("button", { name: new RegExp(`^Segment ${name},`) });
 
 // Blocks and records every request that leaves the app origin.
 async function offline(page: Page) {
@@ -40,11 +40,11 @@ test("map loads with no request leaving the app origin; chips, sites, layers and
   await expect(chips(page)).toHaveCount(5); // in the DOM; chips that would overlap are hidden until zoomed in
   await expect.poll(() => chips(page).filter({ visible: true }).count()).toBeGreaterThanOrEqual(2); // after the first fit eases in
   await expect(map(page).getByTestId("map-site")).toHaveCount(5);
-  await expect(map(page).getByRole("button", { name: /^Site DEV Kuala Lumpur DC, data centre, 3 spans$/ })).toBeVisible();
+  await expect(map(page).getByRole("button", { name: /^Site DEV Kuala Lumpur DC, data centre, 3 segments$/ })).toBeVisible();
   await expect(map(page).getByRole("button", { name: /^Site DEV Penang Tower, other site/ })).toBeVisible();
   await expect(chip(page, FAR)).toHaveText(/^(\d+|–)$/); // the free-core number only, no icon
   await expect(chips(page).locator("svg")).toHaveCount(0);
-  await expect(page.getByTestId("map-not-drawn")).toContainText("2 spans not on the map (no coordinates)");
+  await expect(page.getByTestId("map-not-drawn")).toContainText("2 segments not on the map (no coordinates)");
   await expect(map(page).getByRole("group", { name: "Map key" })).toContainText("Route type");
   if (m === "gl") {
     await expect(page.getByTestId("map-note")).toHaveCount(0);
@@ -72,73 +72,73 @@ test("map loads with no request leaving the app origin; chips, sites, layers and
   expect(outside).toEqual([]);
 });
 
-test("clicking a chip selects the span; Enter on a chip too; Esc clears", async ({ page }) => {
+test("clicking a chip selects the segment; Enter on a chip too; Esc clears", async ({ page }) => {
   await signIn(page);
   await chip(page, FAR).click();
-  await expect(page.locator("#span-h", { hasText: FAR })).toBeVisible();
-  await expect(page).toHaveURL(new RegExp(`#span=${encodeURIComponent(FAR)}$`));
+  await expect(page.locator("#segment-h", { hasText: FAR })).toBeVisible();
+  await expect(page).toHaveURL(new RegExp(`#segment=${encodeURIComponent(FAR)}$`));
   await expect(chip(page, FAR)).toHaveAttribute("aria-pressed", "true");
   await expect(map(page).locator('[data-testid=map-line][data-selected=true]')).toHaveCount(1);
   await expect(map(page).locator("[data-testid=map-site][data-end=true]")).toHaveCount(2);
   await page.evaluate(() => scrollTo(0, 0));
   await settle(page);
-  await page.screenshot({ path: "e2e/screenshots/map-span-selected.png" });
+  await page.screenshot({ path: "e2e/screenshots/map-segment-selected.png" });
 
   const other = "DEV Kuala Lumpur DC - DEV Ipoh Exchange";
   await chip(page, other).focus();
   await page.keyboard.press("Enter");
-  await expect(page.locator("#span-h", { hasText: other })).toBeVisible();
+  await expect(page.locator("#segment-h", { hasText: other })).toBeVisible();
   await chip(page, other).focus();
   await page.keyboard.press("Escape");
-  await expect(page.locator("#span-h")).toHaveCount(0);
+  await expect(page.locator("#segment-h")).toHaveCount(0);
   await expect(map(page).locator('[data-testid=map-line][data-selected=true]')).toHaveCount(0);
-  expect(page.url()).not.toContain("#span=");
+  expect(page.url()).not.toContain("#segment=");
 });
 
-test("Route filter on the Reserve tab lists the routes of the loaded spans (routes mocked)", async ({ page }) => {
-  // Dev spans have no route yet: give the two drawn Trunk spans route R1 in the list and in the span detail.
+test("Route filter on the Reserve tab lists the routes of the loaded segments (routes mocked)", async ({ page }) => {
+  // Dev segments have no route yet: give the two drawn Trunk segments route R1 in the list and in the segment detail.
   const withRoute = (s: { id: number }) => ({ ...s, route: [4, 5].includes(s.id) ? "R1" : null, section: s.id === 4 ? "N-C" : null });
-  await page.route("**/api/spans", async (r) => r.fulfill({ json: ((await (await r.fetch()).json()) as { id: number }[]).map(withRoute) }));
-  await page.route("**/api/spans/*", async (r) => r.fulfill({ json: withRoute(await (await r.fetch()).json()) }));
+  await page.route("**/api/segments", async (r) => r.fulfill({ json: ((await (await r.fetch()).json()) as { id: number }[]).map(withRoute) }));
+  await page.route("**/api/segments/*", async (r) => r.fulfill({ json: withRoute(await (await r.fetch()).json()) }));
   await signIn(page);
   await tab(page, "Reserve");
   const route = page.getByRole("combobox", { name: "Route", exact: true });
   await expect(route.getByRole("option")).toHaveText(["All routes", "R1"]);
   await route.selectOption("R1");
-  await expect(page.getByRole("list", { name: "Spans" }).getByRole("button")).toHaveCount(2);
-  await page.getByRole("list", { name: "Spans" }).getByRole("button", { name: /DEV Kuala Lumpur DC - DEV Ipoh Exchange/ }).click();
+  await expect(page.getByRole("list", { name: "Segments" }).getByRole("button")).toHaveCount(2);
+  await page.getByRole("list", { name: "Segments" }).getByRole("button", { name: /DEV Kuala Lumpur DC - DEV Ipoh Exchange/ }).click();
   await tab(page, "Map");
   await expect(page.getByRole("region", { name: "Inspector" })).toContainText("Route R1");
   await expect(page.getByRole("region", { name: "Inspector" })).toContainText("Section N-C");
-  await page.unrouteAll({ behavior: "ignoreErrors" }); // the tab change refetches the span list
+  await page.unrouteAll({ behavior: "ignoreErrors" }); // the tab change refetches the segment list
 });
 
-// Route search shows the best option; the mock puts the 2-span KL-CJ-BJ option first.
+// Route search shows the best option; the mock puts the 2-segment KL-CJ-BJ option first.
 async function searchKlBj(page: Page) {
   await page.route("**/api/routes?*", async (r) => {
-    const j = (await (await r.fetch()).json()) as { options: { spans: unknown[] }[] };
-    r.fulfill({ json: { ...j, options: j.options.filter((o) => o.spans.length === 2) } });
+    const j = (await (await r.fetch()).json()) as { options: { segments: unknown[] }[] };
+    r.fulfill({ json: { ...j, options: j.options.filter((o) => o.segments.length === 2) } });
   });
   const search = page.getByRole("region", { name: "Route search" });
   await search.getByLabel("Route A").fill("DEV Kuala Lumpur DC");
   await search.getByLabel("Route B").fill("DEV Bukit Jalil TOC");
   await search.getByRole("button", { name: "Search" }).click();
-  await expect(page.getByTestId("route-found")).toHaveText(/^2 spans/);
+  await expect(page.getByTestId("route-found")).toHaveText(/^2 segments/);
 }
 
-test("a route highlights its spans in blue, the shaped KL-CJ-BJ curve included", async ({ page }) => {
+test("a route highlights its segments in blue, the shaped KL-CJ-BJ curve included", async ({ page }) => {
   await signIn(page);
   await searchKlBj(page);
   await expect(map(page).locator("[data-testid=map-line][data-selected=true]")).toHaveCount(2);
   await expect(map(page).locator("[data-testid=map-chip][data-selected=true]")).toHaveCount(2);
-  await expect(chip(page, SPAN)).toHaveAttribute("aria-pressed", "true");
+  await expect(chip(page, SEGMENT)).toHaveAttribute("aria-pressed", "true");
   await expect(chip(page, "DEV Cyberjaya DC - DEV Bukit Jalil TOC")).toHaveAttribute("aria-pressed", "true");
   await page.evaluate(() => scrollTo(0, 0));
   await settle(page);
   await page.screenshot({ path: "e2e/screenshots/map-route.png" });
 });
 
-test("missing basemap file: note shown, spans still drawn, search still works", async ({ page }) => {
+test("missing basemap file: note shown, segments still drawn, search still works", async ({ page }) => {
   await page.route("**/map/malaysia.pmtiles", (r) => r.fulfill({ status: 404, body: "" }));
   await signIn(page);
   await expect(map(page)).toHaveAttribute("data-mode", "svg");
@@ -149,10 +149,10 @@ test("missing basemap file: note shown, spans still drawn, search still works", 
   await search.getByLabel("Route A").fill("DEV Ipoh Exchange");
   await search.getByLabel("Route B").fill("DEV Penang Tower");
   await search.getByRole("button", { name: "Search" }).click();
-  await expect(page.getByTestId("route-found")).toHaveText(/^1 span,/);
+  await expect(page.getByTestId("route-found")).toHaveText(/^1 segment,/);
 });
 
-test("no WebGL: the SVG fallback draws spans and selects by click", async ({ page }) => {
+test("no WebGL: the SVG fallback draws segments and selects by click", async ({ page }) => {
   await noWebGL(page);
   const outside = await offline(page);
   await signIn(page);
@@ -160,7 +160,7 @@ test("no WebGL: the SVG fallback draws spans and selects by click", async ({ pag
   await expect(page.getByTestId("map-note")).toContainText("no WebGL");
   await expect(chips(page)).toHaveCount(5);
   await chip(page, FAR).click();
-  await expect(page.locator("#span-h", { hasText: FAR })).toBeVisible();
+  await expect(page.locator("#segment-h", { hasText: FAR })).toBeVisible();
   await page.getByRole("button", { name: "Zoom in" }).click();
   await page.getByRole("button", { name: "Fit selection" }).click();
   await expect(chip(page, FAR)).toBeInViewport();
@@ -178,7 +178,7 @@ test("map page has no horizontal scroll at 1200, 1280, 1440 and 1920", async ({ 
 
 // The map stage is the growing child of its card: no blank band under the map, in each state (TASK-054 follow-up).
 // The Inspector (420px) is shorter than the map now that Find has left the Map page, so only the stage is checked.
-test("the stage fills the map card: nothing, span and route selected", async ({ page }) => {
+test("the stage fills the map card: nothing, segment and route selected", async ({ page }) => {
   await signIn(page);
   await expect(chips(page)).toHaveCount(5);
   const gaps = () => page.evaluate(() => {
@@ -191,7 +191,7 @@ test("the stage fills the map card: nothing, span and route selected", async ({ 
   const check = async () => expect.poll(async () => { const g = await gaps(); return Math.abs(g.inCard) <= 3; }).toBe(true);
   await check();
   await chip(page, FAR).click();
-  await expect(page.locator("#span-h", { hasText: FAR })).toBeVisible();
+  await expect(page.locator("#segment-h", { hasText: FAR })).toBeVisible();
   await check();
   await page.evaluate(() => scrollTo(0, 0));
   await settle(page);
@@ -201,8 +201,8 @@ test("the stage fills the map card: nothing, span and route selected", async ({ 
   await check();
 });
 
-// A span picked outside the map (top bar search) is followed by the camera; a span clicked on the map is already in view and stays put.
-test("picking a span in the top bar search moves the camera; clicking it on the map does not", async ({ page }) => {
+// A segment picked outside the map (top bar search) is followed by the camera; a segment clicked on the map is already in view and stays put.
+test("picking a segment in the top bar search moves the camera; clicking it on the map does not", async ({ page }) => {
   await signIn(page);
   test.skip((await mode(page)) !== "gl", "camera checks need MapLibre (basemap installed and WebGL)");
   await page.waitForFunction(() => (window as { fiberMap?: { loaded(): boolean } }).fiberMap?.loaded());
@@ -211,11 +211,11 @@ test("picking a span in the top bar search moves the camera; clicking it on the 
     return { zoom: m.getZoom(), lng: c.lng, lat: c.lat, moving: m.isMoving() };
   });
   const still = async () => { await expect.poll(async () => (await cam()).moving).toBe(false); await page.waitForTimeout(400); return cam(); };
-  const start = await still(); // the first fit to all spans
+  const start = await still(); // the first fit to all segments
 
-  await page.getByRole("combobox", { name: /^Find a span/ }).fill("Cyberjaya");
-  await page.getByRole("option", { name: SPAN }).first().click();
-  await expect(page.locator("#span-h", { hasText: SPAN })).toBeVisible();
+  await page.getByRole("combobox", { name: /^Find a segment/ }).fill("Cyberjaya");
+  await page.getByRole("option", { name: SEGMENT }).first().click();
+  await expect(page.locator("#segment-h", { hasText: SEGMENT })).toBeVisible();
   await expect.poll(async () => (await cam()).zoom).toBeGreaterThan(start.zoom + 0.5);
   const followed = await still();
   expect(followed.zoom).toBeGreaterThan(start.zoom);
@@ -223,8 +223,8 @@ test("picking a span in the top bar search moves the camera; clicking it on the 
 
   await page.evaluate(() => scrollTo(0, 0));
   const other = "DEV Cyberjaya DC - DEV Bukit Jalil TOC";
-  await chip(page, other).click(); // a different span, clicked on the map
-  await expect(page.locator("#span-h", { hasText: other })).toBeVisible();
+  await chip(page, other).click(); // a different segment, clicked on the map
+  await expect(page.locator("#segment-h", { hasText: other })).toBeVisible();
   const after = await still();
   expect(after.zoom).toBeCloseTo(followed.zoom, 5);
   expect(after.lng).toBeCloseTo(followed.lng, 6);

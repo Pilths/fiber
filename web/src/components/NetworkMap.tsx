@@ -2,21 +2,21 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type Pointer
 import { api } from "@/api/client";
 import { health } from "@/lib/status";
 
-// Network map card body (TASK-054, TASK-055). One overlay draws spans (SVG lines), free-cores chips and site markers
+// Network map card body (TASK-054, TASK-055). One overlay draws segments (SVG lines), free-cores chips and site markers
 // (DOM buttons, app font, Tab reachable) in both modes:
 //   "gl":  MapLibre renders the self-hosted PMTiles basemap underneath and owns the camera.
 //   "svg": no basemap (WebGL unavailable, or tiles not installed): plain background, own camera, drag to pan.
 // The overlay projects with Web Mercator at 512 px tiles, the same as MapLibre, so it lines up with the basemap.
-// ponytail: the overlay re-renders on every camera move; fine for a few hundred spans, move lines into a MapLibre
+// ponytail: the overlay re-renders on every camera move; fine for a few hundred segments, move lines into a MapLibre
 // GeoJSON layer if real data makes panning sluggish.
 
-export type SpanProps = {
-  span_id: number; name: string; site_a_id: number; site_b_id: number; route_type: string | null; region: string | null;
+export type SegmentProps = {
+  segment_id: number; name: string; site_a_id: number; site_b_id: number; route_type: string | null; region: string | null;
   distance_km: string | null; free_to_reserve: number; surveyed: boolean; chip: "ok" | "low" | "full" | "not_surveyed"; fiber_cut?: boolean;
-  segment_id: number | null; shaped?: boolean;
+  route_id: number | null; shaped?: boolean;
 };
 type SiteProps = { site_id: number; name: string; kind: string; lrd_site_id: number | null; region: string | null; location_from_site?: string };
-type Geo<P> = { features: { properties: P; geometry: { coordinates: P extends SpanProps ? [number, number][] : [number, number] } }[]; not_drawn: { name: string; reason: string }[] };
+type Geo<P> = { features: { properties: P; geometry: { coordinates: P extends SegmentProps ? [number, number][] : [number, number] } }[]; not_drawn: { name: string; reason: string }[] };
 type View = { lng: number; lat: number; zoom: number };
 type Bounds = [number, number, number, number]; // west, south, east, north
 
@@ -51,8 +51,8 @@ function midpoint(p: [number, number][]): [number, number] {
 
 const COLOR = { ok: "var(--green)", low: "var(--amber)", full: "var(--red)", not_surveyed: "var(--ns)" } as const;
 const kindOf = (t: string | null) => (t ?? "").toLowerCase();
-// Chip text: the free-core number only; a cut span reads 0, not surveyed a dash.
-const chipText = (p: SpanProps) => (p.fiber_cut ? "0" : p.surveyed ? String(p.free_to_reserve) : "–");
+// Chip text: the free-core number only; a cut segment reads 0, not surveyed a dash.
+const chipText = (p: SegmentProps) => (p.fiber_cut ? "0" : p.surveyed ? String(p.free_to_reserve) : "–");
 
 type Basemap = "loading" | "gl" | "missing" | "nogl" | "failed";
 const NOTE: Partial<Record<Basemap, string>> = {
@@ -62,9 +62,9 @@ const NOTE: Partial<Record<Basemap, string>> = {
 };
 const webgl = () => { try { return !!document.createElement("canvas").getContext("webgl2"); } catch { return false; } };
 
-export function NetworkMap({ selectedIds, routeKey, visible, onSelectSpan: selectSpan, onSite, onClear, version }: {
-  selectedIds: number[]; routeKey: string | null; visible: (p: SpanProps) => boolean;
-  onSelectSpan: (id: number) => void; onSite: (name: string) => void; onClear: () => void; version: number;
+export function NetworkMap({ selectedIds, routeKey, visible, onSelectSegment: selectSegment, onSite, onClear, version }: {
+  selectedIds: number[]; routeKey: string | null; visible: (p: SegmentProps) => boolean;
+  onSelectSegment: (id: number) => void; onSite: (name: string) => void; onClear: () => void; version: number;
 }) {
   const box = useRef<HTMLDivElement>(null);
   const glBox = useRef<HTMLDivElement>(null);
@@ -73,7 +73,7 @@ export function NetworkMap({ selectedIds, routeKey, visible, onSelectSpan: selec
   const [view, setView] = useState<View | null>(null);
   const [gl] = useState(webgl);
   const [base, setBase] = useState<Basemap>(gl ? "loading" : "nogl");
-  const [spans, setSpans] = useState<Geo<SpanProps> | null>(null);
+  const [segments, setSegments] = useState<Geo<SegmentProps> | null>(null);
   const [sites, setSites] = useState<Geo<SiteProps> | null>(null);
   const [err, setErr] = useState(false);
   const [layerOn, setLayerOn] = useState(true);
@@ -88,15 +88,15 @@ export function NetworkMap({ selectedIds, routeKey, visible, onSelectSpan: selec
 
   useEffect(() => {
     let live = true;
-    Promise.all([api.get("/api/map/spans"), api.get("/api/map/sites")])
-      .then(([a, b]) => { if (live) { setSpans(a as unknown as Geo<SpanProps>); setSites(b as unknown as Geo<SiteProps>); } })
+    Promise.all([api.get("/api/map/segments"), api.get("/api/map/sites")])
+      .then(([a, b]) => { if (live) { setSegments(a as unknown as Geo<SegmentProps>); setSites(b as unknown as Geo<SiteProps>); } })
       .catch(() => live && setErr(true));
     return () => { live = false; };
   }, [version]);
 
   useLayoutEffect(() => {
     const el = box.current!;
-    // Start on Malaysia; the data fit follows once spans arrive.
+    // Start on Malaysia; the data fit follows once segments arrive.
     const ro = new ResizeObserver(() => {
       setSize({ w: el.clientWidth, h: el.clientHeight });
       setView((v) => v ?? (el.clientWidth ? fitView(MALAYSIA, el.clientWidth, el.clientHeight, 8) : null));
@@ -130,26 +130,26 @@ export function NetworkMap({ selectedIds, routeKey, visible, onSelectSpan: selec
     if (map.current) map.current.easeTo({ center: [v.lng, v.lat], zoom: v.zoom, duration: 250 });
     else setView(v);
   }, []);
-  // A span picked on the map is already in view and stays put; a span picked anywhere else (the Find list, search) is followed.
+  // A segment picked on the map is already in view and stays put; a segment picked anywhere else (the Find list, search) is followed.
   const clicked = useRef<number | null>(null);
-  const onSelectSpan = (id: number) => { clicked.current = id; selectSpan(id); };
+  const onSelectSegment = (id: number) => { clicked.current = id; selectSegment(id); };
   const sel = new Set(selectedIds);
-  const feats = spans?.features ?? [];
+  const feats = segments?.features ?? [];
   const fitTo = (ids: number[] | null) => {
     if (!size.w) return;
-    const pts = feats.filter((f) => !ids || ids.includes(f.properties.span_id)).flatMap((f) => f.geometry.coordinates);
+    const pts = feats.filter((f) => !ids || ids.includes(f.properties.segment_id)).flatMap((f) => f.geometry.coordinates);
     const b = boundsOf(pts);
     if (b) go(fitView(b, size.w, size.h, ids ? 100 : 70));
   };
 
-  // First data: fit to the selection if there is one, else to all spans. A new route: fit to its spans.
+  // First data: fit to the selection if there is one, else to all segments. A new route: fit to its segments.
   const fitted = useRef(false);
   const selKey = selectedIds.join(",");
   useEffect(() => {
-    if (fitted.current || !spans || !size.w || base === "loading") return;
+    if (fitted.current || !segments || !size.w || base === "loading") return;
     fitted.current = true;
     fitTo(selectedIds.length ? selectedIds : null);
-  }, [spans, size, base]); // eslint-disable-line react-hooks/exhaustive-deps -- once, when everything is in
+  }, [segments, size, base]); // eslint-disable-line react-hooks/exhaustive-deps -- once, when everything is in
   useEffect(() => {
     if (fitted.current && routeKey && selectedIds.length) fitTo(selectedIds);
   }, [routeKey, selKey]); // eslint-disable-line react-hooks/exhaustive-deps -- refit only when the route changes
@@ -157,7 +157,7 @@ export function NetworkMap({ selectedIds, routeKey, visible, onSelectSpan: selec
     if (!fitted.current || routeKey || selectedIds.length !== 1) return;
     if (clicked.current === selectedIds[0]) { clicked.current = null; return; }
     fitTo(selectedIds);
-  }, [selKey]); // eslint-disable-line react-hooks/exhaustive-deps -- follow a span selected outside the map
+  }, [selKey]); // eslint-disable-line react-hooks/exhaustive-deps -- follow a segment selected outside the map
 
   // SVG mode camera: drag to pan.
   const drag = useRef<{ x: number; y: number; v: View } | null>(null);
@@ -177,11 +177,11 @@ export function NetworkMap({ selectedIds, routeKey, visible, onSelectSpan: selec
     const v = view!, k = TILE * 2 ** v.zoom;
     return [(mx(c[0]) - mx(v.lng)) * k + size.w / 2, (my(c[1]) - my(v.lat)) * k + size.h / 2];
   };
-  const ends = new Set(feats.filter((f) => sel.has(f.properties.span_id)).flatMap((f) => [f.properties.site_a_id, f.properties.site_b_id]));
-  const spanCount = (id: number) => feats.filter((f) => f.properties.site_a_id === id || f.properties.site_b_id === id).length;
+  const ends = new Set(feats.filter((f) => sel.has(f.properties.segment_id)).flatMap((f) => [f.properties.site_a_id, f.properties.site_b_id]));
+  const segmentCount = (id: number) => feats.filter((f) => f.properties.site_a_id === id || f.properties.site_b_id === id).length;
   const drawn = view && size.w ? feats.map((f) => {
     const p = f.properties, pts = f.geometry.coordinates.map(P);
-    const on = sel.has(p.span_id), show = layerOn && (on || visible(p));
+    const on = sel.has(p.segment_id), show = layerOn && (on || visible(p));
     return { p, pts, on, show, dim: show && !on && sel.size > 0, mid: midpoint(pts) };
   }) : [];
   const order = [...drawn].sort((a, b) => Number(a.on) - Number(b.on)); // selected on top
@@ -200,7 +200,7 @@ export function NetworkMap({ selectedIds, routeKey, visible, onSelectSpan: selec
   const chipShown = new Set([...drawn].filter((d) => d.show).sort((a, b) => Number(b.on) - Number(a.on)).filter(({ p, on, mid }) => {
     const w = 20 + 7.5 * chipText(p).length;
     return on ? fits(mid[0], mid[1] - 11, Math.max(w, 7.5 * p.name.length + 16), 46) : fits(mid[0], mid[1], w + 4, 24);
-  }).map((d) => d.p.span_id));
+  }).map((d) => d.p.segment_id));
   const nameShown = siteXY.map(([x, y], i) => fits(x, y + 33, 7.2 * sites!.features[i].properties.name.length + 12, 18));
 
   // The stage is the growing child: it fills the card when the right column makes the row taller (no blank band
@@ -220,21 +220,21 @@ export function NetworkMap({ selectedIds, routeKey, visible, onSelectSpan: selec
                 const d = "M" + pts.map((q) => `${q[0].toFixed(1)} ${q[1].toFixed(1)}`).join("L");
                 const t = kindOf(p.route_type), w = (t === "trunk" ? 6 : 3) + (on ? 3 : 0);
                 return (
-                  <g key={p.span_id} data-testid="map-line" data-span-id={p.span_id} data-selected={on} data-state={!show ? "hidden" : dim ? "dim" : ""} opacity={!show ? 0.12 : dim ? 0.35 : 1}>
+                  <g key={p.segment_id} data-testid="map-line" data-segment-id={p.segment_id} data-selected={on} data-state={!show ? "hidden" : dim ? "dim" : ""} opacity={!show ? 0.12 : dim ? 0.35 : 1}>
                     {on && <path d={d} fill="none" stroke="#fff" strokeWidth={w + 4} strokeLinecap="round" strokeLinejoin="round" />}
                     <path d={d} fill="none" stroke={on ? "var(--blue)" : COLOR[p.chip]} strokeWidth={p.chip === "not_surveyed" && !on ? 4 : w}
                       strokeLinecap="round" strokeLinejoin="round"
                       strokeDasharray={p.chip === "not_surveyed" && !on ? "1 7" : undefined} />
-                    {show && <path d={d} data-hit fill="none" stroke="transparent" strokeWidth={18} className="cursor-pointer" style={{ pointerEvents: "stroke" }} onClick={() => onSelectSpan(p.span_id)} />}
+                    {show && <path d={d} data-hit fill="none" stroke="transparent" strokeWidth={18} className="cursor-pointer" style={{ pointerEvents: "stroke" }} onClick={() => onSelectSegment(p.segment_id)} />}
                   </g>
                 );
               })}
             </svg>
             {(sites?.features ?? []).map((f, i) => {
-              const s = f.properties, [x, y] = siteXY[i], dc = s.kind === "data_center", end = ends.has(s.site_id), n = spanCount(s.site_id);
+              const s = f.properties, [x, y] = siteXY[i], dc = s.kind === "data_center", end = ends.has(s.site_id), n = segmentCount(s.site_id);
               return (
                 <button key={s.site_id} type="button" data-testid="map-site" data-site-id={s.site_id} data-end={end}
-                  aria-label={`Site ${s.name}, ${dc ? "data centre" : "other site"}, ${n} span${n === 1 ? "" : "s"}${end ? ", end of the selection" : ""}`}
+                  aria-label={`Site ${s.name}, ${dc ? "data centre" : "other site"}, ${n} segment${n === 1 ? "" : "s"}${end ? ", end of the selection" : ""}`}
                   className={`msite ${end ? "end" : ""}`} style={{ left: x, top: y }} onClick={() => onSite(s.name)}>
                   <span className={`shape ${dc ? "dc" : "st"}`} />
                   {(nameShown[i] || end) && <span className="code" aria-hidden="true">{s.name}</span>}
@@ -244,9 +244,9 @@ export function NetworkMap({ selectedIds, routeKey, visible, onSelectSpan: selec
             {drawn.filter((d) => d.show).map(({ p, on, mid, dim }) => {
               const h = health({ survey_cores: p.surveyed ? 1 : null, free_to_reserve: p.free_to_reserve, fiber_cut: p.fiber_cut });
               return (
-                <button key={p.span_id} type="button" data-testid="map-chip" data-span-id={p.span_id} data-selected={on} aria-pressed={on}
-                  aria-label={`Span ${p.name}, ${p.route_type ?? "no route type"}, ${p.surveyed ? `${p.free_to_reserve} free to reserve, ${h.word}` : "not surveyed"}`}
-                  className={`mchip ${h.cls} ${on ? "on" : ""}`} style={{ left: mid[0], top: mid[1], visibility: chipShown.has(p.span_id) ? undefined : "hidden", opacity: dim ? 0.6 : undefined }} onClick={() => onSelectSpan(p.span_id)}>
+                <button key={p.segment_id} type="button" data-testid="map-chip" data-segment-id={p.segment_id} data-selected={on} aria-pressed={on}
+                  aria-label={`Segment ${p.name}, ${p.route_type ?? "no route type"}, ${p.surveyed ? `${p.free_to_reserve} free to reserve, ${h.word}` : "not surveyed"}`}
+                  className={`mchip ${h.cls} ${on ? "on" : ""}`} style={{ left: mid[0], top: mid[1], visibility: chipShown.has(p.segment_id) ? undefined : "hidden", opacity: dim ? 0.6 : undefined }} onClick={() => onSelectSegment(p.segment_id)}>
                   {chipText(p)}
                   {on && <span className="mname" aria-hidden="true">{p.name}</span>}
                 </button>
@@ -305,11 +305,11 @@ export function NetworkMap({ selectedIds, routeKey, visible, onSelectSpan: selec
           </p>
         )}
       </div>
-      {spans && spans.not_drawn.length > 0 && (
+      {segments && segments.not_drawn.length > 0 && (
         <details className="mt-2 text-xs text-muted-foreground" data-testid="map-not-drawn">
-          <summary className="cursor-pointer">{spans.not_drawn.length} span{spans.not_drawn.length === 1 ? "" : "s"} not on the map (no coordinates)</summary>
+          <summary className="cursor-pointer">{segments.not_drawn.length} segment{segments.not_drawn.length === 1 ? "" : "s"} not on the map (no coordinates)</summary>
           <ul className="mt-1 list-disc pl-5">
-            {spans.not_drawn.map((s) => <li key={s.name}><b className="font-semibold text-foreground">{s.name}</b>: {s.reason}</li>)}
+            {segments.not_drawn.map((s) => <li key={s.name}><b className="font-semibold text-foreground">{s.name}</b>: {s.reason}</li>)}
           </ul>
         </details>
       )}

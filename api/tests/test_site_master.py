@@ -3,12 +3,10 @@ import io
 
 import openpyxl
 import pytest
-from conftest import alembic_cfg
 from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
 from test_auth import PW, login, mkuser
 
-from alembic import command
 from app.ingest import site_master as sm
 
 SITE_HEAD = ["SITE_NAME", "LATITUDE_IN_DECIMAL", "LONGITUDE_IN_DECIMAL", "REGION", "SITE_TYPE"]
@@ -362,19 +360,6 @@ def test_planner_gets_403_and_bad_files_are_refused(client, db, admin):
     login(client, "boss", PW)
     assert post(client, b"not a workbook", "x.xlsx").status_code == 422
     assert post(client, workbook([site("AAAA")]), "x.csv").status_code == 422
-
-
-def test_migration_0006_roundtrip(engine, db):
-    cfg = alembic_cfg()
-    command.downgrade(cfg, "0005")
-    command.upgrade(cfg, "head")
-    u = db.execute(text("INSERT INTO users (username, display_name, role) VALUES ('u','U','admin') RETURNING id")).scalar_one()
-    assert db.execute(text("INSERT INTO sites (name, kind) VALUES ('A','site') RETURNING active")).scalar_one() is True
-    db.execute(text("INSERT INTO uploads (user_id, filename, kind) VALUES (:u, 'f.xlsx', 'site_master')"), {"u": u})
-    c = db.execute(text("INSERT INTO customers (name) VALUES ('X') RETURNING id")).scalar_one()
-    db.execute(text("INSERT INTO reservations (customer_id, planner_id) VALUES (:c, :u)"), {"c": c, "u": u})
-    with pytest.raises(DBAPIError, match="append-only"):
-        db.execute(text("UPDATE reservations SET created_at = now()"))
 
 
 def test_timing_36k_sites(client, admin, db):
