@@ -5,7 +5,7 @@ database (switch, held cores, existing reservations), so a stale preview cannot 
 Reservations are insert-only: nothing here updates or deletes one.
 
 Not built (parked or not in this workbook): reservation clash labels (New/Same/Differs/Clash), the "modify" proposal,
-chained segments with more than one path (this workbook carries no segments), span route type (no column in it).
+chained routes with more than one path (this workbook carries no routes), segment route type (no column in it).
 """
 import json
 from dataclasses import dataclass, field
@@ -20,21 +20,21 @@ from app.ingest.excel import RowResult
 from app.ingest.reservation_import import (
     Skip,
     add_cores,
-    ensure_span,
-    find_span,
+    ensure_segment,
+    find_segment,
     place_reservation,
 )
 from app.inventory import service as inventory
 from app.routing.graph import invalidate as invalidate_routes
 
 REASON = "reservation upload"
-SPAN_FIELDS = ("region", "distance_km", "survey_cores")
+SEGMENT_FIELDS = ("region", "distance_km", "survey_cores")
 GROUPS = ("new", "changed", "unchanged", "missing", "reservations", "conflicts", "already_imported", "ignored",
           "needs_review", "rejected")
 ROW_GROUP = {"new": "new", "changed": "changed", "missing": "missing", "unchanged": "unchanged", "reservations": "new",
              "conflicts": "conflict", "already_imported": "unchanged", "ignored": "unchanged",
              "needs_review": "needs_review", "rejected": "rejected"}
-SPAN_GROUPS = ("new", "changed", "unchanged", "missing")
+SEGMENT_GROUPS = ("new", "changed", "unchanged", "missing")
 
 
 class ApplyError(Exception):
@@ -83,13 +83,13 @@ class Row:
 
 
 @dataclass
-class SpanItem:
+class SegmentItem:
     key: str
     a: str
     b: str
     rows: list[int]
     vals: dict[str, Any]
-    span_id: int | None = None
+    segment_id: int | None = None
     group: str = "unchanged"
     changes: list[dict[str, Any]] = field(default_factory=list)
     measurements: list[dict[str, Any]] = field(default_factory=list)
@@ -103,7 +103,7 @@ class SpanItem:
 @dataclass
 class Eval:
     rows: list[Row]
-    spans: dict[str, SpanItem]
+    segments: dict[str, SegmentItem]
     missing: list[dict[str, Any]]
     warnings: list[dict[str, Any]]
     closed: bool
@@ -112,7 +112,7 @@ class Eval:
         c = dict.fromkeys(GROUPS, 0)
         for r in self.rows:
             c[r.group] += 1
-        for s in self.spans.values():
+        for s in self.segments.values():
             c[s.group] += 1
         c["missing"] = len(self.missing)
         return c
@@ -123,7 +123,7 @@ def from_results(results: list[RowResult]) -> list[Row]:
 
 
 def _protected(db: Session) -> set[tuple[int, str]]:
-    return {(i, f) for i, f in db.execute(text("SELECT entity_id, field FROM data_edits WHERE entity = 'span' AND reason NOT LIKE :r"),
+    return {(i, f) for i, f in db.execute(text("SELECT entity_id, field FROM data_edits WHERE entity = 'segment' AND reason NOT LIKE :r"),
                                           {"r": REASON + "%"})}
 
 
@@ -132,16 +132,16 @@ def _num_same(a: Any, b: Any) -> bool:
         or (a is not None and b is not None and str(a) == str(b))
 
 
-def _span_items(db: Session, rows: list[Row], sites: dict[str, int], wins: set[tuple[str, str]]) -> dict[str, SpanItem]:
-    spans: dict[str, SpanItem] = {}
+def _segment_items(db: Session, rows: list[Row], sites: dict[str, int], wins: set[tuple[str, str]]) -> dict[str, SegmentItem]:
+    segments: dict[str, SegmentItem] = {}
     for r in rows:
         if r.group:
             continue
         key = "-".join(sorted((r.p["site_a"], r.p["site_b"])))
-        sp = spans.setdefault(key, SpanItem(key, r.p["site_a"], r.p["site_b"], [], {}))
+        sp = segments.setdefault(key, SegmentItem(key, r.p["site_a"], r.p["site_b"], [], {}))
         sp.rows.append(r.n)
-        r.extra["span_key"] = key
-        for f in SPAN_FIELDS:
+        r.extra["segment_key"] = key
+        for f in SEGMENT_FIELDS:
             v = r.p.get(f)
             if v is None:
                 continue
@@ -154,17 +154,17 @@ def _span_items(db: Session, rows: list[Row], sites: dict[str, int], wins: set[t
             if not any(_num_same(x["loss_db"], m["loss_db"]) and x["tested_on"] == m["tested_on"] for x in sp.measurements):
                 sp.measurements.append(m)
     protected = _protected(db)
-    for sp in spans.values():
-        sid = find_span(db, sites[sp.a], sites[sp.b])
-        sp.span_id = sid[0] if sid else None
+    for sp in segments.values():
+        sid = find_segment(db, sites[sp.a], sites[sp.b])
+        sp.segment_id = sid[0] if sid else None
         if sid is None:
             sp.group, sp.survey = "new", sp.vals.get("survey_cores")
             continue
-        old = db.execute(text("SELECT region, distance_km, survey_cores, (SELECT count(*) FROM cores c WHERE c.span_id = :i AND (spans.survey_cores IS NULL OR c.number <= spans.survey_cores)) AS n_cores "
-                              "FROM spans WHERE id = :i"), {"i": sid[0]}).mappings().one()
+        old = db.execute(text("SELECT region, distance_km, survey_cores, (SELECT count(*) FROM cores c WHERE c.segment_id = :i AND (segments.survey_cores IS NULL OR c.number <= segments.survey_cores)) AS n_cores "
+                              "FROM segments WHERE id = :i"), {"i": sid[0]}).mappings().one()
         sp.db_survey = sp.survey = old["survey_cores"]
-        sp.db_free = inventory.list_spans(db, None, None, None, sid[0])[0]["free_to_reserve"]
-        for f in SPAN_FIELDS:
+        sp.db_free = inventory.list_segments(db, None, None, None, sid[0])[0]["free_to_reserve"]
+        for f in SEGMENT_FIELDS:
             new = sp.vals.get(f)
             if new is None or _num_same(old[f], new):
                 continue
@@ -180,13 +180,13 @@ def _span_items(db: Session, rows: list[Row], sites: dict[str, int], wins: set[t
                 sp.survey = new
             sp.changes.append(c)
         for m in list(sp.measurements):
-            if db.execute(text("SELECT 1 FROM measurements WHERE span_id = :s AND loss_db = :l AND tested_on IS NOT DISTINCT FROM "
+            if db.execute(text("SELECT 1 FROM measurements WHERE segment_id = :s AND loss_db = :l AND tested_on IS NOT DISTINCT FROM "
                                "CAST(:t AS date)"), {"s": sid[0], "l": m["loss_db"], "t": m["tested_on"]}).first():
                 sp.measurements.remove(m)
-    for sp in spans.values():
-        if sp.span_id and (sp.changes or sp.measurements):
+    for sp in segments.values():
+        if sp.segment_id and (sp.changes or sp.measurements):
             sp.group = "changed"
-    return spans
+    return segments
 
 
 def _flags(p: dict[str, Any]) -> dict[str, Any]:
@@ -209,7 +209,7 @@ def _set(r: Row, group: str, reason: str | None = None) -> None:
     r.status = {"needs_review": "needs_review", "rejected": "rejected"}.get(group, "ready")
 
 
-def _reservation_row(db: Session, r: Row, sp: SpanItem, sites: dict[str, int], closed: bool, claims: dict[tuple, int],
+def _reservation_row(db: Session, r: Row, sp: SegmentItem, sites: dict[str, int], closed: bool, claims: dict[tuple, int],
                      count_rows: dict[tuple, int]) -> None:
     p = r.p
     if closed:
@@ -220,8 +220,8 @@ def _reservation_row(db: Session, r: Row, sp: SpanItem, sites: dict[str, int], c
     n = p["unassigned_cores"]
     if n < 1:  # parser left it Needs review already; defensive
         return _set(r, "needs_review", "no core count")
-    if sp.span_id:
-        full, _ = _matches(db, "r.unassigned_cores = :n AND r.unassigned_span_id = :s", n=n, s=sp.span_id, **_flags(p))
+    if sp.segment_id:
+        full, _ = _matches(db, "r.unassigned_cores = :n AND r.unassigned_segment_id = :s", n=n, s=sp.segment_id, **_flags(p))
         if full:
             r.extra["matched_reservation_id"] = full[0]
             return _set(r, "already_imported", f"already imported as reservation #{full[0]}")
@@ -229,10 +229,10 @@ def _reservation_row(db: Session, r: Row, sp: SpanItem, sites: dict[str, int], c
     if ident in count_rows:
         return _set(r, "needs_review", f"identical to row {count_rows[ident]} in this file")
     if sp.survey is None:
-        return _set(r, "needs_review", "span is not surveyed: a count-only reservation cannot be booked")
-    free = (sp.db_free if sp.span_id else 0) + max(sp.survey - (sp.db_survey or 0), 0) - sp.used
+        return _set(r, "needs_review", "segment is not surveyed: a count-only reservation cannot be booked")
+    free = (sp.db_free if sp.segment_id else 0) + max(sp.survey - (sp.db_survey or 0), 0) - sp.used
     if n > free:
-        return _set(r, "needs_review", f"{n} cores requested but only {max(free, 0)} free to reserve on this span")
+        return _set(r, "needs_review", f"{n} cores requested but only {max(free, 0)} free to reserve on this segment")
     count_rows[ident] = r.n
     sp.used += n
     _set(r, "reservations")
@@ -248,33 +248,33 @@ def evaluate(db: Session, rows: list[Row], wins: set[tuple[str, str]] = frozense
         r.reason = r.parse_reason
         if not r.group and (unknown := [c for c in (r.p["site_a"], r.p["site_b"]) if c not in sites]):
             _set(r, "rejected", "unknown site " + ", ".join(unknown))
-    spans = _span_items(db, rows, sites, wins)
+    segments = _segment_items(db, rows, sites, wins)
     claims: dict[tuple, int] = {}
     count_rows: dict[tuple, int] = {}
     for r in rows:
         if not r.group:
-            _reservation_row(db, r, spans[r.extra["span_key"]], sites, closed, claims, count_rows)
-    file_keys = set(spans)
-    missing = [{"key": k, "span_id": i} for i, k in db.execute(text(
+            _reservation_row(db, r, segments[r.extra["segment_key"]], sites, closed, claims, count_rows)
+    file_keys = set(segments)
+    missing = [{"key": k, "segment_id": i} for i, k in db.execute(text(
         "SELECT s.id, CASE WHEN a.name COLLATE \"C\" < b.name COLLATE \"C\" THEN a.name || '-' || b.name ELSE b.name || '-' || a.name END "
-        "FROM spans s JOIN sites a ON a.id = s.site_a_id JOIN sites b ON b.id = s.site_b_id ORDER BY s.id")) if k not in file_keys]
-    _warnings(rows, spans, closed, warns)
-    return Eval(rows, spans, missing, warns, closed)
+        "FROM segments s JOIN sites a ON a.id = s.site_a_id JOIN sites b ON b.id = s.site_b_id ORDER BY s.id")) if k not in file_keys]
+    _warnings(rows, segments, closed, warns)
+    return Eval(rows, segments, missing, warns, closed)
 
 
-def _warnings(rows: list[Row], spans: dict[str, SpanItem], closed: bool, warns: list[dict[str, Any]]) -> None:
+def _warnings(rows: list[Row], segments: dict[str, SegmentItem], closed: bool, warns: list[dict[str, Any]]) -> None:
     def add(kind: str, message: str, nums: list[int]) -> None:
         warns.append({"kind": kind, "message": message, "rows": nums})
 
     if closed:
         n = [r.n for r in rows if r.group == "ignored"]
         add("import_closed", f"Reservation import is closed: {len(n)} reservation rows are ignored.", n)
-    for sp in spans.values():
-        firsts = [r.n for r in rows if r.extra.get("span_key") == sp.key and not r.p.get("additional")]
+    for sp in segments.values():
+        firsts = [r.n for r in rows if r.extra.get("segment_key") == sp.key and not r.p.get("additional")]
         if len(firsts) > 1:
             add("duplicate_cable", f"Cable {sp.key} looks listed twice (rows {', '.join(map(str, firsts))}).", firsts)
         for w in sp.warnings:
-            add("span_values", f"{sp.key}: {w}", sp.rows)
+            add("segment_values", f"{sp.key}: {w}", sp.rows)
     for r in rows:
         if r.group == "conflicts":
             add("core_held", f"Row {r.n}: {r.reason}", [r.n])
@@ -292,15 +292,15 @@ def _row_payload(r: Row) -> dict[str, Any]:
     p = r.p
     shown = None
     if p.get("site_a"):
-        shown = {"customer": p.get("customer"), "span": f"{p['site_a']}-{p['site_b']}", "cores": r.extra.get("cores", 0),
+        shown = {"customer": p.get("customer"), "segment": f"{p['site_a']}-{p['site_b']}", "cores": r.extra.get("cores", 0),
                  "count_only": p.get("unassigned_cores") or None, "planned_date": p.get("planned_date"),
                  "group_label": p.get("group_label"), "additional": p.get("additional")}
     return _dump({"group": r.group, "parse_status": r.parse_status, "parse_reason": r.parse_reason, "parsed": p,
                   "reservation": shown, **{k: v for k, v in r.extra.items() if k != "cores"}})
 
 
-def _span_payload(sp: SpanItem) -> dict[str, Any]:
-    return _dump({"group": sp.group, "key": sp.key, "span_id": sp.span_id, "rows": sp.rows, "fields": sp.vals,
+def _segment_payload(sp: SegmentItem) -> dict[str, Any]:
+    return _dump({"group": sp.group, "key": sp.key, "segment_id": sp.segment_id, "rows": sp.rows, "fields": sp.vals,
                   "changes": sp.changes, "measurements": sp.measurements, "survey_cores_after": sp.survey,
                   "edited_in_dashboard": any(c["protected"] for c in sp.changes), "warnings": sp.warnings})
 
@@ -317,12 +317,12 @@ def stage(db: Session, admin_id: int, filename: str, results: list[RowResult], i
         out.append({"u": uid, "g": ROW_GROUP[r.group], "e": "reservation" if r.group in ("reservations", "conflicts", "already_imported", "ignored")
                     else "row", "p": json.dumps(_row_payload(r)), "w": json.dumps(r.warnings),
                     "sh": r.sheet, "n": r.n, "st": r.status, "r": r.reason, "raw": json.dumps(r.raw)})
-    first = {r.extra["span_key"]: r for r in reversed(ev.rows) if r.extra.get("span_key")}
-    for sp in ev.spans.values():
-        out.append({"u": uid, "g": ROW_GROUP[sp.group], "e": "span", "p": json.dumps(_span_payload(sp)), "w": json.dumps(sp.warnings),
+    first = {r.extra["segment_key"]: r for r in reversed(ev.rows) if r.extra.get("segment_key")}
+    for sp in ev.segments.values():
+        out.append({"u": uid, "g": ROW_GROUP[sp.group], "e": "segment", "p": json.dumps(_segment_payload(sp)), "w": json.dumps(sp.warnings),
                     "sh": "Reservation", "n": sp.rows[0], "st": "ready", "r": None, "raw": json.dumps(first[sp.key].raw)})
     for m in ev.missing:
-        out.append({"u": uid, "g": "missing", "e": "span", "p": json.dumps({"group": "missing", **m}), "w": "[]", "sh": None,
+        out.append({"u": uid, "g": "missing", "e": "segment", "p": json.dumps({"group": "missing", **m}), "w": "[]", "sh": None,
                     "n": None, "st": None, "r": None, "raw": None})
     if out:
         db.execute(text("INSERT INTO upload_rows (upload_id, row_group, entity, payload, warnings, sheet, row_number, status, reason, raw) "
@@ -343,7 +343,7 @@ def load_staged(db: Session, upload_id: int) -> list[Row]:
     return [Row(r["row_number"], r["sheet"], r["raw"] or {}, _unjson(r["payload"]["parsed"]), r["payload"]["parse_status"],
                 r["payload"]["parse_reason"], id=r["id"])
             for r in db.execute(text("SELECT id, row_number, sheet, raw, payload FROM upload_rows WHERE upload_id = :u "
-                                     "AND entity <> 'span' ORDER BY row_number"), {"u": upload_id}).mappings()]
+                                     "AND entity <> 'segment' ORDER BY row_number"), {"u": upload_id}).mappings()]
 
 
 # ---- confirm --------------------------------------------------------------------------------------------------
@@ -355,40 +355,40 @@ def confirm(db: Session, admin_id: int, upload_id: int, excel_wins: list[dict[st
         raise ApplyError(404, "Upload not found")
     if up["status"] != "staged":
         raise ApplyError(409, "This upload was already confirmed")
-    span_rows = dict(db.execute(text("SELECT id, payload->>'key' FROM upload_rows WHERE upload_id = :u AND entity = 'span' "
+    segment_rows = dict(db.execute(text("SELECT id, payload->>'key' FROM upload_rows WHERE upload_id = :u AND entity = 'segment' "
                                      "AND row_group <> 'missing'"), {"u": upload_id}).all())
     wins: set[tuple[str, str]] = set()
     for w in excel_wins:
-        if w["row_id"] not in span_rows or w["field"] not in SPAN_FIELDS:
-            raise ApplyError(422, f"Row {w['row_id']} / field '{w['field']}' is not a span field of this upload")
-        wins.add((span_rows[w["row_id"]], w["field"]))
+        if w["row_id"] not in segment_rows or w["field"] not in SEGMENT_FIELDS:
+            raise ApplyError(422, f"Row {w['row_id']} / field '{w['field']}' is not a segment field of this upload")
+        wins.add((segment_rows[w["row_id"]], w["field"]))
     ev = evaluate(db, load_staged(db, upload_id), wins)
     for key, f in wins:
-        if not any(c["field"] == f and c["protected"] for c in ev.spans.get(key, SpanItem(key, "", "", [], {})).changes):
+        if not any(c["field"] == f and c["protected"] for c in ev.segments.get(key, SegmentItem(key, "", "", [], {})).changes):
             raise ApplyError(422, f"{key}: '{f}' is not a protected field that differs in the file")
     why = f"{REASON} {up['filename']} #{upload_id}"
-    counts: dict[str, int] = {"spans": 0, "cores": 0, "ports": 0, "customers": 0, "reservations": 0, "span_updates": 0,
+    counts: dict[str, int] = {"segments": 0, "cores": 0, "ports": 0, "customers": 0, "reservations": 0, "segment_updates": 0,
                               "measurements": 0}
     skipped: list[dict[str, Any]] = []
     sites = dict(db.execute(text("SELECT name, id FROM sites WHERE name = ANY(CAST(:n AS text[]))"),
-                            {"n": sorted({n for s in ev.spans.values() for n in (s.a, s.b)})}).all())
+                            {"n": sorted({n for s in ev.segments.values() for n in (s.a, s.b)})}).all())
     with db.begin_nested():  # all or nothing
-        for sp in ev.spans.values():
+        for sp in ev.segments.values():
             if sp.group == "new":
-                ensure_span(db, counts, sites[sp.a], sites[sp.b], sp.vals)
-            sid = sp.span_id or find_span(db, sites[sp.a], sites[sp.b])[0]  # type: ignore[index]
+                ensure_segment(db, counts, sites[sp.a], sites[sp.b], sp.vals)
+            sid = sp.segment_id or find_segment(db, sites[sp.a], sites[sp.b])[0]  # type: ignore[index]
             for c in sp.changes:
                 if not c["applied"]:
                     continue
-                db.execute(text(f"UPDATE spans SET {c['field']} = :v WHERE id = :i"), {"v": c["new"], "i": sid})
+                db.execute(text(f"UPDATE segments SET {c['field']} = :v WHERE id = :i"), {"v": c["new"], "i": sid})
                 db.execute(text("INSERT INTO data_edits (entity, entity_id, field, old_value, new_value, reason, user_id) "
-                                "VALUES ('span', :i, :f, :o, :n, :r, :u)"),
+                                "VALUES ('segment', :i, :f, :o, :n, :r, :u)"),
                            {"i": sid, "f": c["field"], "o": None if c["old"] is None else str(c["old"]), "n": str(c["new"]), "r": why, "u": admin_id})
                 if c["field"] == "survey_cores":
                     counts["cores"] += add_cores(db, sid, c["new"])
-                counts["span_updates"] += 1
+                counts["segment_updates"] += 1
             for m in sp.measurements:
-                db.execute(text("INSERT INTO measurements (span_id, loss_db, tested_on, upload_id) VALUES (:s, :l, :t, :u)"),
+                db.execute(text("INSERT INTO measurements (segment_id, loss_db, tested_on, upload_id) VALUES (:s, :l, :t, :u)"),
                            {"s": sid, "l": m["loss_db"], "t": m["tested_on"], "u": upload_id})
                 counts["measurements"] += 1
         for r in ev.rows:
@@ -407,6 +407,6 @@ def confirm(db: Session, admin_id: int, upload_id: int, excel_wins: list[dict[st
         db.execute(text("UPDATE uploads SET status = 'confirmed', confirmed_at = now(), summary = CAST(:s AS jsonb) WHERE id = :i"),
                    {"s": json.dumps(summary), "i": upload_id})
     db.commit()
-    invalidate_routes()  # new spans or distances
+    invalidate_routes()  # new segments or distances
     return {"upload_id": upload_id, "counts": counts, "skipped": skipped, "warnings": ev.warnings,
             "ignored_reservation_rows": ev.counts()["ignored"]}

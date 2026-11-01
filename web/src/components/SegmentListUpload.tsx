@@ -5,9 +5,9 @@ import { Icon, type IconName } from "@/components/Icon";
 import { Changes, Chip, Dialog, FilePick, Note, PAGE_SIZE, Pager } from "@/components/upload-parts";
 import { cell, field, uploadError } from "@/lib/utils";
 
-type Staged = components["schemas"]["app__ingest__span_list_router__UploadOut"];
-type Applied = components["schemas"]["app__ingest__span_list_router__ApplyOut"];
-type Row = components["schemas"]["app__ingest__span_list_router__RowsOut"]["items"][number];
+type Staged = components["schemas"]["app__ingest__segment_list_router__UploadOut"];
+type Applied = components["schemas"]["app__ingest__segment_list_router__ApplyOut"];
+type Row = components["schemas"]["app__ingest__segment_list_router__RowsOut"]["items"][number];
 type Group = Row["group"];
 
 const GROUPS: { g: Group; label: string; icon: IconName; cls: string }[] = [
@@ -25,7 +25,7 @@ function Rows({ staged }: { staged: Staged }) {
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     let stale = false;
-    api.get("/api/admin/span-list/uploads/{upload_id}/rows", { path: { upload_id: staged.upload_id }, query: { group, page, page_size: PAGE_SIZE } })
+    api.get("/api/admin/segment-list/uploads/{upload_id}/rows", { path: { upload_id: staged.upload_id }, query: { group, page, page_size: PAGE_SIZE } })
       .then((d) => { if (!stale) { setData(d); setError(null); } })
       .catch((e) => !stale && setError(errorText(e, "Could not load rows.")));
     return () => { stale = true; };
@@ -33,14 +33,14 @@ function Rows({ staged }: { staged: Staged }) {
   const g = GROUPS.find((x) => x.g === group)!;
   return (
     <>
-      <div role="group" aria-label="Span list rows by result" className="mb-3 flex flex-wrap gap-2">
+      <div role="group" aria-label="Segment list rows by result" className="mb-3 flex flex-wrap gap-2">
         {GROUPS.map((x) => <Chip key={x.g} label={x.label} icon={x.icon} n={staged.counts[x.g]} pressed={group === x.g} onClick={() => { setGroup(x.g); setPage(1); }} />)}
       </div>
       {error && <p role="alert" className="text-body font-semibold text-red">{error}</p>}
       {data && (data.total === 0 ? <p className="text-body text-muted-foreground">No {g.label.toLowerCase()} rows.</p> : (
         <>
           <div className="tbox">
-            <table className="tbl band table-fixed" aria-label={`Span list: ${g.label} rows`}>
+            <table className="tbl band table-fixed" aria-label={`Segment list: ${g.label} rows`}>
               <thead><tr>
                 <th scope="col" className="num w-16">Row</th>
                 <th scope="col" className="w-[18%]">Link</th>
@@ -80,7 +80,7 @@ function Rows({ staged }: { staged: Staged }) {
   );
 }
 
-export function SpanListUpload() {
+export function SegmentListUpload() {
   const [staged, setStaged] = useState<Staged | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -90,7 +90,7 @@ export function SpanListUpload() {
   const pick = async (f: File) => {
     setBusy(true); setError(null); setResult(null); setStaged(null); setConfirming(false);
     try {
-      setStaged((await api.postFile("/api/admin/span-list/uploads", f)) as Staged);
+      setStaged((await api.postFile("/api/admin/segment-list/uploads", f)) as Staged);
     } catch (e) {
       setError(uploadError(e));
     } finally {
@@ -102,7 +102,7 @@ export function SpanListUpload() {
     if (!staged) return;
     setError(null);
     try {
-      setResult(await api.post("/api/admin/span-list/uploads/{upload_id}/apply", { path: { upload_id: staged.upload_id } }));
+      setResult(await api.post("/api/admin/segment-list/uploads/{upload_id}/apply", { path: { upload_id: staged.upload_id } }));
       setStaged(null);
     } catch (e) {
       setError(errorText(e, "Apply failed. Nothing was changed. Try again."));
@@ -118,14 +118,14 @@ export function SpanListUpload() {
     <div className="space-y-4">
       <section className="card" aria-labelledby="sl-h">
         <div className="card-h">
-          <h2 id="sl-h">Span list</h2>
+          <h2 id="sl-h">Segment list</h2>
           </div>
         <div className="space-y-4">
-          <FilePick label="Upload a span list" busy={busy} onFile={pick} />
+          <FilePick label="Upload a segment list" busy={busy} onFile={pick} />
           {error && <Note tone="red" role="alert" title={error} />}
           <div aria-live="polite" data-testid="sl-result">
             {result && (
-              <Note tone="green" title="Span list applied">
+              <Note tone="green" title="Segment list applied">
                 <p>{result.created} created, {result.changed} changed, {result.protected_kept} dashboard edits kept, {result.skipped} skipped.</p>
                 {result.warnings.length > 0 && (
                   <><p className="mt-2 font-semibold">Warnings</p><ul className="list-disc pl-4">{result.warnings.map((w) => <li key={w}>{w}</li>)}</ul></>
@@ -150,7 +150,7 @@ export function SpanListUpload() {
               <>
                 <Rows key={staged.upload_id} staged={staged} />
                 <div className="flex flex-wrap items-center gap-4 border-t pt-4">
-                  <button type="button" className="btn btn-p" disabled={nothing} aria-describedby={nothing ? "sl-why" : undefined} onClick={() => setConfirming(true)}>Apply span list…</button>
+                  <button type="button" className="btn btn-p" disabled={nothing} aria-describedby={nothing ? "sl-why" : undefined} onClick={() => setConfirming(true)}>Apply segment list…</button>
                   {nothing && <p id="sl-why" className="text-body text-muted-foreground">Nothing new or changed to apply.</p>}
                 </div>
               </>
@@ -162,7 +162,7 @@ export function SpanListUpload() {
         </section>
       )}
       {confirming && n && (
-        <Dialog title="Apply span list?" onClose={() => setConfirming(false)}>
+        <Dialog title="Apply segment list?" onClose={() => setConfirming(false)}>
           <p className="mt-3 text-body">{n.new} new, {n.changed} changed, {n.problem} need review and are skipped. Fields edited in the dashboard are kept.</p>
           <p className="mt-3 text-body text-muted-foreground">Changes are saved in one step with a history record per field. There is no undo.</p>
           <div className="mt-5 flex justify-end gap-2">

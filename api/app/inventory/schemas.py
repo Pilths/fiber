@@ -8,13 +8,13 @@ CoreStatus = Literal["Available", "Requested", "Reserved", "In use"]
 
 
 class SearchResult(BaseModel):
-    type: Literal["customer", "span", "circuit", "core"]
+    type: Literal["customer", "segment", "circuit", "core"]
     label: str
-    span_id: int | None = None
+    segment_id: int | None = None
     core_id: int | None = None
 
 
-class SpanSummary(BaseModel):
+class SegmentSummary(BaseModel):
     id: int
     site_a: str
     site_b: str
@@ -73,8 +73,8 @@ class Holder(BaseModel):
 class CoreHolderDetail(BaseModel):
     core_id: int
     number: int
-    span_id: int
-    span_name: str
+    segment_id: int
+    segment_name: str
     status: CoreStatus
     circuit_id: str | None
     port_a: str | None
@@ -93,7 +93,7 @@ class UnassignedHold(BaseModel):
     age_days: int
 
 
-class SpanDetail(SpanSummary):
+class SegmentDetail(SegmentSummary):
     cores: list[CoreDetail]
     unassigned: list[UnassignedHold] = []
 

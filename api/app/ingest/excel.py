@@ -152,7 +152,7 @@ def _reservation(r: RowResult, f: dict[str, Any], label: str | None, known: set[
             reasons.append(f"cannot read {col} '{f.get(col)}'")
     if p["survey_cores"] is not None:
         p["survey_cores"] = int(p["survey_cores"])
-    # optional columns (not in the sample workbook): a test result for the span
+    # optional columns (not in the sample workbook): a test result for the segment
     for key, col, conv in [("loss_db", "loss (db)", _float), ("tested_on", "tested on", _date)]:
         try:
             p[key] = conv(f.get(col, f.get(col.replace(" (", "("))))

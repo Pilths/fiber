@@ -12,8 +12,8 @@ from app.inventory.schemas import (
     CustomerCreate,
     CustomerResult,
     SearchResult,
-    SpanDetail,
-    SpanSummary,
+    SegmentDetail,
+    SegmentSummary,
 )
 
 router = APIRouter(prefix="/api", dependencies=[Depends(get_current_user)])
@@ -25,18 +25,18 @@ def search(db: DB, q: Annotated[str, Query(min_length=1)]) -> list[SearchResult]
     return service.search(db, q)
 
 
-@router.get("/spans")
-def list_spans(db: DB, region: str | None = None, route_type: str | None = None,
-               q: str | None = None, route: str | None = None) -> list[SpanSummary]:
-    return service.list_span_summaries(db, region, route_type, q, route)
+@router.get("/segments")
+def list_segments(db: DB, region: str | None = None, route_type: str | None = None,
+               q: str | None = None, route: str | None = None) -> list[SegmentSummary]:
+    return service.list_segment_summaries(db, region, route_type, q, route)
 
 
-@router.get("/spans/{span_id}")
-def get_span(db: DB, span_id: int) -> SpanDetail:
-    span = service.get_span(db, span_id)
-    if span is None:
-        raise HTTPException(404, "Span not found")
-    return span
+@router.get("/segments/{segment_id}")
+def get_segment(db: DB, segment_id: int) -> SegmentDetail:
+    segment = service.get_segment(db, segment_id)
+    if segment is None:
+        raise HTTPException(404, "Segment not found")
+    return segment
 
 
 @router.get("/cores/{core_id}")

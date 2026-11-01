@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, ApiError, authEvents, setDevUser } from "@/api/client";
 import { ChangePassword, Login } from "@/components/Auth";
 import type { components } from "@/api/schema";
-import { EditSiteDialog, EditSpanDialog, type SpanFocus } from "@/components/AdminEdit";
+import { EditSiteDialog, EditSegmentDialog, type SegmentFocus } from "@/components/AdminEdit";
 import { ChosenBar } from "@/components/ChosenBar";
 import { CoreDrawer } from "@/components/CoreDrawer";
 import { FindCard } from "@/components/FindCard";
@@ -10,25 +10,27 @@ import { Header, type View } from "@/components/Header";
 import { HeldTable } from "@/components/HeldTable";
 import { Icon } from "@/components/Icon";
 import { Inspector } from "@/components/Inspector";
-import { CoresTable, RouteSearch, SpanDiagram, Unassigned, type Found } from "@/components/NetworkDetail";
+import { CoresTable, RouteSearch, SegmentDiagram, Unassigned, type Found } from "@/components/NetworkDetail";
 import { NetworkMap } from "@/components/NetworkMap";
 import { PortGrid } from "@/components/PortGrid";
 import { RouteForm, RouteSection, RouteSummary, useRoutePlanner } from "@/components/RoutePlanner";
 import { Upload } from "@/components/Upload";
 import { Users } from "@/components/Users";
 import { Approvals, MyReservations, NeedsReview } from "@/components/Reservations";
-import { countBy, NO_FILTER, spanName, STATUS, STATUS_ORDER, statusLabel, type LossDetail, type SpanFilter, type SpanLoss } from "@/lib/status";
+import { countBy, NO_FILTER, segmentName, STATUS, STATUS_ORDER, statusLabel, type LossDetail, type SegmentFilter, type SegmentLoss } from "@/lib/status";
 
-type Span = components["schemas"]["SpanSummary"];
-type Detail = components["schemas"]["SpanDetail"];
+type Segment = components["schemas"]["SegmentSummary"];
+type Detail = components["schemas"]["SegmentDetail"];
 type Me = components["schemas"]["CurrentUser"];
 type Bell = components["schemas"]["Bell"];
 
-// Selection lives in the URL hash so links can be shared: #span=<site A> - <site B>.
-// The API has no LRD codes on spans yet, so the hash uses the span name, not the AABB-BBCC form of the PRD.
+// Selection lives in the URL hash so links can be shared: #segment=<site A> - <site B>.
+// The API has no LRD codes on segments yet, so the hash uses the segment name, not the AABB-BBCC form of the PRD.
 // Route mode uses #route=<from site id>-<to site id>-<cores>-<km|free_cores>-<option index> (RoutePlanner.tsx).
-const hashSpan = () => {
-  const m = /^#span=(.+)$/.exec(location.hash);
+const hashSegment = () => {
+  // Old links used #span=: rewrite them to #segment= in place.
+  if (location.hash.startsWith("#span=")) history.replaceState(null, "", "#segment=" + location.hash.slice(6));
+  const m = /^#segment=(.+)$/.exec(location.hash);
   try { return m ? decodeURIComponent(m[1]) : null; } catch { return null; }
 };
 
@@ -69,9 +71,9 @@ export default function App() {
 }
 
 function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () => void; onChangePassword: () => void }) {
-  const [spans, setSpans] = useState<Span[] | null>(null);
+  const [segments, setSegments] = useState<Segment[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [spanId, setSpanId] = useState<number | null>(null);
+  const [segmentId, setSegmentId] = useState<number | null>(null);
   const [detail, setDetail] = useState<Detail | null>(null);
   const [focusCoreId, setFocusCoreId] = useState<number | null>(null);
   const [selected, setSelected] = useState<Set<number>>(new Set());
@@ -79,24 +81,24 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
   const [bell, setBell] = useState<Bell | null>(null);
   const [stale, setStale] = useState(0);
   const [loss, setLoss] = useState<LossDetail | null>(null);
-  const [lossList, setLossList] = useState<SpanLoss[]>([]);
-  const [version, setVersion] = useState(0); // bumped after a booking or edit so the span list and grid reload
+  const [lossList, setLossList] = useState<SegmentLoss[]>([]);
+  const [version, setVersion] = useState(0); // bumped after a booking or edit so the segment list and grid reload
   const [drawerCore, setDrawerCore] = useState<number | null>(null);
   const [found, setFound] = useState<Found | null>(null); // route search result
-  const [editSpan, setEditSpan] = useState<{ focus?: SpanFocus } | null>(null);
+  const [editSegment, setEditSegment] = useState<{ focus?: SegmentFocus } | null>(null);
   const [editSite, setEditSite] = useState<number | null>(null);
-  const [filter, setFilter] = useState<SpanFilter>(NO_FILTER);
-  const [mode, setModeState] = useState<"span" | "route">(location.hash.startsWith("#route=") ? "route" : "span");
+  const [filter, setFilter] = useState<SegmentFilter>(NO_FILTER);
+  const [mode, setModeState] = useState<"segment" | "route">(location.hash.startsWith("#route=") ? "route" : "segment");
   const rp = useRoutePlanner(mode === "route" && view === "reserve", version);
   // Upload stays mounted once opened (hidden on other views) so a staged preview and its choices survive tab changes.
   const [uploadSeen, setUploadSeen] = useState(false);
   if (view === "upload" && !uploadSeen) setUploadSeen(true);
   // Switching modes clears the other mode's selection and hash.
-  const setMode = useCallback((m: "span" | "route") => {
+  const setMode = useCallback((m: "segment" | "route") => {
     setModeState(m);
     if (m === "route") {
-      setSpanId(null); setDetail(null); setSelected(new Set()); setDrawerCore(null);
-      if (location.hash.startsWith("#span=")) history.replaceState(null, "", location.pathname);
+      setSegmentId(null); setDetail(null); setSelected(new Set()); setDrawerCore(null);
+      if (location.hash.startsWith("#segment=")) history.replaceState(null, "", location.pathname);
     } else if (location.hash.startsWith("#route=")) history.replaceState(null, "", location.pathname);
   }, []);
 
@@ -104,7 +106,7 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
     api.get("/api/bell").then(setBell).catch(() => {});
     api.get("/api/reservations", { query: { mine: true } }).then((r) => setStale(r.filter((x) => x.stale).length)).catch(() => {});
   }, []);
-  // Users has its own URL (#users) so it can be visited directly; other views keep the #span= hash.
+  // Users has its own URL (#users) so it can be visited directly; other views keep the #segment= hash.
   const setView = useCallback((v: View) => {
     setViewState(v);
     if (v === "users") history.replaceState(null, "", "#users");
@@ -121,29 +123,29 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
   useEffect(refreshBell, [refreshBell, view]);
 
   useEffect(() => {
-    api.get("/api/spans").then(setSpans).catch(() => setError("Could not load spans."));
+    api.get("/api/segments").then(setSegments).catch(() => setError("Could not load segments."));
   }, [version, view]);
   // Loss is read-only here; one load per visit to the map is enough.
   useEffect(() => {
     if (view !== "map" && view !== "reserve") return;
-    api.get("/api/loss/spans").then(setLossList).catch(() => {});
+    api.get("/api/loss/segments").then(setLossList).catch(() => {});
   }, [view, version]);
 
   useEffect(() => {
-    if (spanId == null) return;
+    if (segmentId == null) return;
     let stale = false;
-    api.get("/api/spans/{span_id}", { path: { span_id: spanId } }).then((d) => !stale && setDetail(d)).catch(() => !stale && setError("Could not load the span."));
-    api.get("/api/loss/spans/{span_id}", { path: { span_id: spanId } }).then((l) => !stale && setLoss(l)).catch(() => {});
+    api.get("/api/segments/{segment_id}", { path: { segment_id: segmentId } }).then((d) => !stale && setDetail(d)).catch(() => !stale && setError("Could not load the segment."));
+    api.get("/api/loss/segments/{segment_id}", { path: { segment_id: segmentId } }).then((l) => !stale && setLoss(l)).catch(() => {});
     return () => { stale = true; };
-  }, [spanId, version]);
+  }, [segmentId, version]);
 
-  const spanRef = useRef(spanId);
-  useEffect(() => { spanRef.current = spanId; }, [spanId]);
-  // Selects a span on the current view (Map or Reserve); the Map and Reserve tabs share the selection.
+  const segmentRef = useRef(segmentId);
+  useEffect(() => { segmentRef.current = segmentId; }, [segmentId]);
+  // Selects a segment on the current view (Map or Reserve); the Map and Reserve tabs share the selection.
   const open = useCallback((id: number, coreId: number | null = null) => {
-    setModeState("span");
+    setModeState("segment");
     setDetail((d) => (d?.id === id ? d : null));
-    setSpanId(id);
+    setSegmentId(id);
     setFocusCoreId(coreId);
     setSelected((s) => (s.size ? new Set() : s));
     setDrawerCore(null);
@@ -151,30 +153,30 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
 
   // Hash -> selection, on load and when the hash changes (back button, pasted link).
   useEffect(() => {
-    if (!spans) return;
+    if (!segments) return;
     const sync = () => {
-      const name = hashSpan();
-      const s = name && spans.find((x) => spanName(x) === name);
-      if (s && spanRef.current !== s.id) open(s.id);
+      const name = hashSegment();
+      const s = name && segments.find((x) => segmentName(x) === name);
+      if (s && segmentRef.current !== s.id) open(s.id);
     };
     sync();
     addEventListener("hashchange", sync);
     return () => removeEventListener("hashchange", sync);
-  }, [spans, open]);
+  }, [segments, open]);
   // Selection -> hash.
   useEffect(() => {
-    const s = spans?.find((x) => x.id === spanId);
-    if (s && hashSpan() !== spanName(s)) history.replaceState(null, "", `#span=${encodeURIComponent(spanName(s))}`);
-  }, [spanId, spans]);
+    const s = segments?.find((x) => x.id === segmentId);
+    if (s && hashSegment() !== segmentName(s)) history.replaceState(null, "", `#segment=${encodeURIComponent(segmentName(s))}`);
+  }, [segmentId, segments]);
 
   const toggle = (id: number) => setSelected((s) => { const n = new Set(s); if (!n.delete(id)) n.add(id); return n; });
   const chosen = detail?.cores.filter((c) => selected.has(c.id)) ?? [];
   const changed = () => { setVersion((v) => v + 1); refreshBell(); };
   const drawn = detail?.cores.find((c) => c.id === drawerCore);
-  const admin = me.role === "admin" && spanId != null ? {
-    onEditSpan: (focus?: SpanFocus) => setEditSpan({ focus }),
+  const admin = me.role === "admin" && segmentId != null ? {
+    onEditSegment: (focus?: SegmentFocus) => setEditSegment({ focus }),
     onEditSite: (end: "a" | "b") => {
-      api.get("/api/admin/spans/{sid}", { path: { sid: spanId } }).then((x) => setEditSite(end === "a" ? x.site_a_id : x.site_b_id)).catch(() => setError("Could not load the span."));
+      api.get("/api/admin/segments/{sid}", { path: { sid: segmentId } }).then((x) => setEditSite(end === "a" ? x.site_a_id : x.site_b_id)).catch(() => setError("Could not load the segment."));
     },
   } : null;
   const goToRoute = () => {
@@ -184,19 +186,19 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
   };
   // Map: Esc clears the selection and the searched route.
   const clearSelection = () => {
-    setSpanId(null); setDetail(null); setSelected(new Set()); setDrawerCore(null); setFound(null);
-    if (location.hash.startsWith("#span=")) history.replaceState(null, "", location.pathname);
+    setSegmentId(null); setDetail(null); setSelected(new Set()); setDrawerCore(null); setFound(null);
+    if (location.hash.startsWith("#segment=")) history.replaceState(null, "", location.pathname);
   };
-  const routeName = rp.option && `${rp.option.spans[0].site_a} to ${rp.option.spans[rp.option.spans.length - 1].site_b}`;
-  const mapIds = found ? [...found.ids, ...(spanId != null && !found.ids.includes(spanId) ? [spanId] : [])]
-    : spanId != null ? [spanId] : [];
-  const spanLoss = loss?.span_id === spanId ? loss : null;
-  const measured = useMemo(() => new Set(spanLoss?.cores.map((c) => c.core_id)), [spanLoss]);
+  const routeName = rp.option && `${rp.option.segments[0].site_a} to ${rp.option.segments[rp.option.segments.length - 1].site_b}`;
+  const mapIds = found ? [...found.ids, ...(segmentId != null && !found.ids.includes(segmentId) ? [segmentId] : [])]
+    : segmentId != null ? [segmentId] : [];
+  const segmentLoss = loss?.segment_id === segmentId ? loss : null;
+  const measured = useMemo(() => new Set(segmentLoss?.cores.map((c) => c.core_id)), [segmentLoss]);
   const toCores = () => document.getElementById("cores")?.scrollIntoView({ behavior: "smooth", block: "start" });
 
   return (
     <div className="min-h-screen">
-      <Header onPick={(r) => { if (r.span_id != null) { setView("map"); open(r.span_id, r.core_id ?? null); } }} view={view} onView={setView} me={me}
+      <Header onPick={(r) => { if (r.segment_id != null) { setView("map"); open(r.segment_id, r.core_id ?? null); } }} view={view} onView={setView} me={me}
         approvals={me.role === "admin" ? bell?.approvals ?? null : null} stale={stale} onSignOut={onSignOut} onChangePassword={onChangePassword} />
       {error && <p role="alert" className="mx-6 mt-4 rounded-md border border-red bg-red-bg px-4 py-2 font-semibold text-red">{error}</p>}
       {view !== "map" && view !== "reserve" && view !== "upload" && (
@@ -219,21 +221,21 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
           <RouteSearch onFound={(f) => { setFound(f); if (f) open(f.ids[0]); }} />
           <section className="card col-span-8 flex flex-col p-3" aria-label="Network map" aria-describedby="map-instr">
             {/* ponytail: site clicks do nothing on the view-only map; wire them to Route A/B if planners ask */}
-            <NetworkMap version={version} onSelectSpan={(id) => open(id)} onSite={() => {}} onClear={clearSelection}
+            <NetworkMap version={version} onSelectSegment={(id) => open(id)} onSite={() => {}} onClear={clearSelection}
               selectedIds={mapIds} routeKey={found ? `found-${found.ids.join(",")}` : null} visible={() => true} />
           </section>
           {/* The Inspector fills the map card's height (absolute), so the map alone sets the row height. */}
           <div className="relative col-span-4 min-w-0">
-            <Inspector detail={detail} loading={spanId != null && !detail} loss={spanLoss} admin={admin} onCores={toCores} fill />
+            <Inspector detail={detail} loading={segmentId != null && !detail} loss={segmentLoss} admin={admin} onCores={toCores} fill />
           </div>
           {detail && (
             <div className="col-span-12 space-y-4">
-              <SpanDiagram spans={spans} found={found} d={detail} loss={lossList} selectedId={detail.id} onPick={(id) => open(id)} />
+              <SegmentDiagram segments={segments} found={found} d={detail} loss={lossList} selectedId={detail.id} onPick={(id) => open(id)} />
               <section id="cores" className="card scroll-mt-4" aria-labelledby="cores-h">
-                <div className="card-h items-center"><h2 id="cores-h">Cores of {spanName(detail)}</h2></div>
+                <div className="card-h items-center"><h2 id="cores-h">Cores of {segmentName(detail)}</h2></div>
                 {detail.survey_cores == null
                   ? <NotSurveyed d={detail} admin={admin} />
-                  : <CoresTable key={`${detail.id}-${focusCoreId}`} d={detail} loss={spanLoss} focusCoreId={focusCoreId} onActions={(c) => setDrawerCore(c.id)} />}
+                  : <CoresTable key={`${detail.id}-${focusCoreId}`} d={detail} loss={segmentLoss} focusCoreId={focusCoreId} onActions={(c) => setDrawerCore(c.id)} />}
               </section>
             </div>
           )}
@@ -242,13 +244,13 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
       {view === "reserve" && (
         <main className="grid grid-cols-12 items-start gap-4 px-6 pt-6 pb-10">
           <div className="col-span-4 flex min-w-0 flex-col gap-4">
-            <FindCard spans={spans} selectedId={spanId} onSelect={(id) => open(id)} loss={lossList} mode={mode} onMode={setMode} route={<RouteForm rp={rp} />} filter={filter} onFilter={setFilter} />
+            <FindCard segments={segments} selectedId={segmentId} onSelect={(id) => open(id)} loss={lossList} mode={mode} onMode={setMode} route={<RouteForm rp={rp} />} filter={filter} onFilter={setFilter} />
             {mode === "route" && <Inspector detail={null} loading={false} loss={null} admin={null} onCores={() => {}}
               route={<RouteSummary key={`${rp.idx}-${routeName}`} rp={rp} onGo={goToRoute} />} />}
           </div>
           <div className="col-span-8 min-w-0 space-y-4">
-            {mode === "route" ? rp.option && <RouteSection rp={rp} spans={spans} onDone={changed} />
-              : !detail ? <p className="card empty px-4 py-10 text-center text-body text-muted-foreground">{spanId != null ? "Loading span..." : "Choose a span from the list in Find."}</p>
+            {mode === "route" ? rp.option && <RouteSection rp={rp} segments={segments} onDone={changed} />
+              : !detail ? <p className="card empty px-4 py-10 text-center text-body text-muted-foreground">{segmentId != null ? "Loading segment..." : "Choose a segment from the list in Find."}</p>
               : (
                 <>
                   <section className={`card ${detail.survey_cores != null ? "ccard" : ""}`} aria-labelledby="cores-h">
@@ -270,8 +272,8 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
           </div>
         </main>
       )}
-      {detail && drawn && <CoreDrawer key={drawn.id} core={drawn} span={spanName(detail)} ends={[detail.site_a, detail.site_b]} me={me} onClose={() => setDrawerCore(null)} onChanged={changed} />}
-      {editSpan && spanId != null && <EditSpanDialog spanId={spanId} focus={editSpan.focus} onClose={() => setEditSpan(null)} onSaved={changed} />}
+      {detail && drawn && <CoreDrawer key={drawn.id} core={drawn} segment={segmentName(detail)} ends={[detail.site_a, detail.site_b]} me={me} onClose={() => setDrawerCore(null)} onChanged={changed} />}
+      {editSegment && segmentId != null && <EditSegmentDialog segmentId={segmentId} focus={editSegment.focus} onClose={() => setEditSegment(null)} onSaved={changed} />}
       {editSite != null && <EditSiteDialog siteId={editSite} onClose={() => setEditSite(null)} onSaved={changed} />}
     </div>
   );
@@ -310,11 +312,11 @@ function Cores({ d, selected, chosen, toggle, focusCoreId, onOpen, onClear, onDo
   );
 }
 
-function NotSurveyed({ d, admin }: { d: Detail; admin: { onEditSpan: (focus?: SpanFocus) => void } | null }) {
+function NotSurveyed({ d, admin }: { d: Detail; admin: { onEditSegment: (focus?: SegmentFocus) => void } | null }) {
   return (
     <div role="status" data-testid="capacity" className="flex items-center gap-3 text-body">
       <p>{admin ? "Not surveyed: enter a survey count to make it bookable." : "Not surveyed, cannot be booked."} No cores to show. Cable size {d.cable_size}.</p>
-      {admin && <button type="button" className="btn btn-sm" onClick={() => admin.onEditSpan("survey")}>Enter survey count</button>}
+      {admin && <button type="button" className="btn btn-sm" onClick={() => admin.onEditSegment("survey")}>Enter survey count</button>}
     </div>
   );
 }

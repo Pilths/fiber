@@ -5,7 +5,7 @@ import { Dialog } from "@/components/upload-parts";
 import { when } from "@/lib/status";
 
 type Row = components["schemas"]["HistoryRow"];
-type SpanEdit = components["schemas"]["SpanEdit"];
+type SegmentEdit = components["schemas"]["SegmentEdit"];
 type SiteEdit = components["schemas"]["SiteEdit"];
 type Site = { id: number; name: string };
 
@@ -88,10 +88,10 @@ function Buttons({ busy, onClose }: { busy: boolean; onClose: () => void }) {
 }
 
 // "restore": opened from the Fiber cut banner, box unticked and focus on the reason.
-export type SpanFocus = "survey" | "restore";
+export type SegmentFocus = "survey" | "restore";
 
-export function EditSpanDialog({ spanId, focus, onClose, onSaved }: { spanId: number; focus?: SpanFocus; onClose: () => void; onSaved: () => void }) {
-  const [s, setS] = useState<SpanEdit | null>(null);
+export function EditSegmentDialog({ segmentId, focus, onClose, onSaved }: { segmentId: number; focus?: SegmentFocus; onClose: () => void; onSaved: () => void }) {
+  const [s, setS] = useState<SegmentEdit | null>(null);
   const [f, setF] = useState({ distance: "", route: "", region: "", survey: "", cable: "", reason: "", cut: false });
   const [a, setA] = useState<Site | null>(null);
   const [b, setB] = useState<Site | null>(null);
@@ -102,16 +102,16 @@ export function EditSpanDialog({ spanId, focus, onClose, onSaved }: { spanId: nu
 
   useEffect(() => {
     let stale = false; // a late second load (StrictMode runs effects twice) must not overwrite what the user typed
-    api.get("/api/admin/spans/{sid}", { path: { sid: spanId } }).then((x) => {
+    api.get("/api/admin/segments/{sid}", { path: { sid: segmentId } }).then((x) => {
       if (stale) return;
       setS(x);
       setF({ distance: x.distance_km == null ? "" : String(Number(x.distance_km)), route: x.route_type ?? "", region: x.region ?? "",
         survey: x.survey_cores == null ? "" : String(x.survey_cores), cable: String(x.cable_size), reason: "", cut: focus !== "restore" && x.fiber_cut });
       setA({ id: x.site_a_id, name: x.site_a });
       setB({ id: x.site_b_id, name: x.site_b });
-    }).catch((e) => !stale && setError(errorText(e, "Could not load the span.")));
+    }).catch((e) => !stale && setError(errorText(e, "Could not load the segment.")));
     return () => { stale = true; };
-  }, [spanId, focus]);
+  }, [segmentId, focus]);
   useEffect(() => { if (s && focus === "survey") survey.current?.focus(); }, [s, focus]);
 
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setF((o) => ({ ...o, [k]: e.target.value }));
@@ -120,7 +120,7 @@ export function EditSpanDialog({ spanId, focus, onClose, onSaved }: { spanId: nu
     setTried(true);
     if (!s || !f.reason.trim() || !a || !b) return;
     // Only changed fields are sent.
-    const body: components["schemas"]["SpanBody"] = { reason: f.reason.trim() };
+    const body: components["schemas"]["SegmentBody"] = { reason: f.reason.trim() };
     if (f.distance !== "" && (s.distance_km == null || Number(f.distance) !== Number(s.distance_km))) body.distance_km = f.distance;
     if (f.route && f.route !== s.route_type) body.route_type = f.route as "Trunk" | "Metro";
     if (f.region && f.region !== s.region) body.region = f.region;
@@ -133,7 +133,7 @@ export function EditSpanDialog({ spanId, focus, onClose, onSaved }: { spanId: nu
     setBusy(true);
     setError(null);
     try {
-      await api.post("/api/admin/spans/{sid}", { path: { sid: spanId }, body });
+      await api.post("/api/admin/segments/{sid}", { path: { sid: segmentId }, body });
       onSaved();
       onClose();
     } catch (err) {
@@ -143,10 +143,10 @@ export function EditSpanDialog({ spanId, focus, onClose, onSaved }: { spanId: nu
   };
 
   return (
-    <Dialog title={s ? `Edit span ${s.site_a} - ${s.site_b}` : "Edit span"} onClose={onClose} wide>
+    <Dialog title={s ? `Edit segment ${s.site_a} - ${s.site_b}` : "Edit segment"} onClose={onClose} wide>
       {error && <p role="alert" className="mt-3 rounded-md border border-red bg-red-bg px-3 py-2 text-body font-semibold text-red">{error}</p>}
       {!s ? !error && <p className="mt-3 text-body text-muted-foreground">Loading…</p> : (
-        <form onSubmit={submit} noValidate aria-label="Edit span">
+        <form onSubmit={submit} noValidate aria-label="Edit segment">
           <div className="mt-4 grid grid-cols-2 gap-3">
             <label><span className={lbl}>Distance (km)</span><input className="field" type="number" min="0" step="0.001" value={f.distance} onChange={set("distance")} /></label>
             <label><span className={lbl}>Route type</span>
@@ -241,7 +241,7 @@ export function EditSiteDialog({ siteId, onClose, onSaved }: { siteId: number; o
               <input type="checkbox" className="size-4" checked={f.active} onChange={(e) => setF((o) => ({ ...o, active: e.target.checked }))} />Active
             </label>
             <p className="col-span-2 -mt-1 text-body text-muted-foreground">
-              {f.active ? "Kind: " + s.kind.replace("_", " ") + "." : <b className="font-semibold text-amber">Inactive sites are kept, never deleted. A site used by a span cannot be deactivated.</b>}
+              {f.active ? "Kind: " + s.kind.replace("_", " ") + "." : <b className="font-semibold text-amber">Inactive sites are kept, never deleted. A site used by a segment cannot be deactivated.</b>}
             </p>
             <Reason value={f.reason} onChange={(v) => setF((o) => ({ ...o, reason: v }))} missing={tried && !f.reason.trim()} />
           </div>

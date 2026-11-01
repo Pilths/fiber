@@ -4,13 +4,13 @@ import type { components } from "@/api/schema";
 import { Icon } from "@/components/Icon";
 import { Blank } from "@/components/LossCard";
 import { Dialog } from "@/components/upload-parts";
-import { spanName, STATUS, statusLabel, type CoreStatus } from "@/lib/status";
+import { segmentName, STATUS, statusLabel, type CoreStatus } from "@/lib/status";
 
-type Detail = components["schemas"]["SpanDetail"];
+type Detail = components["schemas"]["SegmentDetail"];
 type Hold = components["schemas"]["UnassignedHold"];
 type Filter = "All" | Exclude<CoreStatus, "Available"> | "Unassigned";
 
-// One row per held core from GET /api/spans/{id}, plus one count-only row per reservation with unassigned cores.
+// One row per held core from GET /api/segments/{id}, plus one count-only row per reservation with unassigned cores.
 export function HeldTable({ d, admin, onOpen, onChanged }: { d: Detail; admin: boolean; onOpen: (c: Detail["cores"][number]) => void; onChanged: () => void }) {
   const [filter, setFilter] = useState<Filter>("All");
   const [assign, setAssign] = useState<Hold | null>(null);
@@ -23,7 +23,7 @@ export function HeldTable({ d, admin, onOpen, onChanged }: { d: Detail; admin: b
   return (
     <section className="card" aria-labelledby="held-h">
       <div className="card-h">
-        <h2 id="held-h" tabIndex={-1} className="outline-offset-4">Allocations<span className="font-normal text-muted-foreground"> of {spanName(d)}</span></h2>
+        <h2 id="held-h" tabIndex={-1} className="outline-offset-4">Allocations<span className="font-normal text-muted-foreground"> of {segmentName(d)}</span></h2>
       </div>
       {held.length === 0 && !d.unassigned.length ? <p className="text-body text-muted-foreground">No allocations.</p> : (
         <>
@@ -35,7 +35,7 @@ export function HeldTable({ d, admin, onOpen, onChanged }: { d: Detail; admin: b
             ))}
           </div>
           <table className="tbl table-fixed [&_td]:text-center! [&_th]:text-center!">
-            <caption className="sr-only">Allocations on this span</caption>
+            <caption className="sr-only">Allocations on this segment</caption>
             <thead><tr>
               <th scope="col" className="w-[7%]">Cores</th><th scope="col" className="w-[15%]">Status</th><th scope="col" className="w-[16%]">Customer</th>
               <th scope="col" className="w-[12%]">Planner</th><th scope="col" className="w-[10%]">SRF</th><th scope="col" className="w-[12%]">Planned date</th>
@@ -104,7 +104,7 @@ function AssignDialog({ d, hold, onClose, onSaved }: { d: Detail; hold: Hold; on
       <p className="mt-2 text-body text-muted-foreground">Reservation #{hold.reservation_id}, {hold.remaining} unassigned. Choose up to {hold.remaining}. <b className="font-semibold text-foreground">{picked.size} chosen</b>.</p>
       {error && <p role="alert" className="mt-3 rounded-md border border-red bg-red-bg px-3 py-2 text-body font-semibold text-red">{error}</p>}
       <form onSubmit={submit} noValidate aria-label="Assign cores">
-        {free.length === 0 ? <p className="mt-4 text-body text-muted-foreground">No Available cores on this span.</p> : (
+        {free.length === 0 ? <p className="mt-4 text-body text-muted-foreground">No Available cores on this segment.</p> : (
           <div role="group" aria-label="Available cores" className="mt-4 grid max-h-[50vh] grid-cols-12 gap-1 overflow-y-auto">
             {free.map((c) => {
               const on = picked.has(c.id);

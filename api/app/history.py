@@ -22,7 +22,7 @@ User = Annotated[CurrentUser, Depends(get_current_user)]
 class CoreRef(BaseModel):
     core_id: int
     number: int
-    span_id: int
+    segment_id: int
 
 
 class EventOut(BaseModel):
@@ -53,10 +53,10 @@ class CoreHistoryItem(BaseModel):
 
 def _links(db: Session, table: str, rid: int) -> dict[int, list[CoreRef]]:
     out: dict[int, list[CoreRef]] = {}
-    for r in db.execute(text(f"SELECT t.event_id, c.id AS core_id, c.number, c.span_id FROM {table} t JOIN cores c ON c.id = t.core_id "
-                             "JOIN reservation_events e ON e.id = t.event_id WHERE e.reservation_id = :r ORDER BY c.span_id, c.number"),
+    for r in db.execute(text(f"SELECT t.event_id, c.id AS core_id, c.number, c.segment_id FROM {table} t JOIN cores c ON c.id = t.core_id "
+                             "JOIN reservation_events e ON e.id = t.event_id WHERE e.reservation_id = :r ORDER BY c.segment_id, c.number"),
                         {"r": rid}).mappings():
-        out.setdefault(r["event_id"], []).append(CoreRef(**{k: r[k] for k in ("core_id", "number", "span_id")}))
+        out.setdefault(r["event_id"], []).append(CoreRef(**{k: r[k] for k in ("core_id", "number", "segment_id")}))
     return out
 
 
@@ -69,8 +69,8 @@ def events(db: Session, rid: int) -> list[EventOut]:
     released, assigned = _links(db, "release_cores", rid), _links(db, "assign_cores", rid)
     assigned_ids = {c.core_id for cs in assigned.values() for c in cs}
     original = [CoreRef(**r) for r in db.execute(text(
-        "SELECT c.id AS core_id, c.number, c.span_id FROM reservation_cores rc JOIN cores c ON c.id = rc.core_id "
-        "WHERE rc.reservation_id = :r ORDER BY c.span_id, c.number"), {"r": rid}).mappings() if r["core_id"] not in assigned_ids]
+        "SELECT c.id AS core_id, c.number, c.segment_id FROM reservation_cores rc JOIN cores c ON c.id = rc.core_id "
+        "WHERE rc.reservation_id = :r ORDER BY c.segment_id, c.number"), {"r": rid}).mappings() if r["core_id"] not in assigned_ids]
     out = []
     for r in rows:
         t = r["type"]

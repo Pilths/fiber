@@ -1,4 +1,4 @@
-"""Dev only (TASK-084): give two consecutive dev spans A-B, B-C a drawn curved shape. Run: python -m app.seed_dev_shape"""
+"""Dev only (TASK-084): give two consecutive dev segments A-B, B-C a drawn curved shape. Run: python -m app.seed_dev_shape"""
 import json
 import os
 import sys
@@ -10,7 +10,7 @@ from app.db import engine
 
 PAIR_SQL = """
 SELECT s1.id AS s1, s2.id AS s2, s1.site_a_id AS a1, s1.site_b_id AS b1, s2.site_a_id AS a2, s2.site_b_id AS b2
-FROM spans s1 JOIN spans s2 ON s2.id > s1.id
+FROM segments s1 JOIN segments s2 ON s2.id > s1.id
  AND (s1.site_a_id IN (s2.site_a_id, s2.site_b_id) OR s1.site_b_id IN (s2.site_a_id, s2.site_b_id))
 WHERE NOT EXISTS (SELECT 1 FROM sites x WHERE x.geom IS NULL AND x.id IN (s1.site_a_id, s1.site_b_id, s2.site_a_id, s2.site_b_id))
 ORDER BY s1.id, s2.id LIMIT 1
@@ -23,7 +23,7 @@ def main() -> None:
     with Session(engine) as db:
         r = db.execute(text(PAIR_SQL)).mappings().first()
         if r is None:
-            sys.exit("no two consecutive spans with coordinates on all three sites")
+            sys.exit("no two consecutive segments with coordinates on all three sites")
         shared = ({r["a1"], r["b1"]} & {r["a2"], r["b2"]}).pop()
         a = (({r["a1"], r["b1"]}) - {shared}).pop()
         c = (({r["a2"], r["b2"]}) - {shared}).pop()
@@ -37,16 +37,16 @@ def main() -> None:
         coords = [[ax, ay], *leg(ax, ay, bx, by), [bx, by], *leg(bx, by, cx, cy), [cx, cy]]
         assert all(99.5 <= x <= 119.5 and 0.8 <= y <= 7.5 for x, y in coords), "shape outside Malaysia bbox"
         geom = json.dumps({"type": "LineString", "coordinates": coords})
-        seg = db.execute(text("SELECT g.id FROM segments g JOIN segment_spans p1 ON p1.segment_id = g.id AND p1.span_id = :s1 "
-                              "JOIN segment_spans p2 ON p2.segment_id = g.id AND p2.span_id = :s2 AND p2.position = p1.position + 1"),
+        seg = db.execute(text("SELECT g.id FROM routes g JOIN route_segments p1 ON p1.route_id = g.id AND p1.segment_id = :s1 "
+                              "JOIN route_segments p2 ON p2.route_id = g.id AND p2.segment_id = :s2 AND p2.position = p1.position + 1"),
                          {"s1": r["s1"], "s2": r["s2"]}).scalar()
         if seg is None:
-            seg = db.execute(text("INSERT INTO segments (site_a_id, site_b_id) VALUES (:a, :c) RETURNING id"), {"a": a, "c": c}).scalar_one()
+            seg = db.execute(text("INSERT INTO routes (site_a_id, site_b_id) VALUES (:a, :c) RETURNING id"), {"a": a, "c": c}).scalar_one()
             for pos, sid in enumerate((r["s1"], r["s2"]), start=1):
-                db.execute(text("INSERT INTO segment_spans (segment_id, span_id, position) VALUES (:g, :s, :p)"), {"g": seg, "s": sid, "p": pos})
-        db.execute(text("UPDATE segments SET geom = ST_SetSRID(ST_GeomFromGeoJSON(:g), 4326) WHERE id = :i"), {"g": geom, "i": seg})
+                db.execute(text("INSERT INTO route_segments (route_id, segment_id, position) VALUES (:g, :s, :p)"), {"g": seg, "s": sid, "p": pos})
+        db.execute(text("UPDATE routes SET geom = ST_SetSRID(ST_GeomFromGeoJSON(:g), 4326) WHERE id = :i"), {"g": geom, "i": seg})
         db.commit()
-        print(f"segment {seg}: spans {r['s1']} and {r['s2']} shaped ({len(coords)} vertices)")
+        print(f"route {seg}: segments {r['s1']} and {r['s2']} shaped ({len(coords)} vertices)")
 
 
 if __name__ == "__main__":

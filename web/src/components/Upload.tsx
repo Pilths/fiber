@@ -1,9 +1,9 @@
 import { useRef, useState } from "react";
 import { ReservationUpload } from "@/components/ReservationUpload";
 import { SiteMasterUpload } from "@/components/SiteMasterUpload";
-import { SpanListUpload } from "@/components/SpanListUpload";
+import { SegmentListUpload } from "@/components/SegmentListUpload";
 
-const TABS = [["site-master", "Site master workbook"], ["span-list", "Span list"], ["reservations", "Reservation workbook"]] as const;
+const TABS = [["site-master", "Site master workbook"], ["segment-list", "Segment list"], ["reservations", "Reservation workbook"]] as const;
 type Tab = (typeof TABS)[number][0];
 
 // Admin Upload page: three separate files, each Upload -> Preview -> Apply/Confirm. All panels stay mounted so a
@@ -30,7 +30,7 @@ export function Upload() {
       </div>
       {TABS.map(([t]) => (
         <div key={t} role="tabpanel" id={`up-panel-${t}`} aria-labelledby={`up-tab-${t}`} hidden={tab !== t}>
-          {t === "site-master" ? <SiteMasterUpload /> : t === "span-list" ? <SpanListUpload /> : <ReservationUpload />}
+          {t === "site-master" ? <SiteMasterUpload /> : t === "segment-list" ? <SegmentListUpload /> : <ReservationUpload />}
         </div>
       ))}
     </div>

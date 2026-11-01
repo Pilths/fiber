@@ -31,7 +31,7 @@ def load(db: Any, path: str) -> tuple[dict[str, int], list[str]]:
         user[u] = one("SELECT id FROM users WHERE username = :u", u=u)
 
     rows = parse_workbook(path)
-    counts = dict.fromkeys(["sites", "data_centers", "spans", "customers", "reservations", "cores", "ports"], 0)
+    counts = dict.fromkeys(["sites", "data_centers", "segments", "customers", "reservations", "cores", "ports"], 0)
     skipped = [f"{r.sheet} row {r.row_number} [{r.status}]: {r.reason}" for r in rows if r.status != "ready"]
     site: dict[str, int] = {}
 

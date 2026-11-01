@@ -9,7 +9,7 @@ type Group = "new" | "changed" | "unchanged" | "missing" | "reservations" | "con
 type Warning = { kind: string; message: string; rows: number[] };
 type Preview = { upload_id: number; filename: string; counts: Record<Group, number>; warnings: Warning[]; switch_closed: boolean };
 type Change = { field: "region" | "distance_km" | "survey_cores"; old: unknown; new: unknown; protected: boolean; note?: string; blocked?: string };
-type Shown = { customer: string | null; span: string; cores: number; count_only: number | null; planned_date: string | null; group_label: string | null; additional: boolean | null; ports: [string, string[]][] | null };
+type Shown = { customer: string | null; segment: string; cores: number; count_only: number | null; planned_date: string | null; group_label: string | null; additional: boolean | null; ports: [string, string[]][] | null };
 type Data = {
   reservation?: Shown | null; key?: string; rows?: number[]; fields?: Record<string, unknown>; changes?: Change[];
   measurements?: unknown[]; matched_reservation_id?: number;
@@ -19,8 +19,8 @@ type Result = { counts: Record<string, number>; skipped: { row_number: number; r
 type Switch = { closed: boolean; closed_at: string | null; closed_by: string | null; reason: string | null };
 
 const GROUP: Record<Group, { label: string; icon: IconName; cls: string; word: string }> = {
-  new: { label: "New spans", icon: "ch", cls: "h-green", word: "New span" },
-  changed: { label: "Changed spans", icon: "co", cls: "h-blue", word: "Changed" },
+  new: { label: "New segments", icon: "ch", cls: "h-green", word: "New segment" },
+  changed: { label: "Changed segments", icon: "co", cls: "h-blue", word: "Changed" },
   unchanged: { label: "Unchanged", icon: "av", cls: "h-ns", word: "Unchanged" },
   missing: { label: "Not in this file", icon: "ns", cls: "h-ns", word: "Not in file, untouched" },
   reservations: { label: "Reservations", icon: "ch", cls: "h-green", word: "Will import" },
@@ -31,7 +31,7 @@ const GROUP: Record<Group, { label: string; icon: IconName; cls: string; word: s
   rejected: { label: "Rejected", icon: "fl", cls: "h-red", word: "Rejected" },
 };
 const OTHER: Group[] = ["new", "changed", "unchanged", "missing", "conflicts", "already_imported", "ignored", "needs_review", "rejected"];
-const SPAN_GROUPS: Group[] = ["new", "changed", "unchanged", "missing"];
+const SEGMENT_GROUPS: Group[] = ["new", "changed", "unchanged", "missing"];
 const FIELD: Record<string, string> = { region: "Region", distance_km: "Distance (km)", survey_cores: "Surveyed cores" };
 
 const TEXT: Record<string, string> = { "h-red": "font-semibold text-red", "h-amber": "font-semibold text-amber", "h-green": "text-green", "h-blue": "text-blue", "h-ns": "text-muted-foreground" };
@@ -113,7 +113,7 @@ function Reservations({ uploadId, total }: { uploadId: number; total: number }) 
         <>
           <div className="tbox">
           <table className="tbl band" aria-label="Reservations to import">
-            <thead><tr><th className="num w-px">Row</th><th>Customer</th><th>Span</th><th className="num w-px">Cores</th><th className="w-px">Planned date</th><th>Group</th><th className="w-px">Additional</th><th>Ports</th></tr></thead>
+            <thead><tr><th className="num w-px">Row</th><th>Customer</th><th>Segment</th><th className="num w-px">Cores</th><th className="w-px">Planned date</th><th>Group</th><th className="w-px">Additional</th><th>Ports</th></tr></thead>
             <tbody>
               {data.items.map((r) => {
                 const s = r.data.reservation!;
@@ -121,7 +121,7 @@ function Reservations({ uploadId, total }: { uploadId: number; total: number }) 
                   <tr key={r.id}>
                     <td className="num text-muted-foreground">{r.row_number}</td>
                     <th scope="row" className="text-left font-semibold">{s.customer}</th>
-                    <td>{s.span}</td>
+                    <td>{s.segment}</td>
                     <td className="num">{cores(s)}</td>
                     <td>{date(s.planned_date)}{r.warnings.length > 0 && <span className="ml-2 inline-flex items-center gap-1 text-xs font-semibold text-amber" title={r.warnings.join("; ")}><Icon name="lo" />{r.warnings.length === 1 ? r.warnings[0] : `${r.warnings.length} warnings`}</span>}</td>
                     <td>{s.group_label ?? "—"}</td>
@@ -144,7 +144,7 @@ function GroupRows({ uploadId, counts, wins, onWin }: { uploadId: number; counts
   const [group, setGroup] = useState<Group>(OTHER.find((g) => g !== "missing" && g !== "unchanged" && counts[g] > 0) ?? "unchanged");
   const [page, setPage] = useState(1);
   const { data, error } = useRows(uploadId, group, page);
-  const span = SPAN_GROUPS.includes(group);
+  const segment = SEGMENT_GROUPS.includes(group);
   return (
     <section aria-labelledby="ru-rows-h" data-testid="ru-groups">
       <h3 id="ru-rows-h" className="mb-2 text-[15px] font-semibold">Rows by group</h3>
@@ -156,18 +156,18 @@ function GroupRows({ uploadId, counts, wins, onWin }: { uploadId: number; counts
         <>
           <div className="tbox">
           <table className="tbl band" aria-label={`${GROUP[group].label} rows`}>
-            <thead><tr>{span ? <><th>Span</th><th>File rows</th></> : <><th className="num w-px">Row</th><th className="w-px">Sheet</th></>}<th className="w-px">Status</th><th>Details</th></tr></thead>
+            <thead><tr>{segment ? <><th>Segment</th><th>File rows</th></> : <><th className="num w-px">Row</th><th className="w-px">Sheet</th></>}<th className="w-px">Status</th><th>Details</th></tr></thead>
             <tbody>
               {data.items.map((r) => (
                 <tr key={r.id} className="align-top [&>*]:py-2.5! [&>*]:h-auto!">
-                  {span
+                  {segment
                     ? <><th scope="row" className="text-left font-semibold">{r.data.key}</th><td className="text-muted-foreground">{r.data.rows?.join(", ") ?? "—"}</td></>
                     : <><td className="num text-muted-foreground">{r.row_number}</td><td className="text-muted-foreground">{r.sheet_name}</td></>}
                   <td><Pill g={group} /></td>
                   <td className="whitespace-normal!">
                     {r.reason && <p>{r.reason}</p>}
-                    {r.data.reservation && !span && <p className="text-muted-foreground">{r.data.reservation.customer ?? "no customer"} · {r.data.reservation.span} · {cores(r.data.reservation)}</p>}
-                    {group === "new" && r.data.fields && <p>{Object.entries(r.data.fields).map(([k, v]) => `${FIELD[k] ?? k} ${v}`).join(" · ") || "No span values in the file"}</p>}
+                    {r.data.reservation && !segment && <p className="text-muted-foreground">{r.data.reservation.customer ?? "no customer"} · {r.data.reservation.segment} · {cores(r.data.reservation)}</p>}
+                    {group === "new" && r.data.fields && <p>{Object.entries(r.data.fields).map(([k, v]) => `${FIELD[k] ?? k} ${v}`).join(" · ") || "No segment values in the file"}</p>}
                     {r.data.changes && r.data.changes.length > 0 && (
                       <Changes changes={r.data.changes.map((c) => ({ ...c, field: FIELD[c.field] ?? c.field }))} extra={(i) => {
                         const c = r.data.changes![i];
@@ -259,7 +259,7 @@ export function ReservationUpload() {
           {result && (
             <Note tone="green" title="Upload confirmed">
               <p>
-                {plural(result.counts.reservations, "reservation")} imported, {plural(result.counts.spans, "new span")}, {plural(result.counts.span_updates, "span field")} updated,{" "}
+                {plural(result.counts.reservations, "reservation")} imported, {plural(result.counts.segments, "new segment")}, {plural(result.counts.segment_updates, "segment field")} updated,{" "}
                 {plural(result.counts.cores, "core")}, {plural(result.counts.ports, "port")} and {plural(result.counts.customers, "customer")} added, {plural(result.counts.measurements, "measurement")} appended{result.ignored_reservation_rows ? `, ${plural(result.ignored_reservation_rows, "reservation row")} ignored (import closed)` : ""}.
               </p>
               {result.skipped.length > 0 && (
@@ -297,9 +297,9 @@ export function ReservationUpload() {
         <Dialog title="Confirm this upload?" onClose={() => setConfirming(false)} wide>
           <ul className="mt-3 list-disc space-y-1 pl-4 text-body">
             <li>Import <b>{plural(c.reservations, "reservation")}</b> as approved.</li>
-            <li>Add <b>{c.new}</b> new spans; update <b>{c.changed}</b> changed spans{wins.size ? ` (Excel value used for ${wins.size} dashboard-edited ${wins.size === 1 ? "field" : "fields"})` : " (dashboard-edited fields keep the dashboard value)"}.</li>
+            <li>Add <b>{c.new}</b> new segments; update <b>{c.changed}</b> changed segments{wins.size ? ` (Excel value used for ${wins.size} dashboard-edited ${wins.size === 1 ? "field" : "fields"})` : " (dashboard-edited fields keep the dashboard value)"}.</li>
             <li>Skip <b>{c.conflicts}</b> conflicts; <b>{notImported}</b> rows are not imported (already imported, ignored, needs review, rejected).</li>
-            <li><b>{c.missing}</b> spans not in this file stay as they are.</li>
+            <li><b>{c.missing}</b> segments not in this file stay as they are.</li>
           </ul>
           <p className="mt-3 text-body text-muted-foreground">Everything is saved in one step. Existing reservations are never changed.</p>
           <div className="mt-5 flex justify-end gap-2">

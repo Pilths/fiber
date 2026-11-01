@@ -11,9 +11,9 @@ Db = Annotated[Decimal, PlainSerializer(lambda v: round(float(v), 2), return_typ
 Pct = Annotated[Decimal, PlainSerializer(lambda v: round(float(v), 1), return_type=float, when_used="json")]
 
 
-class SpanLoss(BaseModel):
-    span_id: int
-    span_name: str
+class SegmentLoss(BaseModel):
+    segment_id: int
+    segment_name: str
     region: str | None
     route_type: str | None
     distance_km: Decimal | None
@@ -54,7 +54,7 @@ class CoreLoss(BaseModel):
     history: list[MeasurementOut]
 
 
-class SpanLossDetail(SpanLoss):
+class SegmentLossDetail(SegmentLoss):
     history: list[MeasurementOut]
     cores: list[CoreLoss]
 
@@ -64,18 +64,18 @@ class Count(BaseModel):
     total: int
 
 
-class SegmentCount(Count):
-    segment_id: int
+class RouteCount(Count):
+    route_id: int
     name: str
 
 
 class Coverage(Count):
     by_region: dict[str, Count]
-    segments: list[SegmentCount]
+    routes: list[RouteCount]
 
 
 class RouteLoss(BaseModel):
-    spans: list[SpanLoss]
+    segments: list[SegmentLoss]
     total_calculated_db: Db | None
     total_measured_db: Db | None
     level: Level | None

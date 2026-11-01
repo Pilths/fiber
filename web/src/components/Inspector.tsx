@@ -2,10 +2,10 @@ import type { ReactNode } from "react";
 import type { components } from "@/api/schema";
 import { Icon } from "@/components/Icon";
 import { LossNum } from "@/components/LossCard";
-import type { SpanFocus } from "@/components/AdminEdit";
-import { countBy, db, health, LEVEL, pct, perKm, spanName, totalLoss, type LossDetail } from "@/lib/status";
+import type { SegmentFocus } from "@/components/AdminEdit";
+import { countBy, db, health, LEVEL, pct, perKm, segmentName, totalLoss, type LossDetail } from "@/lib/status";
 
-type Detail = components["schemas"]["SpanDetail"];
+type Detail = components["schemas"]["SegmentDetail"];
 
 export const Facts = ({ d }: { d: Detail }) => (
   <>
@@ -30,21 +30,21 @@ export const Placeholder = ({ title, text, actions }: { title: string; text?: st
 
 const focusEl = (id: string) => document.getElementById(id)?.focus();
 
-type Admin = { onEditSpan: (focus?: SpanFocus) => void; onEditSite: (end: "a" | "b") => void } | null; // null for planners
+type Admin = { onEditSegment: (focus?: SegmentFocus) => void; onEditSite: (end: "a" | "b") => void } | null; // null for planners
 
 // fill: take the full height of a relative parent (Map page, beside the map); else the fixed 420px card (Reserve tab).
 export function Inspector({ detail, loading, loss, admin, route, onCores, fill }: {
   detail: Detail | null; loading: boolean; loss: LossDetail | null; admin: Admin;
-  route?: ReactNode; // route: the route summary, shown instead of the span in Route mode
+  route?: ReactNode; // route: the route summary, shown instead of the segment in Route mode
   onCores: () => void; fill?: boolean;
 }) {
   return (
     <section className={`card flex flex-col overflow-hidden p-0 ${fill ? "absolute inset-0" : "h-[420px] flex-none"}`} aria-label="Inspector" data-testid="inspector">
       {route ?? (!detail
-        ? <Placeholder title={loading ? "Loading span..." : "No span selected"} text={loading ? undefined : "Select a span on the map, search a route above the map, or search by site or span in the top bar."}
+        ? <Placeholder title={loading ? "Loading segment..." : "No segment selected"} text={loading ? undefined : "Select a segment on the map, search a route above the map, or search by site or segment in the top bar."}
           actions={loading ? undefined : <>
             <button type="button" className="btn btn-sm" onClick={() => focusEl("route-a")}>Search a route</button>
-            <button type="button" className="btn btn-sm" onClick={() => focusEl("global-search")}>Search by site or span</button>
+            <button type="button" className="btn btn-sm" onClick={() => focusEl("global-search")}>Search by site or segment</button>
           </>} />
         : <Body key={detail.id} d={detail} loss={loss} admin={admin} />)}
       {!route && (
@@ -71,7 +71,7 @@ function Body({ d, loss, admin }: { d: Detail; loss: LossDetail | null; admin: A
     { k: "k-cores", v: n.Reserved + n.Requested + d.unassigned_reserved, label: "Reserved" },
     { k: "k-use", v: n["In use"], label: "In service" },
   ];
-  // Loss alert strip: amber or worse, measured only. The card has one alert slot: a cut span shows the cut banner,
+  // Loss alert strip: amber or worse, measured only. The card has one alert slot: a cut segment shows the cut banner,
   // and the core table carries per-core loss.
   const lv = loss?.measured_db != null && loss.deviation_pct != null && loss.level && loss.level !== "green" ? loss.level : null;
   const high = lv === "red" || lv === "off_scale";
@@ -80,21 +80,21 @@ function Body({ d, loss, admin }: { d: Detail; loss: LossDetail | null; admin: A
     <>
       <div className="ins-head">
         <div className="flex items-start justify-between gap-3">
-          <h3 id="span-h" className={`ins-title ${spanName(d).length > 22 ? "long" : ""}`}>
+          <h3 id="segment-h" className={`ins-title ${segmentName(d).length > 22 ? "long" : ""}`}>
             {admin ? (
               <>
                 <button type="button" className={link} aria-label={`Edit site ${d.site_a}`} onClick={() => admin.onEditSite("a")}>{d.site_a}</button>
                 {" - "}
                 <button type="button" className={link} aria-label={`Edit site ${d.site_b}`} onClick={() => admin.onEditSite("b")}>{d.site_b}</button>
               </>
-            ) : spanName(d)}
+            ) : segmentName(d)}
           </h3>
-          {/* Health reads from the big number's colour and the bar; only a cut span gets a chip. */}
+          {/* Health reads from the big number's colour and the bar; only a cut segment gets a chip. */}
           {cut && <span className="pill h-red mt-2 flex-none" data-testid="health"><Icon name="fl" />Cut</span>}
         </div>
         <div className="ins-facts">
           <Facts d={d} />
-          {admin && <button type="button" className="ml-auto font-semibold link" onClick={() => admin.onEditSpan()}>Edit span</button>}
+          {admin && <button type="button" className="ml-auto font-semibold link" onClick={() => admin.onEditSegment()}>Edit segment</button>}
         </div>
       </div>
 
@@ -104,8 +104,8 @@ function Body({ d, loss, admin }: { d: Detail; loss: LossDetail | null; admin: A
             {cut && (
               <div data-testid="fiber-cut" className="flex items-center gap-2.5 rounded-md border border-red-bd bg-red-bg px-3 py-1.5 text-red">
                 <Icon name="fl" />
-                <p className="min-w-0 flex-1"><b className="font-semibold">Fiber cut</b><span className="block text-foreground">All cores on this span are unavailable.</span></p>
-                {admin && <button type="button" className="btn btn-sm flex-none" onClick={() => admin.onEditSpan("restore")}>Restore</button>}
+                <p className="min-w-0 flex-1"><b className="font-semibold">Fiber cut</b><span className="block text-foreground">All cores on this segment are unavailable.</span></p>
+                {admin && <button type="button" className="btn btn-sm flex-none" onClick={() => admin.onEditSegment("restore")}>Restore</button>}
               </div>
             )}
             {lv && !cut && (
@@ -146,12 +146,12 @@ function Body({ d, loss, admin }: { d: Detail; loss: LossDetail | null; admin: A
         ) : admin ? (
           <div className="flex items-center gap-3 text-body">
             <p className="flex-1 font-semibold text-muted-foreground">Not surveyed</p>
-            <button type="button" className="btn btn-sm flex-none" onClick={() => admin.onEditSpan("survey")}>Enter survey count</button>
+            <button type="button" className="btn btn-sm flex-none" onClick={() => admin.onEditSegment("survey")}>Enter survey count</button>
           </div>
         ) : <p className="text-body font-semibold text-muted-foreground">Not surveyed</p>}
 
-        {/* Span facts: total loss is the worst measured core, else the calculated loss (distance x 0.3 dB/km). */}
-        <dl className="mt-4 border-t text-body [&>div]:flex [&>div]:min-h-10 [&>div]:items-center [&>div]:justify-between [&>div]:gap-3 [&>div]:border-b [&>div]:py-1.5 [&_dd]:text-right [&_dd]:font-semibold" data-testid="span-facts">
+        {/* Segment facts: total loss is the worst measured core, else the calculated loss (distance x 0.3 dB/km). */}
+        <dl className="mt-4 border-t text-body [&>div]:flex [&>div]:min-h-10 [&>div]:items-center [&>div]:justify-between [&>div]:gap-3 [&>div]:border-b [&>div]:py-1.5 [&_dd]:text-right [&_dd]:font-semibold" data-testid="segment-facts">
           <div><dt>Distance</dt><dd>{km ? `${km} km` : "-"}</dd></div>
           <div><dt>Free cores</dt><dd>{surveyed ? `${cut ? 0 : d.free_to_reserve} of ${d.survey_cores}` : "-"}</dd></div>
           <div><dt>Cable size</dt><dd>{d.cable_size}</dd></div>

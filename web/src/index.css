@@ -125,7 +125,7 @@
   input.field[list]::-webkit-calendar-picker-indicator { width: 20px; height: 20px; margin: 0 0 0 4px; padding: 0; opacity: 0; cursor: pointer; }
   select.field { appearance: none; padding-right: 30px; cursor: pointer; background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 6l4 4 4-4' fill='none' stroke='%235b6068' stroke-width='1.5'/%3E%3C/svg%3E") no-repeat right 10px center / 16px; }
 
-  /* Inspector (B2): fixed-height card; fixed head, a body that scrolls inside the card, a pinned footer. Span and route states share them.
+  /* Inspector (B2): fixed-height card; fixed head, a body that scrolls inside the card, a pinned footer. Segment and route states share them.
      A long title (DEV seed names, not 4-letter LRD pairs) drops to 24px and may wrap; it is never cut, admins click the site names in it. */
   /* Top padding puts the title's first-line cap centre on the map toolbar's centre line (map card: 1px border + 12px inset
      + 1px stage border + 12px toolbar offset + 16px half button = 42px; inspector-layout.spec.ts checks it). */
@@ -156,7 +156,7 @@
   .tbl thead th { text-align: left; font-size: 12px; font-weight: 500; color: var(--muted-ink); padding: 8px 16px 8px 0; border-bottom: 1px solid var(--border); white-space: nowrap; }
   .tbl td, .tbl tbody th { height: 48px; font-size: 14px; font-weight: inherit; color: inherit; padding: 0 16px 0 0; border-bottom: 1px solid var(--rule); }
   .tbl tbody tr:last-child > * { border-bottom: 0; }
-  /* Band table: the route "Spans on this path" look. Grey header band, 40px rows, no wrapping, inside a bordered box. */
+  /* Band table: the route "Segments on this path" look. Grey header band, 40px rows, no wrapping, inside a bordered box. */
   .tbox { overflow-x: auto; border: 1px solid var(--border); border-radius: 6px; }
   .band thead th { background: var(--subtle); padding: 8px 12px; }
   .band td, .band tbody th { height: 40px; padding: 0 12px; white-space: nowrap; font-size: 13px; }
@@ -203,7 +203,7 @@
 .cfoot[data-has="true"] { background: var(--blue-bg); border-top-color: var(--blue-bd); }
 .cchip { display: inline-flex; align-items: center; height: 24px; padding: 0 10px; border-radius: 4px; background: var(--blue); color: #fff; font-size: 12px; font-weight: 600; }
 
-/* Route diagram (v4 lineSVG): span groups are SVG <g role="button">; outline is unreliable on SVG, so the focus ring is the hit rect's stroke. */
+/* Route diagram (v4 lineSVG): segment groups are SVG <g role="button">; outline is unreliable on SVG, so the focus ring is the hit rect's stroke. */
 .rd-g { outline: none; }
 .rd-g:hover .hit { stroke: var(--line); stroke-width: 1; }
 .rd-g:focus-visible .hit { stroke: var(--blue); stroke-width: 3; }

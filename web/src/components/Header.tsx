@@ -5,8 +5,8 @@ import { NavIcon } from "@/components/Icon";
 
 type Result = components["schemas"]["SearchResult"];
 type Me = components["schemas"]["CurrentUser"];
-const GROUPS: Result["type"][] = ["customer", "span", "circuit", "core"];
-const GROUP_LABEL = { customer: "Customers", span: "Spans", circuit: "Circuits", core: "Cores" };
+const GROUPS: Result["type"][] = ["customer", "segment", "circuit", "core"];
+const GROUP_LABEL = { customer: "Customers", segment: "Segments", circuit: "Circuits", core: "Cores" };
 
 // Global search: GET /api/search already exists, so results come from the server (TASK-079 will add sites and polish).
 function GlobalSearch({ onPick }: { onPick: (r: Result) => void }) {
@@ -49,7 +49,7 @@ function GlobalSearch({ onPick }: { onPick: (r: Result) => void }) {
   }, []);
 
   const pick = (r: Result) => {
-    if (r.span_id == null) return; // nothing to open (e.g. customer without reservations)
+    if (r.segment_id == null) return; // nothing to open (e.g. customer without reservations)
     setOpen(false);
     setQ("");
     onPick(r);
@@ -66,7 +66,7 @@ function GlobalSearch({ onPick }: { onPick: (r: Result) => void }) {
   };
 
   const showList = open && q.trim() !== "";
-  const label = "Find a span, site, customer, circuit or core";
+  const label = "Find a segment, site, customer, circuit or core";
   return (
     <div ref={box} className="relative ml-auto min-w-[260px] flex-[0_1_420px]">
       <svg viewBox="0 0 16 16" aria-hidden="true" className="ni pointer-events-none absolute left-3 top-2.5 text-muted-foreground"><path d="M7 12A5 5 0 1 0 7 2a5 5 0 0 0 0 10zM14 14l-3.5-3.5" /></svg>
@@ -104,13 +104,13 @@ function GlobalSearch({ onPick }: { onPick: (r: Result) => void }) {
                     id={`${id}-${i}`}
                     role="option"
                     aria-selected={i === active}
-                    aria-disabled={r.span_id == null}
+                    aria-disabled={r.segment_id == null}
                     onMouseEnter={() => setActive(i)}
                     onClick={() => pick(r)}
                     className={`flex min-h-10 cursor-pointer items-center px-4 py-1.5 aria-disabled:cursor-not-allowed ${i === active ? "bg-blue-bg" : ""}`}
                   >
                     <span className="font-semibold">{r.label}</span>
-                    {r.span_id == null && <span className="ml-2 text-body text-muted-foreground">(no span yet)</span>}
+                    {r.segment_id == null && <span className="ml-2 text-body text-muted-foreground">(no segment yet)</span>}
                   </div>
                 ))}
               </div>

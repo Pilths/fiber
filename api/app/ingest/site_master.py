@@ -341,9 +341,9 @@ def _possible_renames(res: SheetResult, site_coords: dict[str, tuple[float, floa
 def used_site_ids(db: Session, ids: list[int]) -> set[int]:
     if not ids:
         return set()
-    sql = ("SELECT DISTINCT i FROM (SELECT site_a_id AS i FROM spans UNION ALL SELECT site_b_id FROM spans "
-           "UNION ALL SELECT site_id FROM ports UNION ALL SELECT site_a_id FROM segments "
-           "UNION ALL SELECT site_b_id FROM segments) u WHERE i = ANY(:ids)")
+    sql = ("SELECT DISTINCT i FROM (SELECT site_a_id AS i FROM segments UNION ALL SELECT site_b_id FROM segments "
+           "UNION ALL SELECT site_id FROM ports UNION ALL SELECT site_a_id FROM routes "
+           "UNION ALL SELECT site_b_id FROM routes) u WHERE i = ANY(:ids)")
     return {r[0] for r in db.execute(text(sql), {"ids": ids})}
 
 
@@ -498,7 +498,7 @@ def apply_sheet(db: Session, admin_id: int, kind: str, r: SheetResult, reason: s
         if m.id in pairs:
             continue
         if m.id in r.in_use:
-            warnings.append(f"{m.name} is missing from the file but is used by a span, port or segment; kept active")
+            warnings.append(f"{m.name} is missing from the file but is used by a segment, port or route; kept active")
             out["kept_active"] += 1
         elif is_protected(prot, m.id, "active"):
             out["protected_kept"] += 1

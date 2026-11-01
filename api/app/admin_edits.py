@@ -1,8 +1,8 @@
-"""Admin editing (Session 8): core status, span fields, site fields, and data_edits history.
+"""Admin editing (Session 8): core status, segment fields, site fields, and data_edits history.
 
 Every changed field is its own data_edits row (old, new, reason, user). Field names match what the upload
 modules compare for protection: site name/location ("lat,lon")/region (stored in details.region)/active,
-span distance_km/route_type/region/site_a_id/site_b_id/survey_cores/cable_size, core status.
+segment distance_km/route_type/region/site_a_id/site_b_id/survey_cores/cable_size, core status.
 """
 from decimal import Decimal
 from typing import Annotated, Any, Literal
@@ -26,7 +26,7 @@ from app.routing.graph import invalidate as invalidate_routes
 router = APIRouter(prefix="/api/admin", dependencies=[Depends(require_admin)])
 DB = Annotated[Session, Depends(get_db)]
 Admin = Annotated[CurrentUser, Depends(require_admin)]
-Entity = Literal["core", "span", "site"]
+Entity = Literal["core", "segment", "site"]
 
 
 class HistoryRow(BaseModel):
@@ -70,19 +70,19 @@ def get_history(db: DB, entity: Entity, id: int) -> list[HistoryRow]:
 # ---------- core ports (typed by hand; the reservation upload does not import ports) ----------
 
 class CorePortsBody(BaseModel):
-    port_a: str | None = None  # label at the span's first site; null or empty clears it
-    port_b: str | None = None  # label at the span's second site
+    port_a: str | None = None  # label at the segment's first site; null or empty clears it
+    port_b: str | None = None  # label at the segment's second site
     reason: Reason
 
 
 @router.post("/cores/{core_id}/ports")
 def set_core_ports(db: DB, admin: Admin, core_id: int, body: CorePortsBody) -> CoreHolderDetail:
-    found = db.execute(text("SELECT c.span_id, c.port_a_id, c.port_b_id, s.site_a_id, s.site_b_id FROM cores c "
-                            "JOIN spans s ON s.id = c.span_id WHERE c.id = :c"), {"c": core_id}).first()
+    found = db.execute(text("SELECT c.segment_id, c.port_a_id, c.port_b_id, s.site_a_id, s.site_b_id FROM cores c "
+                            "JOIN segments s ON s.id = c.segment_id WHERE c.id = :c"), {"c": core_id}).first()
     if found is None:
         raise HTTPException(404, "Core not found")
-    span, cur_a, cur_b, site_a, site_b = found
-    db.execute(text("SELECT id FROM spans WHERE id = :s FOR UPDATE"), {"s": span})
+    segment, cur_a, cur_b, site_a, site_b = found
+    db.execute(text("SELECT id FROM segments WHERE id = :s FOR UPDATE"), {"s": segment})
     edits: list[tuple[str, Any, Any]] = []
     new_ids = {}
     for fld, label, cur, site in (("port_a", body.port_a, cur_a, site_a), ("port_b", body.port_b, cur_b, site_b)):
@@ -108,9 +108,9 @@ def set_core_ports(db: DB, admin: Admin, core_id: int, body: CorePortsBody) -> C
     return core
 
 
-# ---------- spans ----------
+# ---------- segments ----------
 
-class SpanBody(BaseModel):
+class SegmentBody(BaseModel):
     reason: Reason
     distance_km: Decimal | None = Field(None, ge=0, max_digits=10, decimal_places=3)
     route_type: Literal["Trunk", "Metro"] | None = None
@@ -122,7 +122,7 @@ class SpanBody(BaseModel):
     fiber_cut: bool | None = None
 
 
-class SpanEdit(BaseModel):
+class SegmentEdit(BaseModel):
     id: int
     site_a_id: int
     site_b_id: int
@@ -137,28 +137,28 @@ class SpanEdit(BaseModel):
     history: list[HistoryRow]
 
 
-SPAN_Q = ("SELECT s.id, s.site_a_id, s.site_b_id, a.name AS site_a, b.name AS site_b, s.route_type, s.region, s.distance_km, "
-          "s.survey_cores, s.cable_size, s.fiber_cut FROM spans s JOIN sites a ON a.id = s.site_a_id JOIN sites b ON b.id = s.site_b_id "
+SEGMENT_Q = ("SELECT s.id, s.site_a_id, s.site_b_id, a.name AS site_a, b.name AS site_b, s.route_type, s.region, s.distance_km, "
+          "s.survey_cores, s.cable_size, s.fiber_cut FROM segments s JOIN sites a ON a.id = s.site_a_id JOIN sites b ON b.id = s.site_b_id "
           "WHERE s.id = :i")
 
 
-@router.get("/spans/{sid}")
-def get_span(db: DB, sid: int) -> SpanEdit:
-    row = db.execute(text(SPAN_Q), {"i": sid}).mappings().first()
+@router.get("/segments/{sid}")
+def get_segment(db: DB, sid: int) -> SegmentEdit:
+    row = db.execute(text(SEGMENT_Q), {"i": sid}).mappings().first()
     if row is None:
-        raise HTTPException(404, "Span not found")
-    return SpanEdit(**row, history=history(db, "span", sid, 10))
+        raise HTTPException(404, "Segment not found")
+    return SegmentEdit(**row, history=history(db, "segment", sid, 10))
 
 
 def _resize(db: Session, sid: int, new: int) -> None:
-    have = db.execute(text("SELECT coalesce(max(number), 0) FROM cores WHERE span_id = :s"), {"s": sid}).scalar_one()
+    have = db.execute(text("SELECT coalesce(max(number), 0) FROM cores WHERE segment_id = :s"), {"s": sid}).scalar_one()
     if new > have:
         add_cores(db, sid, new)  # numbers up to `have` already exist and simply become surveyed again
         return
     if new == have:
         return
     blocking = db.execute(text(
-        "SELECT c.id, c.number FROM cores c JOIN core_status_v v ON v.core_id = c.id WHERE c.span_id = :s AND c.number > :n AND ("
+        "SELECT c.id, c.number FROM cores c JOIN core_status_v v ON v.core_id = c.id WHERE c.segment_id = :s AND c.number > :n AND ("
         "v.status <> 'Available' OR EXISTS (SELECT 1 FROM reservation_cores rc WHERE rc.core_id = c.id) "
         "OR EXISTS (SELECT 1 FROM data_edits d WHERE d.entity = 'core' AND d.entity_id = c.id) "
         "OR c.port_a_id IS NOT NULL OR c.port_b_id IS NOT NULL OR c.circuit_id IS NOT NULL) ORDER BY c.number"),
@@ -168,8 +168,8 @@ def _resize(db: Session, sid: int, new: int) -> None:
         raise conflict(f"Cannot lower to {new}: cores {', '.join(map(str, nums))} are reserved, in use, have ports "
                        "or have reservation history.", blocking_core_numbers=nums, blocking_core_ids=[i for i, _ in blocking])
     free_after = db.execute(text("SELECT count(*) FROM cores c JOIN core_status_v v ON v.core_id = c.id "
-                                 "WHERE c.span_id = :s AND c.number <= :n AND v.status = 'Available'"), {"s": sid, "n": new}).scalar_one()
-    reserved = db.execute(text("SELECT coalesce(sum(remaining), 0) FROM reservation_unassigned_v WHERE span_id = :s"), {"s": sid}).scalar_one()
+                                 "WHERE c.segment_id = :s AND c.number <= :n AND v.status = 'Available'"), {"s": sid, "n": new}).scalar_one()
+    reserved = db.execute(text("SELECT coalesce(sum(remaining), 0) FROM reservation_unassigned_v WHERE segment_id = :s"), {"s": sid}).scalar_one()
     if free_after < reserved:
         raise conflict(f"Cannot lower to {new}: {reserved} cores are reserved by count only and only {free_after} would stay Available.")
     # rows above the new count stay (nothing is deleted); the inventory and booking queries hide them
@@ -181,20 +181,20 @@ def _check_sites(db: Session, sid: int, a: int, b: int) -> None:
     found = db.execute(text("SELECT count(*) FROM sites WHERE id = ANY(CAST(:i AS bigint[]))"), {"i": [a, b]}).scalar_one()
     if found != 2:
         raise HTTPException(422, "Unknown site")
-    if db.execute(text("SELECT 1 FROM spans WHERE id <> :s AND least(site_a_id, site_b_id) = least(CAST(:a AS bigint), CAST(:b AS bigint)) "
+    if db.execute(text("SELECT 1 FROM segments WHERE id <> :s AND least(site_a_id, site_b_id) = least(CAST(:a AS bigint), CAST(:b AS bigint)) "
                        "AND greatest(site_a_id, site_b_id) = greatest(CAST(:a AS bigint), CAST(:b AS bigint))"),
                   {"s": sid, "a": a, "b": b}).first():
-        raise conflict("These two sites already have a span.")
-    if db.execute(text("SELECT 1 FROM core_holds h JOIN cores c ON c.id = h.core_id WHERE c.span_id = :s LIMIT 1"), {"s": sid}).first() \
-            or db.execute(text("SELECT 1 FROM reservation_unassigned_v WHERE span_id = :s AND remaining > 0"), {"s": sid}).first():
-        raise conflict("This span has active reservations; release them before changing its sites.")
+        raise conflict("These two sites already have a segment.")
+    if db.execute(text("SELECT 1 FROM core_holds h JOIN cores c ON c.id = h.core_id WHERE c.segment_id = :s LIMIT 1"), {"s": sid}).first() \
+            or db.execute(text("SELECT 1 FROM reservation_unassigned_v WHERE segment_id = :s AND remaining > 0"), {"s": sid}).first():
+        raise conflict("This segment has active reservations; release them before changing its sites.")
 
 
-@router.post("/spans/{sid}")
-def edit_span(db: DB, admin: Admin, sid: int, body: SpanBody) -> Edited:
-    old = db.execute(text("SELECT * FROM spans WHERE id = :i FOR UPDATE"), {"i": sid}).mappings().first()
+@router.post("/segments/{sid}")
+def edit_segment(db: DB, admin: Admin, sid: int, body: SegmentBody) -> Edited:
+    old = db.execute(text("SELECT * FROM segments WHERE id = :i FOR UPDATE"), {"i": sid}).mappings().first()
     if old is None:
-        raise HTTPException(404, "Span not found")
+        raise HTTPException(404, "Segment not found")
     new: dict[str, Any] = body.model_dump(exclude_none=True, exclude={"reason"})
     if "region" in new:
         new["region"], err = checks.map_region(new["region"])
@@ -209,14 +209,14 @@ def edit_span(db: DB, admin: Admin, sid: int, body: SpanBody) -> Edited:
         _resize(db, sid, changes["survey_cores"])
     for f, v in changes.items():
         if f not in ("site_a_id", "site_b_id"):
-            db.execute(text(f"UPDATE spans SET {f} = :v WHERE id = :i"), {"v": v, "i": sid})  # f is a SpanBody field name
+            db.execute(text(f"UPDATE segments SET {f} = :v WHERE id = :i"), {"v": v, "i": sid})  # f is a SegmentBody field name
     if "site_a_id" in changes or "site_b_id" in changes:  # one statement: a swap passes the differ check only as a pair
-        db.execute(text("UPDATE spans SET site_a_id = :a, site_b_id = :b WHERE id = :i"),
+        db.execute(text("UPDATE segments SET site_a_id = :a, site_b_id = :b WHERE id = :i"),
                    {"a": changes.get("site_a_id", old["site_a_id"]), "b": changes.get("site_b_id", old["site_b_id"]), "i": sid})
-    done = _log(db, admin, "span", sid, [(f, old[f], v) if f != "fiber_cut" else (f, str(old[f]).lower(), str(v).lower()) for f, v in changes.items()], body.reason)
+    done = _log(db, admin, "segment", sid, [(f, old[f], v) if f != "fiber_cut" else (f, str(old[f]).lower(), str(v).lower()) for f, v in changes.items()], body.reason)
     db.commit()
     invalidate_routes()  # distance, site or fiber cut change alters the routing graph
-    return Edited(id=sid, changed=done, history=history(db, "span", sid, 10))
+    return Edited(id=sid, changed=done, history=history(db, "segment", sid, 10))
 
 
 # ---------- sites ----------
@@ -247,7 +247,7 @@ SITE_Q = ("SELECT id, name, kind, ST_Y(geom) AS lat, ST_X(geom) AS lon, details-
 
 @router.get("/sites")
 def find_sites(db: DB, q: Annotated[str, Query(min_length=1)]) -> list[dict[str, Any]]:
-    """Site picker for the span form: id and name, 20 best matches."""
+    """Site picker for the segment form: id and name, 20 best matches."""
     return [dict(r) for r in db.execute(text("SELECT id, name FROM sites WHERE name ILIKE '%' || :q || '%' ORDER BY name LIMIT 20"), {"q": q}).mappings()]
 
 
@@ -292,8 +292,8 @@ def edit_site(db: DB, admin: Admin, sid: int, body: SiteBody) -> Edited:
                             "WHERE id = :i"), {"v": region, "i": sid})
             edits.append(("region", old["region"], region))
     if body.active is not None and body.active != old["active"]:
-        if not body.active and db.execute(text("SELECT 1 FROM spans WHERE site_a_id = :i OR site_b_id = :i LIMIT 1"), {"i": sid}).first():
-            raise conflict("This site is used by a span and cannot be deactivated.")
+        if not body.active and db.execute(text("SELECT 1 FROM segments WHERE site_a_id = :i OR site_b_id = :i LIMIT 1"), {"i": sid}).first():
+            raise conflict("This site is used by a segment and cannot be deactivated.")
         db.execute(text("UPDATE sites SET active = :a WHERE id = :i"), {"a": body.active, "i": sid})
         edits.append(("active", str(old["active"]).lower(), str(body.active).lower()))
     if not edits:

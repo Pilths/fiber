@@ -158,15 +158,15 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/spans": {
+    "/api/segments": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** List Spans */
-        get: operations["list_spans_api_spans_get"];
+        /** List Segments */
+        get: operations["list_segments_api_segments_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -175,15 +175,15 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/spans/{span_id}": {
+    "/api/segments/{segment_id}": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Get Span */
-        get: operations["get_span_api_spans__span_id__get"];
+        /** Get Segment */
+        get: operations["get_segment_api_segments__segment_id__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -452,15 +452,15 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/loss/spans": {
+    "/api/loss/segments": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Spans */
-        get: operations["spans_api_loss_spans_get"];
+        /** Segments */
+        get: operations["segments_api_loss_segments_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -469,15 +469,15 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/loss/spans/{span_id}": {
+    "/api/loss/segments/{segment_id}": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Span */
-        get: operations["span_api_loss_spans__span_id__get"];
+        /** Segment */
+        get: operations["segment_api_loss_segments__segment_id__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -591,7 +591,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/admin/span-list/uploads": {
+    "/api/admin/segment-list/uploads": {
         parameters: {
             query?: never;
             header?: never;
@@ -601,14 +601,14 @@ export interface paths {
         get?: never;
         put?: never;
         /** Upload */
-        post: operations["upload_api_admin_span_list_uploads_post"];
+        post: operations["upload_api_admin_segment_list_uploads_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/admin/span-list/uploads/{upload_id}/rows": {
+    "/api/admin/segment-list/uploads/{upload_id}/rows": {
         parameters: {
             query?: never;
             header?: never;
@@ -616,7 +616,7 @@ export interface paths {
             cookie?: never;
         };
         /** Rows */
-        get: operations["rows_api_admin_span_list_uploads__upload_id__rows_get"];
+        get: operations["rows_api_admin_segment_list_uploads__upload_id__rows_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -625,7 +625,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/admin/span-list/uploads/{upload_id}/apply": {
+    "/api/admin/segment-list/uploads/{upload_id}/apply": {
         parameters: {
             query?: never;
             header?: never;
@@ -635,7 +635,7 @@ export interface paths {
         get?: never;
         put?: never;
         /** Apply */
-        post: operations["apply_api_admin_span_list_uploads__upload_id__apply_post"];
+        post: operations["apply_api_admin_segment_list_uploads__upload_id__apply_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -778,18 +778,18 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/admin/spans/{sid}": {
+    "/api/admin/segments/{sid}": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Get Span */
-        get: operations["get_span_api_admin_spans__sid__get"];
+        /** Get Segment */
+        get: operations["get_segment_api_admin_segments__sid__get"];
         put?: never;
-        /** Edit Span */
-        post: operations["edit_span_api_admin_spans__sid__post"];
+        /** Edit Segment */
+        post: operations["edit_segment_api_admin_segments__sid__post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -805,7 +805,7 @@ export interface paths {
         };
         /**
          * Find Sites
-         * @description Site picker for the span form: id and name, 20 best matches.
+         * @description Site picker for the segment form: id and name, 20 best matches.
          */
         get: operations["find_sites_api_admin_sites_get"];
         put?: never;
@@ -911,7 +911,7 @@ export interface paths {
         };
         /**
          * Pick
-         * @description The cores a route reservation would take: the first free cores on each span. The UI sends them to POST /api/reservations.
+         * @description The cores a route reservation would take: the first free cores on each segment. The UI sends them to POST /api/reservations.
          */
         get: operations["pick_api_routes_pick_get"];
         put?: never;
@@ -922,15 +922,15 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/map/spans": {
+    "/api/map/segments": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Spans */
-        get: operations["spans_api_map_spans_get"];
+        /** Segments */
+        get: operations["segments_api_map_segments_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1005,6 +1005,11 @@ export interface components {
             /** Total */
             total: number;
         };
+        /** Body_upload_api_admin_segment_list_uploads_post */
+        Body_upload_api_admin_segment_list_uploads_post: {
+            /** File */
+            file: string;
+        };
         /** Body_upload_api_admin_site_master_uploads_post */
         Body_upload_api_admin_site_master_uploads_post: {
             /** File */
@@ -1014,11 +1019,6 @@ export interface components {
              * @default false
              */
             add_only: boolean;
-        };
-        /** Body_upload_api_admin_span_list_uploads_post */
-        Body_upload_api_admin_span_list_uploads_post: {
-            /** File */
-            file: string;
         };
         /** Body_upload_api_admin_uploads_post */
         Body_upload_api_admin_uploads_post: {
@@ -1128,10 +1128,10 @@ export interface components {
             core_id: number;
             /** Number */
             number: number;
-            /** Span Id */
-            span_id: number;
-            /** Span Name */
-            span_name: string;
+            /** Segment Id */
+            segment_id: number;
+            /** Segment Name */
+            segment_name: string;
             /**
              * Status
              * @enum {string}
@@ -1196,8 +1196,8 @@ export interface components {
             core_id: number;
             /** Number */
             number: number;
-            /** Span Id */
-            span_id: number;
+            /** Segment Id */
+            segment_id: number;
         };
         /** CorrectBody */
         CorrectBody: {
@@ -1227,8 +1227,8 @@ export interface components {
             by_region: {
                 [key: string]: components["schemas"]["Count"];
             };
-            /** Segments */
-            segments: components["schemas"]["SegmentCount"][];
+            /** Routes */
+            routes: components["schemas"]["RouteCount"][];
         };
         /** CurrentUser */
         CurrentUser: {
@@ -1453,10 +1453,10 @@ export interface components {
             core_id: number;
             /** Number */
             number: number;
-            /** Span Id */
-            span_id: number;
-            /** Span */
-            span: string;
+            /** Segment Id */
+            segment_id: number;
+            /** Segment */
+            segment: string;
             /** Held */
             held: boolean;
         };
@@ -1506,10 +1506,10 @@ export interface components {
             unassigned_cores: number;
             /** Remaining Unassigned */
             remaining_unassigned: number;
-            /** Unassigned Span */
-            unassigned_span: string | null;
-            /** Unassigned Span Id */
-            unassigned_span_id: number | null;
+            /** Unassigned Segment */
+            unassigned_segment: string | null;
+            /** Unassigned Segment Id */
+            unassigned_segment_id: number | null;
             /** Is New Customer */
             is_new_customer: boolean;
             /** Imported */
@@ -1519,10 +1519,21 @@ export interface components {
             /** Release Requested Cores */
             release_requested_cores: number[];
         };
+        /** RouteCount */
+        RouteCount: {
+            /** Measured */
+            measured: number;
+            /** Total */
+            total: number;
+            /** Route Id */
+            route_id: number;
+            /** Name */
+            name: string;
+        };
         /** RouteLoss */
         RouteLoss: {
-            /** Spans */
-            spans: components["schemas"]["SpanLoss"][];
+            /** Segments */
+            segments: components["schemas"]["SegmentLoss"][];
             /** Total Calculated Db */
             total_calculated_db: number | null;
             /** Total Measured Db */
@@ -1559,8 +1570,8 @@ export interface components {
             changes: components["schemas"]["Change"][];
             /** Edited In Dashboard */
             edited_in_dashboard: boolean;
-            /** Span Id */
-            span_id: number | null;
+            /** Segment Id */
+            segment_id: number | null;
         };
         /** SearchResult */
         SearchResult: {
@@ -1568,24 +1579,238 @@ export interface components {
              * Type
              * @enum {string}
              */
-            type: "customer" | "span" | "circuit" | "core";
+            type: "customer" | "segment" | "circuit" | "core";
             /** Label */
             label: string;
-            /** Span Id */
-            span_id?: number | null;
+            /** Segment Id */
+            segment_id?: number | null;
             /** Core Id */
             core_id?: number | null;
         };
-        /** SegmentCount */
-        SegmentCount: {
-            /** Measured */
-            measured: number;
-            /** Total */
-            total: number;
+        /** SegmentBody */
+        SegmentBody: {
+            /** Reason */
+            reason: string;
+            /** Distance Km */
+            distance_km?: number | string | null;
+            /** Route Type */
+            route_type?: ("Trunk" | "Metro") | null;
+            /** Region */
+            region?: string | null;
+            /** Site A Id */
+            site_a_id?: number | null;
+            /** Site B Id */
+            site_b_id?: number | null;
+            /** Survey Cores */
+            survey_cores?: number | null;
+            /** Cable Size */
+            cable_size?: number | null;
+            /** Fiber Cut */
+            fiber_cut?: boolean | null;
+        };
+        /** SegmentDetail */
+        SegmentDetail: {
+            /** Id */
+            id: number;
+            /** Site A */
+            site_a: string;
+            /** Site B */
+            site_b: string;
+            /** Route Type */
+            route_type: string | null;
+            /** Region */
+            region: string | null;
+            /** Route */
+            route: string | null;
+            /** Section */
+            section: string | null;
+            /** Distance Km */
+            distance_km: string | null;
+            /** Free Cores */
+            free_cores: number;
+            /** Status Mix */
+            status_mix: {
+                [key: string]: number;
+            };
+            /** Survey Cores */
+            survey_cores: number | null;
+            /** Cable Size */
+            cable_size: number;
+            /** Not Surveyed */
+            not_surveyed: number | null;
+            /** Unassigned Reserved */
+            unassigned_reserved: number;
+            /** Free To Reserve */
+            free_to_reserve: number;
+            /** Fiber Cut */
+            fiber_cut: boolean;
+            /** Cores */
+            cores: components["schemas"]["CoreDetail"][];
+            /**
+             * Unassigned
+             * @default []
+             */
+            unassigned: components["schemas"]["UnassignedHold"][];
+        };
+        /** SegmentEdit */
+        SegmentEdit: {
+            /** Id */
+            id: number;
+            /** Site A Id */
+            site_a_id: number;
+            /** Site B Id */
+            site_b_id: number;
+            /** Site A */
+            site_a: string;
+            /** Site B */
+            site_b: string;
+            /** Route Type */
+            route_type: string | null;
+            /** Region */
+            region: string | null;
+            /** Distance Km */
+            distance_km: string | null;
+            /** Survey Cores */
+            survey_cores: number | null;
+            /** Cable Size */
+            cable_size: number;
+            /** Fiber Cut */
+            fiber_cut: boolean;
+            /** History */
+            history: components["schemas"]["HistoryRow"][];
+        };
+        /** SegmentLoss */
+        SegmentLoss: {
             /** Segment Id */
             segment_id: number;
-            /** Name */
-            name: string;
+            /** Segment Name */
+            segment_name: string;
+            /** Region */
+            region: string | null;
+            /** Route Type */
+            route_type: string | null;
+            /** Distance Km */
+            distance_km: string | null;
+            /** Calculated Db */
+            calculated_db: number | null;
+            /** Measured Db */
+            measured_db: number | null;
+            /** Difference Db */
+            difference_db: number | null;
+            /** Deviation Pct */
+            deviation_pct: number | null;
+            /** Level */
+            level: ("green" | "amber" | "red" | "off_scale") | null;
+            /** Last Test Date */
+            last_test_date: string | null;
+            /** Test Method */
+            test_method: string | null;
+            /** Field Team */
+            field_team: string | null;
+            /** Worst Core Number */
+            worst_core_number?: number | null;
+            /**
+             * Measured Cores
+             * @default 0
+             */
+            measured_cores: number;
+            /**
+             * Total Cores
+             * @default 0
+             */
+            total_cores: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "measured" | "calculated_only" | "no_distance";
+        };
+        /** SegmentLossDetail */
+        SegmentLossDetail: {
+            /** Segment Id */
+            segment_id: number;
+            /** Segment Name */
+            segment_name: string;
+            /** Region */
+            region: string | null;
+            /** Route Type */
+            route_type: string | null;
+            /** Distance Km */
+            distance_km: string | null;
+            /** Calculated Db */
+            calculated_db: number | null;
+            /** Measured Db */
+            measured_db: number | null;
+            /** Difference Db */
+            difference_db: number | null;
+            /** Deviation Pct */
+            deviation_pct: number | null;
+            /** Level */
+            level: ("green" | "amber" | "red" | "off_scale") | null;
+            /** Last Test Date */
+            last_test_date: string | null;
+            /** Test Method */
+            test_method: string | null;
+            /** Field Team */
+            field_team: string | null;
+            /** Worst Core Number */
+            worst_core_number?: number | null;
+            /**
+             * Measured Cores
+             * @default 0
+             */
+            measured_cores: number;
+            /**
+             * Total Cores
+             * @default 0
+             */
+            total_cores: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "measured" | "calculated_only" | "no_distance";
+            /** History */
+            history: components["schemas"]["MeasurementOut"][];
+            /** Cores */
+            cores: components["schemas"]["CoreLoss"][];
+        };
+        /** SegmentSummary */
+        SegmentSummary: {
+            /** Id */
+            id: number;
+            /** Site A */
+            site_a: string;
+            /** Site B */
+            site_b: string;
+            /** Route Type */
+            route_type: string | null;
+            /** Region */
+            region: string | null;
+            /** Route */
+            route: string | null;
+            /** Section */
+            section: string | null;
+            /** Distance Km */
+            distance_km: string | null;
+            /** Free Cores */
+            free_cores: number;
+            /** Status Mix */
+            status_mix: {
+                [key: string]: number;
+            };
+            /** Survey Cores */
+            survey_cores: number | null;
+            /** Cable Size */
+            cable_size: number;
+            /** Not Surveyed */
+            not_surveyed: number | null;
+            /** Unassigned Reserved */
+            unassigned_reserved: number;
+            /** Free To Reserve */
+            free_to_reserve: number;
+            /** Fiber Cut */
+            fiber_cut: boolean;
         };
         /** SheetOut */
         SheetOut: {
@@ -1639,231 +1864,6 @@ export interface components {
             active: boolean;
             /** History */
             history: components["schemas"]["HistoryRow"][];
-        };
-        /** SpanBody */
-        SpanBody: {
-            /** Reason */
-            reason: string;
-            /** Distance Km */
-            distance_km?: number | string | null;
-            /** Route Type */
-            route_type?: ("Trunk" | "Metro") | null;
-            /** Region */
-            region?: string | null;
-            /** Site A Id */
-            site_a_id?: number | null;
-            /** Site B Id */
-            site_b_id?: number | null;
-            /** Survey Cores */
-            survey_cores?: number | null;
-            /** Cable Size */
-            cable_size?: number | null;
-            /** Fiber Cut */
-            fiber_cut?: boolean | null;
-        };
-        /** SpanDetail */
-        SpanDetail: {
-            /** Id */
-            id: number;
-            /** Site A */
-            site_a: string;
-            /** Site B */
-            site_b: string;
-            /** Route Type */
-            route_type: string | null;
-            /** Region */
-            region: string | null;
-            /** Route */
-            route: string | null;
-            /** Section */
-            section: string | null;
-            /** Distance Km */
-            distance_km: string | null;
-            /** Free Cores */
-            free_cores: number;
-            /** Status Mix */
-            status_mix: {
-                [key: string]: number;
-            };
-            /** Survey Cores */
-            survey_cores: number | null;
-            /** Cable Size */
-            cable_size: number;
-            /** Not Surveyed */
-            not_surveyed: number | null;
-            /** Unassigned Reserved */
-            unassigned_reserved: number;
-            /** Free To Reserve */
-            free_to_reserve: number;
-            /** Fiber Cut */
-            fiber_cut: boolean;
-            /** Cores */
-            cores: components["schemas"]["CoreDetail"][];
-            /**
-             * Unassigned
-             * @default []
-             */
-            unassigned: components["schemas"]["UnassignedHold"][];
-        };
-        /** SpanEdit */
-        SpanEdit: {
-            /** Id */
-            id: number;
-            /** Site A Id */
-            site_a_id: number;
-            /** Site B Id */
-            site_b_id: number;
-            /** Site A */
-            site_a: string;
-            /** Site B */
-            site_b: string;
-            /** Route Type */
-            route_type: string | null;
-            /** Region */
-            region: string | null;
-            /** Distance Km */
-            distance_km: string | null;
-            /** Survey Cores */
-            survey_cores: number | null;
-            /** Cable Size */
-            cable_size: number;
-            /** Fiber Cut */
-            fiber_cut: boolean;
-            /** History */
-            history: components["schemas"]["HistoryRow"][];
-        };
-        /** SpanLoss */
-        SpanLoss: {
-            /** Span Id */
-            span_id: number;
-            /** Span Name */
-            span_name: string;
-            /** Region */
-            region: string | null;
-            /** Route Type */
-            route_type: string | null;
-            /** Distance Km */
-            distance_km: string | null;
-            /** Calculated Db */
-            calculated_db: number | null;
-            /** Measured Db */
-            measured_db: number | null;
-            /** Difference Db */
-            difference_db: number | null;
-            /** Deviation Pct */
-            deviation_pct: number | null;
-            /** Level */
-            level: ("green" | "amber" | "red" | "off_scale") | null;
-            /** Last Test Date */
-            last_test_date: string | null;
-            /** Test Method */
-            test_method: string | null;
-            /** Field Team */
-            field_team: string | null;
-            /** Worst Core Number */
-            worst_core_number?: number | null;
-            /**
-             * Measured Cores
-             * @default 0
-             */
-            measured_cores: number;
-            /**
-             * Total Cores
-             * @default 0
-             */
-            total_cores: number;
-            /**
-             * Status
-             * @enum {string}
-             */
-            status: "measured" | "calculated_only" | "no_distance";
-        };
-        /** SpanLossDetail */
-        SpanLossDetail: {
-            /** Span Id */
-            span_id: number;
-            /** Span Name */
-            span_name: string;
-            /** Region */
-            region: string | null;
-            /** Route Type */
-            route_type: string | null;
-            /** Distance Km */
-            distance_km: string | null;
-            /** Calculated Db */
-            calculated_db: number | null;
-            /** Measured Db */
-            measured_db: number | null;
-            /** Difference Db */
-            difference_db: number | null;
-            /** Deviation Pct */
-            deviation_pct: number | null;
-            /** Level */
-            level: ("green" | "amber" | "red" | "off_scale") | null;
-            /** Last Test Date */
-            last_test_date: string | null;
-            /** Test Method */
-            test_method: string | null;
-            /** Field Team */
-            field_team: string | null;
-            /** Worst Core Number */
-            worst_core_number?: number | null;
-            /**
-             * Measured Cores
-             * @default 0
-             */
-            measured_cores: number;
-            /**
-             * Total Cores
-             * @default 0
-             */
-            total_cores: number;
-            /**
-             * Status
-             * @enum {string}
-             */
-            status: "measured" | "calculated_only" | "no_distance";
-            /** History */
-            history: components["schemas"]["MeasurementOut"][];
-            /** Cores */
-            cores: components["schemas"]["CoreLoss"][];
-        };
-        /** SpanSummary */
-        SpanSummary: {
-            /** Id */
-            id: number;
-            /** Site A */
-            site_a: string;
-            /** Site B */
-            site_b: string;
-            /** Route Type */
-            route_type: string | null;
-            /** Region */
-            region: string | null;
-            /** Route */
-            route: string | null;
-            /** Section */
-            section: string | null;
-            /** Distance Km */
-            distance_km: string | null;
-            /** Free Cores */
-            free_cores: number;
-            /** Status Mix */
-            status_mix: {
-                [key: string]: number;
-            };
-            /** Survey Cores */
-            survey_cores: number | null;
-            /** Cable Size */
-            cable_size: number;
-            /** Not Surveyed */
-            not_surveyed: number | null;
-            /** Unassigned Reserved */
-            unassigned_reserved: number;
-            /** Free To Reserve */
-            free_to_reserve: number;
-            /** Fiber Cut */
-            fiber_cut: boolean;
         };
         /** UnassignedHold */
         UnassignedHold: {
@@ -1973,6 +1973,59 @@ export interface components {
             reason: string;
         };
         /** ApplyOut */
+        app__ingest__segment_list_router__ApplyOut: {
+            /** Upload Id */
+            upload_id: number;
+            /** Created */
+            created: number;
+            /** Changed */
+            changed: number;
+            /** Protected Kept */
+            protected_kept: number;
+            /** Skipped */
+            skipped: number;
+            /** Warnings */
+            warnings: string[];
+        };
+        /** Counts */
+        app__ingest__segment_list_router__Counts: {
+            /** Rows */
+            rows: number;
+            /** New */
+            new: number;
+            /** Changed */
+            changed: number;
+            /** Unchanged */
+            unchanged: number;
+            /** Problem */
+            problem: number;
+        };
+        /** RowsOut */
+        app__ingest__segment_list_router__RowsOut: {
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Items */
+            items: components["schemas"]["RowOut"][];
+        };
+        /** UploadOut */
+        app__ingest__segment_list_router__UploadOut: {
+            /** Upload Id */
+            upload_id: number;
+            /** Filename */
+            filename: string;
+            /** Sheet Name */
+            sheet_name: string | null;
+            /** Found */
+            found: boolean;
+            /** Block Reason */
+            block_reason: string | null;
+            counts: components["schemas"]["app__ingest__segment_list_router__Counts"];
+        };
+        /** ApplyOut */
         app__ingest__site_master_router__ApplyOut: {
             /** Upload Id */
             upload_id: number;
@@ -2035,59 +2088,6 @@ export interface components {
              * @default false
              */
             add_only: boolean;
-        };
-        /** ApplyOut */
-        app__ingest__span_list_router__ApplyOut: {
-            /** Upload Id */
-            upload_id: number;
-            /** Created */
-            created: number;
-            /** Changed */
-            changed: number;
-            /** Protected Kept */
-            protected_kept: number;
-            /** Skipped */
-            skipped: number;
-            /** Warnings */
-            warnings: string[];
-        };
-        /** Counts */
-        app__ingest__span_list_router__Counts: {
-            /** Rows */
-            rows: number;
-            /** New */
-            new: number;
-            /** Changed */
-            changed: number;
-            /** Unchanged */
-            unchanged: number;
-            /** Problem */
-            problem: number;
-        };
-        /** RowsOut */
-        app__ingest__span_list_router__RowsOut: {
-            /** Total */
-            total: number;
-            /** Page */
-            page: number;
-            /** Page Size */
-            page_size: number;
-            /** Items */
-            items: components["schemas"]["RowOut"][];
-        };
-        /** UploadOut */
-        app__ingest__span_list_router__UploadOut: {
-            /** Upload Id */
-            upload_id: number;
-            /** Filename */
-            filename: string;
-            /** Sheet Name */
-            sheet_name: string | null;
-            /** Found */
-            found: boolean;
-            /** Block Reason */
-            block_reason: string | null;
-            counts: components["schemas"]["app__ingest__span_list_router__Counts"];
         };
         /** ReasonBody */
         app__reservations__schemas__ReasonBody: {
@@ -2455,7 +2455,7 @@ export interface operations {
             };
         };
     };
-    list_spans_api_spans_get: {
+    list_segments_api_segments_get: {
         parameters: {
             query?: {
                 region?: string | null;
@@ -2479,7 +2479,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SpanSummary"][];
+                    "application/json": components["schemas"]["SegmentSummary"][];
                 };
             };
             /** @description Validation Error */
@@ -2493,14 +2493,14 @@ export interface operations {
             };
         };
     };
-    get_span_api_spans__span_id__get: {
+    get_segment_api_segments__segment_id__get: {
         parameters: {
             query?: never;
             header?: {
                 "x-dev-user"?: string | null;
             };
             path: {
-                span_id: number;
+                segment_id: number;
             };
             cookie?: {
                 fiber_session?: string | null;
@@ -2514,7 +2514,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SpanDetail"];
+                    "application/json": components["schemas"]["SegmentDetail"];
                 };
             };
             /** @description Validation Error */
@@ -3146,10 +3146,10 @@ export interface operations {
             };
         };
     };
-    spans_api_loss_spans_get: {
+    segments_api_loss_segments_get: {
         parameters: {
             query?: {
-                span_id?: number | null;
+                segment_id?: number | null;
                 region?: string | null;
                 route_type?: string | null;
             };
@@ -3169,7 +3169,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SpanLoss"][];
+                    "application/json": components["schemas"]["SegmentLoss"][];
                 };
             };
             /** @description Validation Error */
@@ -3183,14 +3183,14 @@ export interface operations {
             };
         };
     };
-    span_api_loss_spans__span_id__get: {
+    segment_api_loss_segments__segment_id__get: {
         parameters: {
             query?: never;
             header?: {
                 "x-dev-user"?: string | null;
             };
             path: {
-                span_id: number;
+                segment_id: number;
             };
             cookie?: {
                 fiber_session?: string | null;
@@ -3204,7 +3204,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SpanLossDetail"];
+                    "application/json": components["schemas"]["SegmentLossDetail"];
                 };
             };
             /** @description Validation Error */
@@ -3254,8 +3254,8 @@ export interface operations {
     route_api_loss_route_get: {
         parameters: {
             query: {
-                /** @description Comma-separated span ids, in route order */
-                span_ids: string;
+                /** @description Comma-separated segment ids, in route order */
+                segment_ids: string;
             };
             header?: {
                 "x-dev-user"?: string | null;
@@ -3438,7 +3438,7 @@ export interface operations {
             };
         };
     };
-    upload_api_admin_span_list_uploads_post: {
+    upload_api_admin_segment_list_uploads_post: {
         parameters: {
             query?: never;
             header?: {
@@ -3451,7 +3451,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "multipart/form-data": components["schemas"]["Body_upload_api_admin_span_list_uploads_post"];
+                "multipart/form-data": components["schemas"]["Body_upload_api_admin_segment_list_uploads_post"];
             };
         };
         responses: {
@@ -3461,7 +3461,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["app__ingest__span_list_router__UploadOut"];
+                    "application/json": components["schemas"]["app__ingest__segment_list_router__UploadOut"];
                 };
             };
             /** @description Validation Error */
@@ -3475,7 +3475,7 @@ export interface operations {
             };
         };
     };
-    rows_api_admin_span_list_uploads__upload_id__rows_get: {
+    rows_api_admin_segment_list_uploads__upload_id__rows_get: {
         parameters: {
             query: {
                 group: "new" | "changed" | "unchanged" | "problem";
@@ -3500,7 +3500,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["app__ingest__span_list_router__RowsOut"];
+                    "application/json": components["schemas"]["app__ingest__segment_list_router__RowsOut"];
                 };
             };
             /** @description Validation Error */
@@ -3514,7 +3514,7 @@ export interface operations {
             };
         };
     };
-    apply_api_admin_span_list_uploads__upload_id__apply_post: {
+    apply_api_admin_segment_list_uploads__upload_id__apply_post: {
         parameters: {
             query?: never;
             header?: {
@@ -3535,7 +3535,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["app__ingest__span_list_router__ApplyOut"];
+                    "application/json": components["schemas"]["app__ingest__segment_list_router__ApplyOut"];
                 };
             };
             /** @description Validation Error */
@@ -3784,7 +3784,7 @@ export interface operations {
     get_history_api_admin_history_get: {
         parameters: {
             query: {
-                entity: "core" | "span" | "site";
+                entity: "core" | "segment" | "site";
                 id: number;
             };
             header?: {
@@ -3856,7 +3856,7 @@ export interface operations {
             };
         };
     };
-    get_span_api_admin_spans__sid__get: {
+    get_segment_api_admin_segments__sid__get: {
         parameters: {
             query?: never;
             header?: {
@@ -3877,7 +3877,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SpanEdit"];
+                    "application/json": components["schemas"]["SegmentEdit"];
                 };
             };
             /** @description Validation Error */
@@ -3891,7 +3891,7 @@ export interface operations {
             };
         };
     };
-    edit_span_api_admin_spans__sid__post: {
+    edit_segment_api_admin_segments__sid__post: {
         parameters: {
             query?: never;
             header?: {
@@ -3906,7 +3906,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["SpanBody"];
+                "application/json": components["schemas"]["SegmentBody"];
             };
         };
         responses: {
@@ -4189,7 +4189,7 @@ export interface operations {
     pick_api_routes_pick_get: {
         parameters: {
             query: {
-                span_ids: number[];
+                segment_ids: number[];
                 cores_needed: number;
             };
             header?: {
@@ -4224,7 +4224,7 @@ export interface operations {
             };
         };
     };
-    spans_api_map_spans_get: {
+    segments_api_map_segments_get: {
         parameters: {
             query?: never;
             header?: {

@@ -3,7 +3,7 @@
 #   malaysia.pmtiles  Malaysia basemap (PMTiles, zoom 0-14) from a Protomaps daily build
 #   fonts/Noto Sans Regular/*.pbf  label glyphs for the basemap style (the only font stack it uses)
 # Run once per machine that has internet (personal laptop, dev VM, prod VM). The app never fetches these at runtime
-# from the internet; without them the map still draws spans and sites on a plain background.
+# from the internet; without them the map still draws segments and sites on a plain background.
 # Optional: BUILD=YYYYMMDD picks a Protomaps daily build (default: yesterday, UTC).
 set -eu
 cd "$(dirname "$0")/.."

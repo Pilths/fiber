@@ -31,21 +31,21 @@ export const countBy = (d: { cores: { status: CoreStatus }[] }) => {
   return n;
 };
 
-// Find filters live in the Dashboard so the map dims the same spans the list hides.
-export type SpanFilter = { q: string; region: string; routeType: string; route: string };
-export const NO_FILTER: SpanFilter = { q: "", region: "", routeType: "", route: "" };
+// Find filters live in the Dashboard so the map dims the same segments the list hides.
+export type SegmentFilter = { q: string; region: string; routeType: string; route: string };
+export const NO_FILTER: SegmentFilter = { q: "", region: "", routeType: "", route: "" };
 // Region, route type and route only; the text search narrows the list, not the map.
-export const inFilter = (s: { region: string | null; route_type: string | null; route?: string | null }, f: SpanFilter) =>
+export const inFilter = (s: { region: string | null; route_type: string | null; route?: string | null }, f: SegmentFilter) =>
   (!f.region || s.region === f.region) && (!f.routeType || s.route_type === f.routeType) && (!f.route || s.route === f.route);
 
-export const spanName = (s: { site_a: string; site_b: string }) => `${s.site_a} - ${s.site_b}`;
+export const segmentName = (s: { site_a: string; site_b: string }) => `${s.site_a} - ${s.site_b}`;
 
 export const inputCls =
   "h-9 rounded-md border border-line bg-white px-3 text-sm outline-none focus-visible:outline-3 focus-visible:outline-blue";
 
-export type SpanLoss = components["schemas"]["SpanLoss"];
-export type LossDetail = components["schemas"]["SpanLossDetail"];
-type Level = NonNullable<SpanLoss["level"]>;
+export type SegmentLoss = components["schemas"]["SegmentLoss"];
+export type LossDetail = components["schemas"]["SegmentLossDetail"];
+type Level = NonNullable<SegmentLoss["level"]>;
 
 // Symbol + word per band, never colour alone. Bands come from the API (deviation from calculated).
 export const LEVEL: Record<Level, { icon: IconName; cls: string; word: string }> = {
@@ -70,8 +70,8 @@ export const EVENT_WORD: Record<string, string> = {
   release_requested: "Release requested", released: "Released", release_declined: "Release declined", corrected: "Corrected", assigned: "Cores assigned",
 };
 
-// Total loss of a span: its worst measured core (dB); not measured -> the calculated loss (distance x 0.3 dB/km), flagged.
-type Loss = Pick<SpanLoss, "measured_db" | "calculated_db">;
+// Total loss of a segment: its worst measured core (dB); not measured -> the calculated loss (distance x 0.3 dB/km), flagged.
+type Loss = Pick<SegmentLoss, "measured_db" | "calculated_db">;
 export const totalLoss = (l: Loss | null | undefined) =>
   l?.measured_db != null ? { db: l.measured_db, calc: false } : l?.calculated_db != null ? { db: l.calculated_db, calc: true } : null;
 export const perKm = (dB: number, km: number) => `${(dB / km).toFixed(2)} dB/km`;

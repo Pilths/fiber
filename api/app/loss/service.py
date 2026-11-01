@@ -36,18 +36,18 @@ def worst(levels: list[Level | None]) -> Level | None:
 
 
 _ROWS = """
-SELECT s.id AS span_id, a.name || ' - ' || b.name AS span_name, s.region, s.route_type, s.distance_km,
+SELECT s.id AS segment_id, a.name || ' - ' || b.name AS segment_name, s.region, s.route_type, s.distance_km,
        m.loss_db AS measured_db, m.test_method, m.field_team, c.number AS worst_core_number,
-       (SELECT count(DISTINCT core_id) FROM measurements WHERE span_id = s.id) AS measured_cores,
+       (SELECT count(DISTINCT core_id) FROM measurements WHERE segment_id = s.id) AS measured_cores,
        coalesce(s.survey_cores, 0) AS total_cores,
        coalesce(m.tested_on, (m.created_at AT TIME ZONE 'Asia/Kuala_Lumpur')::date) AS last_test_date
-FROM spans s JOIN sites a ON a.id = s.site_a_id JOIN sites b ON b.id = s.site_b_id
+FROM segments s JOIN sites a ON a.id = s.site_a_id JOIN sites b ON b.id = s.site_b_id
 LEFT JOIN LATERAL (
-  SELECT * FROM (SELECT DISTINCT ON (coalesce(core_id, -1)) * FROM measurements WHERE span_id = s.id
+  SELECT * FROM (SELECT DISTINCT ON (coalesce(core_id, -1)) * FROM measurements WHERE segment_id = s.id
                  ORDER BY coalesce(core_id, -1), coalesce(tested_on, (created_at AT TIME ZONE 'Asia/Kuala_Lumpur')::date) DESC, created_at DESC, id DESC) l
   ORDER BY loss_db DESC, coalesce(tested_on, (created_at AT TIME ZONE 'Asia/Kuala_Lumpur')::date) DESC, id DESC LIMIT 1) m ON true
 LEFT JOIN cores c ON c.id = m.core_id
-WHERE (CAST(:span_id AS bigint) IS NULL OR s.id = :span_id)
+WHERE (CAST(:segment_id AS bigint) IS NULL OR s.id = :segment_id)
   AND (CAST(:region AS text) IS NULL OR s.region = :region)
   AND (CAST(:route_type AS text) IS NULL OR s.route_type = :route_type)
 """
@@ -62,25 +62,25 @@ def _row(r: dict) -> dict:
             "deviation_pct": dev, "level": warning_level(dev), "status": status}
 
 
-def span_rows(db: Session, span_id: int | None = None, region: str | None = None,
+def segment_rows(db: Session, segment_id: int | None = None, region: str | None = None,
               route_type: str | None = None) -> list[dict]:
-    rs = db.execute(text(_ROWS + " ORDER BY s.id"), {"span_id": span_id, "region": region, "route_type": route_type})
+    rs = db.execute(text(_ROWS + " ORDER BY s.id"), {"segment_id": segment_id, "region": region, "route_type": route_type})
     return [_row(dict(r)) for r in rs.mappings()]
 
 
-def history(db: Session, span_id: int) -> list[dict]:
+def history(db: Session, segment_id: int) -> list[dict]:
     rs = db.execute(text(
         "SELECT m.loss_db, m.tested_on, m.created_at, m.test_method, m.field_team, m.core_id, c.number AS core_number "
-        "FROM measurements m LEFT JOIN cores c ON c.id = m.core_id WHERE m.span_id = :s "
+        "FROM measurements m LEFT JOIN cores c ON c.id = m.core_id WHERE m.segment_id = :s "
         "ORDER BY coalesce(m.tested_on, (m.created_at AT TIME ZONE 'Asia/Kuala_Lumpur')::date) DESC, m.created_at DESC, m.id DESC"),
-        {"s": span_id})
+        {"s": segment_id})
     return [dict(r) for r in rs.mappings()]
 
 
-def core_losses(db: Session, span_id: int, calculated: Decimal | None) -> list[dict]:
+def core_losses(db: Session, segment_id: int, calculated: Decimal | None) -> list[dict]:
     """One entry per core with measurements, by core number; history newest first. Anonymous (no core) rows are left out."""
     by_core: dict[int, list[dict]] = {}
-    for h in history(db, span_id):
+    for h in history(db, segment_id):
         if h["core_id"] is not None:
             by_core.setdefault(h["core_id"], []).append(h)
     out = []
@@ -95,34 +95,34 @@ def core_losses(db: Session, span_id: int, calculated: Decimal | None) -> list[d
 
 
 def coverage(db: Session) -> dict:
-    spans = db.execute(text(
-        "SELECT s.id, s.region, EXISTS (SELECT 1 FROM measurements WHERE span_id = s.id) AS measured FROM spans s"
+    segments = db.execute(text(
+        "SELECT s.id, s.region, EXISTS (SELECT 1 FROM measurements WHERE segment_id = s.id) AS measured FROM segments s"
     )).mappings().all()
 
     def count(rows) -> dict:
         return {"measured": sum(r["measured"] for r in rows), "total": len(rows)}
 
     segs = db.execute(text(
-        "SELECT g.id AS segment_id, a.name || ' - ' || b.name AS name, count(*) AS total, "
-        "count(*) FILTER (WHERE EXISTS (SELECT 1 FROM measurements WHERE span_id = ss.span_id)) AS measured "
-        "FROM segments g JOIN sites a ON a.id = g.site_a_id JOIN sites b ON b.id = g.site_b_id "
-        "JOIN segment_spans ss ON ss.segment_id = g.id GROUP BY g.id, a.name, b.name ORDER BY g.id")).mappings().all()
-    return {**count(spans),
-            "by_region": {reg: count([r for r in spans if r["region"] == reg])
-                          for reg in sorted({r["region"] for r in spans if r["region"]})},
-            "segments": [dict(s) for s in segs]}
+        "SELECT g.id AS route_id, a.name || ' - ' || b.name AS name, count(*) AS total, "
+        "count(*) FILTER (WHERE EXISTS (SELECT 1 FROM measurements WHERE segment_id = ss.segment_id)) AS measured "
+        "FROM routes g JOIN sites a ON a.id = g.site_a_id JOIN sites b ON b.id = g.site_b_id "
+        "JOIN route_segments ss ON ss.route_id = g.id GROUP BY g.id, a.name, b.name ORDER BY g.id")).mappings().all()
+    return {**count(segments),
+            "by_region": {reg: count([r for r in segments if r["region"] == reg])
+                          for reg in sorted({r["region"] for r in segments if r["region"]})},
+            "routes": [dict(s) for s in segs]}
 
 
-def route(db: Session, span_ids: list[int]) -> dict | None:
+def route(db: Session, segment_ids: list[int]) -> dict | None:
     """Rows in the given order plus totals. None if any id is unknown."""
-    by_id = {r["span_id"]: r for r in span_rows(db)}
-    if any(i not in by_id for i in span_ids):
+    by_id = {r["segment_id"]: r for r in segment_rows(db)}
+    if any(i not in by_id for i in segment_ids):
         return None
-    rows = [by_id[i] for i in span_ids]
+    rows = [by_id[i] for i in segment_ids]
     calc = [r["calculated_db"] for r in rows]
     meas = [r["measured_db"] for r in rows]
-    # ponytail: totals are null (not partial sums) when any span lacks the figure, so a gap never reads as 0 dB
+    # ponytail: totals are null (not partial sums) when any segment lacks the figure, so a gap never reads as 0 dB
     total_calc = None if not rows or None in calc else sum(calc)
     total_meas = None if not rows or None in meas else sum(meas)
-    return {"spans": rows, "total_calculated_db": total_calc, "total_measured_db": total_meas,
+    return {"segments": rows, "total_calculated_db": total_calc, "total_measured_db": total_meas,
             "level": worst([r["level"] for r in rows])}
