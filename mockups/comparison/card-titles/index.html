@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Card titles: map and Inspector</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+:root{--ground:#f2f4f7;--ink:#0a0a0a;--muted:#5b6068;--line:#e2e5ea;--green:#1a7f4b;--blue:#1d5fbf}
+*{box-sizing:border-box}body{margin:0;background:var(--ground);color:var(--ink);font:14px/1.4 system-ui,Segoe UI,Arial,sans-serif;padding:24px}
+h1{font-size:20px;margin:0 0 4px}p.lead{color:var(--muted);margin:0 0 20px}
+.opt{margin:0 0 36px}.opt>h2{font-size:15px;margin:0 0 8px;display:flex;gap:10px;align-items:center}
+.tag{font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;background:#0a0a0a;color:#fff}.tag.rec{background:var(--green)}
+.row{display:grid;grid-template-columns:1fr 440px;gap:16px;align-items:start;max-width:1120px}
+.card{background:#fff;border:1px solid var(--line);border-radius:8px;padding:20px;min-width:0}
+.card.flush{padding:0;overflow:hidden}
+.ch{display:flex;align-items:baseline;justify-content:space-between;padding-bottom:12px;margin-bottom:16px;border-bottom:1px solid var(--line)}
+.ch h3{margin:0;font-size:16px;font-weight:600}.ch h3.big{font-size:20px;font-weight:700}.ch small{color:var(--muted);font-size:13px}
+.map{height:330px;border-radius:6px;background:#e9edf2;position:relative;overflow:hidden}
+.card.flush .map{height:372px;border-radius:0}
+.map:before{content:"";position:absolute;left:28%;top:-10%;width:3px;height:130%;background:#1d5fbf;transform:rotate(14deg)}
+.map i{position:absolute;left:34%;top:46%;font-style:normal;font-size:11px;font-weight:700;color:var(--green);background:#fff;border:1px solid var(--green);border-radius:999px;padding:1px 8px}
+.ctrl{position:absolute;left:12px;top:12px;display:flex;gap:6px}.ctrl b{font-weight:600;font-size:13px;background:#fff;border:1px solid #868c96;border-radius:6px;padding:6px 10px}
+.title{font-size:32px;line-height:38px;font-weight:700;letter-spacing:-.01em;margin:0}.title.m{font-size:20px;line-height:26px}
+.facts{display:flex;gap:14px;font-size:13px;color:var(--muted);margin:6px 0 14px}.facts b{color:var(--ink)}
+.num{font-size:38px;line-height:40px;font-weight:700;color:var(--green);display:flex;align-items:baseline;gap:10px}.num span{font-size:14px;font-weight:400;color:var(--muted)}
+.bar{display:flex;gap:2px;height:8px;margin:10px 0 8px}.bar i{border-radius:3px}.leg{display:flex;gap:14px;font-size:12px;color:var(--muted)}
+.btns{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}.btns b{text-align:center;padding:9px;border-radius:6px;border:1px solid #868c96;font-weight:600}.btns b:first-child{background:#0a0a0a;color:#fff;border-color:#0a0a0a}
+.note{font-size:12px;color:var(--muted);margin:6px 0 0}
+.top{padding-top:28px}
+</style></head><body>
+<h1>Map card and Inspector titles</h1>
+<p class="lead">Same content in each row, 1440 wide layout scaled to fit. Only the titles and top spacing differ. DEV sample data.</p>
+
+<section class="opt"><h2>0. Now <span class="tag">current</span></h2>
+<div class="row">
+ <div class="card"><div class="ch"><h3>Network map</h3><small>DEV Cyberjaya DC - DEV Bukit Jalil TOC selected</small></div><div class="map"><div class="ctrl"><b>Layers</b><b>+</b><b>-</b><b>Fit selection</b></div><i>17</i></div></div>
+ <div class="card"><p class="title">DEV Cyberjaya DC -<br>DEV Bukit Jalil TOC</p><div class="facts"><b>Central</b><b>Metro</b><span>18.2 km</span></div>
+  <div class="num">17 <span>free to reserve</span></div><div class="bar"><i style="flex:17;background:#1a7f4b"></i><i style="flex:3;background:#272a30"></i><i style="flex:4;background:#50555d"></i></div><div class="leg"><span>17 Free to reserve</span><span>3 Reserved</span><span>4 In service</span></div>
+  <div class="btns"><b>Go to cores</b><b>Plan a route from here</b></div></div>
+</div></section>
+
+<section class="opt"><h2>A. No map title, full-bleed map <span class="tag rec">recommended</span></h2>
+<div class="row">
+ <div class="card flush"><div class="map"><div class="ctrl"><b>Layers</b><b>+</b><b>-</b><b>Fit selection</b></div><i>17</i></div></div>
+ <div class="card top"><p class="title">DEV Cyberjaya DC -<br>DEV Bukit Jalil TOC</p><div class="facts"><b>Central</b><b>Metro</b><span>18.2 km</span></div>
+  <div class="num">17 <span>free to reserve</span></div><div class="bar"><i style="flex:17;background:#1a7f4b"></i><i style="flex:3;background:#272a30"></i><i style="flex:4;background:#50555d"></i></div><div class="leg"><span>17 Free to reserve</span><span>3 Reserved</span><span>4 In service</span></div>
+  <div class="btns"><b>Go to cores</b><b>Plan a route from here</b></div></div>
+</div><p class="note">The map is the page. The span name is the only title. The Inspector title gets 28px of top space so it no longer hugs the card edge.</p></section>
+
+<section class="opt"><h2>B. Both cards get a header row, same style <span class="tag">option</span></h2>
+<div class="row">
+ <div class="card"><div class="ch"><h3 class="big">7 spans, 6 sites</h3></div><div class="map"><div class="ctrl"><b>Layers</b><b>+</b><b>-</b><b>Fit selection</b></div><i>17</i></div></div>
+ <div class="card"><div class="ch"><h3 class="big">DEV Cyberjaya DC - DEV Bukit Jalil TOC</h3></div><div class="facts" style="margin-top:0"><b>Central</b><b>Metro</b><span>18.2 km</span></div>
+  <div class="num">17 <span>free to reserve</span></div><div class="bar"><i style="flex:17;background:#1a7f4b"></i><i style="flex:3;background:#272a30"></i><i style="flex:4;background:#50555d"></i></div><div class="leg"><span>17 Free to reserve</span><span>3 Reserved</span><span>4 In service</span></div>
+  <div class="btns"><b>Go to cores</b><b>Plan a route from here</b></div></div>
+</div><p class="note">Both headers are 20px bold with a rule. The map header states what is drawn (live counts; in route mode it reads "Route A to B"). Long span names truncate in the header.</p></section>
+
+<section class="opt"><h2>C. Rename only <span class="tag">minimal</span></h2>
+<div class="row">
+ <div class="card"><div class="ch"><h3>Spans and sites</h3></div><div class="map"><div class="ctrl"><b>Layers</b><b>+</b><b>-</b><b>Fit selection</b></div><i>17</i></div></div>
+ <div class="card top"><p class="title">DEV Cyberjaya DC -<br>DEV Bukit Jalil TOC</p><div class="facts"><b>Central</b><b>Metro</b><span>18.2 km</span></div>
+  <div class="num">17 <span>free to reserve</span></div><div class="bar"><i style="flex:17;background:#1a7f4b"></i><i style="flex:3;background:#272a30"></i><i style="flex:4;background:#50555d"></i></div><div class="leg"><span>17 Free to reserve</span><span>3 Reserved</span><span>4 In service</span></div>
+  <div class="btns"><b>Go to cores</b><b>Plan a route from here</b></div></div>
+</div><p class="note">Keeps the map header (16px, rule) with a specific name; only the Inspector gets more top space. The two titles still differ in size.</p></section>
+</body></html>

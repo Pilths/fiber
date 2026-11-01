@@ -1,0 +1,439 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#f5f9ff">
+<title>Span AABB - BBCC · Fiber</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Albert+Sans:wght@400;500;600;700&family=Unbounded:wght@500;600&display=swap" rel="stylesheet">
+<style>
+/* tastemaker · screen: app shell / data view · mood: premium-confident, light · palette: generate_palette.py --mood premium --mode light, run 2 of 3 (run 1 rejected: hue 277 sits in the default indigo band), triadic, base hue 260.4, accent hue 20.4
+   tastemaker · design read: app shell for network planners, mode Operate, quiet enterprise lane, dials variance 4 / motion 2 / density 7 / art direction 4
+   tastemaker · reference board: inferred, not viewed (web search skipped by instruction). Borrow: Carbon/Polaris data density, patch-panel tube rows, railway-timetable tabular numerals. Avoid: KPI card mosaics, colour-only status dots, gradient chrome
+   tastemaker · direction contract: thesis "the free number is the answer, the grid is the proof"; first viewport: free-to-reserve figure + surveyed strip above the 3 x 12 core grid; system: Unbounded for 2 slots (span name, free figure) + Albert Sans, 4/8/12 radius, hairline borders, CSS-only state motion; risk: status hues drifting into decoration
+   tastemaker · contrast: check_contrast.py --matrix, all text pairings >= 4.5, state borders >= 3.0 (see tokens)
+   tastemaker · critique: ShowTell 4 · Phil 4 · Hier 5 · Spec 5 · Restr 4 · Var 3 · ColorHarm 4 · MoodTone 4 · Type 4 · Spatial 4 · Pref 4 */
+:root{
+  --c-text:#161b23; --c-muted:#4d5869; --c-bg:#f5f9ff; --c-surface:#eaeff7; --c-panel:#ffffff;
+  --c-border:#dadfe7; --c-line:#8792a3;
+  --c-primary:#4971b4; --c-primary-hi:#3a5d99; --c-on-primary:#ffffff; --c-secondary:#cfdffa; --c-secondary-lo:#dfe9fc;
+  --c-accent:#ae5657;
+  --c-req-ink:#7a4a00; --c-req-a:#fbefd9; --c-req-b:#f1d9a8; --c-req-edge:#b07a1a;
+  --c-res-ink:#1f3d6e;
+  --c-use:#2c3442;
+  --c-fault-ink:#8a2f30; --c-fault-a:#f8e1e0; --c-fault-b:#eec3c2;
+  --font-display:"Unbounded", "Albert Sans", system-ui, sans-serif;
+  --font-body:"Albert Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --r-sm:4px; --r-md:8px; --r-lg:12px;
+  --s-1:4px; --s-2:8px; --s-3:12px; --s-4:16px; --s-6:24px; --s-8:32px;
+  --ease-out:cubic-bezier(0.23, 1, 0.32, 1); --d-press:120ms;
+}
+*,*::before,*::after{box-sizing:border-box}
+html,body{overflow-x:clip}
+body{margin:0;background:var(--c-bg);color:var(--c-text);font:400 14px/1.5 var(--font-body);font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased}
+a{color:var(--c-primary-hi)}
+h1,h2,h3{margin:0;font-weight:600;text-wrap:balance}
+svg{display:block}
+.vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.skip{position:absolute;left:var(--s-2);top:-48px;background:var(--c-text);color:var(--c-panel);padding:var(--s-2) var(--s-3);border-radius:var(--r-sm);z-index:10}
+.skip:focus{top:var(--s-2)}
+:focus-visible{outline:2px solid var(--c-text);outline-offset:2px}
+
+/* shell */
+.shell{display:grid;grid-template-columns:224px minmax(0,1fr);min-height:100dvh}
+.side{background:var(--c-surface);border-right:1px solid var(--c-border);display:flex;flex-direction:column;padding:var(--s-4) var(--s-3);position:sticky;top:0;height:100dvh}
+.brand{display:flex;align-items:center;gap:var(--s-2);padding:var(--s-1) var(--s-2) var(--s-6);font:600 16px/1 var(--font-display);letter-spacing:-0.01em;color:var(--c-text);text-decoration:none}
+.brand svg{width:22px;height:22px;flex:none}
+.mk-l{stroke:var(--c-primary)}.mk-a{fill:var(--c-text)}.mk-b{fill:var(--c-primary)}
+.nav{list-style:none;margin:0;padding:0;display:grid;gap:2px}
+.nav a{display:flex;align-items:center;gap:var(--s-3);padding:var(--s-2) var(--s-3);border-radius:var(--r-md);color:var(--c-text);text-decoration:none;font-weight:500;border-left:3px solid transparent;white-space:nowrap;transition:background-color var(--d-press) var(--ease-out)}
+.nav a:hover{background:var(--c-panel)}
+.nav a[aria-current="page"]{background:var(--c-panel);border-left-color:var(--c-primary);font-weight:600}
+.nav svg{width:20px;height:20px;flex:none;color:var(--c-muted)}
+.nav a[aria-current="page"] svg{color:var(--c-primary)}
+.badge{margin-left:auto;min-width:22px;padding:0 6px;border-radius:999px;background:var(--c-text);color:var(--c-panel);font-size:12px;font-weight:600;line-height:20px;text-align:center}
+.acct{margin-top:auto;display:flex;align-items:center;gap:var(--s-2);padding:var(--s-3);border-top:1px solid var(--c-border);font-size:13px}
+.avatar{width:28px;height:28px;border-radius:50%;background:var(--c-secondary);color:var(--c-res-ink);display:grid;place-items:center;font-weight:700;font-size:12px;flex:none}
+.acct small{display:block;color:var(--c-muted);font-size:12px}
+
+.top{display:flex;align-items:center;gap:var(--s-4);padding:var(--s-3) var(--s-8);border-bottom:1px solid var(--c-border);background:var(--c-bg)}
+.crumbs{display:flex;gap:var(--s-2);list-style:none;margin:0;padding:0;font-size:13px;color:var(--c-muted);white-space:nowrap;min-width:0}
+.crumbs a{color:var(--c-muted);text-decoration:none}
+.crumbs a:hover{text-decoration:underline}
+.crumbs li+li::before{content:"/";margin-right:var(--s-2);color:var(--c-muted)}
+.crumbs [aria-current]{color:var(--c-text);font-weight:600}
+.search{margin-left:auto;position:relative;width:280px}
+.search svg{position:absolute;left:10px;top:50%;width:16px;height:16px;transform:translateY(-50%);color:var(--c-muted)}
+.search input{width:100%;height:36px;padding:0 var(--s-3) 0 34px;border:1px solid var(--c-line);border-radius:var(--r-md);background:var(--c-panel);color:var(--c-text);font:inherit}
+.search input::placeholder{color:var(--c-muted);opacity:1}
+.top .acct-m{display:none;text-decoration:none}
+
+main{padding:var(--s-6) var(--s-8) var(--s-8)}
+.head{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:var(--s-4);margin-bottom:var(--s-6)}
+.head h1{font:600 28px/1.15 var(--font-display);letter-spacing:-0.02em;overflow-wrap:anywhere}
+.meta{display:flex;flex-wrap:wrap;gap:var(--s-1) var(--s-4);margin:var(--s-2) 0 0;padding:0;list-style:none;color:var(--c-muted);font-size:13px}
+.meta b{color:var(--c-text);font-weight:600}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:var(--s-2);height:36px;padding:0 var(--s-4);border-radius:var(--r-md);border:1px solid var(--c-line);background:var(--c-panel);color:var(--c-text);font:600 14px/1 var(--font-body);text-decoration:none;cursor:pointer;white-space:nowrap;transition:background-color var(--d-press) var(--ease-out),transform var(--d-press) var(--ease-out)}
+.btn:hover{background:var(--c-surface)}
+.btn:active{transform:translateY(1px)}
+.btn svg{width:16px;height:16px}
+.btn-p{background:var(--c-primary);border-color:var(--c-primary);color:var(--c-on-primary)}
+.btn-p:hover{background:var(--c-primary-hi);border-color:var(--c-primary-hi)}
+.btn[aria-disabled="true"]{opacity:.55;cursor:not-allowed}
+
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 336px;gap:var(--s-6);align-items:start}
+.card{background:var(--c-panel);border:1px solid var(--c-border);border-radius:var(--r-lg)}
+.card-h{display:flex;align-items:baseline;justify-content:space-between;gap:var(--s-3);padding:var(--s-4) var(--s-6) 0}
+.card-h h2{font-size:15px}
+.card-h .aside{font-size:13px;color:var(--c-muted)}
+
+/* free to reserve */
+.free{display:grid;grid-template-columns:auto minmax(0,1fr);gap:var(--s-2) var(--s-8);align-items:center;padding:var(--s-6);margin-bottom:var(--s-6)}
+.free-fig{display:flex;align-items:baseline;gap:var(--s-3)}
+.free-n{font:600 64px/1 var(--font-display);letter-spacing:-0.04em;color:var(--c-text)}
+.free-l{font-weight:600;font-size:15px;line-height:1.3}
+.free-l small{display:block;font-weight:400;font-size:13px;color:var(--c-muted)}
+.eq{margin:var(--s-2) 0 0;font-size:13px;color:var(--c-muted)}
+.eq b{color:var(--c-text)}
+.strip{display:flex;height:14px;border-radius:var(--r-sm);overflow:hidden;border:1px solid var(--c-line);margin-bottom:var(--s-3)}
+.strip span{display:block;height:100%}
+.k-free{background:var(--c-primary)}
+.k-hold{background:repeating-linear-gradient(135deg,var(--c-secondary) 0 3px,var(--c-panel) 3px 6px)}
+.k-cores{background:var(--c-use)}
+.k-fault{background:var(--c-accent)}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:var(--s-3);margin:0}
+.stats div{display:grid;gap:2px;align-content:start}
+.stats dt{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--c-muted);white-space:nowrap}
+.stats dt i{width:10px;height:10px;border-radius:2px;flex:none;border:1px solid var(--c-line)}
+.stats dd{margin:0;font-weight:700;font-size:18px}
+.stats dd small{display:block;font-weight:400;font-size:12px;color:var(--c-muted);white-space:nowrap}
+
+/* grid */
+.legend{display:flex;flex-wrap:wrap;gap:var(--s-2) var(--s-4);list-style:none;margin:0;padding:var(--s-3) var(--s-6) 0;font-size:12px;color:var(--c-text)}
+.legend li{display:flex;align-items:center;gap:6px}
+.sw{width:22px;height:18px;border-radius:var(--r-sm);display:grid;place-items:center;border:1px solid}
+.sw svg{width:10px;height:10px}
+.grid{padding:var(--s-4) var(--s-6) var(--s-2);display:grid;gap:var(--s-2)}
+.tube{display:grid;grid-template-columns:72px minmax(0,1fr);align-items:center;gap:var(--s-3)}
+.tube-h{display:grid;line-height:1.2}
+.tube-n{font-weight:600;font-size:13px}
+.tube-r{font-size:12px;color:var(--c-muted)}
+.cells{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:6px}
+.core{position:relative;height:52px;padding:0;border-radius:var(--r-md);border:1px solid var(--c-line);background:var(--c-panel);color:var(--c-text);font:600 14px/1 var(--font-body);display:grid;place-items:center;align-content:center;gap:5px;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent;transition:background-color var(--d-press) var(--ease-out),transform var(--d-press) var(--ease-out)}
+.core .ic{width:11px;height:11px}
+.core:focus-visible{outline:3px solid var(--c-text);outline-offset:2px;z-index:1}
+.s-avail .ic{color:var(--c-muted)}
+.s-avail:hover{background:var(--c-secondary-lo)}
+.s-avail:active,.s-chosen:active{transform:scale(0.96)}
+.s-chosen{background:var(--c-primary);border:2px solid var(--c-text);color:var(--c-on-primary)}
+.s-requested{background:repeating-linear-gradient(135deg,var(--c-req-a) 0 5px,var(--c-req-b) 5px 8px);border-color:var(--c-req-edge);color:var(--c-req-ink);cursor:default}
+.s-reserved{background:var(--c-secondary);border-color:var(--c-primary);color:var(--c-res-ink);cursor:default}
+.s-inuse{background:var(--c-use);border-color:var(--c-use);color:var(--c-on-primary);cursor:default}
+.s-faulty{background:repeating-linear-gradient(45deg,var(--c-fault-b) 0 2px,transparent 2px 7px),repeating-linear-gradient(-45deg,var(--c-fault-b) 0 2px,transparent 2px 7px),var(--c-fault-a);border-color:var(--c-accent);color:var(--c-fault-ink);cursor:default}
+.unsurveyed{display:flex;align-items:center;gap:var(--s-2);margin:var(--s-2) var(--s-6) 0;padding:var(--s-2) var(--s-3);border:1px dashed var(--c-line);border-radius:var(--r-md);font-size:13px;color:var(--c-muted)}
+.unsurveyed b{color:var(--c-text)}
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:var(--s-3);margin-top:var(--s-4);padding:var(--s-3) var(--s-6);border-top:1px solid var(--c-border);background:var(--c-bg);border-radius:0 0 var(--r-lg) var(--r-lg)}
+.bar-t{font-size:14px;min-width:0}
+.bar-t b{font-weight:700}
+.bar-t small{display:block;font-size:12px;color:var(--c-muted)}
+.bar .btns{margin-left:auto;display:flex;gap:var(--s-2)}
+
+/* held list */
+.held{list-style:none;margin:0;padding:var(--s-2) var(--s-6) var(--s-4)}
+.held li{display:grid;grid-template-columns:96px 168px minmax(0,1fr) 92px;gap:var(--s-1) var(--s-4);align-items:baseline;padding:var(--s-3) 0;border-bottom:1px solid var(--c-border);font-size:13px}
+.held li:last-child{border-bottom:0}
+.held li.hdr{padding:var(--s-2) 0;font-size:12px;color:var(--c-muted);font-weight:600}
+.held .st{display:flex;align-items:center;gap:6px;font-weight:600}
+.held .st .sw{width:18px;height:16px}
+.held .cr{font-weight:700}
+.held .dt{color:var(--c-muted)}
+.held .d{min-width:0;overflow-wrap:anywhere}
+
+/* rail */
+.rail{display:grid;gap:var(--s-6)}
+.appr{list-style:none;margin:0;padding:var(--s-2) var(--s-4) var(--s-2)}
+.appr li{padding:var(--s-3) var(--s-2);border-bottom:1px solid var(--c-border)}
+.appr li:last-child{border-bottom:0}
+.appr .who{display:flex;justify-content:space-between;gap:var(--s-2);font-weight:600}
+.appr .who span{font-weight:400;font-size:12px;color:var(--c-muted);white-space:nowrap}
+.appr p{margin:2px 0 0;font-size:13px;color:var(--c-muted)}
+.appr p b{color:var(--c-text);font-weight:600}
+.warn{display:flex;gap:var(--s-2);margin-top:var(--s-2);padding:var(--s-2);border-radius:var(--r-sm);background:var(--c-req-a);border:1px solid var(--c-req-edge);color:var(--c-req-ink);font-size:12px;line-height:1.4}
+.warn svg{width:14px;height:14px;flex:none;margin-top:1px}
+.card-f{padding:0 var(--s-6) var(--s-4)}
+.card-f .btn{width:100%}
+.spans{list-style:none;margin:0;padding:var(--s-2) var(--s-3)}
+.spans a{display:flex;align-items:center;justify-content:space-between;gap:var(--s-3);padding:var(--s-2) var(--s-3);border-radius:var(--r-md);color:var(--c-text);text-decoration:none;font-weight:500}
+.spans a:hover{background:var(--c-surface)}
+.spans .v{font-weight:700;white-space:nowrap}
+.spans .v small{font-weight:400;font-size:12px;color:var(--c-muted)}
+.spans .ns{font-weight:500;font-size:12px;color:var(--c-muted);display:flex;align-items:center;gap:4px}
+.spans .ns svg{width:12px;height:12px}
+.spans .full{color:var(--c-fault-ink)}
+.foot-note{padding:0 var(--s-6) var(--s-4);font-size:12px;color:var(--c-muted)}
+
+@media (hover:hover) and (pointer:fine){.s-avail:hover{border-color:var(--c-primary)}}
+@media (prefers-reduced-motion:reduce){*{transition-duration:0ms !important}.core:active,.btn:active{transform:none}}
+
+/* 768 */
+@media (max-width:1100px){
+  .shell{grid-template-columns:64px minmax(0,1fr)}
+  .side{padding:var(--s-4) var(--s-2)}
+  .brand span,.nav .lbl,.acct div{display:none}
+  .brand{justify-content:center;padding:var(--s-1) 0 var(--s-6)}
+  .nav a{justify-content:center;padding:var(--s-3) 0;position:relative}
+  .nav .badge{position:absolute;top:2px;right:2px;min-width:18px;line-height:16px;font-size:11px;padding:0 4px}
+  .acct{justify-content:center;padding:var(--s-3) 0}
+  .top{padding:var(--s-3) var(--s-6)}
+  main{padding:var(--s-6)}
+  .layout{grid-template-columns:minmax(0,1fr)}
+  .rail{grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}
+  .held li{grid-template-columns:72px 150px minmax(0,1fr) 88px}
+  .free{grid-template-columns:minmax(0,1fr);gap:var(--s-4)}
+}
+/* 390 */
+@media (max-width:640px){
+  .shell{grid-template-columns:minmax(0,1fr)}
+  .side{position:fixed;inset:auto 0 0 0;top:auto;height:auto;z-index:5;flex-direction:row;padding:0 var(--s-1) env(safe-area-inset-bottom);border-right:0;border-top:1px solid var(--c-border)}
+  .brand,.side .acct{display:none}
+  .nav{grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);width:100%}
+  .nav a{flex-direction:column;gap:2px;padding:6px 0 8px;border-left:0;border-top:3px solid transparent;border-radius:0;font-size:11px;min-height:56px}
+  .nav a[aria-current="page"]{border-top-color:var(--c-primary);background:var(--c-panel)}
+  .nav .lbl{display:block}
+  .nav .badge{top:4px;right:calc(50% - 22px)}
+  body{padding-bottom:64px}
+  .top{padding:var(--s-2) var(--s-4);gap:var(--s-2);flex-wrap:wrap}
+  .crumbs{font-size:12px;order:1}
+  .top .acct-m{display:grid;margin-left:auto;order:2}
+  .search{order:3;width:100%;margin-left:0}
+  .search input{height:44px}
+  main{padding:var(--s-4)}
+  .head h1{font-size:22px}
+  .head .btn{height:44px}
+  .free{grid-template-columns:minmax(0,1fr);padding:var(--s-4);gap:var(--s-4)}
+  .free-n{font-size:52px}
+  .stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .card-h{padding:var(--s-4) var(--s-4) 0}
+  .legend{padding:var(--s-3) var(--s-4) 0;gap:var(--s-2) var(--s-3)}
+  .grid{padding:var(--s-3) var(--s-3) var(--s-2);gap:var(--s-3)}
+  .tube{grid-template-columns:minmax(0,1fr);gap:var(--s-1)}
+  .tube-h{display:flex;gap:var(--s-2);align-items:baseline}
+  .cells{gap:3px}
+  .core{height:44px;font-size:12px;border-radius:var(--r-sm);gap:4px}
+  .core .ic{width:9px;height:9px}
+  .unsurveyed{margin:var(--s-2) var(--s-3) 0}
+  .bar{padding:var(--s-3) var(--s-4)}
+  .bar .btns{margin-left:0;width:100%}
+  .bar .btn{flex:1;height:44px}
+  .held{padding:var(--s-1) var(--s-4) var(--s-3)}
+  .held li{grid-template-columns:minmax(0,1fr) auto}
+  .held li.hdr{display:none}
+  .held .d{grid-column:1 / -1}
+  .rail{grid-template-columns:minmax(0,1fr)}
+  .card-f .btn{height:44px}
+  .spans a{min-height:44px}
+}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <symbol id="i-avail" viewBox="0 0 12 12"><circle cx="6" cy="6" r="3.6" fill="none" stroke="currentColor" stroke-width="1.5"></circle></symbol>
+  <symbol id="i-chosen" viewBox="0 0 12 12"><path d="M2.2 6.3l2.5 2.5L9.8 3.4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+  <symbol id="i-requested" viewBox="0 0 12 12"><circle cx="6" cy="6" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"></circle><path d="M6 3.4V6.2l1.9 1.2" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"></path></symbol>
+  <symbol id="i-reserved" viewBox="0 0 12 12"><rect x="2.4" y="5.4" width="7.2" height="5.2" rx="1" fill="currentColor"></rect><path d="M4 5.4V4a2 2 0 0 1 4 0v1.4" fill="none" stroke="currentColor" stroke-width="1.4"></path></symbol>
+  <symbol id="i-inuse" viewBox="0 0 12 12"><circle cx="6" cy="6" r="4.2" fill="currentColor"></circle></symbol>
+  <symbol id="i-faulty" viewBox="0 0 12 12"><path d="M2.8 2.8l6.4 6.4M9.2 2.8L2.8 9.2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path></symbol>
+  <symbol id="i-hold" viewBox="0 0 12 12"><rect x="1.8" y="1.8" width="8.4" height="8.4" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-dasharray="2.2 1.6"></rect></symbol>
+  <symbol id="i-warn" viewBox="0 0 16 16"><path d="M8 1.8l6.6 11.6H1.4z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"></path><path d="M8 6.2v3.4M8 11.4v.2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path></symbol>
+  <symbol id="i-dash" viewBox="0 0 12 12"><path d="M2.5 6h7" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path></symbol>
+</svg>
+<a class="skip" href="#main">Skip to span</a>
+<div class="shell">
+  <nav class="side" aria-label="Primary">
+    <a class="brand" href="/">
+      <svg viewBox="0 0 22 22" aria-hidden="true"><path d="M5 16.5L11 5.5l6 11z" fill="none" class="mk-l" stroke-width="1.8" stroke-linejoin="round"></path><circle cx="11" cy="5.5" r="2.8" class="mk-a"></circle><circle cx="5" cy="16.5" r="2.8" class="mk-b"></circle><circle cx="17" cy="16.5" r="2.8" class="mk-b"></circle></svg>
+      <span>Fiber</span>
+    </a>
+    <ul class="nav">
+      <li><a href="/spans" aria-current="page"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="4.5" cy="10" r="2.5"></circle><circle cx="15.5" cy="10" r="2.5"></circle><path d="M7 10h6"></path></svg><span class="lbl">Spans</span></a></li>
+      <li><a href="/routes"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="4" cy="15" r="2"></circle><circle cx="16" cy="5" r="2"></circle><path d="M6 15h3.5a2.5 2.5 0 0 0 2.5-2.5v-5A2.5 2.5 0 0 1 14.5 5"></path></svg><span class="lbl">Routes</span></a></li>
+      <li><a href="/map"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 5l5-2 5 2 5-2v12l-5 2-5-2-5 2z"></path><path d="M7.5 3v12M12.5 5v12"></path></svg><span class="lbl">Map</span></a></li>
+      <li><a href="/approvals" aria-label="Approvals, 2 waiting"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10" cy="10" r="7"></circle><path d="M6.8 10.2l2.2 2.2 4.2-4.6"></path></svg><span class="lbl">Approvals</span><span class="badge" aria-hidden="true">2</span></a></li>
+      <li><a href="/upload"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13V3.5M6 7.5l4-4 4 4"></path><path d="M3.5 13v3h13v-3"></path></svg><span class="lbl">Upload</span></a></li>
+    </ul>
+    <div class="acct"><span class="avatar" aria-hidden="true">P1</span><div>planner1<small>Planner</small></div></div>
+  </nav>
+
+  <div>
+    <header class="top">
+      <ol class="crumbs" aria-label="Breadcrumb">
+        <li><a href="/spans">Spans</a></li>
+        <li><a href="/spans?region=north">North</a></li>
+        <li><span aria-current="page">AABB - BBCC</span></li>
+      </ol>
+      <a class="acct-m" href="/account" aria-label="Account, planner1"><span class="avatar" aria-hidden="true">P1</span></a>
+      <form class="search" role="search" action="/spans">
+        <label class="vh" for="q">Find a span</label>
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="7" cy="7" r="4.5"></circle><path d="M10.5 10.5L14 14"></path></svg>
+        <input id="q" name="q" type="search" placeholder="Find a span, e.g. CCDD…" autocomplete="off" spellcheck="false">
+      </form>
+    </header>
+
+    <main id="main">
+      <div class="head">
+        <div>
+          <h1 translate="no">AABB - BBCC</h1>
+          <ul class="meta" aria-label="Span details">
+            <li><b>North</b> region</li>
+            <li><b>Trunk</b> route</li>
+            <li><b>32.5&nbsp;km</b></li>
+            <li>Group <b>DWDM Trunk Route 1</b></li>
+            <li>Cable <b>144</b> cores (info)</li>
+            <li>Surveyed <b>36</b> cores, tubes 1 to 3</li>
+          </ul>
+        </div>
+        <a class="btn" href="/map?span=AABB-BBCC"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 5l5-2 5 2 5-2v12l-5 2-5-2-5 2z"></path><path d="M7.5 3v12M12.5 5v12"></path></svg>Show on map</a>
+      </div>
+
+      <div class="layout">
+        <div>
+          <section class="card free" aria-labelledby="free-h">
+            <div>
+              <div class="free-fig">
+                <span class="free-n" aria-hidden="true">22</span>
+                <h2 class="free-l" id="free-h"><span class="vh">22 cores </span>Free to reserve<small>on this span now</small></h2>
+              </div>
+              <p class="eq"><b>26</b> available − <b>4</b> held without cores</p>
+            </div>
+            <div>
+              <div class="strip" role="img" aria-label="36 surveyed cores: 22 free, 4 held without cores, 9 held with cores, 1 faulty">
+                <span class="k-free" style="width:61.11%"></span><span class="k-hold" style="width:11.11%"></span><span class="k-cores" style="width:25%"></span><span class="k-fault" style="width:2.78%"></span>
+              </div>
+              <dl class="stats">
+                <div><dt><i class="k-free"></i>Free</dt><dd>22</dd></div>
+                <div><dt><i class="k-hold"></i>Held, no cores</dt><dd>4 <small>[Customer B]</small></dd></div>
+                <div><dt><i class="k-cores"></i>Held with cores</dt><dd>9 <small>2 res · 1 req · 6 use</small></dd></div>
+                <div><dt><i class="k-fault"></i>Faulty</dt><dd>1</dd></div>
+              </dl>
+            </div>
+          </section>
+
+          <section class="card" aria-labelledby="grid-h">
+            <div class="card-h">
+              <h2 id="grid-h">Cores</h2>
+              <span class="aside">36 surveyed · 12 per tube</span>
+            </div>
+            <ul class="legend" aria-label="Core status key">
+              <li><span class="sw s-avail" style="border-color:var(--c-line)"><svg viewBox="0 0 12 12" aria-hidden="true"><use href="#i-avail"></use></svg></span>Available</li>
+              <li><span class="sw s-chosen"><svg viewBox="0 0 12 12" aria-hidden="true"><use href="#i-chosen"></use></svg></span>Chosen</li>
+              <li><span class="sw s-requested"><svg viewBox="0 0 12 12" aria-hidden="true"><use href="#i-requested"></use></svg></span>Requested</li>
+              <li><span class="sw s-reserved"><svg viewBox="0 0 12 12" aria-hidden="true"><use href="#i-reserved"></use></svg></span>Reserved</li>
+              <li><span class="sw s-inuse"><svg viewBox="0 0 12 12" aria-hidden="true"><use href="#i-inuse"></use></svg></span>In use</li>
+              <li><span class="sw s-faulty"><svg viewBox="0 0 12 12" aria-hidden="true"><use href="#i-faulty"></use></svg></span>Faulty</li>
+            </ul>
+            <div class="grid" id="cores" aria-label="Core grid. Use arrow keys to move, Enter or Space to choose an available core.">
+<div class="tube" role="group" aria-label="Tube 1, cores 1 to 12"><div class="tube-h"><span class="tube-n">Tube 1</span><span class="tube-r">1 to 12</span></div><div class="cells"><button type="button" class="core s-reserved" data-core="1" aria-disabled="true" tabindex="-1" aria-label="Core 1, Reserved, DWDM(R), planned 2026-11-21" title="Core 1, Reserved, DWDM(R), planned 2026-11-21"><span class="n">1</span><svg class="ic" viewBox="0 0 12 12" aria-hidden="true"><use href="#i-reserved"></use></svg></button><button type="button" class="core s-reserved" data-core="2" aria-disabled="true" tabindex="-1" aria-label="Core 2, Reserved, DWDM(R), planned 2026-11-21" title="Core 2, Reserved, DWDM(R), planned 2026-11-21"><span class="n">2</span><svg class="ic" viewBox="0 0 12 12" aria-hidden="true"><use href="#i-reserved"></use></svg></button><button type="button" class="core s-requested" data-core="3" aria-disabled="true" tabindex="-1" aria-label="Core 3, Requested, [Customer A], waiting for approval" title="Core 3, Requested, [Customer A], waiting for approval"><span class="n">3</span><svg class="ic" viewBox="0 0 12 12" aria-hidden="true"><use href="#i-requested"></use></svg></button><button type="button" class="core s-avail" data-core="4" data-free="1" aria-pressed="false" tabindex="-1" aria-label="Core 4, Available" title="Core 4, Available"><span class="n">4</span><svg class="ic" viewBox="0 0 12 12" aria-hidden="true"><use href="#i-avail"></use></svg></button><button type="button" class="core s-avail" data-core="5" data-free="1" aria-pressed="false" tabindex="-1" aria-label="Core 5, Available" title="Core 5, Available"><span class="n">5</span><svg class="ic" viewBox="0 0 12 12" aria-hidden="true"><use href="#i-avail"></use></svg></button><button type="button" class="core s-avail" data-core="6" data-free="1" aria-pressed="false" tabindex="-1" aria-label="Core 6, Available" title="Core 6, Available"><span class="n">6</span><svg class="ic" viewBox="0 0 12 12" aria-hidden="true"><use href="#i-avail"></use></svg></button><button type="button" class="core s-chosen" data-core="7" data-free="1" aria-pressed="true" tabindex="0" aria-label="Core 7, Available, chosen" title="Core 7, Available, chosen"><span class="n">7</span><svg class="ic" viewBox="0 0 12 12" aria-hidden="true"><use href="#i-chosen"></use></svg></button><button type="button" class="core s-avail" data-core="8" data-free="1" aria-pressed="false" tabindex="-1" aria-label="Core 8, Available" title="Core 8, Available"><span class="n">8</span><svg class="ic" viewBox="0 0 12 12" aria-hidden="true"><use href="#i-avail"></use></svg></button><button type="button" class="core s-avail" data-core="9" data-free="1" aria-pressed="false" tabindex="-1" aria-label="Core 9, Available" title="Core 9, Available"><span class="n">9</span><svg class="ic" viewBox="0 0 12 12" aria-hidden="true"><use href="#i-avail"></use></svg></button><button type="button" class="core s-avail" data-core="10" data-free="1" aria-pressed="false" tabindex="-1" aria-label="Core 10, Available" title="Core 10, Available"><span class="n">10</span><svg class="ic" viewBox="0 0 12 12" aria-hidden="true"><use href="#i-avail"></use></svg></button><button type="button" class="core s-avail" data-core="11" data-free="1" aria-pressed="false" tabindex="-1" aria-label="Core 11, Available" title="Core 11, Available"><span class="n">11</span><svg class="ic" viewBox="0 0 12 12" aria-hidden="true"><use href="#i-avail"></use></svg></button><button type="button" class="core s-avail" data-core="12" data-free="1" aria-pressed="false" tabindex="-1" aria-label="Core 12, Available" title="Core 12, Available"><span class="n">12</span><svg class="ic" viewBox="0 0 12 12" aria-hidden="true"><use href="#i-avail"></use></svg></button></div></div>
+<div class="tube" role="group" aria-label="Tube 2, cores 13 to 24"><div class="tube-h"><span class="tube-n">Tube 2</span><span class="tube-r">13 to 24</span></div><div class="cells"><button type="button" class="core s-inuse" data-core="13" aria-disabled="true" tabindex="-1" aria-label="Core 13, In use, CKT-1011" title="Core 13, In use, CKT-1011"><span class="n">13</span><svg class="ic" viewBox="0 0 12 12" aria-hidden="true"><use href="#i-inuse"></use></svg></button><button type="button" class="core s-inuse" data-core="14" aria-disabled="true" tabindex="-1" aria-label="Core 14, In use, CKT-1012" title="Core 14, In use, CKT-1012"><span class="n">14</span><svg class="ic" viewBox="0 0 12 12" aria-hidden="true"><use href="#i-inuse"></use></svg></button><button type="button" class="core s-inuse" data-core="15" aria-disabled="true" tabindex="-1" aria-label="Core 15, In use, CKT-1013" title="Core 15, In use, CKT-1013"><span class="n">15</span><svg class="ic" viewBox="0 0 12 12" aria-hidden="true"><use href="#i-inuse"></use></svg></button><button type="button" class="core s-inuse" data-core="16" aria-disabled="true" tabindex="-1" aria-label="Core 16, In use, CKT-1014" title="Core 16, In use, CKT-1014"><span class="n">16</span><svg class="ic" viewBox="0 0 12 12" aria-hidden="true"><use href="#i-inuse"></use></svg></button><button type="button" class="core s-inuse" data-core="17" aria-disabled="true" tabindex="-1" aria-label="Core 17, In use, CKT-1015" title="Core 17, In use, CKT-1015"><span class="n">17</span><svg class="ic" viewBox="0 0 12 12" aria-hidden="true"><use href="#i-inuse"></use></svg></button><button type="button" class="core s-inuse" data-core="18" aria-disabled="true" tabindex="-1" aria-label="Core 18, In use, CKT-1016" title="Core 18, In use, CKT-1016"><span class="n">18</span><svg class="ic" viewBox="0 0 12 12" aria-hidden="true"><use href="#i-inuse"></use></svg></button><button type="button" class="core s-avail" data-core="19" data-free="1" aria-pressed="false" tabindex="-1" aria-label="Core 19, Available" title="Core 19, Available"><span class="n">19</span><svg class="ic" viewBox="0 0 12 12" aria-hidden="true"><use href="#i-avail"></use></svg></button><button type="button" class="core s-avail" data-core="20" data-free="1" aria-pressed="false" tabindex="-1" aria-label="Core 20, Available" title="Core 20, Available"><span class="n">20</span><svg class="ic" viewBox="0 0 12 12" aria-hidden="true"><use href="#i-avail"></use></svg></button><button type="button" class="core s-avail" data-core="21" data-free="1" aria-pressed="false" tabindex="-1" aria-label="Core 21, Available" title="Core 21, Available"><span class="n">21</span><svg class="ic" viewBox="0 0 12 12" aria-hidden="true"><use href="#i-avail"></use></svg></button><button type="button" class="core s-avail" data-core="22" data-free="1" aria-pressed="false" tabindex="-1" aria-label="Core 22, Available" title="Core 22, Available"><span class="n">22</span><svg class="ic" viewBox="0 0 12 12" aria-hidden="true"><use href="#i-avail"></use></svg></button><button type="button" class="core s-avail" data-core="23" data-free="1" aria-pressed="false" tabindex="-1" aria-label="Core 23, Available" title="Core 23, Available"><span class="n">23</span><svg class="ic" viewBox="0 0 12 12" aria-hidden="true"><use href="#i-avail"></use></svg></button><button type="button" class="core s-avail" data-core="24" data-free="1" aria-pressed="false" tabindex="-1" aria-label="Core 24, Available" title="Core 24, Available"><span class="n">24</span><svg class="ic" viewBox="0 0 12 12" aria-hidden="true"><use href="#i-avail"></use></svg></button></div></div>
+<div class="tube" role="group" aria-label="Tube 3, cores 25 to 36"><div class="tube-h"><span class="tube-n">Tube 3</span><span class="tube-r">25 to 36</span></div><div class="cells"><button type="button" class="core s-avail" data-core="25" data-free="1" aria-pressed="false" tabindex="-1" aria-label="Core 25, Available" title="Core 25, Available"><span class="n">25</span><svg class="ic" viewBox="0 0 12 12" aria-hidden="true"><use href="#i-avail"></use></svg></button><button type="button" class="core s-avail" data-core="26" data-free="1" aria-pressed="false" tabindex="-1" aria-label="Core 26, Available" title="Core 26, Available"><span class="n">26</span><svg class="ic" viewBox="0 0 12 12" aria-hidden="true"><use href="#i-avail"></use></svg></button><button type="button" class="core s-avail" data-core="27" data-free="1" aria-pressed="false" tabindex="-1" aria-label="Core 27, Available" title="Core 27, Available"><span class="n">27</span><svg class="ic" viewBox="0 0 12 12" aria-hidden="true"><use href="#i-avail"></use></svg></button><button type="button" class="core s-avail" data-core="28" data-free="1" aria-pressed="false" tabindex="-1" aria-label="Core 28, Available" title="Core 28, Available"><span class="n">28</span><svg class="ic" viewBox="0 0 12 12" aria-hidden="true"><use href="#i-avail"></use></svg></button><button type="button" class="core s-avail" data-core="29" data-free="1" aria-pressed="false" tabindex="-1" aria-label="Core 29, Available" title="Core 29, Available"><span class="n">29</span><svg class="ic" viewBox="0 0 12 12" aria-hidden="true"><use href="#i-avail"></use></svg></button><button type="button" class="core s-faulty" data-core="30" aria-disabled="true" tabindex="-1" aria-label="Core 30, Faulty" title="Core 30, Faulty"><span class="n">30</span><svg class="ic" viewBox="0 0 12 12" aria-hidden="true"><use href="#i-faulty"></use></svg></button><button type="button" class="core s-avail" data-core="31" data-free="1" aria-pressed="false" tabindex="-1" aria-label="Core 31, Available" title="Core 31, Available"><span class="n">31</span><svg class="ic" viewBox="0 0 12 12" aria-hidden="true"><use href="#i-avail"></use></svg></button><button type="button" class="core s-avail" data-core="32" data-free="1" aria-pressed="false" tabindex="-1" aria-label="Core 32, Available" title="Core 32, Available"><span class="n">32</span><svg class="ic" viewBox="0 0 12 12" aria-hidden="true"><use href="#i-avail"></use></svg></button><button type="button" class="core s-avail" data-core="33" data-free="1" aria-pressed="false" tabindex="-1" aria-label="Core 33, Available" title="Core 33, Available"><span class="n">33</span><svg class="ic" viewBox="0 0 12 12" aria-hidden="true"><use href="#i-avail"></use></svg></button><button type="button" class="core s-avail" data-core="34" data-free="1" aria-pressed="false" tabindex="-1" aria-label="Core 34, Available" title="Core 34, Available"><span class="n">34</span><svg class="ic" viewBox="0 0 12 12" aria-hidden="true"><use href="#i-avail"></use></svg></button><button type="button" class="core s-avail" data-core="35" data-free="1" aria-pressed="false" tabindex="-1" aria-label="Core 35, Available" title="Core 35, Available"><span class="n">35</span><svg class="ic" viewBox="0 0 12 12" aria-hidden="true"><use href="#i-avail"></use></svg></button><button type="button" class="core s-avail" data-core="36" data-free="1" aria-pressed="false" tabindex="-1" aria-label="Core 36, Available" title="Core 36, Available"><span class="n">36</span><svg class="ic" viewBox="0 0 12 12" aria-hidden="true"><use href="#i-avail"></use></svg></button></div></div>
+            </div>
+            <p class="unsurveyed"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><use href="#i-dash"></use></svg><span><b>108 cores not surveyed</b> (37 to 144). Not drawn and cannot be booked.</span></p>
+            <div class="bar">
+              <p class="bar-t" id="sel" aria-live="polite"><b>1 core chosen:</b> 7<small>21 more can be chosen</small></p>
+              <div class="btns">
+                <button type="button" class="btn" id="clear">Clear</button>
+                <button type="button" class="btn btn-p" id="reserve">Reserve 1 core</button>
+              </div>
+            </div>
+          </section>
+
+          <section class="card" aria-labelledby="held-h" style="margin-top:var(--s-6)">
+            <div class="card-h"><h2 id="held-h">Held on this span</h2><span class="aside">13 cores</span></div>
+            <ul class="held">
+              <li class="hdr" aria-hidden="true"><span>Cores</span><span>Status</span><span>For / detail</span><span>Planned</span></li>
+              <li><span class="cr">1, 2</span><span class="st"><span class="sw s-reserved"><svg viewBox="0 0 12 12" aria-hidden="true"><use href="#i-reserved"></use></svg></span>Reserved</span><span class="d"><b>DWDM(R)</b> · AABB Tray 1 P1 / P2 to BBCC MOD B P23 / P24</span><span class="dt">2026-11-21</span></li>
+              <li><span class="cr">3</span><span class="st"><span class="sw s-requested"><svg viewBox="0 0 12 12" aria-hidden="true"><use href="#i-requested"></use></svg></span>Requested</span><span class="d"><b>[Customer A]</b> · planner2 · waiting for approval</span><span class="dt">2026-12-01</span></li>
+              <li><span class="cr">13 to 18</span><span class="st"><span class="sw s-inuse"><svg viewBox="0 0 12 12" aria-hidden="true"><use href="#i-inuse"></use></svg></span>In use</span><span class="d">Circuits CKT-1011 to CKT-1016</span><span class="dt"></span></li>
+              <li><span class="cr">30</span><span class="st"><span class="sw s-faulty"><svg viewBox="0 0 12 12" aria-hidden="true"><use href="#i-faulty"></use></svg></span>Faulty</span><span class="d">Not bookable</span><span class="dt"></span></li>
+              <li><span class="cr">4 not assigned</span><span class="st"><span class="sw k-hold" style="border-color:var(--c-primary);color:var(--c-res-ink)"><svg viewBox="0 0 12 12" aria-hidden="true"><use href="#i-hold"></use></svg></span>Held, no cores</span><span class="d"><b>[Customer B]</b> · count-only from Excel import, marks no cell</span><span class="dt">2026-09-02</span></li>
+            </ul>
+          </section>
+        </div>
+
+        <aside class="rail" aria-label="Related">
+          <section class="card" aria-labelledby="appr-h">
+            <div class="card-h"><h2 id="appr-h">Waiting for approval</h2><span class="aside">2</span></div>
+            <ul class="appr">
+              <li>
+                <div class="who">[Customer A]<span>2 days ago</span></div>
+                <p>Route <b translate="no">AABB - BBCC - CCDD</b>, 2 cores per span</p>
+                <p>Planned 2026-12-01 · planner2</p>
+                <div class="warn"><svg viewBox="0 0 16 16" aria-hidden="true"><use href="#i-warn"></use></svg><span>New customer name is close to existing “[Customer A] Sdn Bhd”.</span></div>
+              </li>
+              <li>
+                <div class="who">DWDM(R)<span>5 hours ago</span></div>
+                <p>Span <b translate="no">KKLL - LLMM</b>, cores 7, 8</p>
+                <p>Planned 2026-12-01 · planner1</p>
+              </li>
+            </ul>
+            <div class="card-f"><a class="btn" href="/approvals">Open approvals</a></div>
+          </section>
+
+          <section class="card" aria-labelledby="near-h">
+            <div class="card-h"><h2 id="near-h">Other North spans</h2><span class="aside">Free to reserve</span></div>
+            <ul class="spans">
+              <li><a href="/spans/BBCC-CCDD"><span translate="no">BBCC - CCDD</span><span class="v">20</span></a></li>
+              <li><a href="/spans/BBCC-FFGG"><span translate="no">BBCC - FFGG</span><span class="v">11</span></a></li>
+              <li><a href="/spans/CCDD-DDEE"><span translate="no">CCDD - DDEE</span><span class="v">3</span></a></li>
+              <li><a href="/spans/DDEE-EERR"><span translate="no">DDEE - EERR</span><span class="v full">0 <small class="full">full</small></span></a></li>
+              <li><a href="/spans/EERR-TTEE"><span translate="no">EERR - TTEE</span><span class="ns"><svg viewBox="0 0 12 12" aria-hidden="true"><use href="#i-dash"></use></svg>Not surveyed</span></a></li>
+              <li><a href="/spans/FFGG-GGHH"><span translate="no">FFGG - GGHH</span><span class="v">17</span></a></li>
+              <li><a href="/spans/GGHH-HHJJ"><span translate="no">GGHH - HHJJ</span><span class="v">9</span></a></li>
+              <li><a href="/spans/HHJJ-JJKK"><span translate="no">HHJJ - JJKK</span><span class="v">31</span></a></li>
+            </ul>
+            <p class="foot-note">9 of 14 North spans shown. <a href="/spans?region=north">All North spans</a></p>
+          </section>
+        </aside>
+      </div>
+    </main>
+  </div>
+</div>
+<script>
+(function(){
+  var MAX=22, grid=document.getElementById('cores'), sel=document.getElementById('sel'),
+      res=document.getElementById('reserve'), clr=document.getElementById('clear'),
+      cells=[].slice.call(grid.querySelectorAll('.core'));
+  function chosen(){return cells.filter(function(c){return c.getAttribute('aria-pressed')==='true';});}
+  function update(){
+    var c=chosen(), n=c.length, nums=c.map(function(x){return x.dataset.core;}).join(', ');
+    sel.innerHTML=n?'<b>'+n+' core'+(n>1?'s':'')+' chosen:</b> '+nums+'<small>'+(MAX-n)+' more can be chosen</small>'
+                   :'<b>No cores chosen.</b><small>Choose Available cores in the grid, up to '+MAX+'</small>';
+    res.textContent=n?'Reserve '+n+' core'+(n>1?'s':''):'Reserve';
+    res.setAttribute('aria-disabled',n?'false':'true');
+  }
+  function set(c,on){
+    c.setAttribute('aria-pressed',on);c.className='core '+(on?'s-chosen':'s-avail');
+    c.querySelector('use').setAttribute('href',on?'#i-chosen':'#i-avail');
+    var l='Core '+c.dataset.core+', Available'+(on?', chosen':'');c.setAttribute('aria-label',l);c.title=l;
+  }
+  grid.addEventListener('click',function(e){
+    var c=e.target.closest('.core'); if(!c||!c.dataset.free) return;
+    var on=c.getAttribute('aria-pressed')!=='true';
+    if(on&&chosen().length>=MAX){sel.querySelector('small').textContent='Only '+MAX+' cores are free to reserve';return;}
+    set(c,on);update();
+  });
+  grid.addEventListener('keydown',function(e){
+    var i=cells.indexOf(document.activeElement); if(i<0) return;
+    var d={ArrowRight:1,ArrowLeft:-1,ArrowDown:12,ArrowUp:-12,Home:-(i%12),End:11-(i%12)}[e.key];
+    if(d===undefined) return; e.preventDefault();
+    var j=Math.max(0,Math.min(cells.length-1,i+d));
+    cells[i].tabIndex=-1;cells[j].tabIndex=0;cells[j].focus();
+  });
+  clr.addEventListener('click',function(){chosen().forEach(function(c){set(c,false);});update();});
+  res.addEventListener('click',function(){if(res.getAttribute('aria-disabled')==='true') return;});
+  update();
+})();
+</script>
+</body>
+</html>

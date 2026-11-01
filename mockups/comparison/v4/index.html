@@ -1,0 +1,464 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Span AABB - BBCC · Fiber</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<!-- v4 desktop span view: v3 revised. White cards on grey ground, one 12-col grid, semantic colour, bold numeric scale (see CSS comment). Desktop only (min 1200). -->
+<style>
+:root{
+  --ground:#f2f4f7; --card:#fff; --ink:#0a0a0a; --muted:#5b6068; --border:#e2e5ea; --rule:#eceef2; --line:#868c96; --raised:#eceef2;
+  --blue:#1d5fbf; --blue-bg:#eff5fd; --blue-bd:#bcd2f2;
+  --green:#1a7f4b; --green-bg:#ecfdf3; --green-bd:#b7e4c7;
+  --amber:#b45309; --amber-bg:#fff7ed; --amber-bd:#eec9a0;
+  --red:#b42318; --red-bg:#fef3f2; --red-bd:#f1b4ad;
+  --res:#272a30; --use:#50555d;
+  --r:6px; --font:"Geist",Inter,system-ui,sans-serif; --mono:"Geist Mono",ui-monospace,monospace;
+  --pad:clamp(24px,1.8vw,40px); --gut:16px; --cp:20px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{min-width:1200px;background:var(--ground);color:var(--ink);font:400 14px/1.45 var(--font);font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased}
+button,input{font:inherit;color:inherit}
+a{color:inherit}
+:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.ic{width:12px;height:12px;flex:none}
+.mono{font-family:var(--mono);font-size:13px}
+.shell{display:grid;grid-template-columns:clamp(200px,15vw,232px) minmax(0,1fr);min-height:100vh}
+.side{position:sticky;top:0;height:100vh;display:flex;flex-direction:column;gap:24px;padding:16px 12px 20px}
+.brand{display:flex;align-items:center;gap:10px;padding:0 8px;height:40px}
+.brand b{font-weight:600;font-size:16px;line-height:20px;display:block}
+.brand span{font-size:12px;line-height:16px;color:var(--muted);display:block}
+.nav{list-style:none}
+.nav a{display:flex;align-items:center;gap:10px;height:32px;margin-bottom:2px;padding:0 10px;border-radius:var(--r);color:#3d4046;text-decoration:none}
+.nav a:hover{background:var(--raised)}
+.nav a[aria-current=page]{background:#e4e7ec;color:var(--ink);font-weight:600}
+.ni{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.badge{margin-left:auto;font-size:12px;font-weight:600;line-height:18px;padding:0 8px;border-radius:4px;background:var(--amber-bg);color:var(--amber);border:1px solid var(--amber-bd);white-space:nowrap}
+.user{margin-top:auto;padding:8px;font-size:13px;line-height:18px}
+.user b{font-weight:600;display:block}
+.user span{color:var(--muted)}
+.content{min-width:0;padding:0 var(--pad) 40px 0}
+.top{display:flex;align-items:center;height:72px}
+.search{margin-left:auto;position:relative;width:min(400px,38%)}
+.search .ni{position:absolute;left:12px;top:10px;color:var(--muted)}
+.search input{width:100%;height:36px;padding:0 12px 0 36px;border:1px solid var(--line);border-radius:var(--r);background:#fff}
+input::placeholder{color:var(--muted);opacity:1}
+
+/* Grid: ONE 12-col grid, 16px gutters. Main = cols 1-9, rail = cols 10-12, both flex columns that stretch
+   to the same height (last rail card grows). Every card: 1px #e2e5ea border, 8px radius, 20px padding, header = title row + hairline. */
+.grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:var(--gut);align-items:stretch}
+.g-head,.g-held{grid-column:1/-1}
+.g-main{grid-column:1/10}
+.g-rail{grid-column:10/13}
+.g-main,.g-rail{display:flex;flex-direction:column;gap:var(--gut);min-width:0}
+.card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:var(--cp)}
+.grow{flex:1;display:flex;flex-direction:column}
+.ch{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding-bottom:12px;margin-bottom:16px;border-bottom:1px solid var(--border)}
+h2{font-size:16px;line-height:24px;font-weight:600}
+.ch small,.hint{font-size:13px;font-weight:400;color:var(--muted)}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;line-height:20px;font-weight:600;padding:0 10px;border-radius:999px;border:1px solid;white-space:nowrap}
+.p-green{color:var(--green);background:var(--green-bg);border-color:var(--green-bd)}
+.p-amber{color:var(--amber);background:var(--amber-bg);border-color:var(--amber-bd)}
+.p-red{color:var(--red);background:var(--red-bg);border-color:var(--red-bd)}
+.dot{width:8px;height:8px;border-radius:50%;background:currentColor;flex:none}
+
+/*
+ TYPE SCALE (Geist, tabular-nums everywhere)
+ 32/700 span title (-.02em) | 40/700 metric value (all four) | 16/600 section title, equation (numbers 700)
+ 14/400 body, 14/600 table numbers & facts values | 13/400 secondary, 13/700 legend counts | 12/500 labels, 12/600 badges | 11/500 in-cell words
+ Colour: blue #1d5fbf info/Chosen/links; green #1a7f4b healthy/free; amber #b45309 on #fff7ed warning/Requested;
+ red #b42318 on #fef3f2 error/Faulty/blocked; slate #50555d neutral/In use; ink #272a30 Reserved.
+*/
+.crumb{display:flex;gap:8px;list-style:none;font-size:13px;color:var(--muted);margin-bottom:8px}
+.crumb li+li::before{content:"/";margin-right:8px}
+.crumb [aria-current]{color:var(--ink);font-weight:700}
+h1{font-size:32px;line-height:38px;font-weight:700;letter-spacing:-.02em}
+.facts{display:flex;flex-wrap:wrap;gap:4px 28px;margin-top:10px;font-size:14px}
+.facts dt{display:inline;color:var(--muted);font-weight:400}
+.facts dd{display:inline;margin-left:6px;font-weight:600}
+
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));padding:0}
+.kpi{padding:var(--cp);border-left:1px solid var(--border);min-width:0}
+.kpi:first-child{border-left:0}
+.kpi .l{display:flex;align-items:center;gap:8px;font-size:12px;line-height:20px;font-weight:500;color:var(--muted)}
+.kpi .v{display:flex;align-items:baseline;gap:8px;margin-top:4px;font-size:40px;line-height:46px;font-weight:700;letter-spacing:-.02em}
+.kpi .v .pill{align-self:center;letter-spacing:0}
+.kpi .v small{font-size:14px;font-weight:500;color:var(--muted);letter-spacing:0}
+.kpi .s{font-size:12px;line-height:16px;color:var(--muted);margin-top:4px}
+.v-green{color:var(--green)}.v-amber{color:var(--amber)}.v-red{color:var(--red)}
+
+.eq{font-size:16px;line-height:24px}
+.eq b{font-weight:700}
+.eq-sub{font-size:13px;color:var(--muted);margin-top:4px}
+.pbar{display:flex;height:8px;margin-top:16px;gap:2px}
+.pbar span{display:block;height:100%;border-radius:4px}
+.k-free{background:var(--green)}
+.k-hold{background:repeating-linear-gradient(135deg,#fff 0 2px,var(--use) 2px 3px);box-shadow:inset 0 0 0 1px var(--use)}
+.k-cores{background:var(--res)}
+.k-fault{background:repeating-linear-gradient(135deg,var(--red-bg) 0 2px,var(--red) 2px 3px);box-shadow:inset 0 0 0 1px var(--red)}
+.brk{display:flex;flex-wrap:wrap;gap:6px 24px;margin-top:12px;font-size:13px;color:var(--muted)}
+.brk div{display:flex;gap:8px;align-items:center}
+.brk dd{font-weight:700;color:var(--ink);order:-1;display:flex;align-items:center;gap:8px}
+.k{width:12px;height:12px;border-radius:3px;flex:none;display:inline-block}
+.k-ns{border:1px dashed var(--line)}
+
+.legend{display:flex;flex-wrap:wrap;gap:8px 20px;list-style:none;font-size:13px;color:var(--muted);margin-bottom:4px}
+.legend li{display:flex;align-items:center;gap:8px}
+.legend b{font-weight:700;color:var(--ink)}
+.sw{width:22px;height:20px;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--line);border-radius:4px}
+.tube{padding:14px 0 16px;border-bottom:1px solid var(--rule)}
+.tube-l{font-size:13px;font-weight:400;color:var(--muted);margin-bottom:8px}
+.tube-l b{font-weight:600;color:var(--ink)}
+.cells{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:4px}
+.core{position:relative;height:60px;padding:6px 4px 5px 5px;border:1px solid var(--line);border-radius:var(--r);background:#fff;display:grid;grid-template-columns:1fr auto;grid-template-rows:1fr auto;text-align:left;cursor:default}
+.core .n{font-size:14px;font-weight:600;line-height:16px;align-self:start}
+.core .ic{justify-self:end}
+.core .w{grid-column:1/-1;font-size:11px;font-weight:500;line-height:13px;white-space:nowrap;letter-spacing:-.03em;color:var(--muted)}
+.s-av{cursor:pointer}
+.s-av:hover{border-color:var(--ink)}
+.s-av .ic{color:var(--muted)}
+.s-av[aria-pressed=true]{background:var(--blue);border:2px solid #0f3a78;padding:5px 3px 4px 4px;color:#fff}
+.s-av[aria-pressed=true] .w,.s-av[aria-pressed=true] .ic{color:#fff}
+.s-av[aria-pressed=true] .ic-av,.s-av[aria-pressed=true] .w-av,.s-av[aria-pressed=false] .ic-ch,.s-av[aria-pressed=false] .w-ch{display:none}
+.s-rs{background:repeating-linear-gradient(45deg,var(--res) 0 5px,#3f444c 5px 6px);border-color:var(--res);color:#fff}
+.s-rs .w{color:#fff}
+.s-iu{background:var(--use);border-color:var(--use);color:#fff}
+.s-iu .w{color:#fff}
+.s-rq{background:repeating-linear-gradient(135deg,var(--amber-bg) 0 5px,#f3d9b8 5px 6.5px);border:1px dashed var(--amber);color:var(--amber)}
+.s-fl{background:repeating-linear-gradient(135deg,var(--red-bg) 0 5px,var(--red-bd) 5px 6.5px);border:1px solid var(--red);color:var(--red)}
+.s-rq .n,.s-rq .w{background:var(--amber-bg);color:var(--amber)}
+.s-fl .n,.s-fl .w{background:var(--red-bg);color:var(--red)}
+.s-rq .n,.s-rq .w,.s-fl .n,.s-fl .w{justify-self:start;border-radius:2px;padding:0;margin-left:0}
+.s-rq .w{letter-spacing:-.05em}
+.core:focus-visible{outline:2px solid var(--ink);outline-offset:2px;z-index:1}
+.sw.s-av,.sw.s-rq,.sw.s-rs,.sw.s-iu,.sw.s-fl,.sw.s-ch{padding:0;height:20px}
+.sw.s-ch{background:var(--blue);border:2px solid #0f3a78;color:#fff}
+.sw.s-rs,.sw.s-iu{color:#fff}
+.unsurv{margin-top:14px;font-size:13px;color:var(--muted)}
+.unsurv b{color:var(--ink);font-weight:600}
+
+/* Chosen footer: separate band at the bottom of the cores card */
+.cfoot{margin:16px calc(var(--cp)*-1) calc(var(--cp)*-1);padding:16px var(--cp) var(--cp);border-top:1px solid var(--border);border-radius:0 0 7px 7px;background:#f7f8fa}
+.cfoot[data-has=true]{background:var(--blue-bg);border-top-color:var(--blue-bd)}
+.cr1{display:flex;align-items:center;gap:8px 12px;flex-wrap:wrap;min-height:30px}
+.cnow{font-size:14px;font-weight:700}
+.cnow-m{font-size:13px;color:var(--muted)}
+.cchips{display:flex;flex-wrap:wrap;gap:4px}
+.cchip{display:inline-flex;align-items:center;height:24px;padding:0 10px;border-radius:4px;background:var(--blue);color:#fff;font-size:12px;font-weight:600}
+.cr1 .btn{margin-left:auto}
+.cr2{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px;margin-top:12px}
+.f{display:grid;gap:4px}
+.f label{font-size:12px;font-weight:500;color:var(--muted)}
+.f input{height:36px;padding:0 12px;border:1px solid var(--line);border-radius:var(--r);background:#fff;width:100%}
+.f input[aria-invalid=true]{border:2px solid var(--red)}
+.f-c{flex:1 1 240px;min-width:200px}
+.f-d{flex:0 0 150px}
+.btn{height:36px;padding:0 16px;border:1px solid var(--line);border-radius:var(--r);background:#fff;font-weight:600;cursor:pointer;white-space:nowrap}
+.btn:hover{background:var(--raised)}
+.btn-p{background:var(--ink);border-color:var(--ink);color:#fff;min-width:140px}
+.btn-p:hover{background:#2c2c2c}
+.btn:disabled{background:#fff;color:var(--muted);border-color:var(--border);cursor:not-allowed}
+.cnote{margin-top:10px;font-size:13px;color:var(--muted)}
+.cnote b{color:var(--ink);font-weight:700}
+.err{color:var(--red);font-weight:700}
+
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px}
+.chip{height:32px;padding:0 12px;border:1px solid var(--line);border-radius:var(--r);background:#fff;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:8px}
+.chip b{font-weight:700}
+.chip[aria-pressed=true]{background:var(--ink);border-color:var(--ink);color:#fff}
+.chip .dot{color:var(--use)}
+.chip[data-f=rs] .dot{color:var(--res)}.chip[data-f=rq] .dot{color:var(--amber)}.chip[data-f=fl] .dot{color:var(--red)}
+.chip[aria-pressed=true] .dot{box-shadow:0 0 0 2px #fff}
+table{width:100%;border-collapse:collapse;font-size:14px;table-layout:fixed}
+th{text-align:left;font-size:12px;font-weight:500;color:var(--muted);padding:8px 16px 8px 0;border-bottom:1px solid var(--border);white-space:nowrap}
+td{height:48px;padding:0 16px 0 0;border-bottom:1px solid var(--rule);white-space:nowrap}
+tbody tr:last-child td{border-bottom:0}
+th.r,td.r{text-align:right;padding-right:0}
+td.c,td.r{font-weight:600}
+td.d{white-space:normal;line-height:1.35;padding-top:8px;padding-bottom:8px}
+td.r{display:table-cell}
+.st{display:inline-flex;align-items:center;gap:8px;font-weight:600;vertical-align:middle}
+.t-rs{color:var(--ink)}.t-rq{color:var(--amber)}.t-iu{color:var(--use)}.t-fl{color:var(--red)}.t-co{color:var(--use)}
+.tr-fl td{background:var(--red-bg)}
+.tr-fl td:first-child{box-shadow:inset 3px 0 0 var(--red);padding-left:12px}
+.tr-rq td{background:var(--amber-bg)}
+.nil{color:var(--muted);font-weight:400}
+tr.sub td{background:#fafbfc}
+tr.sub td.c{padding-left:24px}
+.exp{display:inline-flex;align-items:center;gap:6px;border:0;background:none;font-weight:600;cursor:pointer;padding:4px 0}
+.chev{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.exp[aria-expanded=true] .chev{transform:rotate(90deg)}
+.tag{display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:4px;font-size:11px;font-weight:600;white-space:nowrap;margin-right:10px;border:1px solid var(--amber-bd);background:var(--amber-bg);color:var(--amber)}
+
+.appr{list-style:none}
+.appr li{padding:12px 0;border-bottom:1px solid var(--rule)}
+.appr li:first-child{padding-top:0}
+.appr .who{display:flex;justify-content:space-between;gap:8px;font-weight:600}
+.appr .who span{font-weight:400;font-size:12px;color:var(--muted);white-space:nowrap}
+.appr p{font-size:13px;margin-top:2px}
+.appr .meta{color:var(--muted)}
+.warn{display:flex;gap:8px;margin-top:10px;padding:10px 12px;border:1px solid var(--amber-bd);border-left:3px solid var(--amber);border-radius:var(--r);background:var(--amber-bg);color:#7c2d12;font-size:13px;line-height:1.4}
+.warn .ic{margin-top:3px;width:14px;height:14px;color:var(--amber)}
+.warn b{font-weight:700;color:var(--amber)}
+.more{display:inline-block;margin-top:12px;font-size:13px;font-weight:600;color:var(--blue)}
+.spans{list-style:none}
+.spans a{display:flex;justify-content:space-between;align-items:center;gap:8px;height:48px;padding:0 0 0 10px;text-decoration:none;border-left:3px solid transparent;border-bottom:1px solid var(--rule)}
+.spans a:hover{background:var(--ground)}
+.spans a[aria-current=page]{border-left-color:var(--blue);font-weight:700}
+.cb{min-width:44px;text-align:center;font-size:12px;line-height:20px;font-weight:600;padding:0 10px;border-radius:999px;border:1px solid;white-space:nowrap}
+.cb-g{color:var(--green);background:var(--green-bg);border-color:var(--green-bd)}
+.cb-a{color:var(--amber);background:var(--amber-bg);border-color:var(--amber-bd)}
+.cb-r{color:var(--red);background:var(--red-bg);border-color:var(--red-bd)}
+.cb-n{color:var(--muted);background:#fff;border:1px dashed var(--line);font-weight:500}
+.note{font-size:12px;color:var(--muted)}
+.colh{display:flex;justify-content:space-between;font-size:12px;font-weight:500;color:var(--muted);padding:0 0 6px 13px;border-bottom:1px solid var(--border)}
+h2{white-space:nowrap}
+.rail-foot{margin-top:auto;padding-top:12px}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-av" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5" fill="none" stroke="currentColor" stroke-width="1.6"></circle></symbol>
+  <symbol id="i-ch" viewBox="0 0 16 16"><path d="M3 8.5l3.2 3.2L13 4.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+  <symbol id="i-rq" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.2" fill="none" stroke="currentColor" stroke-width="1.6"></circle><path d="M8 2.8a5.2 5.2 0 0 1 0 10.4z" fill="currentColor"></path></symbol>
+  <symbol id="i-rs" viewBox="0 0 16 16"><rect x="3" y="7" width="10" height="7" fill="currentColor"></rect><path d="M5.3 7V5.2a2.7 2.7 0 0 1 5.4 0V7" fill="none" stroke="currentColor" stroke-width="1.6"></path></symbol>
+  <symbol id="i-iu" viewBox="0 0 16 16"><rect x="3" y="3" width="10" height="10" fill="currentColor"></rect></symbol>
+  <symbol id="i-fl" viewBox="0 0 16 16"><path d="M3.5 3.5l9 9M12.5 3.5l-9 9" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"></path></symbol>
+  <symbol id="i-co" viewBox="0 0 16 16"><rect x="2.8" y="2.8" width="10.4" height="10.4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-dasharray="2.6 1.8"></rect></symbol>
+  <symbol id="i-warn" viewBox="0 0 16 16"><path d="M8 2l6.5 11.5h-13z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"></path><path d="M8 6.5v3.2M8 11.4v.6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></symbol>
+</svg>
+
+<div class="shell">
+<aside class="side">
+  <div class="brand"><svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><circle cx="15" cy="15" r="14" fill="#141414"></circle><circle cx="22.0" cy="15.0" r="2" fill="none" stroke="#fff" stroke-width="1.2"></circle><circle cx="18.5" cy="21.1" r="2" fill="#fff" stroke="#fff" stroke-width="1.2"></circle><circle cx="11.5" cy="21.1" r="2" fill="none" stroke="#fff" stroke-width="1.2"></circle><circle cx="8.0" cy="15.0" r="2" fill="none" stroke="#fff" stroke-width="1.2"></circle><circle cx="11.5" cy="8.9" r="2" fill="none" stroke="#fff" stroke-width="1.2"></circle><circle cx="18.5" cy="8.9" r="2" fill="none" stroke="#fff" stroke-width="1.2"></circle></svg><div><b>Fiber</b><span>Malaysia network</span></div></div>
+  <nav aria-label="Main"><ul class="nav">
+<li><a href="#" aria-current="page"><svg class="ni" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8h12M2 4h12M2 12h12"></path></svg><span>Spans</span></a></li>
+<li><a href="#"><svg class="ni" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 13c0-6 10-2 10-8"></path></svg><span>Routes</span></a></li>
+<li><a href="#"><svg class="ni" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 4l4-1.5 4 1.5 4-1.5v9.5l-4 1.5-4-1.5-4 1.5zM6 2.5v9.5M10 4v9.5"></path></svg><span>Map</span></a></li>
+<li><a href="#"><svg class="ni" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3 3 7-7"></path></svg><span>Approvals</span><span class="badge">2 waiting</span></a></li>
+<li><a href="#"><svg class="ni" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 11V3M5 6l3-3 3 3M3 13h10"></path></svg><span>Upload</span></a></li>
+  </ul></nav>
+  <div class="user"><b>planner1</b><span>Planner</span></div>
+</aside>
+<div class="content">
+<header class="top">
+  <form class="search" role="search" onsubmit="return false">
+    <svg class="ni" viewBox="0 0 16 16" aria-hidden="true"><path d="M7 12A5 5 0 1 0 7 2a5 5 0 0 0 0 10zM14 14l-3.5-3.5"></path></svg>
+    <label class="vh" for="q">Search</label>
+    <input id="q" type="search" placeholder="Find a span, customer, circuit or core" autocomplete="off">
+  </form>
+</header>
+<div class="grid">
+
+<header class="card g-head">
+  <nav aria-label="Breadcrumb"><ol class="crumb"><li>Spans</li><li>North</li><li aria-current="page">AABB - BBCC</li></ol></nav>
+  <h1>AABB - BBCC</h1>
+  <dl class="facts">
+    <div><dt>Region</dt><dd>North</dd></div><div><dt>Route</dt><dd>Trunk</dd></div><div><dt>Distance</dt><dd>32.5 km</dd></div>
+    <div><dt>Group</dt><dd>DWDM Trunk Route 1</dd></div><div><dt>Cable size</dt><dd>144 cores (info)</dd></div><div><dt>Surveyed</dt><dd>36 cores, tubes 1 to 3</dd></div>
+  </dl>
+</header>
+
+<main class="g-main">
+  <section class="card kpis" aria-label="Capacity">
+    <div class="kpi"><div class="l">Free to reserve</div><div class="v v-green">22<span class="pill p-green"><i class="dot"></i>Healthy</span></div><div class="s">26 Available minus 4 held</div></div>
+    <div class="kpi"><div class="l">Held with cores</div><div class="v">9</div><div class="s">Cores with numbers</div></div>
+    <div class="kpi"><div class="l"><i class="dot" style="color:var(--red)"></i>Faulty</div><div class="v v-red">1</div><div class="s">Core 30, tube 3</div></div>
+    <div class="kpi"><div class="l">Surveyed</div><div class="v">36<small>of 144</small></div><div class="s">108 not surveyed</div></div>
+  </section>
+
+  <section class="card" aria-labelledby="fr-h">
+    <div class="ch"><h2 id="fr-h">How free to reserve is worked out</h2></div>
+    <p class="eq">26 Available − 4 held without cores = <b>22</b> free to reserve</p>
+    <p class="eq-sub">[Customer B] holds 4 cores with no core numbers yet (count-only, planned 2026-09-02). They lower this number but mark no cell.</p>
+    <div class="pbar" role="img" aria-label="Of 36 surveyed cores: 22 free, 4 held without cores, 9 held with cores, 1 faulty"><span class="k-free" style="flex:22"></span><span class="k-hold" style="flex:4"></span><span class="k-cores" style="flex:9"></span><span class="k-fault" style="flex:1"></span></div>
+    <dl class="brk">
+      <div><dt>free to reserve</dt><dd><i class="k k-free"></i>22</dd></div>
+      <div><dt>held without cores</dt><dd><i class="k k-hold"></i>4</dd></div>
+      <div><dt>held with cores</dt><dd><i class="k k-cores"></i>9</dd></div>
+      <div><dt>faulty</dt><dd><i class="k k-fault"></i>1</dd></div>
+      <div><dt>not surveyed</dt><dd><i class="k k-ns"></i>108</dd></div>
+    </dl>
+  </section>
+
+  <section class="card grow" aria-labelledby="grid-h">
+    <div class="ch"><h2 id="grid-h">Surveyed cores</h2><small>Choose Available cores, then Reserve. Arrow keys move between cores.</small></div>
+    <ul class="legend" aria-label="Status key"><li><span class="sw s-av"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-av"></use></svg></span>Available <b>26</b></li><li><span class="sw s-ch"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-ch"></use></svg></span>Chosen <b id="lg-ch">1</b></li><li><span class="sw s-rq"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-rq"></use></svg></span>Requested <b>1</b></li><li><span class="sw s-rs"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-rs"></use></svg></span>Reserved <b>2</b></li><li><span class="sw s-iu"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-iu"></use></svg></span>In use <b>6</b></li><li><span class="sw s-fl"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-fl"></use></svg></span>Faulty <b>1</b></li></ul>
+    <div class="grid-c" role="group" aria-labelledby="grid-h">
+<div class="tube"><h3 class="tube-l">Tube 1, cores 1 to 12, <b>9 available</b></h3><div class="cells"><button type="button" class="core s-rs" data-n="1" aria-disabled="true" tabindex="-1" aria-label="Core 1, Reserved, DWDM(R)"><span class="n">1</span><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-rs"></use></svg><span class="w">Reserved</span></button>
+<button type="button" class="core s-rs" data-n="2" aria-disabled="true" tabindex="-1" aria-label="Core 2, Reserved, DWDM(R)"><span class="n">2</span><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-rs"></use></svg><span class="w">Reserved</span></button>
+<button type="button" class="core s-rq" data-n="3" aria-disabled="true" tabindex="-1" aria-label="Core 3, Requested, [Customer A], waiting for approval"><span class="n">3</span><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-rq"></use></svg><span class="w">Requested</span></button>
+<button type="button" class="core s-av" data-n="4" aria-pressed="false" tabindex="-1" aria-label="Core 4, Available"><span class="n">4</span><svg class="ic ic-av" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-av"></use></svg><svg class="ic ic-ch" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-ch"></use></svg><span class="w"><span class="w-av">Available</span><span class="w-ch">Chosen</span></span></button>
+<button type="button" class="core s-av" data-n="5" aria-pressed="false" tabindex="-1" aria-label="Core 5, Available"><span class="n">5</span><svg class="ic ic-av" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-av"></use></svg><svg class="ic ic-ch" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-ch"></use></svg><span class="w"><span class="w-av">Available</span><span class="w-ch">Chosen</span></span></button>
+<button type="button" class="core s-av" data-n="6" aria-pressed="false" tabindex="-1" aria-label="Core 6, Available"><span class="n">6</span><svg class="ic ic-av" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-av"></use></svg><svg class="ic ic-ch" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-ch"></use></svg><span class="w"><span class="w-av">Available</span><span class="w-ch">Chosen</span></span></button>
+<button type="button" class="core s-av" data-n="7" aria-pressed="true" tabindex="0" aria-label="Core 7, Available"><span class="n">7</span><svg class="ic ic-av" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-av"></use></svg><svg class="ic ic-ch" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-ch"></use></svg><span class="w"><span class="w-av">Available</span><span class="w-ch">Chosen</span></span></button>
+<button type="button" class="core s-av" data-n="8" aria-pressed="false" tabindex="-1" aria-label="Core 8, Available"><span class="n">8</span><svg class="ic ic-av" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-av"></use></svg><svg class="ic ic-ch" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-ch"></use></svg><span class="w"><span class="w-av">Available</span><span class="w-ch">Chosen</span></span></button>
+<button type="button" class="core s-av" data-n="9" aria-pressed="false" tabindex="-1" aria-label="Core 9, Available"><span class="n">9</span><svg class="ic ic-av" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-av"></use></svg><svg class="ic ic-ch" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-ch"></use></svg><span class="w"><span class="w-av">Available</span><span class="w-ch">Chosen</span></span></button>
+<button type="button" class="core s-av" data-n="10" aria-pressed="false" tabindex="-1" aria-label="Core 10, Available"><span class="n">10</span><svg class="ic ic-av" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-av"></use></svg><svg class="ic ic-ch" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-ch"></use></svg><span class="w"><span class="w-av">Available</span><span class="w-ch">Chosen</span></span></button>
+<button type="button" class="core s-av" data-n="11" aria-pressed="false" tabindex="-1" aria-label="Core 11, Available"><span class="n">11</span><svg class="ic ic-av" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-av"></use></svg><svg class="ic ic-ch" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-ch"></use></svg><span class="w"><span class="w-av">Available</span><span class="w-ch">Chosen</span></span></button>
+<button type="button" class="core s-av" data-n="12" aria-pressed="false" tabindex="-1" aria-label="Core 12, Available"><span class="n">12</span><svg class="ic ic-av" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-av"></use></svg><svg class="ic ic-ch" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-ch"></use></svg><span class="w"><span class="w-av">Available</span><span class="w-ch">Chosen</span></span></button></div></div>
+<div class="tube"><h3 class="tube-l">Tube 2, cores 13 to 24, <b>6 available</b></h3><div class="cells"><button type="button" class="core s-iu" data-n="13" aria-disabled="true" tabindex="-1" aria-label="Core 13, In use, CKT-1011"><span class="n">13</span><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-iu"></use></svg><span class="w">In use</span></button>
+<button type="button" class="core s-iu" data-n="14" aria-disabled="true" tabindex="-1" aria-label="Core 14, In use, CKT-1012"><span class="n">14</span><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-iu"></use></svg><span class="w">In use</span></button>
+<button type="button" class="core s-iu" data-n="15" aria-disabled="true" tabindex="-1" aria-label="Core 15, In use, CKT-1013"><span class="n">15</span><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-iu"></use></svg><span class="w">In use</span></button>
+<button type="button" class="core s-iu" data-n="16" aria-disabled="true" tabindex="-1" aria-label="Core 16, In use, CKT-1014"><span class="n">16</span><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-iu"></use></svg><span class="w">In use</span></button>
+<button type="button" class="core s-iu" data-n="17" aria-disabled="true" tabindex="-1" aria-label="Core 17, In use, CKT-1015"><span class="n">17</span><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-iu"></use></svg><span class="w">In use</span></button>
+<button type="button" class="core s-iu" data-n="18" aria-disabled="true" tabindex="-1" aria-label="Core 18, In use, CKT-1016"><span class="n">18</span><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-iu"></use></svg><span class="w">In use</span></button>
+<button type="button" class="core s-av" data-n="19" aria-pressed="false" tabindex="-1" aria-label="Core 19, Available"><span class="n">19</span><svg class="ic ic-av" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-av"></use></svg><svg class="ic ic-ch" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-ch"></use></svg><span class="w"><span class="w-av">Available</span><span class="w-ch">Chosen</span></span></button>
+<button type="button" class="core s-av" data-n="20" aria-pressed="false" tabindex="-1" aria-label="Core 20, Available"><span class="n">20</span><svg class="ic ic-av" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-av"></use></svg><svg class="ic ic-ch" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-ch"></use></svg><span class="w"><span class="w-av">Available</span><span class="w-ch">Chosen</span></span></button>
+<button type="button" class="core s-av" data-n="21" aria-pressed="false" tabindex="-1" aria-label="Core 21, Available"><span class="n">21</span><svg class="ic ic-av" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-av"></use></svg><svg class="ic ic-ch" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-ch"></use></svg><span class="w"><span class="w-av">Available</span><span class="w-ch">Chosen</span></span></button>
+<button type="button" class="core s-av" data-n="22" aria-pressed="false" tabindex="-1" aria-label="Core 22, Available"><span class="n">22</span><svg class="ic ic-av" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-av"></use></svg><svg class="ic ic-ch" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-ch"></use></svg><span class="w"><span class="w-av">Available</span><span class="w-ch">Chosen</span></span></button>
+<button type="button" class="core s-av" data-n="23" aria-pressed="false" tabindex="-1" aria-label="Core 23, Available"><span class="n">23</span><svg class="ic ic-av" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-av"></use></svg><svg class="ic ic-ch" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-ch"></use></svg><span class="w"><span class="w-av">Available</span><span class="w-ch">Chosen</span></span></button>
+<button type="button" class="core s-av" data-n="24" aria-pressed="false" tabindex="-1" aria-label="Core 24, Available"><span class="n">24</span><svg class="ic ic-av" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-av"></use></svg><svg class="ic ic-ch" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-ch"></use></svg><span class="w"><span class="w-av">Available</span><span class="w-ch">Chosen</span></span></button></div></div>
+<div class="tube"><h3 class="tube-l">Tube 3, cores 25 to 36, <b>11 available</b></h3><div class="cells"><button type="button" class="core s-av" data-n="25" aria-pressed="false" tabindex="-1" aria-label="Core 25, Available"><span class="n">25</span><svg class="ic ic-av" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-av"></use></svg><svg class="ic ic-ch" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-ch"></use></svg><span class="w"><span class="w-av">Available</span><span class="w-ch">Chosen</span></span></button>
+<button type="button" class="core s-av" data-n="26" aria-pressed="false" tabindex="-1" aria-label="Core 26, Available"><span class="n">26</span><svg class="ic ic-av" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-av"></use></svg><svg class="ic ic-ch" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-ch"></use></svg><span class="w"><span class="w-av">Available</span><span class="w-ch">Chosen</span></span></button>
+<button type="button" class="core s-av" data-n="27" aria-pressed="false" tabindex="-1" aria-label="Core 27, Available"><span class="n">27</span><svg class="ic ic-av" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-av"></use></svg><svg class="ic ic-ch" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-ch"></use></svg><span class="w"><span class="w-av">Available</span><span class="w-ch">Chosen</span></span></button>
+<button type="button" class="core s-av" data-n="28" aria-pressed="false" tabindex="-1" aria-label="Core 28, Available"><span class="n">28</span><svg class="ic ic-av" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-av"></use></svg><svg class="ic ic-ch" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-ch"></use></svg><span class="w"><span class="w-av">Available</span><span class="w-ch">Chosen</span></span></button>
+<button type="button" class="core s-av" data-n="29" aria-pressed="false" tabindex="-1" aria-label="Core 29, Available"><span class="n">29</span><svg class="ic ic-av" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-av"></use></svg><svg class="ic ic-ch" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-ch"></use></svg><span class="w"><span class="w-av">Available</span><span class="w-ch">Chosen</span></span></button>
+<button type="button" class="core s-fl" data-n="30" aria-disabled="true" tabindex="-1" aria-label="Core 30, Faulty"><span class="n">30</span><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-fl"></use></svg><span class="w">Faulty</span></button>
+<button type="button" class="core s-av" data-n="31" aria-pressed="false" tabindex="-1" aria-label="Core 31, Available"><span class="n">31</span><svg class="ic ic-av" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-av"></use></svg><svg class="ic ic-ch" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-ch"></use></svg><span class="w"><span class="w-av">Available</span><span class="w-ch">Chosen</span></span></button>
+<button type="button" class="core s-av" data-n="32" aria-pressed="false" tabindex="-1" aria-label="Core 32, Available"><span class="n">32</span><svg class="ic ic-av" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-av"></use></svg><svg class="ic ic-ch" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-ch"></use></svg><span class="w"><span class="w-av">Available</span><span class="w-ch">Chosen</span></span></button>
+<button type="button" class="core s-av" data-n="33" aria-pressed="false" tabindex="-1" aria-label="Core 33, Available"><span class="n">33</span><svg class="ic ic-av" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-av"></use></svg><svg class="ic ic-ch" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-ch"></use></svg><span class="w"><span class="w-av">Available</span><span class="w-ch">Chosen</span></span></button>
+<button type="button" class="core s-av" data-n="34" aria-pressed="false" tabindex="-1" aria-label="Core 34, Available"><span class="n">34</span><svg class="ic ic-av" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-av"></use></svg><svg class="ic ic-ch" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-ch"></use></svg><span class="w"><span class="w-av">Available</span><span class="w-ch">Chosen</span></span></button>
+<button type="button" class="core s-av" data-n="35" aria-pressed="false" tabindex="-1" aria-label="Core 35, Available"><span class="n">35</span><svg class="ic ic-av" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-av"></use></svg><svg class="ic ic-ch" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-ch"></use></svg><span class="w"><span class="w-av">Available</span><span class="w-ch">Chosen</span></span></button>
+<button type="button" class="core s-av" data-n="36" aria-pressed="false" tabindex="-1" aria-label="Core 36, Available"><span class="n">36</span><svg class="ic ic-av" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-av"></use></svg><svg class="ic ic-ch" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-ch"></use></svg><span class="w"><span class="w-av">Available</span><span class="w-ch">Chosen</span></span></button></div></div>
+</div>
+    <p class="unsurv"><b>108 cores not surveyed</b> (cores 37 to 144). Not drawn, and cannot be booked until an admin enters a survey count.</p>
+    <form class="cfoot" id="cfoot" data-has="true" aria-label="Reserve chosen cores" onsubmit="return false" novalidate>
+      <div class="cr1">
+        <div class="cnow" id="c-now" aria-live="polite">1 core chosen</div>
+        <div class="cchips" id="c-chips"></div>
+        <span class="cnow-m" id="c-more">21 more can be chosen</span>
+        <button type="button" class="btn" id="clear">Clear</button>
+      </div>
+      <div class="cr2">
+        <div class="f f-c"><label for="cust">Customer (required)</label><input id="cust" placeholder="e.g. [Customer A]" autocomplete="off" required aria-describedby="c-note"></div>
+        <div class="f f-d"><label for="plan">Planned date</label><input id="plan" placeholder="YYYY-MM-DD" inputmode="numeric" pattern="\d{4}-\d{2}-\d{2}" maxlength="10"></div>
+        <button type="submit" class="btn btn-p" id="reserve" aria-describedby="c-note">Reserve 1 core</button>
+      </div>
+      <p class="cnote" id="c-note">Goes to an admin for approval. Free to reserve after this: <b>21 of 22</b>.</p>
+    </form>
+  </section>
+</main>
+
+<aside class="g-rail" aria-label="Approvals and other spans">
+  <section class="card" aria-labelledby="ap-h">
+    <div class="ch"><h2 id="ap-h">Waiting for approval</h2><span class="pill p-amber" aria-label="2 waiting">2</span></div>
+    <ol class="appr">
+      <li>
+        <div class="who">[Customer A]<span>2 days ago</span></div>
+        <p>Route AABB - BBCC - CCDD, 2 cores per span</p>
+        <p class="meta">Planned 2026-12-01 · planner2</p>
+        <div class="warn" role="note"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-warn"></use></svg><span><b>New customer name.</b> It is close to existing [Customer A] Sdn Bhd. Admin checks before approving.</span></div>
+      </li>
+      <li>
+        <div class="who">DWDM(R)<span>5 hours ago</span></div>
+        <p>KKLL - LLMM, cores 7, 8</p>
+        <p class="meta">Planned 2026-12-01 · planner1</p>
+      </li>
+    </ol>
+    <a class="more" href="#">Open approvals</a>
+  </section>
+  <section class="card grow" aria-labelledby="os-h">
+    <div class="ch"><h2 id="os-h">Other North spans</h2></div>
+    <p class="colh"><span>Span</span><span>Free to reserve</span></p>
+    <ol class="spans">
+<li><a href="#"><span>HHJJ - JJKK</span><span class="cb cb-g">31</span></a></li>
+<li><a href="#" aria-current="page"><span>AABB - BBCC</span><span class="cb cb-g">22</span></a></li>
+<li><a href="#"><span>BBCC - CCDD</span><span class="cb cb-g">20</span></a></li>
+<li><a href="#"><span>FFGG - GGHH</span><span class="cb cb-g">17</span></a></li>
+<li><a href="#"><span>BBCC - FFGG</span><span class="cb cb-g">11</span></a></li>
+<li><a href="#"><span>GGHH - HHJJ</span><span class="cb cb-a">9</span></a></li>
+<li><a href="#"><span>CCDD - DDEE</span><span class="cb cb-a">3</span></a></li>
+<li><a href="#"><span>DDEE - EERR</span><span class="cb cb-r">0 full</span></a></li>
+<li><a href="#"><span>EERR - TTEE</span><span class="cb cb-n">Not surveyed</span></a></li>
+    </ol>
+    <p class="note rail-foot">9 of 14 North spans shown</p>
+  </section>
+</aside>
+
+<section class="card g-held" aria-labelledby="held-h">
+  <div class="ch"><h2 id="held-h">Held on this span</h2><small>13 cores held with numbers, 4 held without, 1 faulty</small></div>
+  <div class="chips" role="group" aria-label="Filter by status">
+    <button type="button" class="chip" data-f="all" aria-pressed="true">All <b>14</b></button><button type="button" class="chip" data-f="rs" aria-pressed="false"><i class="dot"></i>Reserved <b>2</b></button><button type="button" class="chip" data-f="rq" aria-pressed="false"><i class="dot"></i>Requested <b>1</b></button><button type="button" class="chip" data-f="iu" aria-pressed="false"><i class="dot"></i>In use <b>6</b></button><button type="button" class="chip" data-f="fl" aria-pressed="false"><i class="dot"></i>Faulty <b>1</b></button><button type="button" class="chip" data-f="co" aria-pressed="false"><i class="dot"></i>Count only <b>4</b></button>
+  </div>
+  <table>
+    <colgroup><col style="width:110px"><col style="width:130px"><col style="width:112px"><col><col style="width:176px"><col style="width:96px"><col style="width:150px"></colgroup>
+    <thead><tr><th scope="col">Cores</th><th scope="col">Status</th><th scope="col">Held by</th><th scope="col">Ports or detail</th><th scope="col">Circuit</th><th scope="col">Planned</th><th scope="col" class="r">Age (days)</th></tr></thead>
+    <tbody>
+<tr data-k="rs"><td class="c">1, 2</td><td><span class="st t-rs"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-rs"></use></svg>Reserved</span></td><td>DWDM(R)</td><td class="d">AABB Tray 1 P1 / P2 to BBCC MOD B P23 / P24</td><td><span class="nil" aria-label="none">–</span></td><td>2026-11-21</td><td class="r"><span class="tag">Needs review</span>98</td></tr>
+<tr data-k="rq" class="tr-rq"><td class="c">3</td><td><span class="st t-rq"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-rq"></use></svg>Requested</span></td><td>[Customer A]</td><td>planner2, waiting for approval</td><td><span class="nil" aria-label="none">–</span></td><td>2026-12-01</td><td class="r">2</td></tr>
+<tr data-k="iu" class="grp"><td class="c"><button type="button" class="exp" aria-expanded="false"><svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 4l4 4-4 4"></path></svg>13 to 18<span class="vh"> show 6 cores</span></button></td><td><span class="st t-iu"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-iu"></use></svg>In use</span></td><td><span class="nil" aria-label="none">–</span></td><td>6 cores, one circuit per core</td><td class="mono">CKT-1011 to CKT-1016</td><td><span class="nil" aria-label="none">–</span></td><td class="r">412</td></tr>
+<tr data-k="iu" class="sub" hidden><td class="c">13</td><td><span class="st t-iu"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-iu"></use></svg>In use</span></td><td><span class="nil" aria-label="none">–</span></td><td>One circuit</td><td class="mono">CKT-1011</td><td><span class="nil" aria-label="none">–</span></td><td class="r">412</td></tr>
+<tr data-k="iu" class="sub" hidden><td class="c">14</td><td><span class="st t-iu"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-iu"></use></svg>In use</span></td><td><span class="nil" aria-label="none">–</span></td><td>One circuit</td><td class="mono">CKT-1012</td><td><span class="nil" aria-label="none">–</span></td><td class="r">412</td></tr>
+<tr data-k="iu" class="sub" hidden><td class="c">15</td><td><span class="st t-iu"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-iu"></use></svg>In use</span></td><td><span class="nil" aria-label="none">–</span></td><td>One circuit</td><td class="mono">CKT-1013</td><td><span class="nil" aria-label="none">–</span></td><td class="r">412</td></tr>
+<tr data-k="iu" class="sub" hidden><td class="c">16</td><td><span class="st t-iu"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-iu"></use></svg>In use</span></td><td><span class="nil" aria-label="none">–</span></td><td>One circuit</td><td class="mono">CKT-1014</td><td><span class="nil" aria-label="none">–</span></td><td class="r">412</td></tr>
+<tr data-k="iu" class="sub" hidden><td class="c">17</td><td><span class="st t-iu"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-iu"></use></svg>In use</span></td><td><span class="nil" aria-label="none">–</span></td><td>One circuit</td><td class="mono">CKT-1015</td><td><span class="nil" aria-label="none">–</span></td><td class="r">412</td></tr>
+<tr data-k="iu" class="sub" hidden><td class="c">18</td><td><span class="st t-iu"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-iu"></use></svg>In use</span></td><td><span class="nil" aria-label="none">–</span></td><td>One circuit</td><td class="mono">CKT-1016</td><td><span class="nil" aria-label="none">–</span></td><td class="r">412</td></tr>
+<tr data-k="fl" class="tr-fl"><td class="c">30</td><td><span class="st t-fl"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-fl"></use></svg>Faulty</span></td><td><span class="nil" aria-label="none">–</span></td><td>Not bookable</td><td><span class="nil" aria-label="none">–</span></td><td><span class="nil" aria-label="none">–</span></td><td class="r">75</td></tr>
+<tr data-k="co"><td class="c">4, not assigned</td><td><span class="st t-co"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-co"></use></svg>Count only</span></td><td>[Customer B]</td><td class="d">From Excel import, no cell, admin assigns later</td><td><span class="nil" aria-label="none">–</span></td><td>2026-09-02</td><td class="r">54</td></tr>
+    </tbody>
+  </table>
+</section>
+
+</div>
+</div>
+</div>
+<script>
+(function(){
+  var MAX=22;
+  var cores=[].slice.call(document.querySelectorAll('.core'));
+  var av=cores.filter(function(b){return b.classList.contains('s-av')});
+  var $=function(id){return document.getElementById(id)};
+  var btn=$('reserve'),cust=$('cust');
+  function sync(){
+    var c=av.filter(function(b){return b.getAttribute('aria-pressed')==='true'}).map(function(b){return b.dataset.n});
+    var n=c.length;
+    $('c-now').textContent=n?n+(n>1?' cores':' core')+' chosen':'No cores chosen';$('c-chips').innerHTML=c.map(function(x){return '<span class="cchip">'+x+'</span>'}).join('');$('cfoot').dataset.has=n>0;
+    $('c-more').textContent=n?(MAX-n)+' more can be chosen':'Up to '+MAX+' cores per request';
+    $('lg-ch').textContent=n;
+    $('clear').disabled=!n;
+    btn.disabled=!n;
+    btn.textContent=n?'Reserve '+n+(n>1?' cores':' core'):'Reserve';
+    $('c-note').innerHTML=n?'Goes to an admin for approval. Free to reserve after this: <b>'+(MAX-n)+' of '+MAX+'</b>.':'Reserve is off: choose at least one Available core in the grid.';
+    av.forEach(function(b){b.setAttribute('aria-label','Core '+b.dataset.n+', Available'+(b.getAttribute('aria-pressed')==='true'?', chosen':''))});
+  }
+  av.forEach(function(b){b.addEventListener('click',function(){
+    var on=b.getAttribute('aria-pressed')!=='true';
+    if(on&&av.filter(function(x){return x.getAttribute('aria-pressed')==='true'}).length>=MAX)return;
+    b.setAttribute('aria-pressed',on);sync();
+  })});
+  $('clear').addEventListener('click',function(){av.forEach(function(b){b.setAttribute('aria-pressed','false')});sync()});
+  btn.addEventListener('click',function(){
+    if(!cust.value.trim()){cust.setAttribute('aria-invalid','true');$('c-note').innerHTML='<span class="err">Customer is required.</span> Enter the customer, then Reserve.';cust.focus();}
+  });
+  cust.addEventListener('input',function(){cust.removeAttribute('aria-invalid')});
+  // Roving tabindex: arrows move, Up/Down jump a tube, Home/End go to row ends.
+  document.querySelector('.grid-c').addEventListener('keydown',function(e){
+    var i=cores.indexOf(e.target);if(i<0)return;
+    var j={ArrowRight:i+1,ArrowLeft:i-1,ArrowDown:i+12,ArrowUp:i-12,Home:i-i%12,End:i-i%12+11}[e.key];
+    if(j===undefined||j<0||j>=cores.length)return;
+    e.preventDefault();cores[i].tabIndex=-1;cores[j].tabIndex=0;cores[j].focus();
+  });
+  cores.forEach(function(b){b.addEventListener('focus',function(){cores.forEach(function(x){x.tabIndex=x===b?0:-1})})});
+  // Held table filter chips and the In use group expander.
+  var exp=document.querySelector('.exp'),f='all';
+  function filt(){
+    document.querySelectorAll('tbody tr').forEach(function(r){
+      var show=f==='all'||r.dataset.k===f;
+      if(r.classList.contains('sub'))show=show&&exp.getAttribute('aria-expanded')==='true';
+      r.hidden=!show;
+    });
+  }
+  document.querySelectorAll('.chip').forEach(function(c){c.addEventListener('click',function(){
+    f=c.dataset.f;document.querySelectorAll('.chip').forEach(function(x){x.setAttribute('aria-pressed',x===c)});filt();
+  })});
+  exp.addEventListener('click',function(){exp.setAttribute('aria-expanded',exp.getAttribute('aria-expanded')!=='true');filt()});
+  sync();
+})();
+</script>
+</body>
+</html>

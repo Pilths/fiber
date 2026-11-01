@@ -1,0 +1,404 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Span AABB - BBCC · Fiber</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;700&display=swap" rel="stylesheet">
+<!--
+Design Decisions (web-design-engineer, Step 3; checkpoints skipped in bake-off):
+- Design Read: operational span view for network planners; Swiss institutional information architecture.
+  Dials: variance 3, motion 2, density 7, assets 1, brand fidelity 3.
+- Recipe: vignelli-swiss-helvetica. Helvetica is not on Google Fonts; Archivo (neo-grotesque) substitutes.
+- Palette: ink #111, paper #fff, one accent Vignelli blue #0033A0 (used only for "chosen" and the primary action),
+  secondary gray darkened #5C5C5C (recipe's #8A8A8A fails 4.5:1; accessibility overrides).
+- Type: one family, 400/500/700, hierarchy by size: 72 / 32 / 20 / 16 / 14 / 12, tabular numerals.
+- Spacing: 8px grid (4 for hairline gaps). Radius 0. Shadow none. Motion: none beyond instant state change.
+- Status: pattern (fill/hatch/dots/cross) + symbol + text label (legend, aria-label, held-cores table).
+-->
+<style>
+:root{
+  --ink:#111111; --paper:#ffffff; --gray:#5c5c5c; --rule:#d4d4d4; --line:#767676;
+  --tint:#f3f3f1; --accent:#0033a0;
+  --s1:4px; --s2:8px; --s3:16px; --s4:24px; --s5:32px; --s6:48px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{background:var(--paper);color:var(--ink);font:400 14px/1.45 "Archivo",sans-serif;font-variant-numeric:tabular-nums;text-wrap:pretty}
+button,input{font:inherit;color:inherit}
+a{color:inherit}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.sym{width:10px;height:10px;flex:none}
+
+/* Top bar: the Swiss colour bar carrying the header */
+.bar{background:var(--ink);color:#fff;display:flex;align-items:stretch;gap:var(--s4);padding:0 var(--s4);min-height:48px;flex-wrap:wrap}
+.brand{font-weight:700;font-size:16px;display:flex;align-items:center;letter-spacing:.02em}
+.nav{display:flex;gap:0;flex:1;overflow-x:auto}
+.nav a{display:flex;align-items:center;padding:0 var(--s3);text-decoration:none;font-size:14px;color:#fff;border-bottom:3px solid transparent;white-space:nowrap}
+.nav a[aria-current=page]{border-bottom-color:#fff;font-weight:700}
+.nav .n{display:inline-block;margin-left:6px;background:#fff;color:var(--ink);font-size:12px;font-weight:700;padding:0 6px;line-height:18px}
+.acct{display:flex;align-items:center;font-size:14px}
+
+/* Page grid */
+.page{display:grid;grid-template-columns:232px minmax(0,1fr) 344px;min-height:calc(100vh - 48px)}
+.spans{border-right:1px solid var(--rule);padding:var(--s4) 0}
+.main{padding:var(--s4) var(--s5) var(--s6)}
+.side{border-left:1px solid var(--rule);padding:var(--s4)}
+
+h2.lbl{font-size:16px;font-weight:700;line-height:1.3;margin-bottom:var(--s3)}
+h2.lbl small{font-size:14px;font-weight:400;color:var(--gray);margin-left:var(--s2)}
+
+/* Span list */
+.spans h2.lbl{padding:0 var(--s4)}
+.spans h2.lbl small{display:block;margin:0}
+.spans p.note{padding:var(--s2) var(--s4) 0;font-size:12px;color:var(--gray)}
+.spans ul{list-style:none}
+.spans a{display:flex;justify-content:space-between;gap:var(--s2);padding:7px var(--s4);text-decoration:none;font-size:14px;border-left:4px solid transparent}
+.spans a:hover{background:var(--tint)}
+.spans a[aria-current=page]{border-left-color:var(--ink);font-weight:700;background:var(--tint)}
+.spans .f{font-weight:500}
+.spans .f.ns{font-weight:400;color:var(--gray);font-size:12px}
+
+/* Span header */
+.crumb{font-size:12px;color:var(--gray);margin-bottom:var(--s1)}
+h1{font-size:32px;line-height:1.15;font-weight:700;letter-spacing:-.01em}
+.facts{display:flex;flex-wrap:wrap;gap:var(--s1) var(--s4);margin-top:var(--s2);font-size:14px}
+.facts dt{color:var(--gray);display:inline}
+.facts dd{display:inline;margin-left:4px;font-weight:500}
+
+/* Headline figure */
+.head{display:grid;grid-template-columns:auto 1fr;gap:var(--s5);align-items:end;margin:var(--s4) 0 var(--s4);padding:var(--s4) 0;border-top:2px solid var(--ink);border-bottom:1px solid var(--rule)}
+.big{font-size:72px;line-height:.9;font-weight:700;letter-spacing:-.03em}
+.big-l{font-size:14px;font-weight:700;margin-top:var(--s2)}
+.sum{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:var(--s3)}
+.sum div{border-left:1px solid var(--rule);padding-left:var(--s2)}
+.sum b{display:block;font-size:20px;font-weight:700;line-height:1.2}
+.sum span{font-size:12px;color:var(--gray);display:block}
+.eq{grid-column:1/-1;font-size:14px}
+.eq b{display:inline;font-size:inherit}
+
+/* Legend */
+.legend{display:flex;flex-wrap:wrap;gap:var(--s2) var(--s4);list-style:none;margin-bottom:var(--s3);font-size:14px}
+.legend li{display:flex;align-items:center;gap:var(--s2)}
+.sw{width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--line)}
+.legend .c{color:var(--gray)}
+
+/* Core grid */
+.grid{border-top:1px solid var(--rule)}
+.tube{display:grid;grid-template-columns:88px minmax(0,1fr);gap:var(--s3);align-items:center;padding:var(--s2) 0;border-bottom:1px solid var(--rule)}
+.tube-l{font-size:14px;font-weight:700}
+.tube-l span{display:block;font-weight:400;font-size:12px;color:var(--gray)}
+.cells{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:var(--s1)}
+.core{position:relative;height:48px;border:1px solid var(--line);background:var(--paper);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:default;font-size:14px;font-weight:500}
+.core .num{line-height:1;padding:1px 3px;background:var(--paper)}
+.core[data-s=available]{cursor:pointer}
+.core[data-s=available]:hover{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
+.core[data-s=requested],.sw.requested{background:repeating-linear-gradient(135deg,#fff 0 4px,#b0b0b0 4px 5.5px)}
+.core[data-s=reserved],.sw.reserved{background:radial-gradient(#8c8c8c 1.1px,transparent 1.4px) 0 0/6px 6px,#e6e6e6}
+.core[data-s=reserved] .num{background:#e6e6e6}
+.core[data-s=inuse],.sw.inuse{background:var(--ink);border-color:var(--ink);color:#fff}
+.core[data-s=inuse] .num{background:var(--ink)}
+.core[data-s=faulty],.sw.faulty{background:repeating-linear-gradient(45deg,transparent 0 5px,#b0b0b0 5px 6px),repeating-linear-gradient(135deg,#fff 0 5px,#b0b0b0 5px 6px)}
+.core[aria-pressed=true],.sw.chosen{background:var(--accent);border-color:var(--accent);color:#fff}
+.core[aria-pressed=true] .num{background:var(--accent)}
+.core[aria-pressed=true]{outline:2px solid var(--accent);outline-offset:2px}
+.core[aria-pressed=true]:focus-visible{outline:3px solid var(--ink)}
+.core .sym{display:block}
+.core[aria-pressed=true] .s-avail{display:none}
+.core:not([aria-pressed=true]) .s-chosen{display:none}
+.unsurv{padding:var(--s3) 0 0;font-size:14px;color:var(--gray)}
+.unsurv b{color:var(--ink)}
+
+/* Held cores table */
+.held{margin-top:var(--s5)}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{text-align:left;font-size:12px;font-weight:700;color:var(--gray);padding:var(--s2) var(--s2) var(--s2) 0;border-bottom:2px solid var(--ink)}
+td{padding:10px var(--s2) 10px 0;border-bottom:1px solid var(--rule);vertical-align:top}
+td .st{display:inline-flex;align-items:center;gap:6px;font-weight:500;white-space:nowrap}
+td.d{white-space:nowrap}
+td .sub{display:block;font-size:12px;color:var(--gray)}
+
+/* Side: reserve + approvals */
+.res{border:2px solid var(--ink);padding:var(--s3)}
+.res h2{font-size:20px;font-weight:700;line-height:1.2}
+.res .chosen-line{font-size:14px;margin:var(--s2) 0 var(--s3)}
+.res .chosen-line b{font-weight:700}
+.field{margin-bottom:var(--s3)}
+.field label{display:block;font-size:12px;font-weight:700;margin-bottom:var(--s1)}
+.field input{width:100%;height:40px;border:1px solid var(--line);padding:0 10px;background:#fff;font-size:14px}
+.field input::placeholder{color:var(--gray);opacity:1}
+.field .hint{font-size:12px;color:var(--gray);margin-top:var(--s1)}
+.btn{display:inline-flex;align-items:center;justify-content:center;height:44px;padding:0 var(--s3);border:2px solid var(--ink);background:#fff;font-weight:700;font-size:14px;cursor:pointer;text-decoration:none}
+.btn:hover{background:var(--tint)}
+.btn.primary{width:100%;background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.primary:hover{background:#002a85}
+.btn.primary:disabled{background:#fff;color:var(--gray);border-color:var(--line);cursor:not-allowed}
+.btn.link{height:auto;border:0;padding:0;background:none;text-decoration:underline;font-weight:500}
+.res .limit{font-size:12px;color:var(--gray);margin-top:var(--s2)}
+
+.appr{margin-top:var(--s5)}
+.appr h2{display:flex;justify-content:space-between;align-items:baseline}
+.appr ol{list-style:none;border-top:2px solid var(--ink)}
+.appr li{padding:var(--s3) 0;border-bottom:1px solid var(--rule)}
+.appr .who{font-weight:700;font-size:14px}
+.appr .what{font-size:14px;margin-top:2px}
+.appr .meta{font-size:12px;color:var(--gray);margin-top:var(--s1)}
+.warn{display:flex;gap:var(--s2);align-items:flex-start;margin-top:var(--s2);padding:var(--s2);border:1px solid var(--ink);font-size:12px}
+.warn .sym{margin-top:3px}
+
+/* 768–1199: spans list moves under the content */
+@media (max-width:1199px){
+  .page{grid-template-columns:minmax(0,1fr) 320px}
+  .spans{grid-column:1/-1;grid-row:2;border-right:0;border-top:1px solid var(--rule)}
+  .spans ul{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr))}
+  .main{padding:var(--s4)}
+}
+@media (max-width:899px){
+  .page{grid-template-columns:minmax(0,1fr)}
+  .side{border-left:0;border-top:1px solid var(--rule);grid-row:2}
+  .spans{grid-row:3}
+  .sum{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (max-width:599px){
+  .bar{padding:0 var(--s3);gap:0 var(--s3)}
+  .brand{min-height:44px}
+  .acct{margin-left:auto}
+  .nav{order:3;flex-basis:100%;justify-content:space-between}
+  .nav a{padding:0 4px;min-height:44px}
+  .main,.side{padding:var(--s3)}
+  h1{font-size:28px}
+  .head{grid-template-columns:1fr;gap:var(--s3)}
+  .big{font-size:64px}
+  .tube{grid-template-columns:1fr;gap:var(--s1)}
+  .tube-l span{display:inline;margin-left:var(--s2)}
+  .cells{gap:2px}
+  .core{height:48px;font-size:12px;gap:2px}
+  .core .num{padding:0 1px}
+  .legend{gap:var(--s2) var(--s3)}
+  table thead{display:none}
+  table,tbody,tr,td{display:block}
+  tr{border-bottom:1px solid var(--rule);padding:var(--s2) 0}
+  td{border:0;padding:2px 0}
+}
+.mbar{display:none}
+@media (max-width:899px){
+  .mbar{display:flex;position:sticky;bottom:0;align-items:center;justify-content:space-between;gap:var(--s3);padding:var(--s2) var(--s3);background:#fff;border-top:2px solid var(--ink)}
+  .mbar .btn{width:auto;flex:none}
+  .mbar.off .btn{background:#fff;color:var(--gray);border-color:var(--line);pointer-events:none}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="s-avail" viewBox="0 0 10 10"><circle cx="5" cy="5" r="3.6" fill="none" stroke="currentColor" stroke-width="1.4"></circle></symbol>
+  <symbol id="s-chosen" viewBox="0 0 10 10"><path d="M1.2 5.3 4 8 8.8 2.4" fill="none" stroke="currentColor" stroke-width="1.9"></path></symbol>
+  <symbol id="s-req" viewBox="0 0 10 10"><circle cx="5" cy="5" r="3.6" fill="none" stroke="currentColor" stroke-width="1.4"></circle><path d="M5 1.4 A3.6 3.6 0 0 1 5 8.6 Z" fill="currentColor"></path></symbol>
+  <symbol id="s-res" viewBox="0 0 10 10"><rect x="1.4" y="1.4" width="7.2" height="7.2" fill="currentColor"></rect></symbol>
+  <symbol id="s-use" viewBox="0 0 10 10"><circle cx="5" cy="5" r="4" fill="currentColor"></circle></symbol>
+  <symbol id="s-fault" viewBox="0 0 10 10"><path d="M1.5 1.5 8.5 8.5 M8.5 1.5 1.5 8.5" fill="none" stroke="currentColor" stroke-width="1.9"></path></symbol>
+  <symbol id="s-warn" viewBox="0 0 10 10"><path d="M5 1 9.4 9 H0.6 Z" fill="none" stroke="currentColor" stroke-width="1.2"></path><path d="M5 4 V6.3 M5 7.2 V8" stroke="currentColor" stroke-width="1.2"></path></symbol>
+</svg>
+
+<header class="bar">
+  <div class="brand">Fiber</div>
+  <nav class="nav" aria-label="Main">
+    <a href="#" aria-current="page">Spans</a>
+    <a href="#">Routes</a>
+    <a href="#">Map</a>
+    <a href="#">Approvals<span class="n" aria-label="2 waiting">2</span></a>
+    <a href="#">Upload</a>
+  </nav>
+  <div class="acct">planner1</div>
+</header>
+
+<div class="page">
+  <aside class="spans" aria-labelledby="spans-h">
+    <h2 class="lbl" id="spans-h">North spans<small>free to reserve</small></h2>
+    <ul>
+      <li><a href="#" aria-current="page"><span>AABB - BBCC</span><span class="f">22</span></a></li>
+      <li><a href="#"><span>BBCC - CCDD</span><span class="f">20</span></a></li>
+      <li><a href="#"><span>BBCC - FFGG</span><span class="f">11</span></a></li>
+      <li><a href="#"><span>CCDD - DDEE</span><span class="f">3</span></a></li>
+      <li><a href="#"><span>DDEE - EERR</span><span class="f">0</span></a></li>
+      <li><a href="#"><span>EERR - TTEE</span><span class="f ns">not surveyed</span></a></li>
+      <li><a href="#"><span>FFGG - GGHH</span><span class="f">17</span></a></li>
+      <li><a href="#"><span>GGHH - HHJJ</span><span class="f">9</span></a></li>
+      <li><a href="#"><span>HHJJ - JJKK</span><span class="f">31</span></a></li>
+    </ul>
+    <p class="note">9 of 14 North spans shown</p>
+  </aside>
+
+  <main class="main">
+    <p class="crumb">Spans / North / DWDM Trunk Route 1</p>
+    <h1>AABB - BBCC</h1>
+    <dl class="facts">
+      <div><dt>Region</dt><dd>North</dd></div>
+      <div><dt>Route</dt><dd>Trunk</dd></div>
+      <div><dt>Distance</dt><dd>32.5 km</dd></div>
+      <div><dt>Group</dt><dd>DWDM Trunk Route 1</dd></div>
+      <div><dt>Cable size</dt><dd>144 cores</dd></div>
+      <div><dt>Surveyed</dt><dd>36 cores (tubes 1 to 3)</dd></div>
+    </dl>
+
+    <section class="head" aria-labelledby="free-l">
+      <div>
+        <div class="big" aria-describedby="free-l">22</div>
+        <div class="big-l" id="free-l">Free to reserve</div>
+      </div>
+      <div class="sum">
+        <div><b>26</b><span>Available cells</span></div>
+        <div><b>4</b><span>Held, not assigned</span></div>
+        <div><b>9</b><span>Held with cores</span></div>
+        <div><b>108</b><span>Not surveyed</span></div>
+        <p class="eq">26 available − 4 held by [Customer B] without specific cores (planned 2026-09-02) = <b>22 free to reserve</b></p>
+      </div>
+    </section>
+
+    <section aria-labelledby="grid-h">
+      <h2 class="lbl" id="grid-h">Surveyed cores<small>Select Available cores, then Reserve</small></h2>
+      <ul class="legend" aria-label="Status key">
+        <li><span class="sw"><svg class="sym"><use href="#s-avail"></use></svg></span>Available <span class="c">26</span></li>
+        <li><span class="sw chosen"><svg class="sym"><use href="#s-chosen"></use></svg></span>Chosen <span class="c" id="chosen-n">1</span></li>
+        <li><span class="sw requested"><svg class="sym"><use href="#s-req"></use></svg></span>Requested <span class="c">1</span></li>
+        <li><span class="sw reserved"><svg class="sym"><use href="#s-res"></use></svg></span>Reserved <span class="c">2</span></li>
+        <li><span class="sw inuse"><svg class="sym"><use href="#s-use"></use></svg></span>In use <span class="c">6</span></li>
+        <li><span class="sw faulty"><svg class="sym"><use href="#s-fault"></use></svg></span>Faulty <span class="c">1</span></li>
+      </ul>
+
+      <div class="grid" role="group" aria-labelledby="grid-h">
+        <div class="tube">
+          <div class="tube-l">Tube 1<span>cores 1–12</span></div>
+          <div class="cells">
+            <button type="button" class="core" data-s="reserved" aria-disabled="true" aria-label="Core 1, Reserved, DWDM(R)"><span class="num">1</span><svg class="sym" aria-hidden="true"><use href="#s-res"></use></svg></button>
+            <button type="button" class="core" data-s="reserved" aria-disabled="true" aria-label="Core 2, Reserved, DWDM(R)"><span class="num">2</span><svg class="sym" aria-hidden="true"><use href="#s-res"></use></svg></button>
+            <button type="button" class="core" data-s="requested" aria-disabled="true" aria-label="Core 3, Requested by [Customer A], waiting for approval"><span class="num">3</span><svg class="sym" aria-hidden="true"><use href="#s-req"></use></svg></button>
+            <button type="button" class="core" data-s="available" aria-pressed="false" aria-label="Core 4, Available"><span class="num">4</span><svg class="sym s-avail" aria-hidden="true"><use href="#s-avail"></use></svg><svg class="sym s-chosen" aria-hidden="true"><use href="#s-chosen"></use></svg></button>
+            <button type="button" class="core" data-s="available" aria-pressed="false" aria-label="Core 5, Available"><span class="num">5</span><svg class="sym s-avail" aria-hidden="true"><use href="#s-avail"></use></svg><svg class="sym s-chosen" aria-hidden="true"><use href="#s-chosen"></use></svg></button>
+            <button type="button" class="core" data-s="available" aria-pressed="false" aria-label="Core 6, Available"><span class="num">6</span><svg class="sym s-avail" aria-hidden="true"><use href="#s-avail"></use></svg><svg class="sym s-chosen" aria-hidden="true"><use href="#s-chosen"></use></svg></button>
+            <button type="button" class="core" data-s="available" aria-pressed="true" aria-label="Core 7, Available"><span class="num">7</span><svg class="sym s-avail" aria-hidden="true"><use href="#s-avail"></use></svg><svg class="sym s-chosen" aria-hidden="true"><use href="#s-chosen"></use></svg></button>
+            <button type="button" class="core" data-s="available" aria-pressed="false" aria-label="Core 8, Available"><span class="num">8</span><svg class="sym s-avail" aria-hidden="true"><use href="#s-avail"></use></svg><svg class="sym s-chosen" aria-hidden="true"><use href="#s-chosen"></use></svg></button>
+            <button type="button" class="core" data-s="available" aria-pressed="false" aria-label="Core 9, Available"><span class="num">9</span><svg class="sym s-avail" aria-hidden="true"><use href="#s-avail"></use></svg><svg class="sym s-chosen" aria-hidden="true"><use href="#s-chosen"></use></svg></button>
+            <button type="button" class="core" data-s="available" aria-pressed="false" aria-label="Core 10, Available"><span class="num">10</span><svg class="sym s-avail" aria-hidden="true"><use href="#s-avail"></use></svg><svg class="sym s-chosen" aria-hidden="true"><use href="#s-chosen"></use></svg></button>
+            <button type="button" class="core" data-s="available" aria-pressed="false" aria-label="Core 11, Available"><span class="num">11</span><svg class="sym s-avail" aria-hidden="true"><use href="#s-avail"></use></svg><svg class="sym s-chosen" aria-hidden="true"><use href="#s-chosen"></use></svg></button>
+            <button type="button" class="core" data-s="available" aria-pressed="false" aria-label="Core 12, Available"><span class="num">12</span><svg class="sym s-avail" aria-hidden="true"><use href="#s-avail"></use></svg><svg class="sym s-chosen" aria-hidden="true"><use href="#s-chosen"></use></svg></button>
+          </div>
+        </div>
+        <div class="tube">
+          <div class="tube-l">Tube 2<span>cores 13–24</span></div>
+          <div class="cells">
+            <button type="button" class="core" data-s="inuse" aria-disabled="true" aria-label="Core 13, In use, CKT-1011"><span class="num">13</span><svg class="sym" aria-hidden="true"><use href="#s-use"></use></svg></button>
+            <button type="button" class="core" data-s="inuse" aria-disabled="true" aria-label="Core 14, In use, CKT-1012"><span class="num">14</span><svg class="sym" aria-hidden="true"><use href="#s-use"></use></svg></button>
+            <button type="button" class="core" data-s="inuse" aria-disabled="true" aria-label="Core 15, In use, CKT-1013"><span class="num">15</span><svg class="sym" aria-hidden="true"><use href="#s-use"></use></svg></button>
+            <button type="button" class="core" data-s="inuse" aria-disabled="true" aria-label="Core 16, In use, CKT-1014"><span class="num">16</span><svg class="sym" aria-hidden="true"><use href="#s-use"></use></svg></button>
+            <button type="button" class="core" data-s="inuse" aria-disabled="true" aria-label="Core 17, In use, CKT-1015"><span class="num">17</span><svg class="sym" aria-hidden="true"><use href="#s-use"></use></svg></button>
+            <button type="button" class="core" data-s="inuse" aria-disabled="true" aria-label="Core 18, In use, CKT-1016"><span class="num">18</span><svg class="sym" aria-hidden="true"><use href="#s-use"></use></svg></button>
+            <button type="button" class="core" data-s="available" aria-pressed="false" aria-label="Core 19, Available"><span class="num">19</span><svg class="sym s-avail" aria-hidden="true"><use href="#s-avail"></use></svg><svg class="sym s-chosen" aria-hidden="true"><use href="#s-chosen"></use></svg></button>
+            <button type="button" class="core" data-s="available" aria-pressed="false" aria-label="Core 20, Available"><span class="num">20</span><svg class="sym s-avail" aria-hidden="true"><use href="#s-avail"></use></svg><svg class="sym s-chosen" aria-hidden="true"><use href="#s-chosen"></use></svg></button>
+            <button type="button" class="core" data-s="available" aria-pressed="false" aria-label="Core 21, Available"><span class="num">21</span><svg class="sym s-avail" aria-hidden="true"><use href="#s-avail"></use></svg><svg class="sym s-chosen" aria-hidden="true"><use href="#s-chosen"></use></svg></button>
+            <button type="button" class="core" data-s="available" aria-pressed="false" aria-label="Core 22, Available"><span class="num">22</span><svg class="sym s-avail" aria-hidden="true"><use href="#s-avail"></use></svg><svg class="sym s-chosen" aria-hidden="true"><use href="#s-chosen"></use></svg></button>
+            <button type="button" class="core" data-s="available" aria-pressed="false" aria-label="Core 23, Available"><span class="num">23</span><svg class="sym s-avail" aria-hidden="true"><use href="#s-avail"></use></svg><svg class="sym s-chosen" aria-hidden="true"><use href="#s-chosen"></use></svg></button>
+            <button type="button" class="core" data-s="available" aria-pressed="false" aria-label="Core 24, Available"><span class="num">24</span><svg class="sym s-avail" aria-hidden="true"><use href="#s-avail"></use></svg><svg class="sym s-chosen" aria-hidden="true"><use href="#s-chosen"></use></svg></button>
+          </div>
+        </div>
+        <div class="tube">
+          <div class="tube-l">Tube 3<span>cores 25–36</span></div>
+          <div class="cells">
+            <button type="button" class="core" data-s="available" aria-pressed="false" aria-label="Core 25, Available"><span class="num">25</span><svg class="sym s-avail" aria-hidden="true"><use href="#s-avail"></use></svg><svg class="sym s-chosen" aria-hidden="true"><use href="#s-chosen"></use></svg></button>
+            <button type="button" class="core" data-s="available" aria-pressed="false" aria-label="Core 26, Available"><span class="num">26</span><svg class="sym s-avail" aria-hidden="true"><use href="#s-avail"></use></svg><svg class="sym s-chosen" aria-hidden="true"><use href="#s-chosen"></use></svg></button>
+            <button type="button" class="core" data-s="available" aria-pressed="false" aria-label="Core 27, Available"><span class="num">27</span><svg class="sym s-avail" aria-hidden="true"><use href="#s-avail"></use></svg><svg class="sym s-chosen" aria-hidden="true"><use href="#s-chosen"></use></svg></button>
+            <button type="button" class="core" data-s="available" aria-pressed="false" aria-label="Core 28, Available"><span class="num">28</span><svg class="sym s-avail" aria-hidden="true"><use href="#s-avail"></use></svg><svg class="sym s-chosen" aria-hidden="true"><use href="#s-chosen"></use></svg></button>
+            <button type="button" class="core" data-s="available" aria-pressed="false" aria-label="Core 29, Available"><span class="num">29</span><svg class="sym s-avail" aria-hidden="true"><use href="#s-avail"></use></svg><svg class="sym s-chosen" aria-hidden="true"><use href="#s-chosen"></use></svg></button>
+            <button type="button" class="core" data-s="faulty" aria-disabled="true" aria-label="Core 30, Faulty"><span class="num">30</span><svg class="sym" aria-hidden="true"><use href="#s-fault"></use></svg></button>
+            <button type="button" class="core" data-s="available" aria-pressed="false" aria-label="Core 31, Available"><span class="num">31</span><svg class="sym s-avail" aria-hidden="true"><use href="#s-avail"></use></svg><svg class="sym s-chosen" aria-hidden="true"><use href="#s-chosen"></use></svg></button>
+            <button type="button" class="core" data-s="available" aria-pressed="false" aria-label="Core 32, Available"><span class="num">32</span><svg class="sym s-avail" aria-hidden="true"><use href="#s-avail"></use></svg><svg class="sym s-chosen" aria-hidden="true"><use href="#s-chosen"></use></svg></button>
+            <button type="button" class="core" data-s="available" aria-pressed="false" aria-label="Core 33, Available"><span class="num">33</span><svg class="sym s-avail" aria-hidden="true"><use href="#s-avail"></use></svg><svg class="sym s-chosen" aria-hidden="true"><use href="#s-chosen"></use></svg></button>
+            <button type="button" class="core" data-s="available" aria-pressed="false" aria-label="Core 34, Available"><span class="num">34</span><svg class="sym s-avail" aria-hidden="true"><use href="#s-avail"></use></svg><svg class="sym s-chosen" aria-hidden="true"><use href="#s-chosen"></use></svg></button>
+            <button type="button" class="core" data-s="available" aria-pressed="false" aria-label="Core 35, Available"><span class="num">35</span><svg class="sym s-avail" aria-hidden="true"><use href="#s-avail"></use></svg><svg class="sym s-chosen" aria-hidden="true"><use href="#s-chosen"></use></svg></button>
+            <button type="button" class="core" data-s="available" aria-pressed="false" aria-label="Core 36, Available"><span class="num">36</span><svg class="sym s-avail" aria-hidden="true"><use href="#s-avail"></use></svg><svg class="sym s-chosen" aria-hidden="true"><use href="#s-chosen"></use></svg></button>
+          </div>
+        </div>
+      </div>
+      <p class="unsurv"><b>108 cores not surveyed</b> (cores 37 to 144). They are not drawn and cannot be booked until an admin enters a survey count.</p>
+    </section>
+
+    <section class="held" aria-labelledby="held-h">
+      <h2 class="lbl" id="held-h">Held on this span</h2>
+      <table>
+        <thead><tr><th scope="col">Cores</th><th scope="col">Status</th><th scope="col">Customer / circuit</th><th scope="col">Ports or detail</th><th scope="col">Planned</th></tr></thead>
+        <tbody>
+          <tr><td>1, 2</td><td><span class="st"><svg class="sym" aria-hidden="true"><use href="#s-res"></use></svg>Reserved</span></td><td>DWDM(R)</td><td>AABB Tray 1 P1 / P2 <span class="sub">to BBCC MOD B P23 / P24</span></td><td class="d">2026-11-21</td></tr>
+          <tr><td>3</td><td><span class="st"><svg class="sym" aria-hidden="true"><use href="#s-req"></use></svg>Requested</span></td><td>[Customer A]</td><td>planner2 <span class="sub">Waiting for approval</span></td><td class="d">2026-12-01</td></tr>
+          <tr><td>13–18</td><td><span class="st"><svg class="sym" aria-hidden="true"><use href="#s-use"></use></svg>In use</span></td><td>CKT-1011 to CKT-1016</td><td>One circuit per core</td><td>—</td></tr>
+          <tr><td>30</td><td><span class="st"><svg class="sym" aria-hidden="true"><use href="#s-fault"></use></svg>Faulty</span></td><td>—</td><td>Not bookable</td><td>—</td></tr>
+          <tr><td>4 not assigned</td><td><span class="st">Reserved, count only</span></td><td>[Customer B]</td><td>From Excel import. Marks no cell; lowers free to reserve. <span class="sub">An admin assigns specific cores later.</span></td><td class="d">2026-09-02</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </main>
+
+  <aside class="side">
+    <section class="res" id="res" aria-labelledby="res-h">
+      <h2 id="res-h">Reserve cores</h2>
+      <p class="chosen-line" aria-live="polite">Chosen: <b id="chosen-list">core 7</b></p>
+      <div class="field">
+        <label for="cust">Customer (required)</label>
+        <input id="cust" name="cust" placeholder="Search or type a customer" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="plan">Planned date</label>
+        <input id="plan" name="plan" type="date">
+        <p class="hint">Goes to an admin for approval.</p>
+      </div>
+      <button type="button" class="btn primary" id="reserve">Reserve 1 core</button>
+      <p class="limit">Up to 22 cores can be reserved on this span.</p>
+    </section>
+
+    <section class="appr" aria-labelledby="appr-h">
+      <h2 class="lbl" id="appr-h"><span>Waiting for approval (2)</span><a href="#" class="btn link">Approvals</a></h2>
+      <ol>
+        <li>
+          <div class="who">[Customer A]</div>
+          <div class="what">Route AABB - BBCC - CCDD, 2 cores per span</div>
+          <div class="meta">Planned 2026-12-01 · planner2 · 2 days ago</div>
+          <p class="warn"><svg class="sym" aria-hidden="true"><use href="#s-warn"></use></svg><span><b>New customer name.</b> Close to existing “[Customer A] Sdn Bhd”. Admin checks before approving.</span></p>
+        </li>
+        <li>
+          <div class="who">DWDM(R)</div>
+          <div class="what">KKLL - LLMM, cores 7, 8</div>
+          <div class="meta">Planned 2026-12-01 · planner1 · 5 hours ago</div>
+        </li>
+      </ol>
+    </section>
+  </aside>
+</div>
+
+<div class="mbar"><span>Chosen: <b id="m-list">core 7</b></span><a class="btn primary" href="#res" id="m-btn">Reserve 1 core</a></div>
+
+<script>
+// Toggle Chosen on Available cores; keep the reserve panel in step.
+(function(){
+  var list=document.getElementById('chosen-list'),btn=document.getElementById('reserve'),n=document.getElementById('chosen-n'),mlist=document.getElementById('m-list'),mbtn=document.getElementById('m-btn'),mbar=document.querySelector('.mbar');
+  function sync(){
+    var c=[].slice.call(document.querySelectorAll('.core[aria-pressed=true]')).map(function(b){return b.querySelector('.num').textContent});
+    list.textContent=c.length?(c.length>1?'cores ':'core ')+c.join(', '):'none';
+    n.textContent=c.length;
+    btn.disabled=!c.length;
+    btn.textContent=c.length?'Reserve '+c.length+(c.length>1?' cores':' core'):'Choose Available cores';
+    mlist.textContent=list.textContent;mbtn.textContent=c.length?btn.textContent:'Choose cores';mbar.classList.toggle('off',!c.length);
+  }
+  document.querySelectorAll('.core[data-s=available]').forEach(function(b){
+    b.addEventListener('click',function(){
+      var on=b.getAttribute('aria-pressed')!=='true';
+      if(on&&document.querySelectorAll('.core[aria-pressed=true]').length>=22)return;
+      b.setAttribute('aria-pressed',on);sync();
+    });
+  });
+  sync();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Map Focus Layouts</title>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--ground:#f2f4f7;--ink:#0a0a0a;--muted:#5b6068;--border:#e2e5ea;--blue:#1d5fbf}
+*{box-sizing:border-box;margin:0}
+body{min-width:1200px;background:var(--ground);color:var(--ink);font:400 14px/1.5 "Geist",system-ui,sans-serif;padding:40px}
+main{max-width:960px;background:#fff;border:1px solid var(--border);border-radius:8px;padding:24px}
+h1{font-size:24px;line-height:30px}
+p{color:var(--muted);margin-top:6px}
+ul{list-style:none;padding:0;margin-top:20px}
+li{display:grid;grid-template-columns:90px 1fr;gap:12px;padding:12px 0;border-top:1px solid var(--border)}
+a{color:var(--blue);font-weight:600}
+</style>
+</head>
+<body><main>
+<h1>Map page: keeping the selected span in view</h1>
+<p>Layouts kept by the owner (A, B) and their revisions (A2, B2), built from <a href="../map/index.html">map/index.html</a>. Each opens with span AABB - BBCC selected; the black strip on top switches mock states. Screenshots at 1440 x 900 are in <code>shots/</code>. Options C, D and E were dropped (files kept).</p>
+<ul>
+  <li><a href="a.html">Option A</a> <span>Fixed-height banner slot between the top bar and the map: span (title, sites, km, type, free count, Reserve, Clear), route (A to B, km, bottleneck) or a quiet placeholder. Nothing below ever moves.</span></li>
+  <li><a href="b.html">Option B</a> <span>Inspector moves to the top of the right column with a header (eyebrow, status chip, 32px title, then tabs) at a fixed height; Find sits below it, compact.</span></li>
+  <li><a href="a2.html">Option A2</a> <span>A overhauled: a fixed 124px banner carries the span title, free to reserve with the bar and counts, a held-by-status summary and the actions. The Inspector card is removed; the right column is Find at full height.</span></li>
+  <li><a href="b2.html">Option B2</a> <span>B slimmed: the Inspector stays first in the right column at a fixed 420px with eyebrow, small inline tabs, title and one status badge, a one-row bar legend and up to 3 held lines; Find shows below it.</span></li>
+</ul>
+</main></body>
+</html>
