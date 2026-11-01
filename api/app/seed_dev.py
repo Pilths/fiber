@@ -9,6 +9,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.db import engine
+from app.loss.service import calculated_loss_db
 
 # code, name, kind, (lon, lat) or None
 SITES = [
@@ -75,7 +76,7 @@ def run(db: Session) -> None:
             for _ in range(3):
                 ins("INSERT INTO measurements (segment_id, core_id, loss_db, tested_on) "
                     "VALUES (:s, :c, :l, current_date - :d)",
-                    s=sid, c=cores[sid][1], l=round(km * 0.3 * factor * rng.uniform(0.97, 1.03), 3), d=rng.randint(1, 300))
+                    s=sid, c=cores[sid][1], l=round(float(calculated_loss_db(km)) * factor * rng.uniform(0.97, 1.03), 3), d=rng.randint(1, 300))
 
     # routes: a long route (several segments) and a short one
     for sites_ab, segments_in in [(("KL", "PEN"), [segment[3], segment[4]]), (("KL", "BJ"), [segment[2]])]:
