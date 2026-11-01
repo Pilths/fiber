@@ -23,6 +23,6 @@ def routes(db: DB, frm: Annotated[int, Query(alias="from")], to: int, cores_need
 
 
 @router.get("/pick")
-def pick(db: DB, span_ids: Annotated[list[int], Query(min_length=1)], cores_needed: Annotated[int, Query(ge=1)]) -> dict[str, Any]:
-    """The cores a route reservation would take: the first free cores on each span. The UI sends them to POST /api/reservations."""
-    return service.pick(db, span_ids, cores_needed)
+def pick(db: DB, segment_ids: Annotated[list[int], Query(min_length=1)], cores_needed: Annotated[int, Query(ge=1)]) -> dict[str, Any]:
+    """The cores a route reservation would take: the first free cores on each segment. The UI sends them to POST /api/reservations."""
+    return service.pick(db, segment_ids, cores_needed)

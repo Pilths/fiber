@@ -1,6 +1,6 @@
 """Reservation lifecycle. Events are insert-only; release frees only core_holds rows; every write names its user.
 
-Each action locks the reservation row (and, for bookings, the spans) so concurrent requests are serialised.
+Each action locks the reservation row (and, for bookings, the segments) so concurrent requests are serialised.
 Atomic blocks use savepoints (begin_nested) so a refusal never rolls back more than itself.
 """
 from datetime import date
@@ -33,9 +33,9 @@ SELECT r.id, COALESCE(cc.customer_id, r.customer_id) AS customer_id, cu.name AS 
   r.planner_id, pu.display_name AS planner, COALESCE(cd.planned_date, r.planned_date) AS planned_date,
   st.status, st.last_event, st.last_event_at, st.last_reason, st.is_stale AS stale,
   COALESCE((now() AT TIME ZONE {TZ})::date - (st.last_event_at AT TIME ZONE {TZ})::date, 0) AS age_days,
-  r.unassigned_cores, COALESCE(un.remaining, 0) AS remaining_unassigned, r.unassigned_span_id,
-  (SELECT a.name || ' - ' || b.name FROM spans s JOIN sites a ON a.id = s.site_a_id JOIN sites b ON b.id = s.site_b_id
-   WHERE s.id = r.unassigned_span_id) AS unassigned_span,
+  r.unassigned_cores, COALESCE(un.remaining, 0) AS remaining_unassigned, r.unassigned_segment_id,
+  (SELECT a.name || ' - ' || b.name FROM segments s JOIN sites a ON a.id = s.site_a_id JOIN sites b ON b.id = s.site_b_id
+   WHERE s.id = r.unassigned_segment_id) AS unassigned_segment,
   r.is_new_customer, r.imported
 FROM reservations r
 JOIN reservation_state_v st ON st.reservation_id = r.id
@@ -49,15 +49,15 @@ LEFT JOIN reservation_unassigned_v un ON un.reservation_id = r.id
 """
 
 CORES_SQL = """
-SELECT rc.reservation_id, c.id AS core_id, c.number, c.span_id, a.name || ' - ' || b.name AS span,
+SELECT rc.reservation_id, c.id AS core_id, c.number, c.segment_id, a.name || ' - ' || b.name AS segment,
   (h.core_id IS NOT NULL) AS held
 FROM reservation_cores rc
 JOIN cores c ON c.id = rc.core_id
-JOIN spans s ON s.id = c.span_id
+JOIN segments s ON s.id = c.segment_id
 JOIN sites a ON a.id = s.site_a_id JOIN sites b ON b.id = s.site_b_id
 LEFT JOIN core_holds h ON h.core_id = rc.core_id AND h.reservation_id = rc.reservation_id
 WHERE rc.reservation_id = ANY(CAST(:ids AS bigint[]))
-ORDER BY c.span_id, c.number
+ORDER BY c.segment_id, c.number
 """
 
 REQUESTED_RELEASE_SQL = """
@@ -108,12 +108,12 @@ def approvals(db: Session) -> list[ReservationOut]:
 
 
 def needs_review(db: Session, user: CurrentUser) -> list[NeedsReviewItem]:
-    cut: dict[int, list[str]] = {}  # reservation -> names of cut spans it holds cores or a count on
+    cut: dict[int, list[str]] = {}  # reservation -> names of cut segments it holds cores or a count on
     for rid, name in db.execute(text(
             "SELECT x.rid, a.name || ' - ' || b.name FROM ("
-            " SELECT h.reservation_id AS rid, c.span_id FROM core_holds h JOIN cores c ON c.id = h.core_id"
-            " UNION SELECT u.reservation_id, u.span_id FROM reservation_unassigned_v u WHERE u.remaining > 0) x "
-            "JOIN spans s ON s.id = x.span_id AND s.fiber_cut JOIN sites a ON a.id = s.site_a_id JOIN sites b ON b.id = s.site_b_id "
+            " SELECT h.reservation_id AS rid, c.segment_id FROM core_holds h JOIN cores c ON c.id = h.core_id"
+            " UNION SELECT u.reservation_id, u.segment_id FROM reservation_unassigned_v u WHERE u.remaining > 0) x "
+            "JOIN segments s ON s.id = x.segment_id AND s.fiber_cut JOIN sites a ON a.id = s.site_a_id JOIN sites b ON b.id = s.site_b_id "
             "ORDER BY x.rid, s.id")):
         cut.setdefault(rid, []).append(name)
     where = ("(st.is_stale OR (st.status = 'approved' AND st.last_event = 'release_requested') "
@@ -136,7 +136,7 @@ def needs_review(db: Session, user: CurrentUser) -> list[NeedsReviewItem]:
 
 def _lock(db: Session, rid: int) -> dict[str, Any]:
     row = db.execute(text(
-        "SELECT r.id, r.planner_id, r.imported, r.planned_date, r.unassigned_span_id, st.status, st.last_event, "
+        "SELECT r.id, r.planner_id, r.imported, r.planned_date, r.unassigned_segment_id, st.status, st.last_event, "
         "COALESCE(un.remaining, 0) AS remaining FROM reservations r "
         "JOIN reservation_state_v st ON st.reservation_id = r.id "
         "LEFT JOIN reservation_unassigned_v un ON un.reservation_id = r.id "
@@ -164,16 +164,16 @@ def _own_or_admin(row: dict[str, Any], user: CurrentUser) -> None:
         raise HTTPException(403, "Only the planner who made the request can do this")
 
 
-def _lock_spans(db: Session, span_ids: set[int]) -> None:
-    if span_ids:
-        db.execute(text("SELECT id FROM spans WHERE id = ANY(CAST(:ids AS bigint[])) ORDER BY id FOR UPDATE"),
-                   {"ids": sorted(span_ids)})
+def _lock_segments(db: Session, segment_ids: set[int]) -> None:
+    if segment_ids:
+        db.execute(text("SELECT id FROM segments WHERE id = ANY(CAST(:ids AS bigint[])) ORDER BY id FOR UPDATE"),
+                   {"ids": sorted(segment_ids)})
 
 
 def _core_rows(db: Session, core_ids: list[int]) -> list[dict[str, Any]]:
     return [dict(r) for r in db.execute(text(
-        "SELECT c.id, c.span_id, v.status, (s.survey_cores IS NOT NULL AND c.number > s.survey_cores) AS hidden "
-        "FROM cores c JOIN core_status_v v ON v.core_id = c.id JOIN spans s ON s.id = c.span_id "
+        "SELECT c.id, c.segment_id, v.status, (s.survey_cores IS NOT NULL AND c.number > s.survey_cores) AS hidden "
+        "FROM cores c JOIN core_status_v v ON v.core_id = c.id JOIN segments s ON s.id = c.segment_id "
         "WHERE c.id = ANY(CAST(:ids AS bigint[]))"), {"ids": core_ids}).mappings()]
 
 
@@ -190,28 +190,28 @@ def _hold(db: Session, rid: int, core_ids: list[int]) -> None:
 
 
 def _check_book(db: Session, core_ids: list[int]) -> list[dict[str, Any]]:
-    """Locks the spans, then checks: cores exist, spans surveyed, cores Available, count within free_to_reserve."""
+    """Locks the segments, then checks: cores exist, segments surveyed, cores Available, count within free_to_reserve."""
     rows = _core_rows(db, core_ids)
     if len(rows) != len(core_ids):
         raise HTTPException(422, "Unknown core id")
-    spans = {r["span_id"] for r in rows}
-    _lock_spans(db, spans)
+    segments = {r["segment_id"] for r in rows}
+    _lock_segments(db, segments)
     rows = _core_rows(db, core_ids)  # statuses as of now, after the lock
     taken = sorted(r["id"] for r in rows if r["status"] != "Available" or r["hidden"])
     if taken:
         raise conflict("Some cores are not Available (or are beyond the surveyed count).", taken_core_ids=taken)
-    for sid in sorted(spans):
-        span = inventory.get_span(db, sid)
-        assert span is not None
-        n = sum(r["span_id"] == sid for r in rows)
-        label = f"{span.site_a} - {span.site_b}"
-        if span.fiber_cut:
+    for sid in sorted(segments):
+        segment = inventory.get_segment(db, sid)
+        assert segment is not None
+        n = sum(r["segment_id"] == sid for r in rows)
+        label = f"{segment.site_a} - {segment.site_b}"
+        if segment.fiber_cut:
             raise conflict(f"{label} has a fiber cut and cannot be booked until an admin restores it.")
-        if span.survey_cores is None:
+        if segment.survey_cores is None:
             raise conflict(f"{label} is not surveyed yet; it cannot be booked.")
-        if n > span.free_to_reserve:
-            raise conflict(f"{label}: {n} requested but only {span.free_to_reserve} free to reserve "
-                           f"({span.unassigned_reserved} reserved by count only).")
+        if n > segment.free_to_reserve:
+            raise conflict(f"{label}: {n} requested but only {segment.free_to_reserve} free to reserve "
+                           f"({segment.unassigned_reserved} reserved by count only).")
     return rows
 
 
@@ -348,7 +348,7 @@ def correct(db: Session, user: CurrentUser, rid: int, reason: str, customer_id: 
 
 
 def assign(db: Session, user: CurrentUser, rid: int, core_ids: list[int]) -> ReservationOut:
-    """Turn part of a count-only reservation into named cores (on its span)."""
+    """Turn part of a count-only reservation into named cores (on its segment)."""
     core_ids = sorted(set(core_ids))
     row = _lock(db, rid)
     _require(row, "approved")
@@ -357,9 +357,9 @@ def assign(db: Session, user: CurrentUser, rid: int, core_ids: list[int]) -> Res
     if len(core_ids) > row["remaining"]:
         raise conflict(f"Only {row['remaining']} unassigned cores remain on this reservation.")
     cores = _core_rows(db, core_ids)
-    if len(cores) != len(core_ids) or any(c["span_id"] != row["unassigned_span_id"] for c in cores):
-        raise HTTPException(422, "Cores must belong to the reservation's span")
-    _lock_spans(db, {row["unassigned_span_id"]})
+    if len(cores) != len(core_ids) or any(c["segment_id"] != row["unassigned_segment_id"] for c in cores):
+        raise HTTPException(422, "Cores must belong to the reservation's segment")
+    _lock_segments(db, {row["unassigned_segment_id"]})
     taken = sorted(c["id"] for c in _core_rows(db, core_ids) if c["status"] != "Available" or c["hidden"])
     if taken:
         raise conflict("Some cores are not Available.", taken_core_ids=taken)

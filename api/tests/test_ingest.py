@@ -148,7 +148,7 @@ def test_excel_check_reports_and_writes_nothing(workbook, capsys, monkeypatch):
 
 def test_seed_loads_ready_rows(db, workbook):
     counts, skipped = seed.load(db, str(workbook))
-    assert counts == {"sites": 3, "data_centers": 1, "spans": 1, "customers": 1, "reservations": 4, "cores": 4, "ports": 0}
+    assert counts == {"sites": 3, "data_centers": 1, "segments": 1, "customers": 1, "reservations": 4, "cores": 4, "ports": 0}
     assert len(skipped) == 8  # 3 sites + 4 reservation rows not ready, and row 13 whose site CCDD was not loaded
     assert any("row 13 [skipped]" in s for s in skipped)
     n = lambda sql: db.execute(text(sql)).scalar_one()
@@ -156,7 +156,7 @@ def test_seed_loads_ready_rows(db, workbook):
     assert n("SELECT count(*) FROM reservation_events WHERE type = 'approved'") == 4
     assert n("SELECT s.name FROM sites d JOIN sites s ON s.id = d.lrd_site_id WHERE d.kind = 'data_center'") == "AABB"
     assert n("SELECT details->>'SITE_TYPE' FROM sites WHERE name = 'AABB'") == "Tower"
-    assert n("SELECT survey_cores FROM spans") == 4 and n("SELECT region FROM spans") == "North"
+    assert n("SELECT survey_cores FROM segments") == 4 and n("SELECT region FROM segments") == "North"
     assert n("SELECT count(*) FROM reservations WHERE additional AND group_label = 'DWDM Trunk Route 1'") == 1
     with pytest.raises(DBAPIError, match="append-only"):
         db.execute(text("UPDATE reservations SET remark = 'x'"))
@@ -195,9 +195,9 @@ def test_seed_surveyed_cores_and_count_only(db, count_workbook):
     counts, skipped = seed.load(db, str(count_workbook))
     n = lambda sql: db.execute(text(sql)).scalar_one()
     assert counts["reservations"] == 5 and any("row 15 [needs_review]" in s for s in skipped)
-    assert n("SELECT survey_cores FROM spans") == 4 == n("SELECT count(*) FILTER (WHERE number <= 4) FROM cores")
+    assert n("SELECT survey_cores FROM segments") == 4 == n("SELECT count(*) FILTER (WHERE number <= 4) FROM cores")
     assert n("SELECT count(*) FROM cores") == 4 and n("SELECT count(*) FROM cores WHERE port_a_id IS NOT NULL") == 0
-    row = db.execute(text("SELECT unassigned_cores, unassigned_span_id = (SELECT id FROM spans) FROM reservations "
+    row = db.execute(text("SELECT unassigned_cores, unassigned_segment_id = (SELECT id FROM segments) FROM reservations "
                           "WHERE unassigned_cores = 3")).one()
     assert tuple(row) == (3, True)
     rid = n("SELECT id FROM reservations WHERE unassigned_cores = 3")

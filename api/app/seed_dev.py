@@ -20,7 +20,7 @@ SITES = [
     ("KTN", "DEV Kuantan Hut", "site", None),
 ]
 # site A, site B, route_type, region, distance_km, loss factor vs distance*0.3 (None = no measurements)
-SPANS: list[tuple[str, str, str, str, float | None, float | None]] = [
+SEGMENTS: list[tuple[str, str, str, str, float | None, float | None]] = [
     ("KL", "CJ", "Metro", "Central", 32.5, 1.0),
     ("CJ", "BJ", "Metro", "Central", 18.2, 1.05),
     ("KL", "BJ", "Metro", "Central", 12.0, 1.3),
@@ -54,12 +54,12 @@ def run(db: Session) -> None:
                          n=name, k=kind, lon=lon, lat=lat)
 
     rng = random.Random(1)
-    span: list[int] = []
-    cores: dict[int, dict[int, int]] = {}  # span id -> core number -> core id
-    for n, (a, b, route, region, km, factor) in enumerate(SPANS, start=1):
-        sid = one("INSERT INTO spans (site_a_id, site_b_id, route_type, region, distance_km, survey_cores) "
+    segment: list[int] = []
+    cores: dict[int, dict[int, int]] = {}  # segment id -> core number -> core id
+    for n, (a, b, route, region, km, factor) in enumerate(SEGMENTS, start=1):
+        sid = one("INSERT INTO segments (site_a_id, site_b_id, route_type, region, distance_km, survey_cores) "
                   "VALUES (:a, :b, :r, :g, :d, :n) RETURNING id", a=site[a], b=site[b], r=route, g=region, d=km, n=CORES)
-        span.append(sid)
+        segment.append(sid)
         cores[sid] = {}
         for num in range(1, CORES + 1):
             ports = [one("INSERT INTO ports (port_id, site_id) VALUES (:p, :s) RETURNING id",
@@ -68,27 +68,27 @@ def run(db: Session) -> None:
             # cores 10-13 in use with a circuit, 14 has a circuit but is not in use
             circuit = f"CKT-{1000 + n * 10 + num - 9}" if 10 <= num <= 14 and n <= 5 else None
             cores[sid][num] = one(
-                "INSERT INTO cores (span_id, number, port_a_id, port_b_id, circuit_id, in_use) "
+                "INSERT INTO cores (segment_id, number, port_a_id, port_b_id, circuit_id, in_use) "
                 "VALUES (:s, :n, :pa, :pb, :c, :u) RETURNING id",
                 s=sid, n=num, pa=ports[0], pb=ports[1], c=circuit, u=circuit is not None and num != 14)
         if km is not None and factor is not None:
             for _ in range(3):
-                ins("INSERT INTO measurements (span_id, loss_db, tested_on) "
+                ins("INSERT INTO measurements (segment_id, loss_db, tested_on) "
                     "VALUES (:s, :l, current_date - :d)",
                     s=sid, l=round(km * 0.3 * factor * rng.uniform(0.97, 1.03), 3), d=rng.randint(1, 300))
 
-    # segments: a long route (several spans) and a short one
-    for sites_ab, spans_in in [(("KL", "PEN"), [span[3], span[4]]), (("KL", "BJ"), [span[2]])]:
-        seg = one("INSERT INTO segments (site_a_id, site_b_id, geom) VALUES (:a, :b, NULL) RETURNING id",
+    # routes: a long route (several segments) and a short one
+    for sites_ab, segments_in in [(("KL", "PEN"), [segment[3], segment[4]]), (("KL", "BJ"), [segment[2]])]:
+        seg = one("INSERT INTO routes (site_a_id, site_b_id, geom) VALUES (:a, :b, NULL) RETURNING id",
                   a=site[sites_ab[0]], b=site[sites_ab[1]])
-        for pos, sid in enumerate(spans_in, start=1):
-            ins("INSERT INTO segment_spans (segment_id, span_id, position) VALUES (:g, :s, :p)",
+        for pos, sid in enumerate(segments_in, start=1):
+            ins("INSERT INTO route_segments (route_id, segment_id, position) VALUES (:g, :s, :p)",
                 g=seg, s=sid, p=pos)
 
     cust = [one("INSERT INTO customers (name, created_by) VALUES (:n, :u) RETURNING id", n=n, u=user["planner1"])
             for n in ("DEV Telco Alpha", "DEV Telco Beta", "DEV Bank Gamma")]
 
-    def reserve(customer: int, planner: str, span_id: int, nums: list[int], approver: str | None, srf: str | None = None) -> None:
+    def reserve(customer: int, planner: str, segment_id: int, nums: list[int], approver: str | None, srf: str | None = None) -> None:
         res = one("INSERT INTO reservations (customer_id, planner_id, planned_date, srf_id) "
                   "VALUES (:c, :u, current_date + 30, :srf) RETURNING id", c=customer, u=user[planner], srf=srf)
         ins("INSERT INTO reservation_events (reservation_id, type, user_id) VALUES (:r, 'requested', :u)",
@@ -97,15 +97,15 @@ def run(db: Session) -> None:
             ins("INSERT INTO reservation_events (reservation_id, type, user_id) VALUES (:r, 'approved', :u)",
                 r=res, u=user[approver])
         for num in nums:
-            ins("INSERT INTO reservation_cores (reservation_id, core_id) VALUES (:r, :c)", r=res, c=cores[span_id][num])
-            ins("INSERT INTO core_holds (core_id, reservation_id) VALUES (:c, :r)", c=cores[span_id][num], r=res)
+            ins("INSERT INTO reservation_cores (reservation_id, core_id) VALUES (:r, :c)", r=res, c=cores[segment_id][num])
+            ins("INSERT INTO core_holds (core_id, reservation_id) VALUES (:c, :r)", c=cores[segment_id][num], r=res)
 
-    reserve(cust[0], "planner1", span[0], [1, 2], "admin1", "SRF-DEV-001")
-    reserve(cust[1], "planner2", span[3], [1, 2], None, "SRF-DEV-002")
+    reserve(cust[0], "planner1", segment[0], [1, 2], "admin1", "SRF-DEV-001")
+    reserve(cust[1], "planner2", segment[3], [1, 2], None, "SRF-DEV-002")
 
     # count-only reservation, as an Excel import makes it: 3 cores wanted on CJ-BJ, ports not assigned yet
-    res = one("INSERT INTO reservations (customer_id, planner_id, imported, unassigned_cores, unassigned_span_id) "
-              "VALUES (:c, :u, true, 3, :s) RETURNING id", c=cust[2], u=user["planner1"], s=span[1])
+    res = one("INSERT INTO reservations (customer_id, planner_id, imported, unassigned_cores, unassigned_segment_id) "
+              "VALUES (:c, :u, true, 3, :s) RETURNING id", c=cust[2], u=user["planner1"], s=segment[1])
     for who, kind in (("planner1", "requested"), ("admin1", "approved")):
         ins("INSERT INTO reservation_events (reservation_id, type, user_id) VALUES (:r, :t, :u)",
             r=res, t=kind, u=user[who])

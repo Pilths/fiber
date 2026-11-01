@@ -19,11 +19,11 @@ def site(db, name, kind="site", xy=None, lrd=None, region=None):
                d=json.dumps({"region": region} if region else {}))
 
 
-def span(db, a, b, survey, used=0):
-    sid = one(db, "INSERT INTO spans (site_a_id, site_b_id, distance_km, survey_cores, route_type, region) "
+def segment(db, a, b, survey, used=0):
+    sid = one(db, "INSERT INTO segments (site_a_id, site_b_id, distance_km, survey_cores, route_type, region) "
                   "VALUES (:a,:b,5,:n,'Metro','Central') RETURNING id", a=a, b=b, n=survey)
     for n in range(1, (survey or 0) + 1):
-        db.execute(text("INSERT INTO cores (span_id, number, in_use) VALUES (:s,:n,:u)"), {"s": sid, "n": n, "u": n <= used})
+        db.execute(text("INSERT INTO cores (segment_id, number, in_use) VALUES (:s,:n,:u)"), {"s": sid, "n": n, "u": n <= used})
     return sid
 
 
@@ -32,36 +32,36 @@ def mkuser(db):
 
 
 def test_requires_sign_in(client):
-    assert client.get("/api/map/spans").status_code == 401
+    assert client.get("/api/map/segments").status_code == 401
     assert client.get("/api/map/sites").status_code == 401
 
 
-def test_spans_straight_chips_and_not_drawn(client, db):
+def test_segments_straight_chips_and_not_drawn(client, db):
     mkuser(db)
     a, b, c, d, e, nogeo = [*(site(db, n, xy=(101 + i, 3)) for i, n in enumerate("ABCDE")), site(db, "Z")]
-    ok, low, full, ns = span(db, a, b, 12), span(db, b, c, 12, used=5), span(db, c, d, 3, used=3), span(db, d, e, None)
-    lost = span(db, e, nogeo, 4)
-    r = client.get("/api/map/spans", headers=H()).json()
-    by = {f["properties"]["span_id"]: f for f in r["features"]}
+    ok, low, full, ns = segment(db, a, b, 12), segment(db, b, c, 12, used=5), segment(db, c, d, 3, used=3), segment(db, d, e, None)
+    lost = segment(db, e, nogeo, 4)
+    r = client.get("/api/map/segments", headers=H()).json()
+    by = {f["properties"]["segment_id"]: f for f in r["features"]}
     assert [by[i]["properties"]["chip"] for i in (ok, low, full, ns)] == ["ok", "low", "full", "not_surveyed"]
     assert by[low]["properties"]["free_to_reserve"] == 7 and by[ns]["properties"]["surveyed"] is False
     assert by[ok]["geometry"]["coordinates"] == [[101, 3], [102, 3]] and "shaped" not in by[ok]["properties"]
-    assert by[ok]["properties"]["segment_id"] is None
-    assert lost not in by and r["not_drawn"] == [{"span_id": lost, "name": "E - Z", "reason": "no valid coordinates for Z"}]
+    assert by[ok]["properties"]["route_id"] is None
+    assert lost not in by and r["not_drawn"] == [{"segment_id": lost, "name": "E - Z", "reason": "no valid coordinates for Z"}]
 
 
-def test_shaped_segment_parts(client, db):
+def test_shaped_route_parts(client, db):
     mkuser(db)
     a, b, c, d = site(db, "A", xy=(101, 3)), site(db, "B", xy=(102, 4)), site(db, "C", xy=(103, 3)), site(db, "D", xy=(104, 3))
-    ab, cb, cd = span(db, a, b, 5), span(db, c, b, 5), span(db, c, d, 5)  # C-B stored reversed
-    seg = one(db, "INSERT INTO segments (site_a_id, site_b_id, geom) VALUES (:a,:c, ST_GeomFromText("
+    ab, cb, cd = segment(db, a, b, 5), segment(db, c, b, 5), segment(db, c, d, 5)  # C-B stored reversed
+    seg = one(db, "INSERT INTO routes (site_a_id, site_b_id, geom) VALUES (:a,:c, ST_GeomFromText("
                   "'LINESTRING(101 3, 101.4 3.8, 102 4, 102.6 3.8, 103 3)', 4326)) RETURNING id", a=a, c=c)
     for i, s in enumerate((ab, cb), 1):
-        db.execute(text("INSERT INTO segment_spans (segment_id, span_id, position) VALUES (:g,:s,:p)"), {"g": seg, "s": s, "p": i})
-    by = {f["properties"]["span_id"]: f for f in client.get("/api/map/spans", headers=H()).json()["features"]}
+        db.execute(text("INSERT INTO route_segments (route_id, segment_id, position) VALUES (:g,:s,:p)"), {"g": seg, "s": s, "p": i})
+    by = {f["properties"]["segment_id"]: f for f in client.get("/api/map/segments", headers=H()).json()["features"]}
     assert by[ab]["geometry"]["coordinates"] == [[101, 3], [101.4, 3.8], [102, 4]]
     assert by[cb]["geometry"]["coordinates"] == [[103, 3], [102.6, 3.8], [102, 4]]  # oriented site A (C) -> site B (B)
-    assert by[ab]["properties"]["shaped"] and by[cb]["properties"]["segment_id"] == seg
+    assert by[ab]["properties"]["shaped"] and by[cb]["properties"]["route_id"] == seg
     assert by[cd]["geometry"]["coordinates"] == [[103, 3], [104, 3]] and "shaped" not in by[cd]["properties"]
 
 
@@ -73,9 +73,9 @@ def test_sites(client, db):
     dc_own = site(db, "DC own", "data_center", xy=(102, 3), lrd=lrd)
     toc = site(db, "TOC", "toc", xy=(103, 3))
     bad = site(db, "Nogeo")
-    site(db, "Lonely", xy=(105, 3))  # no span: left out
+    site(db, "Lonely", xy=(105, 3))  # no segment: left out
     for x, y in ((lrd, dc_fallback), (dc_none, dc_own), (toc, bad)):
-        span(db, x, y, 2)
+        segment(db, x, y, 2)
     r = client.get("/api/map/sites", headers=H()).json()
     by = {f["properties"]["name"]: f for f in r["features"]}
     assert set(by) == {"LRD1", "DC fallback", "DC own", "TOC"}
@@ -86,11 +86,11 @@ def test_sites(client, db):
     assert {n["name"] for n in r["not_drawn"]} == {"DC none", "Nogeo"}
 
 
-def test_spans_expose_fiber_cut_as_full(client, db):
+def test_segments_expose_fiber_cut_as_full(client, db):
     mkuser(db)
     a, b, c = (site(db, n, xy=(101 + i, 3)) for i, n in enumerate("ABC"))
-    ok, cut = span(db, a, b, 12), span(db, b, c, 12)
-    db.execute(text("UPDATE spans SET fiber_cut = true WHERE id = :s"), {"s": cut})
-    by = {f["properties"]["span_id"]: f["properties"] for f in client.get("/api/map/spans", headers=H()).json()["features"]}
+    ok, cut = segment(db, a, b, 12), segment(db, b, c, 12)
+    db.execute(text("UPDATE segments SET fiber_cut = true WHERE id = :s"), {"s": cut})
+    by = {f["properties"]["segment_id"]: f["properties"] for f in client.get("/api/map/segments", headers=H()).json()["features"]}
     assert (by[ok]["fiber_cut"], by[ok]["chip"]) == (False, "ok")
     assert (by[cut]["fiber_cut"], by[cut]["chip"], by[cut]["free_to_reserve"]) == (True, "full", 0)

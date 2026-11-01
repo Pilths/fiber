@@ -16,17 +16,17 @@ def one(db, sql, **p):
 
 
 def build(db):
-    """planner1/2, admin1/2, span s1 (6 surveyed cores), s2 (4), s3 (never surveyed, 1 stray core), customers."""
+    """planner1/2, admin1/2, segment s1 (6 surveyed cores), s2 (4), s3 (never surveyed, 1 stray core), customers."""
     w = {}
     for u, role in [("planner1", "planner"), ("planner2", "planner"), ("admin1", "admin"), ("admin2", "admin")]:
         w[u] = one(db, "INSERT INTO users (username, display_name, role) VALUES (:u,:u,:r) RETURNING id", u=u, r=role)
     a, b, c, d = (one(db, "INSERT INTO sites (name, kind) VALUES (:n,'site') RETURNING id", n=n) for n in "ABCD")
     w["s1"], w["s2"], w["s3"] = (
-        one(db, "INSERT INTO spans (site_a_id, site_b_id, survey_cores) VALUES (:a,:b,:n) RETURNING id", a=x, b=y, n=n)
+        one(db, "INSERT INTO segments (site_a_id, site_b_id, survey_cores) VALUES (:a,:b,:n) RETURNING id", a=x, b=y, n=n)
         for x, y, n in [(a, b, 6), (b, c, 4), (c, d, None)])
-    w["c1"] = {n: one(db, "INSERT INTO cores (span_id, number) VALUES (:s,:n) RETURNING id", s=w["s1"], n=n) for n in range(1, 7)}
-    w["c2"] = {n: one(db, "INSERT INTO cores (span_id, number) VALUES (:s,:n) RETURNING id", s=w["s2"], n=n) for n in range(1, 5)}
-    w["c3"] = one(db, "INSERT INTO cores (span_id, number) VALUES (:s, 1) RETURNING id", s=w["s3"])
+    w["c1"] = {n: one(db, "INSERT INTO cores (segment_id, number) VALUES (:s,:n) RETURNING id", s=w["s1"], n=n) for n in range(1, 7)}
+    w["c2"] = {n: one(db, "INSERT INTO cores (segment_id, number) VALUES (:s,:n) RETURNING id", s=w["s2"], n=n) for n in range(1, 5)}
+    w["c3"] = one(db, "INSERT INTO cores (segment_id, number) VALUES (:s, 1) RETURNING id", s=w["s3"])
     w["cust"] = one(db, "INSERT INTO customers (name) VALUES ('Acme') RETURNING id")
     w["cust2"] = one(db, "INSERT INTO customers (name) VALUES ('Beta') RETURNING id")
     return w
@@ -57,18 +57,18 @@ def event_types(db, rid):
     return list(db.execute(text("SELECT type FROM reservation_events WHERE reservation_id = :r ORDER BY id"), {"r": rid}).scalars())
 
 
-def count_only(db, w, n, span="s2", planner="planner1"):
+def count_only(db, w, n, segment="s2", planner="planner1"):
     """What an Excel import makes: approved, n cores wanted, no cores, no holds."""
-    rid = one(db, "INSERT INTO reservations (customer_id, planner_id, imported, unassigned_cores, unassigned_span_id) "
-                  "VALUES (:c,:u,true,:n,:s) RETURNING id", c=w["cust2"], u=w[planner], n=n, s=w[span])
+    rid = one(db, "INSERT INTO reservations (customer_id, planner_id, imported, unassigned_cores, unassigned_segment_id) "
+                  "VALUES (:c,:u,true,:n,:s) RETURNING id", c=w["cust2"], u=w[planner], n=n, s=w[segment])
     for kind, who in (("requested", planner), ("approved", "admin1")):
         db.execute(text("INSERT INTO reservation_events (reservation_id, type, user_id) VALUES (:r,:t,:u)"),
                    {"r": rid, "t": kind, "u": w[who]})
     return rid
 
 
-def span(client, sid):
-    return client.get(f"/api/spans/{sid}", headers=H("planner1")).json()
+def segment(client, sid):
+    return client.get(f"/api/segments/{sid}", headers=H("planner1")).json()
 
 
 # ---------- TEST-001 ----------
@@ -119,7 +119,7 @@ def test_customer_is_required(client, w):
 def test_route_request_is_one_reservation_and_marks_new_customer(client, w, db):
     r = book(client, w, [w["c1"][1], w["c2"][1]], planned_date="2026-12-01").json()
     assert r["status"] == "pending" and r["is_new_customer"] is True and len(r["cores"]) == 2
-    assert {c["span_id"] for c in r["cores"]} == {w["s1"], w["s2"]}
+    assert {c["segment_id"] for c in r["cores"]} == {w["s1"], w["s2"]}
     assert one(db, "SELECT count(*) FROM core_holds") == 2 and event_types(db, r["id"]) == ["requested"]
     assert book(client, w, [w["c1"][2]]).json()["is_new_customer"] is False
 
@@ -197,14 +197,14 @@ def test_004_partial_release_of_route_reservation(client, w, db):
     assert act(client, rid, "request-release", user="planner1", cores=s1c).status_code == 200
     r = act(client, rid, "release", cores=s1c).json()
     assert r["status"] == "approved"
-    assert [status(db, c) for c in s1c + s2c] == ["Available", "Available", "Reserved"]  # other span stays Reserved
+    assert [status(db, c) for c in s1c + s2c] == ["Available", "Available", "Reserved"]  # other segment stays Reserved
     assert one(db, "SELECT count(*) FROM reservation_cores WHERE reservation_id = :r", r=rid) == 3  # nothing deleted
     assert event_types(db, rid) == ["requested", "approved", "release_requested", "release_declined",
                                     "release_requested", "released"]
     per_event = db.execute(text("SELECT e.type, array_agg(rc.core_id ORDER BY rc.core_id) FROM release_cores rc "
                                 "JOIN reservation_events e ON e.id = rc.event_id GROUP BY e.id, e.type ORDER BY e.id")).all()
     assert per_event == [("release_requested", sorted(s1c)), ("release_requested", sorted(s1c)), ("released", sorted(s1c))]
-    assert [(c["core_id"], c["held"]) for c in r["cores"] if c["span_id"] == w["s1"]] == [(c, False) for c in s1c]
+    assert [(c["core_id"], c["held"]) for c in r["cores"] if c["segment_id"] == w["s1"]] == [(c, False) for c in s1c]
 
     r = act(client, rid, "release", cores=s2c).json()  # releasing the rest ends it
     assert r["status"] == "ended" and status(db, s2c[0]) == "Available"
@@ -292,7 +292,7 @@ def test_006_correction_rules(client, w, db):
     assert db.execute(text("SELECT customer_id, planned_date::text FROM reservations WHERE id = :r"), {"r": rid}).one() == (w["cust"], "2026-12-01")
     assert event_types(db, rid) == ["requested", "approved", "corrected"]
     assert one(db, "SELECT reason FROM reservation_events WHERE type = 'corrected'") == "Customer renamed"
-    core = span(client, w["s1"])["cores"][0]
+    core = segment(client, w["s1"])["cores"][0]
     assert (core["customer"], core["planned_date"]) == ("Beta", "2027-01-01")
     assert act(client, rid, "correct", reason="date only", planned_date="2027-02-02").json()["customer"] == "Beta"
 
@@ -318,16 +318,16 @@ def test_my_reservations_list(client, w):
 
 # ---------- surveyed capacity and count-only reservations ----------
 
-def test_not_surveyed_span_refuses_booking(client, w):
+def test_not_surveyed_segment_refuses_booking(client, w):
     r = book(client, w, [w["c3"]])
     assert r.status_code == 409 and "not surveyed" in r.json()["detail"]["message"]
-    s = span(client, w["s3"])
+    s = segment(client, w["s3"])
     assert (s["survey_cores"], s["not_surveyed"], s["free_to_reserve"]) == (None, None, 0)
 
 
 def test_count_only_limits_booking(client, w, db):
     count_only(db, w, 3)  # 3 of the 4 cores on s2 promised
-    s = client.get("/api/spans", headers=H("planner1")).json()
+    s = client.get("/api/segments", headers=H("planner1")).json()
     s2 = next(x for x in s if x["id"] == w["s2"])
     assert (s2["free_cores"], s2["unassigned_reserved"], s2["free_to_reserve"]) == (4, 3, 1)
     r = book(client, w, [w["c2"][1], w["c2"][2]])
@@ -335,13 +335,13 @@ def test_count_only_limits_booking(client, w, db):
     assert one(db, "SELECT count(*) FROM core_holds") == 0
     assert book(client, w, [w["c2"][1]]).status_code == 200
     assert book(client, w, [w["c2"][2]], user="planner2").status_code == 409  # now 0 free to reserve
-    assert book(client, w, [w["c1"][1], w["c1"][2]]).status_code == 200  # other spans unaffected
+    assert book(client, w, [w["c1"][1], w["c1"][2]]).status_code == 200  # other segments unaffected
 
 
 def test_assign_reduces_remaining_and_creates_holds(client, w, db):
     rid = count_only(db, w, 3)
     assert act(client, rid, "assign", cores=[w["c2"][1], w["c2"][2], w["c2"][3], w["c2"][4]]).status_code == 409  # > remaining
-    assert act(client, rid, "assign", cores=[w["c1"][1]]).status_code == 422  # wrong span
+    assert act(client, rid, "assign", cores=[w["c1"][1]]).status_code == 422  # wrong segment
     assert act(client, rid, "assign", user="planner1", cores=[w["c2"][1]]).status_code == 403
     assert act(client, rid, "assign", cores=[]).status_code == 422
     r = act(client, rid, "assign", cores=[w["c2"][1], w["c2"][2]]).json()
@@ -349,7 +349,7 @@ def test_assign_reduces_remaining_and_creates_holds(client, w, db):
     assert [status(db, w["c2"][n]) for n in (1, 2, 3)] == ["Reserved", "Reserved", "Available"]
     assert one(db, "SELECT count(*) FROM core_holds WHERE reservation_id = :r", r=rid) == 2
     assert event_types(db, rid) == ["requested", "approved", "assigned"]
-    s2 = next(x for x in client.get("/api/spans", headers=H("planner1")).json() if x["id"] == w["s2"])
+    s2 = next(x for x in client.get("/api/segments", headers=H("planner1")).json() if x["id"] == w["s2"])
     assert (s2["free_cores"], s2["unassigned_reserved"], s2["free_to_reserve"]) == (2, 1, 1)  # promise kept, not exceeded
     assert act(client, rid, "assign", cores=[w["c2"][1]]).status_code == 409  # already held
     assert act(client, rid, "assign", cores=[w["c2"][3], w["c2"][4]]).status_code == 409  # only 1 remaining
@@ -365,10 +365,10 @@ def test_assign_conflict_with_taken_core(client, w, db):
 
 def test_release_of_count_only_frees_its_count(client, w, db):
     rid = count_only(db, w, 3)
-    assert next(x for x in client.get("/api/spans", headers=H("planner1")).json() if x["id"] == w["s2"])["free_to_reserve"] == 1
+    assert next(x for x in client.get("/api/segments", headers=H("planner1")).json() if x["id"] == w["s2"])["free_to_reserve"] == 1
     r = act(client, rid, "release", cores=[]).json()
     assert r["status"] == "ended" and r["remaining_unassigned"] == 0
-    assert next(x for x in client.get("/api/spans", headers=H("planner1")).json() if x["id"] == w["s2"])["free_to_reserve"] == 4
+    assert next(x for x in client.get("/api/segments", headers=H("planner1")).json() if x["id"] == w["s2"])["free_to_reserve"] == 4
     assert one(db, "SELECT count(*) FROM reservations WHERE id = :r AND unassigned_cores = 3", r=rid) == 1  # nothing rewritten
 
     other = count_only(db, w, 2)  # partly assigned, then every held core released: the rest of the count goes too
@@ -381,16 +381,16 @@ def test_count_only_reservation_in_lists(client, w, db):
     rid = count_only(db, w, 3)
     r = next(x for x in client.get("/api/reservations", params={"mine": True}, headers=H("planner1")).json() if x["id"] == rid)
     assert (r["status"], r["cores"], r["remaining_unassigned"]) == ("approved", [], 3)
-    assert r["unassigned_span"] == "B - C"
+    assert r["unassigned_segment"] == "B - C"
 
 
-# ---------- core holder endpoint and stale flags on span detail ----------
+# ---------- core holder endpoint and stale flags on segment detail ----------
 
-def test_core_holder_endpoint_and_span_stale(client, w, db):
+def test_core_holder_endpoint_and_segment_stale(client, w, db):
     free, held, old = w["c1"][1], w["c1"][2], w["c1"][3]
     r = client.get(f"/api/cores/{free}", headers=H("planner2"))
     assert r.status_code == 200 and r.json()["holder"] is None and r.json()["hidden"] is False
-    assert r.json()["span_id"] == w["s1"] and r.json()["number"] == 1 and r.json()["span_name"] == "A - B"
+    assert r.json()["segment_id"] == w["s1"] and r.json()["number"] == 1 and r.json()["segment_name"] == "A - B"
     rid = book(client, w, [held]).json()["id"]
     mine = client.get(f"/api/cores/{held}", headers=H("planner1")).json()["holder"]
     assert mine["is_mine"] is True and mine["state"] == "requested" and mine["customer"] == "Acme" and mine["stale"] is False
@@ -406,20 +406,20 @@ def test_core_holder_endpoint_and_span_stale(client, w, db):
     db.execute(text("INSERT INTO core_holds (core_id, reservation_id) VALUES (:c,:r)"), {"r": orid, "c": old})
     h = client.get(f"/api/cores/{old}", headers=H("planner2")).json()["holder"]
     assert h["stale"] is True and h["stale_since"] is not None
-    rows = {c["id"]: c for c in span(client, w["s1"])["cores"]}
+    rows = {c["id"]: c for c in segment(client, w["s1"])["cores"]}
     assert rows[old]["stale"] is True and rows[old]["reservation_id"] == orid and rows[old]["stale_since"] == h["stale_since"]
     assert rows[held]["stale"] is False and rows[held]["reservation_id"] == rid
     assert rows[free]["reservation_id"] is None and rows[free]["stale"] is False
     # hidden core (above survey_cores) and unknown core
-    hidden = one(db, "INSERT INTO cores (span_id, number) VALUES (:s, 7) RETURNING id", s=w["s1"])
+    hidden = one(db, "INSERT INTO cores (segment_id, number) VALUES (:s, 7) RETURNING id", s=w["s1"])
     assert client.get(f"/api/cores/{hidden}", headers=H("planner1")).status_code == 404
     assert client.get("/api/cores/999999", headers=H("planner1")).status_code == 404
 
 
-def test_srf_and_planner_on_span_detail(client, w, db):
+def test_srf_and_planner_on_segment_detail(client, w, db):
     core = w["c1"][1]
     assert book(client, w, [core], srf_id=" SRF-9 ").status_code == 200
-    held = next(c for c in span(client, w["s1"])["cores"] if c["id"] == core)
+    held = next(c for c in segment(client, w["s1"])["cores"] if c["id"] == core)
     assert held["srf_id"] == "SRF-9" and held["planner"] and held["srf_id"] != " SRF-9 "
-    free = next(c for c in span(client, w["s1"])["cores"] if c["id"] != core and c["status"] == "Available")
+    free = next(c for c in segment(client, w["s1"])["cores"] if c["id"] != core and c["status"] == "Available")
     assert free["srf_id"] is None and free["planner"] is None

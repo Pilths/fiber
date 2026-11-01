@@ -1,4 +1,4 @@
-"""Span list upload. Fixtures are tiny workbooks built here; no real data."""
+"""Segment list upload. Fixtures are tiny workbooks built here; no real data."""
 import io
 
 import openpyxl
@@ -9,11 +9,11 @@ from test_auth import login, mkuser
 
 from alembic import command
 
-URL = "/api/admin/span-list"
+URL = "/api/admin/segment-list"
 HEAD = ["Link", "Site A", "Route", "Section", "Type", "Distance", "lat"]
 
 
-def workbook(rows, head=HEAD, tab="Spans", offset=0, pad=0):
+def workbook(rows, head=HEAD, tab="Segments", offset=0, pad=0):
     wb = openpyxl.Workbook()
     wb.active.title = "Cover"
     wb.active.append(["nothing here"])
@@ -58,13 +58,13 @@ def apply(client, uid):
     return client.post(f"{URL}/uploads/{uid}/apply")
 
 
-def span(db, a, b):
-    return db.execute(text("SELECT s.* FROM spans s JOIN sites x ON x.id = s.site_a_id JOIN sites y ON y.id = s.site_b_id "
+def segment(db, a, b):
+    return db.execute(text("SELECT s.* FROM segments s JOIN sites x ON x.id = s.site_a_id JOIN sites y ON y.id = s.site_b_id "
                            "WHERE x.name = :a AND y.name = :b"), {"a": a, "b": b}).mappings().first()
 
 
-def seed_span(db, a, b, dist="5.000", typ=None, route=None, section=None):
-    return db.execute(text("INSERT INTO spans (site_a_id, site_b_id, distance_km, route_type, route, section) "
+def seed_segment(db, a, b, dist="5.000", typ=None, route=None, section=None):
+    return db.execute(text("INSERT INTO segments (site_a_id, site_b_id, distance_km, route_type, route, section) "
                            "SELECT x.id, y.id, :d, :t, :r, :s FROM sites x, sites y WHERE x.name = :a AND y.name = :b RETURNING id"),
                       {"a": a, "b": b, "d": dist, "t": typ, "r": route, "s": section}).scalar_one()
 
@@ -74,38 +74,38 @@ def problems(client, uid):
 
 
 def test_happy_path_new_changed_unchanged_and_apply(client, admin, sites, db):
-    seed_span(db, "BBBB", "CCCC", "5.000", "Metro", "R9", "S9")
-    seed_span(db, "CCCC", "DDDD", "7.000", "Trunk", "R1", "S1")
+    seed_segment(db, "BBBB", "CCCC", "5.000", "Metro", "R9", "S9")
+    seed_segment(db, "CCCC", "DDDD", "7.000", "Trunk", "R1", "S1")
     r = post(client, workbook([row("AAAA-BBBB"), row("BBBB-CCCC", 6), row("CCCC-DDDD", 7), row("AAAA-ZZZZ")]))
     assert r.status_code == 201
     j = r.json()
-    assert j["found"] and j["sheet_name"] == "Spans" and j["counts"] == {"rows": 4, "new": 1, "changed": 1, "unchanged": 1, "problem": 1}
+    assert j["found"] and j["sheet_name"] == "Segments" and j["counts"] == {"rows": 4, "new": 1, "changed": 1, "unchanged": 1, "problem": 1}
     ch = rows(client, j["upload_id"], "changed")["items"][0]
     assert {(c["field"], c["old"], c["new"]) for c in ch["changes"]} == {
         ("distance_km", "5.000", "6.000"), ("route_type", "Metro", "Trunk"), ("route", "R9", "R1"), ("section", "S9", "S1")}
     assert ch["parsed"]["site_a"] == "BBBB" and ch["raw"]["lat"] == 1.0  # ignored column stays in the raw row
     assert problems(client, j["upload_id"]) == {5: "site ZZZZ is not in the dashboard"}
-    assert span(db, "AAAA", "BBBB") is None  # staging writes no span
+    assert segment(db, "AAAA", "BBBB") is None  # staging writes no segment
     res = apply(client, j["upload_id"])
     assert res.status_code == 200
     assert res.json() == {"upload_id": j["upload_id"], "created": 1, "changed": 1, "protected_kept": 0, "skipped": 1, "warnings": []}
-    new = span(db, "AAAA", "BBBB")
+    new = segment(db, "AAAA", "BBBB")
     assert (str(new["distance_km"]), new["route_type"], new["route"], new["section"]) == ("10.500", "Trunk", "R1", "S1")
     assert new["survey_cores"] is None and new["region"] is None and new["cable_size"] == 144
-    assert db.execute(text("SELECT count(*) FROM cores WHERE span_id = :i"), {"i": new["id"]}).scalar_one() == 0
-    assert str(span(db, "BBBB", "CCCC")["distance_km"]) == "6.000"
+    assert db.execute(text("SELECT count(*) FROM cores WHERE segment_id = :i"), {"i": new["id"]}).scalar_one() == 0
+    assert str(segment(db, "BBBB", "CCCC")["distance_km"]) == "6.000"
     assert db.execute(text("SELECT status FROM uploads WHERE id = :i"), {"i": j["upload_id"]}).scalar_one() == "confirmed"
 
 
 def test_history_rows_written(client, admin, sites, db):
-    sid = seed_span(db, "AAAA", "BBBB", "5.000", "Metro")
+    sid = seed_segment(db, "AAAA", "BBBB", "5.000", "Metro")
     uid = post(client, workbook([row("AAAA-BBBB", 6, typ="Trunk")]), "my.xlsx").json()["upload_id"]
     apply(client, uid)
-    h = db.execute(text("SELECT field, old_value, new_value, reason, user_id FROM data_edits WHERE entity = 'span' AND entity_id = :i "
+    h = db.execute(text("SELECT field, old_value, new_value, reason, user_id FROM data_edits WHERE entity = 'segment' AND entity_id = :i "
                         "ORDER BY field"), {"i": sid}).all()
     assert [(x[0], x[1], x[2]) for x in h] == [("distance_km", "5.000", "6.000"), ("route", None, "R1"), ("route_type", "Metro", "Trunk"),
                                                 ("section", None, "S1")]
-    assert all(x[3] == f"span list upload my.xlsx #{uid}" and x[4] == admin for x in h)
+    assert all(x[3] == f"segment list upload my.xlsx #{uid}" and x[4] == admin for x in h)
 
 
 def test_header_below_row_one_away_from_column_a_other_sheet_name_and_aliases(client, admin, sites):
@@ -144,40 +144,40 @@ def test_duplicate_pair_does_not_block_others(client, admin, sites, db):
     uid = post(client, workbook([row("AAAA-BBBB"), row("BBBB-AAAA"), row("CCCC-DDDD")])).json()["upload_id"]
     assert problems(client, uid) == {2: "duplicate link in file (rows 2, 3)", 3: "duplicate link in file (rows 2, 3)"}
     assert apply(client, uid).json()["created"] == 1
-    assert span(db, "CCCC", "DDDD") and span(db, "AAAA", "BBBB") is None
+    assert segment(db, "CCCC", "DDDD") and segment(db, "AAAA", "BBBB") is None
 
 
 def test_blank_cells_never_clear(client, admin, sites, db):
-    seed_span(db, "AAAA", "BBBB", "5.000", "Metro", "R9", "S9")
+    seed_segment(db, "AAAA", "BBBB", "5.000", "Metro", "R9", "S9")
     data = workbook([["AAAA-BBBB", None, None, "", None, None, None]])
     j = post(client, data).json()
     assert j["counts"]["unchanged"] == 1
     assert apply(client, j["upload_id"]).json()["changed"] == 0
-    s = span(db, "AAAA", "BBBB")
+    s = segment(db, "AAAA", "BBBB")
     assert (str(s["distance_km"]), s["route_type"], s["route"], s["section"]) == ("5.000", "Metro", "R9", "S9")
 
 
 def test_protected_field_kept(client, admin, sites, db):
-    sid = seed_span(db, "AAAA", "BBBB", "5.000", "Metro")
+    sid = seed_segment(db, "AAAA", "BBBB", "5.000", "Metro")
     db.execute(text("INSERT INTO data_edits (entity, entity_id, field, old_value, new_value, reason, user_id) "
-                    "VALUES ('span', :i, 'distance_km', '4', '5', 'surveyed', :u)"), {"i": sid, "u": admin})
+                    "VALUES ('segment', :i, 'distance_km', '4', '5', 'surveyed', :u)"), {"i": sid, "u": admin})
     uid = post(client, workbook([row("AAAA-BBBB", 9)])).json()["upload_id"]
     it = rows(client, uid, "changed")["items"][0]
     d = next(c for c in it["changes"] if c["field"] == "distance_km")
     assert d["protected"] and d["note"] == "edited in dashboard, file differs" and it["edited_in_dashboard"]
     res = apply(client, uid).json()
     assert res["protected_kept"] == 1 and res["changed"] == 1
-    s = span(db, "AAAA", "BBBB")
+    s = segment(db, "AAAA", "BBBB")
     assert str(s["distance_km"]) == "5.000" and s["route_type"] == "Trunk" and s["route"] == "R1"
 
 
 def test_reverse_order_matches_and_keeps_site_order(client, admin, sites, db):
-    seed_span(db, "AAAA", "BBBB", "5.000")
+    seed_segment(db, "AAAA", "BBBB", "5.000")
     uid = post(client, workbook([row("BBBB-AAAA", 8)])).json()["upload_id"]
     assert rows(client, uid, "changed")["total"] == 1
     apply(client, uid)
-    assert span(db, "BBBB", "AAAA") is None and str(span(db, "AAAA", "BBBB")["distance_km"]) == "8.000"
-    assert db.execute(text("SELECT count(*) FROM spans")).scalar_one() == 1
+    assert segment(db, "BBBB", "AAAA") is None and str(segment(db, "AAAA", "BBBB")["distance_km"]) == "8.000"
+    assert db.execute(text("SELECT count(*) FROM segments")).scalar_one() == 1
 
 
 def test_idempotent_reupload_and_site_added_later(client, admin, sites, db):
@@ -206,23 +206,23 @@ def test_planner_forbidden_apply_twice_and_bad_file(client, db, admin, sites):
     assert client.get(f"{URL}/uploads/{uid}/rows", params={"group": "new"}).status_code == 403
 
 
-def test_span_api_shows_route_section_and_route_filter(client, admin, sites, db):
-    seed_span(db, "AAAA", "BBBB", route="Rx", section="Sx")
-    seed_span(db, "CCCC", "DDDD", route="Ry")
-    got = client.get("/api/spans", params={"route": "rX"}).json()
+def test_segment_api_shows_route_section_and_route_filter(client, admin, sites, db):
+    seed_segment(db, "AAAA", "BBBB", route="Rx", section="Sx")
+    seed_segment(db, "CCCC", "DDDD", route="Ry")
+    got = client.get("/api/segments", params={"route": "rX"}).json()
     assert len(got) == 1 and got[0]["route"] == "Rx" and got[0]["section"] == "Sx"
-    assert client.get(f"/api/spans/{got[0]['id']}").json()["section"] == "Sx"
+    assert client.get(f"/api/segments/{got[0]['id']}").json()["section"] == "Sx"
 
 
 def test_migration_0008_roundtrip(engine, db):
     cfg = alembic_cfg()
     command.downgrade(cfg, "0007")
-    assert not db.execute(text("SELECT 1 FROM information_schema.columns WHERE table_name = 'spans' AND column_name = 'route'")).first()
+    assert not db.execute(text("SELECT 1 FROM information_schema.columns WHERE table_name = 'segments' AND column_name = 'route'")).first()
     command.upgrade(cfg, "head")
     u = db.execute(text("INSERT INTO users (username, display_name, role) VALUES ('u','U','admin') RETURNING id")).scalar_one()
-    db.execute(text("INSERT INTO uploads (user_id, filename, kind) VALUES (:u, 'f.xlsx', 'span_list')"), {"u": u})
+    db.execute(text("INSERT INTO uploads (user_id, filename, kind) VALUES (:u, 'f.xlsx', 'segment_list')"), {"u": u})
     db.execute(text("INSERT INTO sites (name, kind) VALUES ('A','site'), ('B','site')"))
-    db.execute(text("INSERT INTO spans (site_a_id, site_b_id, route, section) SELECT a.id, b.id, 'r', 's' FROM sites a, sites b "
+    db.execute(text("INSERT INTO segments (site_a_id, site_b_id, route, section) SELECT a.id, b.id, 'r', 's' FROM sites a, sites b "
                     "WHERE a.name = 'A' AND b.name = 'B'"))
 
 

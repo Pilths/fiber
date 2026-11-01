@@ -12,14 +12,14 @@ def one(db, sql, **p):
 
 @pytest.fixture
 def ids(db):
-    """A user, three sites, a span, a core and a reservation."""
+    """A user, three sites, a segment, a core and a reservation."""
     u = one(db, "INSERT INTO users (username, display_name, role) VALUES ('u','U','admin') RETURNING id")
     a, b, _c = (one(db, "INSERT INTO sites (name, kind) VALUES (:n,'site') RETURNING id", n=n) for n in "ABC")
-    span = one(db, "INSERT INTO spans (site_a_id, site_b_id) VALUES (:a,:b) RETURNING id", a=a, b=b)
-    core = one(db, "INSERT INTO cores (span_id, number) VALUES (:s,1) RETURNING id", s=span)
+    segment = one(db, "INSERT INTO segments (site_a_id, site_b_id) VALUES (:a,:b) RETURNING id", a=a, b=b)
+    core = one(db, "INSERT INTO cores (segment_id, number) VALUES (:s,1) RETURNING id", s=segment)
     cust = one(db, "INSERT INTO customers (name) VALUES ('X') RETURNING id")
     res = one(db, "INSERT INTO reservations (customer_id, planner_id) VALUES (:c,:u) RETURNING id", c=cust, u=u)
-    return {"user": u, "a": a, "b": b, "span": span, "core": core, "res": res}
+    return {"user": u, "a": a, "b": b, "segment": segment, "core": core, "res": res}
 
 
 def test_migration_roundtrip(engine):
@@ -34,7 +34,7 @@ def test_append_only(db, ids, table, op):
     i = ids
     db.execute(text({
         "reservation_events": "INSERT INTO reservation_events (reservation_id, type, user_id) VALUES (:res,'requested',:user)",
-        "measurements": "INSERT INTO measurements (span_id, loss_db) VALUES (:span, 1.5)",
+        "measurements": "INSERT INTO measurements (segment_id, loss_db) VALUES (:segment, 1.5)",
         "data_edits": "INSERT INTO data_edits (entity, entity_id, field, reason, user_id) VALUES ('core',1,'f','r',:user)",
     }[table]), i)
     with pytest.raises(DBAPIError, match="append-only"):
@@ -91,16 +91,16 @@ def test_duplicate_release_core_fails(db, ids):
         db.execute(text(sql), p)
 
 
-def test_segments_share_end_sites(db, ids):
-    sql = "INSERT INTO segments (site_a_id, site_b_id) VALUES (:x,:y)"
+def test_routes_share_end_sites(db, ids):
+    sql = "INSERT INTO routes (site_a_id, site_b_id) VALUES (:x,:y)"
     db.execute(text(sql), {"x": ids["a"], "y": ids["b"]})
     db.execute(text(sql), {"x": ids["a"], "y": ids["b"]})
     db.execute(text(sql), {"x": ids["b"], "y": ids["a"]})
 
 
 def test_measurement_method_and_team(db, ids):
-    db.execute(text("INSERT INTO measurements (span_id, loss_db, test_method, field_team) "
-                    "VALUES (:span, 1.5, 'OTDR', 'Team A')"), ids)
+    db.execute(text("INSERT INTO measurements (segment_id, loss_db, test_method, field_team) "
+                    "VALUES (:segment, 1.5, 'OTDR', 'Team A')"), ids)
 
 
 def test_second_hold_fails(db, ids):
@@ -110,9 +110,9 @@ def test_second_hold_fails(db, ids):
         db.execute(text(sql), ids)
 
 
-def test_reversed_span_fails(db, ids):
+def test_reversed_segment_fails(db, ids):
     with pytest.raises(IntegrityError):
-        db.execute(text("INSERT INTO spans (site_a_id, site_b_id) VALUES (:b,:a)"), ids)
+        db.execute(text("INSERT INTO segments (site_a_id, site_b_id) VALUES (:b,:a)"), ids)
 
 
 def test_blank_reason_fails(db, ids):

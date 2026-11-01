@@ -1,4 +1,4 @@
-"""Span list upload: create and update spans (site pairs) from one sheet with Link and Distance headers.
+"""Segment list upload: create and update segments (site pairs) from one sheet with Link and Distance headers.
 
 Staging writes only `uploads` and `upload_rows`. Apply recomputes the diff from the staged rows against the
 current database (like the site master), so a stale preview cannot overwrite newer data.
@@ -21,13 +21,13 @@ from app.ingest.reservation_upload import REASON as RESERVATION_REASON
 from app.ingest.site_master import ApplyError, hkey
 from app.routing.graph import invalidate as invalidate_routes
 
-UPLOAD_REASON = "span list upload"
+UPLOAD_REASON = "segment list upload"
 ALIASES = {"link": "link", "links": "link", "sitea": "site_a", "section": "section", "segment": "section",
            "distance": "distance", "distancekm": "distance", "km": "distance", "route": "route", "type": "type", "routetype": "type"}
 EXPECTED = "Link, Distance"
 GROUP_COL = {"new": "new", "changed": "changed", "unchanged": "unchanged", "problem": "needs_review"}
 TYPES = {"trunk": "Trunk", "metro": "Metro"}
-FIELDS = ("distance_km", "route_type", "route", "section")  # span columns a row may change
+FIELDS = ("distance_km", "route_type", "route", "section")  # segment columns a row may change
 MAX_DISTANCE = Decimal("9999999.999")  # numeric(10,3)
 
 
@@ -135,7 +135,7 @@ def parse_workbook(data: Any) -> Parsed:
 
 def load_protected(db: Session) -> dict[int, set[str]]:
     prot: dict[int, set[str]] = {}
-    for i, f in db.execute(text("SELECT entity_id, field FROM data_edits WHERE entity = 'span' AND reason NOT LIKE :a AND reason NOT LIKE :b"),
+    for i, f in db.execute(text("SELECT entity_id, field FROM data_edits WHERE entity = 'segment' AND reason NOT LIKE :a AND reason NOT LIKE :b"),
                            {"a": UPLOAD_REASON + "%", "b": RESERVATION_REASON + "%"}):
         prot.setdefault(i, set()).add(f)
     return prot
@@ -149,8 +149,8 @@ def evaluate(db: Session, parsed: Parsed) -> list[Item]:
     """Set status, reason, group, changes and db_id on every item."""
     names = {n for it in parsed.items for n in (it.p["a"], it.p["b"]) if n}
     sites = {r.name: r for r in db.execute(text("SELECT id, name, active FROM sites WHERE name = ANY(:n)"), {"n": sorted(names)})}
-    spans = {frozenset((r["site_a_id"], r["site_b_id"])): r for r in db.execute(text(
-        "SELECT id, site_a_id, site_b_id, distance_km, route_type, route, section FROM spans")).mappings()}
+    segments = {frozenset((r["site_a_id"], r["site_b_id"])): r for r in db.execute(text(
+        "SELECT id, site_a_id, site_b_id, distance_km, route_type, route, section FROM segments")).mappings()}
     prot = load_protected(db)
     pairs = Counter(frozenset((it.p["a"], it.p["b"])) for it in parsed.items if it.p["a"])
     for it in parsed.items:
@@ -172,7 +172,7 @@ def evaluate(db: Session, parsed: Parsed) -> list[Item]:
             continue
         ia, ib = sites[p["a"]].id, sites[p["b"]].id
         it.ids = (ia, ib)
-        row = spans.get(frozenset((ia, ib)))
+        row = segments.get(frozenset((ia, ib)))
         if row is None:
             it.group = "new"
             continue
@@ -206,11 +206,11 @@ def stage(db: Session, admin_id: int, filename: str, parsed: Parsed) -> dict[str
     summary = {"sheet_name": parsed.sheet_name, "found": parsed.found, "block_reason": block_reason(parsed),
                "counts": _counts(items), "applied": None}
     uid = db.execute(text("INSERT INTO uploads (user_id, filename, kind, status, summary) "
-                          "VALUES (:u, :f, 'span_list', 'staged', CAST(:s AS jsonb)) RETURNING id"),
+                          "VALUES (:u, :f, 'segment_list', 'staged', CAST(:s AS jsonb)) RETURNING id"),
                      {"u": admin_id, "f": filename, "s": json.dumps(summary)}).scalar_one()
     if items:
         db.execute(text("INSERT INTO upload_rows (upload_id, row_group, entity, payload, sheet, row_number, status, reason, raw) "
-                        "VALUES (:u, :g, 'span', CAST(:p AS jsonb), :sh, :n, :st, :r, CAST(:raw AS jsonb))"),
+                        "VALUES (:u, :g, 'segment', CAST(:p AS jsonb), :sh, :n, :st, :r, CAST(:raw AS jsonb))"),
                    [{"u": uid, "g": GROUP_COL[it.group], "sh": parsed.sheet_name, "n": it.row_number, "st": it.status,
                      "r": it.reason, "raw": json.dumps(it.raw),
                      "p": json.dumps({"group": it.group, "db_id": it.db_id, "changes": it.changes,
@@ -229,7 +229,7 @@ def load_staged(db: Session, upload_id: int, summary: dict[str, Any]) -> Parsed:
 # ---- apply ----------------------------------------------------------------------------------------------------
 
 def apply_upload(db: Session, admin_id: int, upload_id: int) -> dict[str, Any]:
-    up = db.execute(text("SELECT id, filename, status, summary FROM uploads WHERE id = :i AND kind = 'span_list' FOR UPDATE"),
+    up = db.execute(text("SELECT id, filename, status, summary FROM uploads WHERE id = :i AND kind = 'segment_list' FOR UPDATE"),
                     {"i": upload_id}).mappings().first()
     if not up:
         raise ApplyError(404, "Upload not found")
@@ -249,7 +249,7 @@ def apply_upload(db: Session, admin_id: int, upload_id: int) -> dict[str, Any]:
                 out["skipped"] += 1
             elif it.group == "new":
                 p = it.p
-                db.execute(text("INSERT INTO spans (site_a_id, site_b_id, route_type, distance_km, route, section) "
+                db.execute(text("INSERT INTO segments (site_a_id, site_b_id, route_type, distance_km, route, section) "
                                 "VALUES (:a, :b, :t, CAST(:d AS numeric), :r, :s)"),
                            {"a": it.ids[0], "b": it.ids[1], "t": p["type"], "d": p["distance"], "r": p["route"], "s": p["section"]})  # type: ignore[index]
                 out["created"] += 1
@@ -259,13 +259,13 @@ def apply_upload(db: Session, admin_id: int, upload_id: int) -> dict[str, Any]:
                 if not todo:
                     continue
                 for c in todo:  # c["field"] is one of FIELDS
-                    db.execute(text(f"UPDATE spans SET {c['field']} = CAST(:v AS {'numeric' if c['field'] == 'distance_km' else 'text'}) WHERE id = :i"),
+                    db.execute(text(f"UPDATE segments SET {c['field']} = CAST(:v AS {'numeric' if c['field'] == 'distance_km' else 'text'}) WHERE id = :i"),
                                {"v": c["new"], "i": it.db_id})
                     edits.append({"i": it.db_id, "f": c["field"], "o": c["old"], "n": c["new"], "r": why, "u": admin_id})
                 out["changed"] += 1
         if edits:
             db.execute(text("INSERT INTO data_edits (entity, entity_id, field, old_value, new_value, reason, user_id) "
-                            "VALUES ('span', :i, :f, :o, :n, :r, :u)"), edits)
+                            "VALUES ('segment', :i, :f, :o, :n, :r, :u)"), edits)
         applied = {"by": admin_id, "at": datetime.now(UTC).isoformat(), **out, "warnings": warnings}
         db.execute(text("UPDATE uploads SET status = 'confirmed', confirmed_at = now(), summary = CAST(:s AS jsonb) WHERE id = :i"),
                    {"s": json.dumps(dict(up["summary"], applied=applied)), "i": upload_id})

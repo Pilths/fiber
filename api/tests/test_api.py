@@ -10,20 +10,20 @@ def one(db, sql, **p):
 
 @pytest.fixture
 def net(db):
-    """Two spans (North, Central); span 1 has one core per status."""
+    """Two segments (North, Central); segment 1 has one core per status."""
     u = one(db, "INSERT INTO users (username, display_name, role) VALUES ('planner1','P','planner') RETURNING id")
     adm = one(db, "INSERT INTO users (username, display_name, role) VALUES ('admin1','A','admin') RETURNING id")
     a, b, c = (one(db, "INSERT INTO sites (name, kind) VALUES (:n,'site') RETURNING id", n=n)
                for n in ("Alpha Hub", "Bravo Hub", "Charlie Hub"))
-    s1 = one(db, "INSERT INTO spans (site_a_id, site_b_id, region, route_type, distance_km) "
+    s1 = one(db, "INSERT INTO segments (site_a_id, site_b_id, region, route_type, distance_km) "
                  "VALUES (:a,:b,'North','Trunk',10) RETURNING id", a=a, b=b)
-    db.execute(text("UPDATE spans SET survey_cores = 5 WHERE id = :s"), {"s": s1})
-    s2 = one(db, "INSERT INTO spans (site_a_id, site_b_id, region) VALUES (:a,:b,'Central') RETURNING id", a=b, b=c)
+    db.execute(text("UPDATE segments SET survey_cores = 5 WHERE id = :s"), {"s": s1})
+    s2 = one(db, "INSERT INTO segments (site_a_id, site_b_id, region) VALUES (:a,:b,'Central') RETURNING id", a=b, b=c)
     cores = {}
     for n in range(1, 6):
         pa = one(db, "INSERT INTO ports (port_id, site_id) VALUES (:p,:s) RETURNING id", p=f"P-{n}-A", s=a)
         pb = one(db, "INSERT INTO ports (port_id, site_id) VALUES (:p,:s) RETURNING id", p=f"P-{n}-B", s=b)
-        cores[n] = one(db, "INSERT INTO cores (span_id, number, port_a_id, port_b_id, circuit_id, in_use) "
+        cores[n] = one(db, "INSERT INTO cores (segment_id, number, port_a_id, port_b_id, circuit_id, in_use) "
                            "VALUES (:s,:n,:pa,:pb,:ck,:u) RETURNING id",
                        s=s1, n=n, pa=pa, pb=pb, ck="CKT-9001" if n == 4 else None, u=n == 4)
     cust = one(db, "INSERT INTO customers (name) VALUES ('Telekom Zeta') RETURNING id")
@@ -45,8 +45,8 @@ def net(db):
 
 
 def test_requires_user(client, net):
-    assert client.get("/api/spans").status_code == 401
-    assert client.get("/api/spans", headers={"X-Dev-User": "nobody"}).status_code == 401
+    assert client.get("/api/segments").status_code == 401
+    assert client.get("/api/segments", headers={"X-Dev-User": "nobody"}).status_code == 401
 
 
 def labels(client, q, type_):
@@ -58,18 +58,18 @@ def labels(client, q, type_):
 def test_search_customer(client, net):
     hits = labels(client, "telekom", "customer")
     assert [h["label"] for h in hits] == ["Telekom Zeta"]
-    assert hits[0]["span_id"] == net["s1"]
+    assert hits[0]["segment_id"] == net["s1"]
     assert labels(client, "Telecom Zeta", "customer")  # trigram, not substring
 
 
-def test_search_span(client, net):
-    hits = labels(client, "bravo", "span")
-    assert {h["span_id"] for h in hits} == {net["s1"], net["s2"]}
+def test_search_segment(client, net):
+    hits = labels(client, "bravo", "segment")
+    assert {h["segment_id"] for h in hits} == {net["s1"], net["s2"]}
 
 
 def test_search_circuit(client, net):
     hits = labels(client, "ckt-9001", "circuit")
-    assert hits == [{"type": "circuit", "label": "CKT-9001", "span_id": net["s1"], "core_id": net["cores"][4]}]
+    assert hits == [{"type": "circuit", "label": "CKT-9001", "segment_id": net["s1"], "core_id": net["cores"][4]}]
 
 
 def test_search_core_number(client, net):
@@ -78,20 +78,20 @@ def test_search_core_number(client, net):
     assert client.get("/api/search", params={"q": ""}, headers=H).status_code == 422
 
 
-def test_span_list_filter(client, net):
-    r = client.get("/api/spans", params={"region": "North"}, headers=H).json()
+def test_segment_list_filter(client, net):
+    r = client.get("/api/segments", params={"region": "North"}, headers=H).json()
     assert [s["id"] for s in r] == [net["s1"]]
     s = r[0]
     assert (s["site_a"], s["site_b"], s["route_type"], s["free_cores"]) == ("Alpha Hub", "Bravo Hub", "Trunk", 2)
     assert s["status_mix"] == {"Available": 2, "Requested": 1, "Reserved": 1, "In use": 1}
     assert (s["survey_cores"], s["cable_size"], s["not_surveyed"]) == (5, 144, 139)
     assert (s["unassigned_reserved"], s["free_to_reserve"]) == (0, 2)
-    other = client.get("/api/spans", headers=H).json()[1]  # never surveyed: not bookable
+    other = client.get("/api/segments", headers=H).json()[1]  # never surveyed: not bookable
     assert (other["survey_cores"], other["not_surveyed"], other["free_to_reserve"]) == (None, None, 0)
 
 
-def test_span_detail(client, net):
-    r = client.get(f"/api/spans/{net['s1']}", headers=H).json()
+def test_segment_detail(client, net):
+    r = client.get(f"/api/segments/{net['s1']}", headers=H).json()
     cores = r["cores"]
     assert [c["number"] for c in cores] == [1, 2, 3, 4, 5]
     assert [c["status"] for c in cores] == ["Available", "Requested", "Reserved", "In use", "Available"]
@@ -101,8 +101,8 @@ def test_span_detail(client, net):
     assert (cores[0]["port_a"], cores[0]["port_b"]) == ("P-1-A", "P-1-B")
 
 
-def test_span_unknown(client, net):
-    assert client.get("/api/spans/999999", headers=H).status_code == 404
+def test_segment_unknown(client, net):
+    assert client.get("/api/segments/999999", headers=H).status_code == 404
 
 
 def test_customers(client, net):

@@ -15,33 +15,33 @@ def one(db: Any, sql: str, **p: Any) -> Any:
     return db.execute(text(sql), p).scalar_one_or_none()
 
 
-def find_span(db: Any, a: int, b: int) -> tuple[int, int] | None:
-    """(span id, its site_a_id) for the unordered pair."""
-    row = db.execute(text("SELECT id, site_a_id FROM spans WHERE LEAST(site_a_id, site_b_id) = LEAST(:a, :b) "
+def find_segment(db: Any, a: int, b: int) -> tuple[int, int] | None:
+    """(segment id, its site_a_id) for the unordered pair."""
+    row = db.execute(text("SELECT id, site_a_id FROM segments WHERE LEAST(site_a_id, site_b_id) = LEAST(:a, :b) "
                           "AND GREATEST(site_a_id, site_b_id) = GREATEST(:a, :b)"), {"a": a, "b": b}).first()
     return (row[0], row[1]) if row else None
 
 
-def add_cores(db: Any, span_id: int, upto: int) -> int:
+def add_cores(db: Any, segment_id: int, upto: int) -> int:
     """Portless surveyed cores up to number `upto`; returns how many were added."""
-    have = one(db, "SELECT coalesce(max(number), 0) FROM cores WHERE span_id = :s", s=span_id)
+    have = one(db, "SELECT coalesce(max(number), 0) FROM cores WHERE segment_id = :s", s=segment_id)
     for num in range(have + 1, upto + 1):
-        db.execute(text("INSERT INTO cores (span_id, number) VALUES (:s, :n)"), {"s": span_id, "n": num})
+        db.execute(text("INSERT INTO cores (segment_id, number) VALUES (:s, :n)"), {"s": segment_id, "n": num})
     return max(upto - have, 0)
 
 
-def ensure_span(db: Any, counts: dict[str, int], a: int, b: int, p: dict[str, Any]) -> tuple[int, int]:
-    """Find the span for a site pair or create it (surveyed cores 1..N, ports filled in later). Returns (id, site_a_id)."""
-    span = find_span(db, a, b)
-    if span:
-        return span
-    span_id = one(db, "INSERT INTO spans (site_a_id, site_b_id, region, distance_km, survey_cores) "
+def ensure_segment(db: Any, counts: dict[str, int], a: int, b: int, p: dict[str, Any]) -> tuple[int, int]:
+    """Find the segment for a site pair or create it (surveyed cores 1..N, ports filled in later). Returns (id, site_a_id)."""
+    segment = find_segment(db, a, b)
+    if segment:
+        return segment
+    segment_id = one(db, "INSERT INTO segments (site_a_id, site_b_id, region, distance_km, survey_cores) "
                       "VALUES (:a, :b, :g, :d, :c) RETURNING id", a=a, b=b, g=p.get("region"), d=p.get("distance_km"),
                   c=p.get("survey_cores"))
-    counts["spans"] = counts.get("spans", 0) + 1
+    counts["segments"] = counts.get("segments", 0) + 1
     if p.get("survey_cores"):
-        counts["cores"] = counts.get("cores", 0) + add_cores(db, span_id, p["survey_cores"])
-    return span_id, a
+        counts["cores"] = counts.get("cores", 0) + add_cores(db, segment_id, p["survey_cores"])
+    return segment_id, a
 
 
 def port(db: Any, counts: dict[str, int], label: str, site_id: int) -> int:
@@ -57,19 +57,19 @@ def place_reservation(db: Any, counts: dict[str, int], p: dict[str, Any], site_i
                       creator_id: int, approver_id: int) -> int:
     """Insert an approved reservation (events requested + approved) for a parsed Ready row. Count-only: cores are assigned later by an admin."""
     a, b = site_ids[p["site_a"]], site_ids[p["site_b"]]
-    span_id, _ = ensure_span(db, counts, a, b, p)
+    segment_id, _ = ensure_segment(db, counts, a, b, p)
     cust = one(db, "SELECT id FROM customers WHERE lower(name) = lower(:n)", n=p["customer"])
     if cust is None:
         cust = one(db, "INSERT INTO customers (name, created_by) VALUES (:n, :u) RETURNING id", n=p["customer"], u=creator_id)
         counts["customers"] = counts.get("customers", 0) + 1
     res = one(db, "INSERT INTO reservations (customer_id, planner_id, planned_date, imported, group_label, additional, "
                   "cv_ready_date, contractor, remark, srf_id, port_info_raw, monitoring_code, fiber_monitored, "
-                  "unassigned_cores, unassigned_span_id) VALUES "
+                  "unassigned_cores, unassigned_segment_id) VALUES "
                   "(:c, :u, :pd, true, :gl, :ad, :cv, :ct, :rm, :sr, :pi, :mc, :fm, :uc, :us) RETURNING id",
               c=cust, u=creator_id, pd=p["planned_date"], gl=p["group_label"], ad=p["additional"],
               cv=p["cv_ready_date"], ct=p["contractor"], rm=p["remark"], sr=p.get("srf_id"), pi=p["port_info_raw"],
               mc=p["monitoring_code"], fm=p["fiber_monitored"],
-              uc=p["unassigned_cores"], us=span_id if p["unassigned_cores"] else None)
+              uc=p["unassigned_cores"], us=segment_id if p["unassigned_cores"] else None)
     ev = "INSERT INTO reservation_events (reservation_id, type, user_id) VALUES (:r, :t, :u)"
     db.execute(text(ev), {"r": res, "t": "requested", "u": creator_id})
     db.execute(text(ev), {"r": res, "t": "approved", "u": approver_id})

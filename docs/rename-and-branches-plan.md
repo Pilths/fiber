@@ -44,12 +44,22 @@ and the worktrees `/home/user1/project/fiber-pd` and `/home/user1/project/fiber-
       pyrightconfig.json, .oxlintrc.json, playwright.config.ts) and strip lint, gen:api, test:e2e and their packages.
 - [x] 2. Docs on `dev`: CLAUDE.md, PRD, DESIGN.md, architecture, workflow reworded (segment, route) and old
       wording removed. Test: `grep -rniw "span\|spans" CLAUDE.md docs/*.md` finds only intended uses.
-- [ ] 3. Database: one fresh baseline migration with `segments` (was `spans`), `routes` (was `segments`),
+- [x] 3. Database: one fresh baseline migration with `segments` (was `spans`), `routes` (was `segments`),
       `route_segments` (was `segment_spans`), `segment_id` columns, views, indexes, constraint names, and
       data value 'segment' in `data_edits`. Test: empty database, `alembic upgrade head`, then
       `docker compose exec api pytest`.
-- [ ] 4. Backend: models, SQL, schemas, routers (`/api/segments`), JSON keys (`segment_id`), seeds, tests.
+- [x] 4. Backend: models, SQL, schemas, routers (`/api/segments`), JSON keys (`segment_id`), seeds, tests.
       Test: `docker compose exec api pytest` all green.
+- Steps 3 and 4 were done together (2 Nov) as migration `0014_rename_segment` (rename, with downgrade) instead
+      of a fresh baseline; pytest 205 passed. 0014 also renames uploads.kind 'span_list' to 'segment_list' and the
+      upload_rows payload key span_id to segment_id. API changes for step 5 (old -> new):
+      - URLs: /api/inventory/spans -> /api/inventory/segments (and /{segment_id}); /api/loss/spans ->
+        /api/loss/segments; /api/routing/spans -> /api/routing/segments (check prefix); /api/admin/span-list/* ->
+        /api/admin/segment-list/*; admin edit /spans/{sid} -> /segments/{sid}; query span_id -> segment_id.
+      - JSON: every span_* key -> segment_* (span_id, span_name, unassigned_span(_id), bottleneck_span_id,
+        measured_spans, total_spans); "spans" arrays -> "segments"; search type 'span' -> 'segment'.
+      - The old route-level keys: segment_id -> route_id, "segments: SegmentCount[]" -> "routes: RouteCount[]",
+        segment_label -> route_label. Watch the mixed meaning: "segments"/segment_id now mean the old spans.
 - [ ] 5. Frontend: regenerate `web/src/api/schema.d.ts`, rename identifiers and labels ("Segment list
       upload"), URL hash `#segment=` (also accept old `#span=`). Do not touch HTML `<span>` tags.
       Test: `docker compose exec web npm run lint`, typecheck, `npm run test:e2e`.

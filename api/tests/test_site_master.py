@@ -257,7 +257,7 @@ def test_apply_updates_with_history_and_deactivates_missing(client, admin, db):
 
 def test_missing_site_in_use_stays_active_with_warning(client, admin, db):
     seed_sites(db, ["AAAA", "BBBB", "CCCC"])
-    db.execute(text("INSERT INTO spans (site_a_id, site_b_id) SELECT a.id, b.id FROM sites a, sites b "
+    db.execute(text("INSERT INTO segments (site_a_id, site_b_id) SELECT a.id, b.id FROM sites a, sites b "
                     "WHERE a.name = 'BBBB' AND b.name = 'CCCC'"))
     r = post(client, workbook([site("AAAA")], None))
     uid = r.json()["upload_id"]

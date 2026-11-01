@@ -87,15 +87,15 @@ class Site(Base):
     created_at: Mapped[datetime] = _created()
 
 
-class Span(Base):
-    __tablename__ = "spans"
+class Segment(Base):
+    __tablename__ = "segments"
     __table_args__ = (
-        CheckConstraint("site_a_id <> site_b_id", name="spans_sites_differ_ck"),
-        _in("route_type", ("Trunk", "Metro"), "spans_route_type_ck"),
-        _in("region", ("North", "Central", "South", "East Coast"), "spans_region_ck"),
-        CheckConstraint("distance_km >= 0", name="spans_distance_ck"),
-        CheckConstraint("cable_size > 0", name="spans_cable_size_ck"),
-        _pair_ix("spans_site_pair_uq", unique=True),
+        CheckConstraint("site_a_id <> site_b_id", name="segments_sites_differ_ck"),
+        _in("route_type", ("Trunk", "Metro"), "segments_route_type_ck"),
+        _in("region", ("North", "Central", "South", "East Coast"), "segments_region_ck"),
+        CheckConstraint("distance_km >= 0", name="segments_distance_ck"),
+        CheckConstraint("cable_size > 0", name="segments_cable_size_ck"),
+        _pair_ix("segments_site_pair_uq", unique=True),
     )
     id: Mapped[int] = _id()
     site_a_id: Mapped[int] = _fk("sites")
@@ -111,11 +111,11 @@ class Span(Base):
     created_at: Mapped[datetime] = _created()
 
 
-class Segment(Base):
-    __tablename__ = "segments"
+class Route(Base):
+    __tablename__ = "routes"
     __table_args__ = (
-        CheckConstraint("site_a_id <> site_b_id", name="segments_sites_differ_ck"),
-        _pair_ix("segments_site_pair_ix"),
+        CheckConstraint("site_a_id <> site_b_id", name="routes_sites_differ_ck"),
+        _pair_ix("routes_site_pair_ix"),
     )
     id: Mapped[int] = _id()
     site_a_id: Mapped[int] = _fk("sites")
@@ -124,11 +124,11 @@ class Segment(Base):
     created_at: Mapped[datetime] = _created()
 
 
-class SegmentSpan(Base):
-    __tablename__ = "segment_spans"
-    __table_args__ = (UniqueConstraint("segment_id", "position"),)
+class RouteSpan(Base):
+    __tablename__ = "route_segments"
+    __table_args__ = (UniqueConstraint("route_id", "position"),)
+    route_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("routes.id"), primary_key=True)
     segment_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("segments.id"), primary_key=True)
-    span_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("spans.id"), primary_key=True)
     position: Mapped[int] = mapped_column(Integer)
 
 
@@ -141,9 +141,9 @@ class Port(Base):
 
 class Core(Base):
     __tablename__ = "cores"
-    __table_args__ = (UniqueConstraint("span_id", "number"),)
+    __table_args__ = (UniqueConstraint("segment_id", "number"),)
     id: Mapped[int] = _id()
-    span_id: Mapped[int] = _fk("spans")
+    segment_id: Mapped[int] = _fk("segments")
     number: Mapped[int] = mapped_column(Integer)
     port_a_id: Mapped[int | None] = _fk("ports", True)
     port_b_id: Mapped[int | None] = _fk("ports", True)
@@ -165,7 +165,7 @@ class Reservation(Base):
     __table_args__ = (
         _in("fiber_monitored", ("Y", "N", "WIP"), "reservations_fiber_monitored_ck"),
         CheckConstraint("unassigned_cores >= 0", name="reservations_unassigned_ck"),
-        CheckConstraint("unassigned_cores = 0 OR unassigned_span_id IS NOT NULL", name="reservations_unassigned_span_ck"),
+        CheckConstraint("unassigned_cores = 0 OR unassigned_segment_id IS NOT NULL", name="reservations_unassigned_segment_ck"),
     )
     id: Mapped[int] = _id()
     customer_id: Mapped[int] = _fk("customers")
@@ -184,7 +184,7 @@ class Reservation(Base):
     monitoring_code: Mapped[str | None] = mapped_column(Text)
     fiber_monitored: Mapped[str | None] = mapped_column(Text)
     unassigned_cores: Mapped[int] = mapped_column(Integer, server_default=text("0"))  # set at INSERT only
-    unassigned_span_id: Mapped[int | None] = _fk("spans", True)
+    unassigned_segment_id: Mapped[int | None] = _fk("segments", True)
 
 
 class ReservationCore(Base):
@@ -273,9 +273,9 @@ class UploadRow(Base):
 
 class Measurement(Base):
     __tablename__ = "measurements"
-    __table_args__ = (Index("measurements_span_created_ix", "span_id", "created_at"), Index("measurements_core_ix", "core_id"))
+    __table_args__ = (Index("measurements_segment_created_ix", "segment_id", "created_at"), Index("measurements_core_ix", "core_id"))
     id: Mapped[int] = _id()
-    span_id: Mapped[int] = _fk("spans")
+    segment_id: Mapped[int] = _fk("segments")
     loss_db: Mapped[Decimal] = mapped_column(Numeric(8, 3))
     tested_on: Mapped[date | None] = mapped_column(Date)
     upload_id: Mapped[int | None] = _fk("uploads", True)

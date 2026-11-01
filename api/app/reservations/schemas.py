@@ -32,8 +32,8 @@ class CorrectBody(BaseModel):
 class ResCore(BaseModel):
     core_id: int
     number: int
-    span_id: int
-    span: str
+    segment_id: int
+    segment: str
     held: bool  # False once released
 
 
@@ -53,8 +53,8 @@ class ReservationOut(BaseModel):
     stale: bool
     unassigned_cores: int  # count-only reservation: cores wanted, ports not assigned
     remaining_unassigned: int
-    unassigned_span: str | None
-    unassigned_span_id: int | None
+    unassigned_segment: str | None
+    unassigned_segment_id: int | None
     is_new_customer: bool
     imported: bool
     cores: list[ResCore]

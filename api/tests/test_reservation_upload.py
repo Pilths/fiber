@@ -90,9 +90,9 @@ def test_009_validation_and_nothing_saved(client, db, admin):
     assert "blank requestor" in reasons[3] and "unknown site ZZZZ" in reasons[4]
     assert rows_of(client, uid, "rejected")[0]["raw"]["Fiber core requestor"] == " "
     assert client.get(f"{URL}/{uid}", headers=ADMIN).json()["counts"] == j["counts"]
-    for t in ("spans", "reservations", "cores", "ports", "customers", "measurements"):
+    for t in ("segments", "reservations", "cores", "ports", "customers", "measurements"):
         assert n(db, f"SELECT count(*) FROM {t}") == 0, t
-    assert n(db, f"SELECT count(*) FROM upload_rows WHERE upload_id = {uid} AND entity <> 'span'") == 4
+    assert n(db, f"SELECT count(*) FROM upload_rows WHERE upload_id = {uid} AND entity <> 'segment'") == 4
 
 
 def test_unreadable_and_non_xlsx(client, db, admin):
@@ -106,14 +106,14 @@ def test_unreadable_and_non_xlsx(client, db, admin):
 
 def test_confirm_imports_then_reupload_is_idempotent(client, db, admin):
     out = run(client, row(), row("BBCC-CCDD", who="Beta", cores=None, count=2, survey=4), row("AABB-BBCC (additional core)", ra="P3-P4", rb="P25-26", survey=None, km=None))
-    assert out["counts"]["reservations"] == 3 and out["counts"]["spans"] == 2
+    assert out["counts"]["reservations"] == 3 and out["counts"]["segments"] == 2
     assert n(db, "SELECT count(*) FROM reservations WHERE imported") == 3
-    assert n(db, "SELECT count(*) FROM reservations WHERE unassigned_span_id IS NOT NULL") == 3
+    assert n(db, "SELECT count(*) FROM reservations WHERE unassigned_segment_id IS NOT NULL") == 3
     assert n(db, "SELECT sum(unassigned_cores) FROM reservations") == 6
     assert n(db, "SELECT count(*) FROM ports") == 0 and n(db, "SELECT count(*) FROM core_holds") == 0
     assert n(db, "SELECT count(DISTINCT user_id) FROM reservation_events") == 1  # the uploading admin
     assert n(db, "SELECT count(*) FROM reservation_events WHERE type IN ('requested','approved')") == 6
-    before = {t: n(db, f"SELECT count(*) FROM {t}") for t in ("spans", "ports", "cores", "reservations", "customers", "core_holds")}
+    before = {t: n(db, f"SELECT count(*) FROM {t}") for t in ("segments", "ports", "cores", "reservations", "customers", "core_holds")}
     snap = db.execute(text("SELECT * FROM reservations ORDER BY id")).all()
     events = n(db, "SELECT count(*) FROM reservation_events")
     r = up(client, workbook(row(), row("BBCC-CCDD", who="Beta", cores=None, count=2, survey=4), row("AABB-BBCC (additional core)", ra="P3-P4", rb="P25-26", survey=None, km=None)))
@@ -128,11 +128,11 @@ def test_confirm_imports_then_reupload_is_idempotent(client, db, admin):
 
 def test_missing_rows_untouched_and_protected_fields(client, db, admin):
     run(client, row(), row("BBCC-CCDD", who="Beta", ra="P5-P6", rb="P7-8"))
-    sid = n(db, "SELECT s.id FROM spans s JOIN sites a ON a.id = s.site_a_id WHERE a.name = 'AABB'")
+    sid = n(db, "SELECT s.id FROM segments s JOIN sites a ON a.id = s.site_a_id WHERE a.name = 'AABB'")
     boss = n(db, "SELECT id FROM users WHERE username = 'boss'")
-    db.execute(text("UPDATE spans SET distance_km = 9 WHERE id = :i"), {"i": sid})
+    db.execute(text("UPDATE segments SET distance_km = 9 WHERE id = :i"), {"i": sid})
     db.execute(text("INSERT INTO data_edits (entity, entity_id, field, old_value, new_value, reason, user_id) "
-                    "VALUES ('span', :i, 'distance_km', '3', '9', 'surveyed again', :u)"), {"i": sid, "u": boss})
+                    "VALUES ('segment', :i, 'distance_km', '3', '9', 'surveyed again', :u)"), {"i": sid, "u": boss})
     res_before = db.execute(text("SELECT * FROM reservations ORDER BY id")).all()
     # second file lacks BBCC-CCDD, differs on distance (protected) and region (not protected)
     j = up(client, workbook(row(km=5, region="North"))).json()
@@ -145,18 +145,18 @@ def test_missing_rows_untouched_and_protected_fields(client, db, admin):
     assert not by["region"]["protected"] and ch["data"]["edited_in_dashboard"]
     assert rows_of(client, uid, "missing")[0]["data"]["key"] == "BBCC-CCDD"
     confirm(client, uid)
-    assert n(db, f"SELECT distance_km FROM spans WHERE id = {sid}") == 9
-    assert n(db, f"SELECT region FROM spans WHERE id = {sid}") == "North"
-    assert n(db, "SELECT reason FROM data_edits WHERE entity = 'span' AND field = 'region'").startswith("reservation upload res.xlsx #")
-    assert n(db, "SELECT count(*) FROM spans") == 2 and n(db, "SELECT count(*) FROM reservations") == 2  # missing span untouched
+    assert n(db, f"SELECT distance_km FROM segments WHERE id = {sid}") == 9
+    assert n(db, f"SELECT region FROM segments WHERE id = {sid}") == "North"
+    assert n(db, "SELECT reason FROM data_edits WHERE entity = 'segment' AND field = 'region'").startswith("reservation upload res.xlsx #")
+    assert n(db, "SELECT count(*) FROM segments") == 2 and n(db, "SELECT count(*) FROM reservations") == 2  # missing segment untouched
     # now the admin ticks Excel wins
     j = up(client, workbook(row(km=5, region="North"))).json()
     row_id = rows_of(client, j["upload_id"], "changed")[0]["id"]
     bad = confirm(client, j["upload_id"], excel_wins=[{"row_id": row_id, "field": "region"}])
     assert bad.status_code == 422  # region is not protected
     assert confirm(client, j["upload_id"], excel_wins=[{"row_id": row_id, "field": "distance_km"}]).status_code == 200
-    assert float(n(db, f"SELECT distance_km FROM spans WHERE id = {sid}")) == 5
-    assert n(db, "SELECT count(*) FROM data_edits WHERE entity = 'span' AND field = 'distance_km' AND reason LIKE 'reservation upload%'") == 1
+    assert float(n(db, f"SELECT distance_km FROM segments WHERE id = {sid}")) == 5
+    assert n(db, "SELECT count(*) FROM data_edits WHERE entity = 'segment' AND field = 'distance_km' AND reason LIKE 'reservation upload%'") == 1
     assert db.execute(text("SELECT * FROM reservations ORDER BY id")).all() == res_before
 
 
@@ -193,7 +193,7 @@ def test_switch_closed(client, db, admin):
     assert n(db, "SELECT count(*) FROM data_edits WHERE entity = 'system' AND entity_id = 0 AND field = 'reservation_import'") == 1
     out = confirm(client, j["upload_id"]).json()  # re-checked at confirm
     assert out["counts"]["reservations"] == 0 and out["ignored_reservation_rows"] == 2
-    assert n(db, "SELECT count(*) FROM reservations") == 0 and n(db, "SELECT count(*) FROM spans") == 2  # spans still feed
+    assert n(db, "SELECT count(*) FROM reservations") == 0 and n(db, "SELECT count(*) FROM segments") == 2  # segments still feed
     j = up(client, workbook(row(), row("BBCC-CCDD", who="Beta"))).json()
     assert j["switch_closed"] and j["counts"]["ignored"] == 2 and j["counts"]["reservations"] == 0
     assert "import_closed" in kinds(j) and len([w for w in j["warnings"] if w["kind"] == "import_closed"]) == 1
@@ -217,7 +217,7 @@ def test_count_only_and_capacity(client, db, admin):
     assert j["counts"]["already_imported"] == 1 and j["counts"]["needs_review"] == 1
     assert "only 1 free" in rows_of(client, j["upload_id"], "needs_review")[0]["reason"]
     assert n(db, "SELECT unassigned_cores FROM reservations") == 3 and n(db, "SELECT count(*) FROM core_holds") == 0
-    assert n(db, "SELECT survey_cores FROM spans") == 4 and n(db, "SELECT count(*) FROM cores") == 4
+    assert n(db, "SELECT survey_cores FROM segments") == 4 and n(db, "SELECT count(*) FROM cores") == 4
     j = up(client, workbook(row("BBCC-CCDD", cores=None, count=1, survey=None))).json()
     assert j["counts"]["needs_review"] == 1 and "not surveyed" in rows_of(client, j["upload_id"], "needs_review")[0]["reason"]
     dup = up(client, workbook(row("BBCC-CCDD", cores=None, count=1, survey=5), row("BBCC-CCDD", cores=None, count=1, survey=5))).json()
@@ -269,7 +269,7 @@ def test_confirm_is_atomic(client, db, admin, monkeypatch):
     monkeypatch.setattr(ru, "place_reservation", boom)
     with pytest.raises(RuntimeError):
         confirm(client, uid)
-    for t in ("spans", "reservations", "cores", "ports", "customers"):
+    for t in ("segments", "reservations", "cores", "ports", "customers"):
         assert n(db, f"SELECT count(*) FROM {t}") == 0, t
     assert n(db, f"SELECT status FROM uploads WHERE id = {uid}") == "staged"
     monkeypatch.undo()

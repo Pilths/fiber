@@ -1,4 +1,4 @@
-"""Admin span list upload: stage, preview rows, apply."""
+"""Admin segment list upload: stage, preview rows, apply."""
 import io
 from typing import Annotated, Any, Literal
 
@@ -9,10 +9,10 @@ from sqlalchemy.orm import Session
 
 from app.auth.deps import CurrentUser, require_admin
 from app.db import get_db
-from app.ingest import span_list as sl
+from app.ingest import segment_list as sl
 from app.ingest.site_master import ApplyError
 
-router = APIRouter(prefix="/api/admin/span-list", dependencies=[Depends(require_admin)])
+router = APIRouter(prefix="/api/admin/segment-list", dependencies=[Depends(require_admin)])
 DB = Annotated[Session, Depends(get_db)]
 Admin = Annotated[CurrentUser, Depends(require_admin)]
 MAX_BYTES = 20 * 1024 * 1024
@@ -65,7 +65,7 @@ class RowOut(BaseModel):
     parsed: Parsed
     changes: list[Change]
     edited_in_dashboard: bool
-    span_id: int | None
+    segment_id: int | None
 
 
 class RowsOut(BaseModel):
@@ -102,7 +102,7 @@ def upload(db: DB, admin: Admin, file: UploadFile) -> UploadOut:
 @router.get("/uploads/{upload_id}/rows")
 def rows(db: DB, upload_id: int, group: Group, page: Annotated[int, Query(ge=1)] = 1,
          page_size: Annotated[int, Query(ge=1, le=500)] = 100) -> RowsOut:
-    if not db.execute(text("SELECT 1 FROM uploads WHERE id = :i AND kind = 'span_list'"), {"i": upload_id}).first():
+    if not db.execute(text("SELECT 1 FROM uploads WHERE id = :i AND kind = 'segment_list'"), {"i": upload_id}).first():
         raise HTTPException(404, "Upload not found")
     where = {"u": upload_id, "g": sl.GROUP_COL[group]}
     total = db.execute(text("SELECT count(*) FROM upload_rows WHERE upload_id = :u AND row_group = :g"), where).scalar_one()
@@ -117,7 +117,7 @@ def rows(db: DB, upload_id: int, group: Group, page: Annotated[int, Query(ge=1)]
             raw=r["raw"] or {}, parsed=Parsed(link=pp["link"], site_a=pp["a"], site_b=pp["b"], distance_km=pp["distance"],
                                               route=pp["route"], section=pp["section"], type=pp["type"]),
             changes=[Change(**c) for c in p.get("changes", [])], edited_in_dashboard=p.get("edited_in_dashboard", False),
-            span_id=p.get("db_id")))
+            segment_id=p.get("db_id")))
     return RowsOut(total=total, page=page, page_size=page_size, items=items)
 
 
