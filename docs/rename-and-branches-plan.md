@@ -35,9 +35,13 @@ and the worktrees `/home/user1/project/fiber-pd` and `/home/user1/project/fiber-
       shadcn, @base-ui/react, class-variance-authority, tw-animate-css and the `cn` package (web), replacing
       the one `Button` and `cn` with plain local code; move pytest and httpx into a dev-only requirements file.
       Test: `docker compose up -d --build`, `docker compose exec api pytest`, web lint, typecheck, e2e.
-- [ ] 1c. Rebuild `main` as the clean website from `dev`: only runtime files (as the old `PD` did), scripts and
+- [x] 1c. Rebuild `main` as the clean website from `dev`: only runtime files (as the old `PD` did), scripts and
       dev packages removed from `web/package.json`, runtime-only requirements, lockfiles regenerated.
       Test: on `main`, `docker compose up -d --build` starts db, api and web.
+      Done 2 Nov: images build; api image has no pytest/httpx, web image no playwright/oxlint. Worktree
+      `/home/user1/project/fiber-main` holds `main`; to update it, extract `git archive dev` there with the same
+      excludes (CLAUDE.md, docs, api/tests, web/e2e, pytest.ini, requirements-dev.lock, certs/README.md,
+      pyrightconfig.json, .oxlintrc.json, playwright.config.ts) and strip lint, gen:api, test:e2e and their packages.
 - [ ] 2. Docs on `dev`: CLAUDE.md, PRD, DESIGN.md, architecture, workflow reworded (segment, route) and old
       wording removed. Test: `grep -rniw "span\|spans" CLAUDE.md docs/*.md` finds only intended uses.
 - [ ] 3. Database: one fresh baseline migration with `segments` (was `spans`), `routes` (was `segments`),
