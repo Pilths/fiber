@@ -394,6 +394,7 @@ def test_core_holder_endpoint_and_span_stale(client, w, db):
     rid = book(client, w, [held]).json()["id"]
     mine = client.get(f"/api/cores/{held}", headers=H("planner1")).json()["holder"]
     assert mine["is_mine"] is True and mine["state"] == "requested" and mine["customer"] == "Acme" and mine["stale"] is False
+    assert mine["age_days"] == 0
     other = client.get(f"/api/cores/{held}", headers=H("planner2")).json()["holder"]
     assert other["is_mine"] is False and other["customer"] == "Acme" and other["reservation_id"] == rid
     assert other["owner"]["username"] == "planner1"

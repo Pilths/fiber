@@ -1,6 +1,6 @@
 # Fiber Dashboard
 
-Read before working: `docs/PRD.md` (requirements), `docs/architecture.md` (design and pinned versions), `docs/fiber-dashboard-workflow.md` (build steps and session order). Where they disagree, the PRD wins.
+Read before working: `docs/PRD.md` (requirements), `docs/architecture.md` (design and pinned versions), `docs/fiber-dashboard-workflow.md` (build steps and session order). Where they disagree, the PRD wins, except for layout and UI, where `docs/DESIGN.md` wins. Read `docs/DESIGN.md` before any UI or mock work.
 
 ## Commands
 
@@ -33,7 +33,7 @@ Read before working: `docs/PRD.md` (requirements), `docs/architecture.md` (desig
 - Nothing is deleted. Accounts are deactivated.
 - After the first import the dashboard database is the source of truth and the Excel is a feed. A field edited in the dashboard is protected from uploads.
 - Internal span ID is the key. Two sites have at most one span; uploads match a span by its site pair. Circuit ID comes from another system and is an optional field on the core, because one span carries many circuits.
-- Loss belongs to a CORE, not to the whole span cable: a measurement is one core's test. The calculated loss (distance x 0.3 dB/km) is the span's expected value that each core is compared with. Span-level views (Inspector, Find, map) show the worst measured core and how many cores are measured. A measurement with no core recorded (old Excel imports) is shown as "core not recorded". Distance comes from the Excel.
+- Loss belongs to a CORE, not to the whole span cable. Each core has a calculated loss and a measured loss. Calculated loss comes from a formula the owner will provide (distance x 0.3 dB/km is a placeholder until then; ask for the formula before building loss UI). Measured loss is a physical field test by the field team, kept with its test type, date and team. Always label them "Calculated loss" and "Measured loss", never just "Loss". Span-level views show no worst-core value; per-core loss lives in core details and the reserve list. A measurement with no core recorded (old Excel imports) is shown as "core not recorded". Distance comes from the Excel.
 - Site is the general term for a site, building or equipment location.
 - The same Docker Compose setup runs unchanged on the personal laptop, work laptop, dev server and production server. Anything machine-specific lives only in `.env`.
 
@@ -42,10 +42,10 @@ Read before working: `docs/PRD.md` (requirements), `docs/architecture.md` (desig
 - No eyebrow labels: no small label above a title or a number ("Selected span", "Free to reserve" as a tiny line).
 - No subtext: no muted explanation or restating line under or beside a title, number or control. Keep only labels, table headers, empty states, validation and error messages, confirmation counts, and a fact that appears nowhere else. Screen-reader text may stay as sr-only.
 - No check-mark or "healthy" chip beside a title. Status shows in the number's colour; a state such as Cut keeps its chip.
-- Core status words are Available, Requested, Reserved, In service (data value `In use`). There is no per-core Faulty: a fiber cut is a state of the span. Route types are Trunk and Metro only (Bespoke was removed). The section is "Allocations", not "Held" or "Taken".
+- Core status words are Available, Requested, Reserved, In service (data value `In use`). There is no per-core Faulty: a fiber cut is a state of the span. Route types are Trunk and Metro only (Bespoke was removed). One merged "Cores" table replaces the old core table and Allocations (see `docs/DESIGN.md`).
 - Map chips show only the free-core number on the line, no icons. Status is never colour alone: symbol, pattern or word somewhere on the screen.
-- Do not add Collapse map, Site/Services "Later" tabs, a Circuit column in Allocations, or helper lines like "Reserve is off: ...".
-- Map page (overview, view only): Route A to B search, map with the Inspector (420px wide, as tall as the map card, every span fact lives there), span diagram below the map, then the core table. No Find card, no core picking, no reserve box there. Reserving and Allocations live on the Reserve tab.
+- Do not add Collapse map, Site/Services "Later" tabs, a Reserve tab, or helper lines like "Reserve is off: ...".
+- Tabs: Inventory and My reservations. Inventory: map (8 of 12 columns, never shrunk) with the span list beside it, the span diagram (the current `SpanDiagram`) with a "Reserve cores" button, then the Cores table. Reserving opens as a box over Inventory. Full layout: `docs/DESIGN.md` section 3.
 
 ## Delegating to subagents
 

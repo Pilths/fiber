@@ -1095,6 +1095,8 @@ export interface components {
             srf_id?: string | null;
             /** Planner */
             planner?: string | null;
+            /** Age Days */
+            age_days?: number | null;
         };
         /** CoreHistoryItem */
         CoreHistoryItem: {
@@ -1352,6 +1354,8 @@ export interface components {
             srf_id?: string | null;
             /** Planner */
             planner?: string | null;
+            /** Age Days */
+            age_days: number;
             owner: components["schemas"]["Owner"];
             /** Is Mine */
             is_mine: boolean;
@@ -1875,6 +1879,8 @@ export interface components {
             srf_id?: string | null;
             /** Planner */
             planner?: string | null;
+            /** Age Days */
+            age_days: number;
         };
         /** UserCreate */
         UserCreate: {

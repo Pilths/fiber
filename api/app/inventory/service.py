@@ -3,6 +3,7 @@ from typing import Any, get_args
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.reservations.service import TZ
 from app.inventory.schemas import (
     CoreDetail,
     CoreHolderDetail,
@@ -42,11 +43,12 @@ ORDER BY s.id
 
 # Customer and planned date: each field takes its latest 'corrected' value, else the reservation row.
 # (A correction may set only one of the two fields.)
-CORE_SQL = """
+CORE_SQL = f"""
 SELECT c.id, c.number, v.status, c.circuit_id, pa.port_id AS port_a, pb.port_id AS port_b,
        COALESCE(cust.name, hc.name) AS customer, COALESCE(corr_date.planned_date, r.planned_date) AS planned_date,
        r.id AS reservation_id, COALESCE(st.is_stale, false) AS stale, st.stale_since,
-       r.srf_id, pu.display_name AS planner
+       r.srf_id, pu.display_name AS planner,
+       (now() AT TIME ZONE {TZ})::date - (r.created_at AT TIME ZONE {TZ})::date AS age_days
 FROM cores c
 JOIN core_status_v v ON v.core_id = c.id
 LEFT JOIN ports pa ON pa.id = c.port_a_id
@@ -77,9 +79,10 @@ CORE_ONE_SQL = CORE_SQL.replace("SELECT c.id, c.number,", "SELECT c.span_id, a.n
     .replace("JOIN spans sp ON sp.id = c.span_id\n", "JOIN spans sp ON sp.id = c.span_id\nJOIN sites a ON a.id = sp.site_a_id JOIN sites b ON b.id = sp.site_b_id\n") \
     .replace("WHERE c.span_id = :id AND", "WHERE c.id = :id AND").replace("ORDER BY c.number", "")
 # Count-only holds with cores still to assign; customer and date take the latest correction like CORE_SQL.
-UNASSIGNED_SQL = """
+UNASSIGNED_SQL = f"""
 SELECT u.reservation_id, COALESCE(cust.name, hc.name) AS customer, u.remaining,
-       COALESCE(corr_date.planned_date, r.planned_date) AS planned_date, r.srf_id, pu.display_name AS planner
+       COALESCE(corr_date.planned_date, r.planned_date) AS planned_date, r.srf_id, pu.display_name AS planner,
+       COALESCE((now() AT TIME ZONE {TZ})::date - (r.created_at AT TIME ZONE {TZ})::date, 0) AS age_days
 FROM reservation_unassigned_v u
 JOIN reservations r ON r.id = u.reservation_id
 JOIN customers hc ON hc.id = r.customer_id
@@ -141,7 +144,7 @@ def get_core(db: Session, core_id: int, user_id: int) -> CoreHolderDetail | None
         owner = db.execute(text(HOLDER_SQL), {"rid": row["reservation_id"]}).mappings().one()
         holder = Holder(reservation_id=row["reservation_id"], customer=row["customer"], planned_date=row["planned_date"],
                         state=state, stale=row["stale"], stale_since=row["stale_since"],
-                        srf_id=row["srf_id"], planner=row["planner"],
+                        srf_id=row["srf_id"], planner=row["planner"], age_days=row["age_days"],
                         owner=Owner(**owner), is_mine=owner["id"] == user_id)
     return CoreHolderDetail(core_id=row["id"], number=row["number"], span_id=row["span_id"], span_name=row["span_name"],
                             status=row["status"], circuit_id=row["circuit_id"], port_a=row["port_a"], port_b=row["port_b"],

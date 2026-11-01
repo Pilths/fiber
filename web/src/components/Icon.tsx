@@ -1,4 +1,4 @@
-// Status and health symbols copied from the map mock (docs/mockups/comparison/map). Always decorative:
+// Status and health symbols copied from the map mock (map mock, branch `pictures`). Always decorative:
 // the word next to them carries the meaning.
 const PATHS = {
   av: <circle cx="8" cy="8" r="5" fill="none" stroke="currentColor" strokeWidth="1.6" />,

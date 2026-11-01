@@ -11,7 +11,6 @@ type Hold = components["schemas"]["UnassignedHold"];
 type Filter = "All" | Exclude<CoreStatus, "Available"> | "Unassigned";
 
 // One row per held core from GET /api/spans/{id}, plus one count-only row per reservation with unassigned cores.
-// Age and the reservation's planner are not on the span endpoint (history is TASK-077), so those columns are left out.
 export function HeldTable({ d, admin, onOpen, onChanged }: { d: Detail; admin: boolean; onOpen: (c: Detail["cores"][number]) => void; onChanged: () => void }) {
   const [filter, setFilter] = useState<Filter>("All");
   const [assign, setAssign] = useState<Hold | null>(null);
@@ -38,8 +37,9 @@ export function HeldTable({ d, admin, onOpen, onChanged }: { d: Detail; admin: b
           <table className="tbl table-fixed [&_td]:text-center! [&_th]:text-center!">
             <caption className="sr-only">Allocations on this span</caption>
             <thead><tr>
-              <th scope="col" className="w-[10%]">Cores</th><th scope="col" className="w-[20%]">Status</th><th scope="col" className="w-[25%]">Customer</th>
-              <th scope="col">Ports or detail</th><th scope="col" className="w-[18%] pr-0!">Planned date</th>
+              <th scope="col" className="w-[7%]">Cores</th><th scope="col" className="w-[15%]">Status</th><th scope="col" className="w-[16%]">Customer</th>
+              <th scope="col" className="w-[12%]">Planner</th><th scope="col" className="w-[10%]">SRF</th><th scope="col" className="w-[12%]">Planned date</th>
+              <th scope="col" className="w-[7%]"><span className="block text-right">Age</span></th><th scope="col" className="pr-0!">Ports</th>
             </tr></thead>
             <tbody>
               {rows.map((c) => { const na = <Blank />; return (
@@ -49,9 +49,12 @@ export function HeldTable({ d, admin, onOpen, onChanged }: { d: Detail; admin: b
                   </th>
                   <td><span className={`inline-flex items-center gap-2 font-semibold whitespace-nowrap ${STATUS[c.status].tone}`}><Icon name={STATUS[c.status].icon} />{statusLabel(c.status)}</span>
                     {c.stale && <>{" "}<span className="pill h-amber mt-1" title={`No keep for over 3 months since ${c.stale_since ?? "-"}`}><Icon name="lo" />Stale<span className="sr-only">: no keep for over 3 months since {c.stale_since ?? "-"}</span></span></>}</td>
-                  <td className="truncate">{c.customer ?? na}</td>
-                  <td className="py-2 leading-snug">{c.port_a || c.port_b ? <>{c.port_a ?? <Blank />} to {c.port_b ?? <Blank />}</> : <Blank>No ports yet</Blank>}</td>
-                  <td className="pr-0 whitespace-nowrap">{c.planned_date ?? na}</td>
+                  <td className="truncate" title={c.customer ?? undefined}>{c.customer ?? na}</td>
+                  <td className="truncate" title={c.planner ?? undefined}>{c.planner ?? na}</td>
+                  <td className="truncate" title={c.srf_id ?? undefined}>{c.srf_id ?? na}</td>
+                  <td className="whitespace-nowrap">{c.planned_date ?? na}</td>
+                  <td className="truncate tabular-nums"><span className="block text-right">{c.age_days != null ? `${c.age_days} d` : na}</span></td>
+                  <td className="py-2 pr-0 leading-snug">{c.port_a || c.port_b ? <>{c.port_a ?? <Blank />} to {c.port_b ?? <Blank />}</> : <Blank>No ports yet</Blank>}</td>
                 </tr>
               ); })}
               {holds.map((h) => (
@@ -59,8 +62,11 @@ export function HeldTable({ d, admin, onOpen, onChanged }: { d: Detail; admin: b
                   <th scope="row" className="text-left font-semibold">{h.remaining}</th>
                   <td><span className="inline-flex items-center gap-2 font-semibold whitespace-nowrap text-use"><Icon name="co" />Unassigned</span></td>
                   <td className="truncate" title={h.customer ?? undefined}>{h.customer ?? <Blank />}</td>
-                  <td className="py-2 leading-snug">{admin ? <button type="button" className="btn btn-sm" onClick={() => setAssign(h)}>Assign cores</button> : <Blank>No ports yet</Blank>}</td>
-                  <td className="pr-0 whitespace-nowrap">{h.planned_date ?? <Blank />}</td>
+                  <td className="truncate" title={h.planner ?? undefined}>{h.planner ?? <Blank />}</td>
+                  <td className="truncate" title={h.srf_id ?? undefined}>{h.srf_id ?? <Blank />}</td>
+                  <td className="whitespace-nowrap">{h.planned_date ?? <Blank />}</td>
+                  <td className="tabular-nums whitespace-nowrap"><span className="block text-right">{h.age_days} d</span></td>
+                  <td className="py-2 pr-0 leading-snug">{admin ? <button type="button" className="btn btn-sm" onClick={() => setAssign(h)}>Assign cores</button> : <Blank>No ports yet</Blank>}</td>
                 </tr>
               ))}
             </tbody>

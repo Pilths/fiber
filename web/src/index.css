@@ -54,7 +54,7 @@
     --radius-xl: 8px;
 }
 
-/* v4 style tokens (docs/mockups/comparison/v4). Light only: the dark theme is parked (PRD, Design decisions). */
+/* v4 style tokens (v4 mock, branch `pictures`). Light only: the dark theme is parked (PRD, Design decisions). */
 :root {
     --ground: #f2f4f7; --ink: #0a0a0a; --muted-ink: #5b6068; --line: #868c96; --rule: #eceef2; --raised: #eceef2;
     --blue: #1d5fbf; --blue-bg: #eff5fd; --blue-bd: #bcd2f2;
