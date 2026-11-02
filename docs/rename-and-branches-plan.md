@@ -71,8 +71,7 @@ and the worktrees `/home/user1/project/fiber-pd` and `/home/user1/project/fiber-
 
 ## Open after the rename
 
-- PRD and architecture still describe a per-core "Faulty" status (F7, story 8, workbook columns); CLAUDE.md says there
-  is none (a cut is a segment state). Clean up in a later docs pass.
+- Done 2 Nov: per-core "Faulty" removed from PRD, architecture and workflow (fiber cut is a segment state).
 
 ## Reminders for the website build
 

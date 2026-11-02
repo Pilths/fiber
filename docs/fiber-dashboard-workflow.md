@@ -107,7 +107,7 @@ Do not create a separate agent per phase. Make an agent only when it needs a dif
 - Loss coverage counts segments with a reading.
 - Layout is decided (26 October): one map page as the home, top bar navigation, no left sidebar, desktop only, light theme only. The PRD, Design decisions, holds the details.
 - Decided 26 October: loss shows per core (core details, reserve box); Users is in the account menu (admin only); KMZ shapes are not in the MVP map (straight lines plus one mock route with a drawn shape); no site master undo in the MVP (previous uploads kept); the site master is a separate workbook from the Reservation workbook.
-- Admins can edit core status (Faulty or Available), segment details and site details. The daily job is an in-app scheduler (APScheduler) that records its last run.
+- Admins can edit fiber cut on a segment (cut or restore), segment details and site details. The daily job is an in-app scheduler (APScheduler) that records its last run.
 
 ## Still open
 

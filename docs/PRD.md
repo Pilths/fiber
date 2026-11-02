@@ -86,7 +86,7 @@ To confirm against the mock files arriving 22 October 2026: KMZ lines are named 
    - A planner can withdraw their own pending request; the withdrawal is saved as a new record and the held cores are freed at once.
 3. As a planner, I want stale reservations flagged and reminded, so that none is forgotten.
    - A reservation is stale 3 months after it was approved. An imported reservation with no reserved date starts at its import date, and the upload preview warns the admin. Keeping it restarts the 3-month clock, and each keep is saved as a new history record.
-   - Stale reservations appear in the Stale chip and the Action needed count badge on My reservations; so do reservations hit by an upload conflict or a core marked Faulty.
+   - Stale reservations appear in the Stale chip and the Action needed count badge on My reservations; so do reservations hit by an upload conflict or a fiber cut on the segment.
    - The 3-month rule and "today" in the daily digest use the Asia/Kuala_Lumpur time zone.
    - The planner keeps a stale reservation or sends a release request; only an admin releases it. A release request appears in Approvals and its waiting count, the cores stay Reserved until an admin releases them, and a declined release needs a reason the planner can see.
    - A release request chooses which segments (cores) of a route reservation to free; the rest stays reserved. Releasing all its cores ends the reservation.
@@ -148,8 +148,8 @@ To confirm against the mock files arriving 22 October 2026: KMZ lines are named 
    - Many rows with the same two sites are normal, because one cable has many cores. The validation report warns when the same Port ID appears twice or when a cable looks listed twice between the same two sites, and the admin decides what to keep before anything is saved.
    - After the first import, the dashboard database is the source of truth and the Excel is a feed. A field edited in the dashboard is protected: a later upload that differs shows as a conflict in the preview and keeps the dashboard value unless the admin ticks the Excel value.
    - The Admin area runs an upload in three steps: Upload, Preview and Confirm. The preview groups rows as New, Changed, Conflicts, Not in this file, Needs review and Rejected, each with its warnings and row status. Rows missing from a file are left untouched and listed as Not in this file. The site master upload below is the exception: it uses the replace-file model.
-   - An upload never changes a reservation. If an uploaded row conflicts with a Requested or Reserved core, for example the core is marked Faulty or no longer exists, the preview flags it and the reservation goes to the Action needed list.
-   - Admins can edit data in the app, because the Excel is a feed and not the source of truth. The MVP covers core status (Faulty or Available only; In use comes from the Excel and Reserved from the reservation flow), segment details (distance, route type, region, sites A and B, survey count, total cores) and site details (name, coordinates). Everything else is v1.1. Each edit needs a reason and is saved as a new history record; a changed distance recalculates loss, and marking a Requested or Reserved core Faulty sends its reservation to Needs review.
+   - An upload never changes a reservation. If an uploaded row conflicts with a Requested or Reserved core, for example the segment is marked cut or the core no longer exists, the preview flags it and the reservation goes to the Action needed list.
+   - Admins can edit data in the app, because the Excel is a feed and not the source of truth. The MVP covers fiber cut on a segment (cut or restore; In use comes from the Excel and Reserved from the reservation flow), segment details (distance, route type, region, sites A and B, survey count, total cores) and site details (name, coordinates). Everything else is v1.1. Each edit needs a reason and is saved as a new history record; a changed distance recalculates loss, and marking a segment cut sends the reservations on it to Needs review.
    - Each upload is logged with who, when and what changed.
 
 **Non-Goals**
@@ -301,7 +301,7 @@ All five MVP items are planned for 31 October 2026, about 11 days from this draf
 8. **Sites and data centres view**: a Sites switch in the segment list and a site detail view, plus map layers Services and Data centres (placeholders for DC internals and bandwidth); see `docs/DESIGN.md`, "Later".
 9. **Undo of a site master upload** (rollback to a previous upload). The MVP keeps previous uploads for comparison only.
 10. **Real KMZ import** and KMZ route shapes on the map in place of straight lines. The MVP proves the path with one mock route.
-11. **Optional Reservation workbook columns** Core status (mark a core Faulty), Loss (dB) and Tested on (append a measurement). The parser reads them when present, but the real sheet has none; agree the names with the planners first.
+11. **Optional Reservation workbook columns** Loss (dB) and Tested on (append a measurement). The parser reads them when present, but the real sheet has none; agree the names with the planners first.
 
 **Technical Risks**
 
