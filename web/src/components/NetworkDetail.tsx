@@ -5,7 +5,7 @@ import { Icon } from "@/components/Icon";
 import { Blank } from "@/components/LossCard";
 import type { RouteOption } from "@/components/RoutePlanner";
 import { FreeBadge } from "@/components/FindCard";
-import { countBy, db, LEVEL, perKm, segmentName, totalLoss, STATUS, statusLabel, type CoreStatus, type SegmentLoss } from "@/lib/status";
+import { countBy, LEVEL, segmentName, STATUS, statusLabel, type CoreStatus, type SegmentLoss } from "@/lib/status";
 
 type Detail = components["schemas"]["SegmentDetail"];
 type Core = Detail["cores"][number];
@@ -67,16 +67,9 @@ export function SegmentDiagram({ segments, found, d, loss, selectedId, onPick, a
     : [{ s: d, a: d.site_a, b: d.site_b, id: d.id }];
   const rows = chain.map((c) => ({ ...c, l: loss.find((x) => x.segment_id === c.id) }));
   const km = rows.reduce((n, r) => n + (r.s ? kmOf(r.s) ?? 0 : 0), 0);
-  // Segments with a distance count: worst measured core if measured, else calculated. A segment with no distance adds neither dB nor km.
-  const used = rows.flatMap((r) => { const k = r.s ? kmOf(r.s) : null, t = k ? totalLoss(r.l) : null; return t ? [{ k: k!, ...t }] : []; });
-  const total = used.length ? used.reduce((n, u) => n + u.db, 0) : null;
-  const usedKm = used.reduce((n, u) => n + u.k, 0);
-  const anyCalc = used.some((u) => u.calc);
   const totals: [string, string][] = [
     ["Segments", String(rows.length)],
     ["Distance", km ? `${Number(km.toFixed(1))} km` : "-"],
-    [anyCalc ? "Calculated loss" : "Total loss", total == null ? "-" : db(total)],
-    ["Average loss per km", total != null && usedKm ? perKm(total, usedKm) : "-"],
   ];
   const cols = Math.min(rows.length, PER_ROW);
   return (
@@ -169,8 +162,9 @@ const Stale = ({ c }: { c: Core }) => c.stale && (
 );
 
 // The one Cores table: chips with counts (the only place counts appear), holders first, ranges collapse and expand.
-export function CoresTable({ d, focusCoreId, onOpen, onAssign }: {
+export function CoresTable({ d, focusCoreId, flash, onOpen, onAssign }: {
   d: Detail; focusCoreId: number | null; onOpen: (c: Core) => void; onAssign: ((h: Hold) => void) | null;
+  flash?: number | null; // reservation id just requested: its row is highlighted briefly
 }) {
   const rows = group(d);
   const [filter, setFilter] = useState<Chip>("All");
@@ -222,7 +216,8 @@ export function CoresTable({ d, focusCoreId, onOpen, onAssign }: {
             const tint = c.status === "Requested" ? "bg-amber-bg" : "";
             return (
               <Fragment key={r.key}>
-                <tr onClick={() => onOpen(c)} className={`cursor-pointer hover:bg-raised ${tint} ${!many && c.id === focusCoreId ? "bg-blue-bg" : ""}`} data-core={many ? undefined : c.number}>
+                <tr onClick={() => onOpen(c)} className={`cursor-pointer hover:bg-raised ${tint} ${!many && c.id === focusCoreId ? "bg-blue-bg" : ""} ${flash != null && c.reservation_id === flash ? "flash" : ""}`}
+                  data-core={many ? undefined : c.number} data-flash={(flash != null && c.reservation_id === flash) || undefined}>
                   <th scope="row" className="text-left font-semibold">
                     {many ? (
                       <button type="button" className="inline-flex cursor-pointer items-center font-semibold" aria-expanded={isOpen} aria-label={`Cores ${range(r.cores)}, show each core`} onClick={(e) => { e.stopPropagation(); toggle(r.key); }}>
@@ -256,15 +251,3 @@ export function CoresTable({ d, focusCoreId, onOpen, onAssign }: {
     </>
   );
 }
-
-// One row per count-only reservation: cores requested but not yet assigned to specific cores.
-export const Unassigned = ({ d }: { d: Detail }) => d.unassigned.length > 0 && (
-  <dl className="mt-3 text-body" data-testid="unassigned">
-    {d.unassigned.map((u) => (
-      <div key={u.reservation_id} className="flex gap-3 py-0.5">
-        <dt className="w-28 flex-none text-muted-foreground">Unassigned</dt>
-        <dd className="font-semibold">{[`${u.remaining} ${u.remaining === 1 ? "core" : "cores"}`, u.customer, u.srf_id, u.planner].filter(Boolean).join(", ")}</dd>
-      </div>
-    ))}
-  </dl>
-);

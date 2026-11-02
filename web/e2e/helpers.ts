@@ -58,10 +58,19 @@ export async function pickSegment(page: Page, name: RegExp | string) {
   await expect(page.locator("#segment-h")).toHaveText(name);
 }
 
-// The reserve flow (core grid, route planner) opens from "Reserve cores" on the segment diagram; step B makes it a box.
+// The Reserve box opens from "Reserve cores" on the segment diagram; returns the box.
 export async function openReserve(page: Page, name: RegExp | string) {
   await pickSegment(page, name);
   await page.getByTestId("segment-diagram").getByRole("button", { name: "Reserve cores" }).click();
+  const box = page.getByTestId("reserve-box");
+  await expect(box).toBeVisible();
+  return box;
+}
+
+// The route planner has no tab: a #route= link opens it (empty form when the hash names no route).
+export async function openRoutePlanner(page: Page) {
+  await page.goto("/#route=");
+  await expect(page.getByTestId("route-form")).toBeVisible();
 }
 
 // Cores table: opens a core's details, first expanding the collapsed run ("10-12") that holds it.

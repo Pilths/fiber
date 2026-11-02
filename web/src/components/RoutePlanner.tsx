@@ -1,10 +1,10 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import { api, ApiError, errorText } from "@/api/client";
 import type { components } from "@/api/schema";
-import { useCustomerPicker } from "@/components/ChosenBar";
 import { FreeBadge } from "@/components/FindCard";
 import { Icon } from "@/components/Icon";
 import { Placeholder } from "@/components/Inspector";
+import { ReserveBox } from "@/components/ReserveBox";
 import { db } from "@/lib/status";
 
 // Route planner (TASK-051, TASK-076, route loss line of TASK-040). The routes API returns plain dicts, so the shapes live here.
@@ -286,6 +286,9 @@ export function RouteSection({ rp, segments, onDone }: { rp: RoutePlanner; segme
   const op = rp.option!;
   const need = rp.need ?? 0;
   const [loss, setLoss] = useState<RouteLoss | null>(null);
+  const [reserving, setReserving] = useState(false);
+  const [sent, setSent] = useState<number | null>(null);
+  const short = op.segments.some((s) => isShort(s, need));
   const ids = op.segments.map((s) => s.segment_id).join(",");
   const freeSum = op.segments.reduce((n, s) => n + s.free_to_reserve, 0);
   useEffect(() => {
@@ -306,7 +309,16 @@ export function RouteSection({ rp, segments, onDone }: { rp: RoutePlanner; segme
         <Diagram rp={rp} op={op} need={need} type={type} loss={loss} />
       </section>
       <section className="card" aria-labelledby="route-t">
-        <div className="card-h"><h2 id="route-t">Segments on this path</h2></div>
+        <div className="card-h items-center">
+          <h2 id="route-t">Segments on this path</h2>
+          <button type="button" className="btn btn-p ml-auto" disabled={short || !need} onClick={() => { setSent(null); setReserving(true); }}>Reserve on this route</button>
+        </div>
+        {sent != null && (
+          <div role="status" className="mb-3 flex items-center gap-3 rounded-md border border-green-bd bg-green-bg px-3 py-2 text-body font-semibold text-green" data-testid="request-sent">
+            <span className="flex-1">Request #{sent} sent. Waiting for admin approval.</span>
+            <button type="button" className="btn btn-sm px-2.5" aria-label="Close" onClick={() => setSent(null)}>×</button>
+          </div>
+        )}
         {/* v4 .tw: full card width, cells never wrap, long names scroll inside this box */}
         <div tabIndex={0} role="region" aria-label="Segments on this path, scrolls sideways" className="relative overflow-x-auto rounded-md border" data-testid="route-table-box">
             <table className="tbl [&_td]:whitespace-nowrap [&_th]:whitespace-nowrap" data-testid="route-table">
@@ -350,7 +362,10 @@ export function RouteSection({ rp, segments, onDone }: { rp: RoutePlanner; segme
             </table>
         </div>
       </section>
-      <ReserveBox key={ids} op={op} need={need} onDone={onDone} />
+      {reserving && (
+        <ReserveBox sites={[first, ...op.segments.map((s) => s.site_b)]} onClose={() => setReserving(false)} onSent={(id) => { setSent(id); onDone(); }}
+          mode={{ kind: "route", need, legs: op.segments.map((s) => ({ segment_id: s.segment_id, name: s.name, free: s.free_to_reserve })) }} />
+      )}
     </div>
   );
 }
@@ -444,66 +459,5 @@ function Diagram({ rp, op, need, type, loss }: { rp: RoutePlanner; op: RouteOpti
         <span className="inline-flex items-center gap-1.5"><Shape kind="site" className="scale-75" />Site</span>
       </p>
     </>
-  );
-}
-
-function ReserveBox({ op, need, onDone }: { op: RouteOption; need: number; onDone: () => void }) {
-  const id = useId();
-  const [date, setDate] = useState("");
-  const [srf, setSrf] = useState("");
-  const [tried, setTried] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
-  const { customer, field, warning } = useCustomerPicker((text) => setMsg({ text, ok: false }));
-  const short = op.segments.find((s) => isShort(s, need));
-  const total = need * op.total_segments;
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setTried(true);
-    if (!customer || short || !need) return;
-    setBusy(true);
-    setMsg(null);
-    try {
-      const p = await api.get("/api/routes/pick", { query: { segment_ids: op.segments.map((s) => s.segment_id), cores_needed: need } }) as unknown as
-        { segments: { name: string; cores: { number: number }[] }[]; core_ids: number[] };
-      const r = await api.post("/api/reservations", { body: { customer_id: customer.id, planned_date: date || null, ...(srf.trim() && { srf_id: srf.trim() }), cores: p.core_ids } });
-      setMsg({ ok: true, text: `Request #${r.id} sent (${r.status}): ${p.segments.map((s) => `${s.name} cores ${s.cores.map((c) => c.number).join(", ")}`).join("; ")}. Nothing is reserved until an admin approves.` });
-      setTried(false);
-      onDone();
-    } catch (err) {
-      setMsg({ ok: false, text: errorText(err, "Reserve failed. Try again.") + (err instanceof ApiError && err.status === 409 ? " The route is shown again with fresh counts." : "") });
-      if (err instanceof ApiError && err.status === 409) onDone();
-    } finally {
-      setBusy(false);
-    }
-  };
-  return (
-    <section className="card" aria-labelledby={`${id}-h`} data-testid="route-reserve">
-      <div className="card-h"><h2 id={`${id}-h`}>Reserve on this route</h2></div>
-      <div className="flex flex-wrap items-end gap-6">
-      <p className="max-w-[380px] min-w-[200px] flex-1 self-center text-body text-muted-foreground">
-        <b className="text-foreground">{need}</b> {need === 1 ? "core" : "cores"} on each of <b className="text-foreground">{op.total_segments}</b> segments, <b className="text-foreground">{total}</b> in total. Cores are assigned from the first free cores on each segment.
-      </p>
-      <form className="flex flex-1 items-end justify-end gap-3" onSubmit={submit} noValidate>
-        {field}
-        <label className="grid w-[140px] min-w-[90px] gap-1"><span className="lbl">SRF ID</span>
-          <input className="field" value={srf} onChange={(e) => setSrf(e.target.value)} autoComplete="off" />
-        </label>
-        <label className="grid w-[170px] shrink-0 gap-1"><span className="lbl">Planned date</span>
-          <input type="date" className="field" value={date} onChange={(e) => setDate(e.target.value)} />
-        </label>
-        <button type="submit" className="btn btn-p shrink-0" disabled={busy || !!short} aria-describedby={short ? `${id}-why` : undefined}>Reserve on this route</button>
-      </form>
-      </div>
-      {short && (
-        <p id={`${id}-why`} className="mt-3 flex gap-2 rounded-md border border-l-3 border-red-bd border-l-red bg-red-bg px-3 py-2.5 text-body text-red">
-          <Icon name="fl" className="ic mt-[3px]" />
-          <span><b>Reserve is off:</b> {short.surveyed ? `${short.name} has ${short.free_to_reserve} free, fewer than the ${need} needed.` : `${short.name} is not surveyed, so it cannot be booked.`} Pick another option or lower the cores needed.</span>
-        </p>
-      )}
-      {warning}
-      {tried && !customer && <p role="alert" className="mt-2.5 text-body font-bold text-red">Choose a customer before submitting.</p>}
-      {msg && <p role={msg.ok ? "status" : "alert"} className={`mt-2.5 text-body ${msg.ok ? "font-semibold" : "font-bold text-red"}`}>{msg.text}</p>}
-    </section>
   );
 }

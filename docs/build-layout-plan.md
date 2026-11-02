@@ -16,7 +16,7 @@ numbers right-aligned, no big empty gaps).
       Age, Ports; holders first; consecutive cores of one reservation and runs of Available cores grouped into one
       expandable row; Unassigned row; row click opens core details). Shared table spacing fix for all tables.
       Test: lint, typecheck, e2e updated for the new page.
-- [ ] B. Reserve box: modal over Inventory, about 1040 wide; header segment line, free count, close; "Cores needed"
+- [x] B. Reserve box: modal over Inventory, about 1040 wide; header segment line, free count, close; "Cores needed"
       stepper ticking the first N Available cores; list of Available cores (tick, Core, Ports both ends, Calculated
       loss, Measured loss, "Not tested", triangle and bold amber when measured is above calculated); footer Customer
       (required), Planned date, SRF ID (optional), "Reserve N cores"; discard prompt; success box and highlighted

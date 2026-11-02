@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { contrast, openReserve, pickSegment, signIn } from "./helpers";
+import { contrast, openRoutePlanner, pickSegment, signIn } from "./helpers";
 
 // Dev seed: Cyberjaya DC to Kuantan Hut has several paths (via Bukit Jalil, via Kuala Lumpur, ...). Site ids vary by database.
 const FROM = "DEV Cyberjaya DC", TO = "DEV Kuantan Hut";
@@ -19,11 +19,10 @@ const noOldWords = async (page: Page) => {
 // Scroll the route section to the top, under the sticky header.
 const toSection = (page: Page) => page.evaluate(() => scrollTo(0, document.getElementById("route-h")!.getBoundingClientRect().top + scrollY - 84));
 
-// The route planner and its Reserve flow open from "Reserve cores" on Inventory (any segment), then Route A to B.
+// The route planner opens from a #route= link; its "Reserve on this route" opens the Reserve box in route mode.
 const SEG = /^DEV Kuala Lumpur DC - DEV Cyberjaya DC/;
 async function plan(page: Page, cores = "2", from = FROM, to = TO) {
-  await openReserve(page, SEG);
-  await page.getByRole("radio", { name: "Route A to B" }).check({ force: true });
+  await openRoutePlanner(page);
   await page.getByLabel("From", { exact: true }).fill(from);
   await page.getByLabel("To", { exact: true }).fill(to);
   await page.getByLabel("Cores needed per segment").fill(cores);
@@ -54,7 +53,7 @@ test("route options: up to 3, a Best match, every field shown", async ({ page })
   await expect(table.locator("tfoot")).toContainText(/Total, \d+ segments/);
   await expect(table.locator("tfoot")).toContainText(/\d+ of \d+ measured/);
   const section = page.getByTestId("route-section");
-  await expect(section.getByRole("heading", { level: 2 })).toHaveText([/^End-to-end segment diagram/, "Segments on this path", "Reserve on this route"]);
+  await expect(section.getByRole("heading", { level: 2 })).toHaveText([/^End-to-end segment diagram/, "Segments on this path"]);
   // diagram: a node per site, a segment group per segment, End total
   const rows = await table.locator("tbody tr").count();
   await expect(groups(page)).toHaveCount(rows);
@@ -143,9 +142,7 @@ test("too many cores: options short, diagram segment short, Reserve off naming t
   const cell = page.getByTestId("route-cell-short").first();
   await expect(cell).toHaveText(/^(\d+|Not surveyed) short$/);
   await expect(cell.locator('svg[data-icon="fl"]')).toHaveCount(1);
-  const box = page.getByTestId("route-reserve");
-  await expect(box.getByRole("button", { name: "Reserve on this route" })).toBeDisabled();
-  await expect(box).toContainText(/Reserve is off: DEV .+ has \d+ free, fewer than the 200 needed/);
+  await expect(page.getByRole("button", { name: "Reserve on this route" })).toBeDisabled();
   await expect(page.getByTestId("route-summary")).toContainText("Not enough free cores");
   await noOldWords(page);
   // red text keeps 4.5:1
@@ -159,8 +156,7 @@ test("too many cores: options short, diagram segment short, Reserve off naming t
 
 test("from equal to to shows the inline error", async ({ page }) => {
   await signIn(page);
-  await openReserve(page, SEG);
-  await page.getByRole("radio", { name: "Route A to B" }).check({ force: true });
+  await openRoutePlanner(page);
   await page.getByLabel("From", { exact: true }).fill(FROM);
   await page.getByLabel("To", { exact: true }).fill(FROM);
   await expect(page.getByTestId("route-form")).toContainText(/from and to must differ/i);
@@ -209,16 +205,22 @@ test("Reserve on a sufficient route sends one request (then withdrawn)", async (
   // KL DC -> Ipoh -> Penang: segments no other spec books, so parallel workers do not race for the same first free core
   await plan(page, "1", "DEV Kuala Lumpur DC", "DEV Penang Tower");
   await options(page).first().click();
-  const box = page.getByTestId("route-reserve");
-  await expect(box).toContainText(/1 core on each of \d+ segments, \d+ in total\. Cores are assigned from the first free cores on each segment\./);
+  await page.getByRole("button", { name: "Reserve on this route" }).click();
+  const box = page.getByTestId("reserve-box");
+  await expect(box.getByRole("heading", { level: 2 })).toContainText("DEV Kuala Lumpur DC");
+  await expect(box.getByRole("group", { name: "Cores needed per segment" }).locator("output")).toHaveText("1");
+  const legs = await box.getByRole("table", { name: "Segments on this route" }).locator("tbody tr").count();
+  expect(legs).toBeGreaterThan(1);
+  await expect(box.getByRole("button", { name: `Reserve ${legs} cores` })).toBeVisible();
   await box.getByLabel("Search customers").fill("DEV Telco Alpha");
   await box.getByRole("button", { name: "DEV Telco Alpha", exact: true }).click();
-  await box.getByLabel("SRF ID").fill("SRF-E2E");
+  await box.getByLabel("SRF ID (optional)").fill("SRF-E2E");
   await box.screenshot({ path: "test-results/route-reserve.png" });
   const sent = page.waitForRequest((q) => q.method() === "POST" && q.url().endsWith("/api/reservations"));
-  await box.getByRole("button", { name: "Reserve on this route" }).click();
+  await box.getByRole("button", { name: `Reserve ${legs} cores` }).click();
   expect((await sent).postDataJSON().srf_id).toBe("SRF-E2E");
-  const status = box.getByRole("status");
+  await expect(box).toBeHidden();
+  const status = page.getByTestId("request-sent");
   await expect(status).toContainText(/Request #\d+ sent/);
   const id = /Request #(\d+)/.exec((await status.textContent())!)![1];
   const r = await page.request.post(`/api/reservations/${id}/withdraw`); // leave the dev data as found

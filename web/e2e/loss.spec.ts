@@ -10,10 +10,10 @@ const pick = (page: Page, name: RegExp) => pickSegment(page, name);
 
 test.use({ viewport: { width: 1440, height: 900 } });
 
-test("segment-level views show no per-core loss; the diagram totals keep the segment loss", async ({ page }) => {
+test("segment-level views show no loss: diagram totals, segment list and Cores table", async ({ page }) => {
   await signIn(page);
   await pick(page, SEGMENTS.measured);
-  await expect(page.getByTestId("route-totals")).toContainText(/(Total|Calculated) loss[\d.]+ dB/);
+  await expect(page.getByTestId("route-totals")).toHaveText(/^Segments1Distance[\d.]+ km$/);
   await expect(page.getByRole("region", { name: "Segment list" })).not.toContainText("dB");
   await expect(page.getByRole("table", { name: /^Cores of / }).locator("thead")).not.toContainText("Loss"); // no loss column
 });
@@ -26,6 +26,6 @@ test("no distance segment: dashes, never 0 dB", async ({ page }) => {
   await pick(page, SEGMENTS.noDistance);
   const totals = page.getByTestId("route-totals");
   await expect(totals).toContainText("Distance-");
-  await expect(totals).toContainText(/loss-Average loss per km-/);
+  await expect(totals).not.toContainText("loss");
   await expect(page.getByTestId("segment-diagram")).not.toContainText("0.00 dB");
 });

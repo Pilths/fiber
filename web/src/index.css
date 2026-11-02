@@ -186,8 +186,6 @@
 .core:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; z-index: 1; }
 /* legend swatches reuse the cell classes */
 .sw { width: 22px; height: 20px; display: inline-flex; align-items: center; justify-content: center; border-radius: 4px; padding: 0; }
-.sw-chosen { background: var(--blue); border: 2px solid #0f3a78; color: #fff; }
-.sw-chosen .ic { color: #fff; }
 
 /* proportion bar keys */
 .k { width: 12px; height: 12px; border-radius: 3px; flex: none; display: inline-block; }
@@ -197,13 +195,10 @@
 .k-use { background: var(--use); }
 .k-fault { background: repeating-linear-gradient(135deg, var(--red-bg) 0 2px, var(--red) 2px 3px); box-shadow: inset 0 0 0 1px var(--red); }
 
-/* Chosen bar: footer band of the cores card; its wrapper .cstick (with the stale note) is sticky to the viewport bottom while the card is in view.
-   overflow: clip (not hidden) keeps the band inside the card without making it a scroll container. */
-.ccard { padding-bottom: 0; overflow: clip; }
-.cstick { position: sticky; bottom: 0; z-index: 6; margin: 16px -20px 0; background: #fff; }
-.cfoot { padding: 14px 20px 16px; border-top: 1px solid var(--border); background: var(--subtle); }
-.cfoot[data-has="true"] { background: var(--blue-bg); border-top-color: var(--blue-bd); }
-.cchip { display: inline-flex; align-items: center; height: 24px; padding: 0 10px; border-radius: 4px; background: var(--blue); color: #fff; font-size: 12px; font-weight: 600; }
+/* Cores table: the row of a request just sent fades from blue to its normal tint. */
+@keyframes flash { from { background: var(--blue-bg); box-shadow: inset 3px 0 0 var(--blue); } }
+.tbl tr.flash { animation: flash 3s ease-out; }
+@media (prefers-reduced-motion: reduce) { .tbl tr.flash { animation: none; box-shadow: inset 3px 0 0 var(--blue); } }
 
 /* Route diagram (v4 lineSVG): segment groups are SVG <g role="button">; outline is unreliable on SVG, so the focus ring is the hit rect's stroke. */
 .rd-g { outline: none; }

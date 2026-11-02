@@ -22,7 +22,7 @@ test("route search, pick a segment in the diagram: totals, one Cores table with 
   const segs = diagram.getByRole("list", { name: "Segments on the route" }).getByRole("button");
   await expect(segs.first()).toHaveAttribute("aria-pressed", "true");
   const n = await segs.count();
-  await expect(diagram.getByTestId("route-totals")).toHaveText(new RegExp(`^Segments${n}Distance[\\d.]+ km(Total|Calculated) loss[\\d.]+ dBAverage loss per km[\\d.]+ dB/km$`));
+  await expect(diagram.getByTestId("route-totals")).toHaveText(new RegExp(`^Segments${n}Distance[\\d.]+ km$`));
   await expect(diagram).not.toContainText("No distance");
 
   const last = segs.filter({ hasText: /\d km/ }).last(); // a segment with a distance, so it has a calculated loss
@@ -61,10 +61,10 @@ test("route search, pick a segment in the diagram: totals, one Cores table with 
   await page.screenshot({ path: "e2e/screenshots/network-detail.png", fullPage: true });
 });
 
-test("Reserve cores on the segment diagram opens the core grid with the chosen bar", async ({ page }) => {
+test("Reserve cores on the segment diagram opens the Reserve box over Inventory", async ({ page }) => {
   await signIn(page);
-  await openReserve(page, /^DEV Kuala Lumpur DC - DEV Cyberjaya DC/);
-  await expect(page.getByRole("grid", { name: "Cores" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: /^Allocations/ })).toHaveCount(0); // merged into the Cores table
-  await page.screenshot({ path: "e2e/screenshots/reserve-tab.png", fullPage: true });
+  const box = await openReserve(page, /^DEV Kuala Lumpur DC - DEV Cyberjaya DC/);
+  await expect(page.getByTestId("segment-diagram")).toBeAttached(); // Inventory stays behind the box
+  await expect(page.getByRole("grid", { name: "Cores" })).toHaveCount(0); // no core grid any more
+  await expect(box.getByRole("table", { name: "Available cores" })).toBeVisible();
 });
