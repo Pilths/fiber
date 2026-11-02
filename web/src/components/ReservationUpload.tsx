@@ -113,7 +113,7 @@ function Reservations({ uploadId, total }: { uploadId: number; total: number }) 
         <>
           <div className="tbox">
           <table className="tbl band" aria-label="Reservations to import">
-            <thead><tr><th className="num w-px">Row</th><th>Customer</th><th>Segment</th><th className="num w-px">Cores</th><th className="w-px">Planned date</th><th>Group</th><th className="w-px">Additional</th><th>Ports</th></tr></thead>
+            <thead><tr><th className="num w-16">Row</th><th>Customer</th><th>Segment</th><th className="num w-20">Cores</th><th className="w-32">Planned date</th><th>Group</th><th className="w-28">Additional</th><th>Ports</th></tr></thead>
             <tbody>
               {data.items.map((r) => {
                 const s = r.data.reservation!;
@@ -156,7 +156,7 @@ function GroupRows({ uploadId, counts, wins, onWin }: { uploadId: number; counts
         <>
           <div className="tbox">
           <table className="tbl band" aria-label={`${GROUP[group].label} rows`}>
-            <thead><tr>{segment ? <><th>Segment</th><th>File rows</th></> : <><th className="num w-px">Row</th><th className="w-px">Sheet</th></>}<th className="w-px">Status</th><th>Details</th></tr></thead>
+            <thead><tr>{segment ? <><th>Segment</th><th>File rows</th></> : <><th className="num w-16">Row</th><th className="w-36">Sheet</th></>}<th className="w-36">Status</th><th>Details</th></tr></thead>
             <tbody>
               {data.items.map((r) => (
                 <tr key={r.id} className="align-top [&>*]:py-2.5! [&>*]:h-auto!">

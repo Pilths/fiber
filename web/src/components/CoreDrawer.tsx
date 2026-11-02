@@ -4,12 +4,13 @@ import type { components } from "@/api/schema";
 import { Icon } from "@/components/Icon";
 import { Blank } from "@/components/LossCard";
 import { Dialog } from "@/components/upload-parts";
-import { EVENT_WORD, STATUS, statusLabel, when } from "@/lib/status";
+import { db, EVENT_WORD, STATUS, statusLabel, when } from "@/lib/status";
 
 type Core = components["schemas"]["CoreDetail"];
 type Holder = components["schemas"]["Holder"];
 type Item = components["schemas"]["CoreHistoryItem"];
 type Me = components["schemas"]["CurrentUser"];
+type CoreLoss = components["schemas"]["CoreLoss"];
 
 const line = (h: Item) =>
   h.kind === "data_edit"
@@ -18,8 +19,10 @@ const line = (h: Item) =>
 
 // Core detail: right-side drawer on the native <dialog> (Esc closes, focus returns to the cell or row that opened it).
 // The holder comes from GET /api/cores/{id}: everyone sees who holds a core; actions follow holder.is_mine or admin.
-export function CoreDrawer({ core, segment, ends, me, onClose, onChanged }: {
+// Loss is per core: `calc` is the core's calculated loss (the segment's formula when the core has no row), `loss` its tests.
+export function CoreDrawer({ core, segment, ends, me, onClose, onChanged, loss, calc }: {
   core: Core; segment: string; ends: [string, string]; me: Me; onClose: () => void; onChanged: () => void;
+  loss: CoreLoss | null; calc: number | null;
 }) {
   const [items, setItems] = useState<Item[] | null>(null);
   const [res, setRes] = useState<Holder | null>(null);
@@ -63,6 +66,13 @@ export function CoreDrawer({ core, segment, ends, me, onClose, onChanged }: {
     ["Ports", core.port_a || core.port_b ? <span key="p">{core.port_a ?? <Blank />} to {core.port_b ?? <Blank />}</span> : <Blank key="p">No ports yet</Blank>],
     ["Circuit", core.circuit_id ? <span key="c" className="font-mono">{core.circuit_id}</span> : <Blank key="c">{core.status === "Available" ? "Not applicable" : "Not recorded"}</Blank>],
     ["Planned date", core.planned_date ?? na],
+    ["Calculated loss", calc == null ? <Blank key="cl">No distance</Blank> : db(calc)],
+    ["Measured loss", !loss ? <Blank key="ml">Not tested</Blank> : <span key="ml">
+      {loss.measured_db > (calc ?? Infinity)
+        ? <>{db(loss.measured_db)} <span aria-hidden className="text-amber">▲</span><span className="sr-only"> above calculated</span></>
+        : db(loss.measured_db)}
+      {[loss.test_method, loss.tested_on, loss.field_team].filter(Boolean).map((x) => `, ${x}`).join("")}
+    </span>],
   ];
 
   return (
@@ -88,6 +98,19 @@ export function CoreDrawer({ core, segment, ends, me, onClose, onChanged }: {
           {canKeep && <button type="button" className="btn" disabled={busy} onClick={() => act(() => resAction(res.reservation_id, "request-release", { cores: [core.id] }))}>Request release of core {core.number}</button>}
           {canRelease && <button type="button" className="btn btn-p" disabled={busy} onClick={() => act(() => release(res.reservation_id))}>Release requested cores</button>}
         </div>
+      )}
+
+      {loss && loss.history.length > 0 && (
+        <>
+          <h3 className="mt-5 border-t pt-4 text-sm font-semibold">Measured loss tests</h3>
+          <ol className="mt-2 text-body" aria-label="Measured loss tests, newest first">
+            {loss.history.map((h, i) => (
+              <li key={i} className="border-b border-rule py-2 last:border-b-0">
+                <span className="font-semibold">{db(h.loss_db)}</span>{[h.test_method, h.tested_on, h.field_team].filter(Boolean).map((x) => `, ${x}`).join("")}
+              </li>
+            ))}
+          </ol>
+        </>
       )}
 
       <h3 className="mt-5 border-t pt-4 text-sm font-semibold">History</h3>

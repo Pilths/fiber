@@ -1,23 +1,20 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api, ApiError, authEvents, setDevUser } from "@/api/client";
 import { ChangePassword, Login } from "@/components/Auth";
 import type { components } from "@/api/schema";
 import { EditSiteDialog, EditSegmentDialog, type SegmentFocus } from "@/components/AdminEdit";
-import { ChosenBar } from "@/components/ChosenBar";
 import { CoreDrawer } from "@/components/CoreDrawer";
-import { FindCard } from "@/components/FindCard";
+import { SegmentList } from "@/components/FindCard";
 import { Header, type View } from "@/components/Header";
-import { HeldTable } from "@/components/HeldTable";
-import { Icon } from "@/components/Icon";
-import { Inspector } from "@/components/Inspector";
-import { CoresTable, RouteSearch, SegmentDiagram, Unassigned, type Found } from "@/components/NetworkDetail";
+import { AssignDialog } from "@/components/AssignDialog";
+import { CoresTable, SegmentDiagram, type Found } from "@/components/NetworkDetail";
 import { NetworkMap } from "@/components/NetworkMap";
-import { PortGrid } from "@/components/PortGrid";
-import { RouteForm, RouteSection, RouteSummary, useRoutePlanner } from "@/components/RoutePlanner";
+import { ReserveBox } from "@/components/ReserveBox";
+import { RouteOptions, RouteSearch, useRoutePlanner } from "@/components/RoutePlanner";
 import { Upload } from "@/components/Upload";
 import { Users } from "@/components/Users";
 import { Approvals, MyReservations, NeedsReview } from "@/components/Reservations";
-import { countBy, NO_FILTER, segmentName, STATUS, STATUS_ORDER, statusLabel, type LossDetail, type SegmentFilter, type SegmentLoss } from "@/lib/status";
+import { inFilter, NO_FILTER, segmentName, type LossDetail, type SegmentFilter } from "@/lib/status";
 
 type Segment = components["schemas"]["SegmentSummary"];
 type Detail = components["schemas"]["SegmentDetail"];
@@ -26,7 +23,7 @@ type Bell = components["schemas"]["Bell"];
 
 // Selection lives in the URL hash so links can be shared: #segment=<site A> - <site B>.
 // The API has no LRD codes on segments yet, so the hash uses the segment name, not the AABB-BBCC form of the PRD.
-// Route mode uses #route=<from site id>-<to site id>-<cores>-<km|free_cores>-<option index> (RoutePlanner.tsx).
+// A found route uses #route=<from site id>-<to site id>-<cores>-<km|free_cores>-<option index> (RoutePlanner.tsx).
 const hashSegment = () => {
   // Old links used #span=: rewrite them to #segment= in place.
   if (location.hash.startsWith("#span=")) history.replaceState(null, "", "#segment=" + location.hash.slice(6));
@@ -76,31 +73,26 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
   const [segmentId, setSegmentId] = useState<number | null>(null);
   const [detail, setDetail] = useState<Detail | null>(null);
   const [focusCoreId, setFocusCoreId] = useState<number | null>(null);
-  const [selected, setSelected] = useState<Set<number>>(new Set());
-  const [view, setViewState] = useState<View>(location.hash === "#users" ? "users" : location.hash.startsWith("#route=") ? "reserve" : "map");
+  const [reserving, setReserving] = useState<"segment" | "route" | null>(null);
+  const [sent, setSent] = useState<number | null>(null); // reservation id of the last request: success box and highlighted row
+  const [view, setViewState] = useState<View>(location.hash === "#users" ? "users" : "map");
   const [bell, setBell] = useState<Bell | null>(null);
   const [stale, setStale] = useState(0);
   const [loss, setLoss] = useState<LossDetail | null>(null);
-  const [lossList, setLossList] = useState<SegmentLoss[]>([]);
   const [version, setVersion] = useState(0); // bumped after a booking or edit so the segment list and grid reload
   const [drawerCore, setDrawerCore] = useState<number | null>(null);
-  const [found, setFound] = useState<Found | null>(null); // route search result
   const [editSegment, setEditSegment] = useState<{ focus?: SegmentFocus } | null>(null);
   const [editSite, setEditSite] = useState<number | null>(null);
+  const [assign, setAssign] = useState<Detail["unassigned"][number] | null>(null);
   const [filter, setFilter] = useState<SegmentFilter>(NO_FILTER);
-  const [mode, setModeState] = useState<"segment" | "route">(location.hash.startsWith("#route=") ? "route" : "segment");
-  const rp = useRoutePlanner(mode === "route" && view === "reserve", version);
+  // Route A to B above the map; the chosen option is the found route, drawn on the map and the segment diagram.
+  const rp = useRoutePlanner(view === "map", version);
+  const op = rp.option;
+  const found: Found | null = op && { ids: op.segments.map((s) => s.segment_id), km: op.total_km, sites: [op.segments[0].site_a, ...op.segments.map((s) => s.site_b)] };
+  const foundKey = found?.ids.join(",");
   // Upload stays mounted once opened (hidden on other views) so a staged preview and its choices survive tab changes.
   const [uploadSeen, setUploadSeen] = useState(false);
   if (view === "upload" && !uploadSeen) setUploadSeen(true);
-  // Switching modes clears the other mode's selection and hash.
-  const setMode = useCallback((m: "segment" | "route") => {
-    setModeState(m);
-    if (m === "route") {
-      setSegmentId(null); setDetail(null); setSelected(new Set()); setDrawerCore(null);
-      if (location.hash.startsWith("#segment=")) history.replaceState(null, "", location.pathname);
-    } else if (location.hash.startsWith("#route=")) history.replaceState(null, "", location.pathname);
-  }, []);
 
   const refreshBell = useCallback(() => {
     api.get("/api/bell").then(setBell).catch(() => {});
@@ -110,27 +102,21 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
   const setView = useCallback((v: View) => {
     setViewState(v);
     if (v === "users") history.replaceState(null, "", "#users");
-    else if (location.hash === "#users" || (v !== "reserve" && location.hash.startsWith("#route="))) history.replaceState(null, "", location.pathname);
+    else if (location.hash === "#users" || (v !== "map" && location.hash.startsWith("#route="))) history.replaceState(null, "", location.pathname);
   }, []);
   useEffect(() => {
     const sync = () => {
       if (location.hash === "#users") setViewState("users");
-      if (location.hash.startsWith("#route=")) { setViewState("reserve"); setMode("route"); }
+      if (location.hash.startsWith("#route=")) setViewState("map");
     };
     addEventListener("hashchange", sync);
     return () => removeEventListener("hashchange", sync);
-  }, [setMode]);
+  }, []);
   useEffect(refreshBell, [refreshBell, view]);
 
   useEffect(() => {
     api.get("/api/segments").then(setSegments).catch(() => setError("Could not load segments."));
   }, [version, view]);
-  // Loss is read-only here; one load per visit to the map is enough.
-  useEffect(() => {
-    if (view !== "map" && view !== "reserve") return;
-    api.get("/api/loss/segments").then(setLossList).catch(() => {});
-  }, [view, version]);
-
   useEffect(() => {
     if (segmentId == null) return;
     let stale = false;
@@ -141,13 +127,13 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
 
   const segmentRef = useRef(segmentId);
   useEffect(() => { segmentRef.current = segmentId; }, [segmentId]);
-  // Selects a segment on the current view (Map or Reserve); the Map and Reserve tabs share the selection.
+  // Selects a segment on Inventory.
   const open = useCallback((id: number, coreId: number | null = null) => {
-    setModeState("segment");
     setDetail((d) => (d?.id === id ? d : null));
     setSegmentId(id);
     setFocusCoreId(coreId);
-    setSelected((s) => (s.size ? new Set() : s));
+    setReserving(null);
+    setSent(null);
     setDrawerCore(null);
   }, []);
 
@@ -163,14 +149,15 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
     addEventListener("hashchange", sync);
     return () => removeEventListener("hashchange", sync);
   }, [segments, open]);
-  // Selection -> hash.
+  // A newly found route (or another option) selects its first segment.
+  const [seenRoute, setSeenRoute] = useState(foundKey);
+  if (seenRoute !== foundKey) { setSeenRoute(foundKey); if (found) open(found.ids[0]); }
+  // Selection -> hash; a found route keeps its #route= hash.
   useEffect(() => {
     const s = segments?.find((x) => x.id === segmentId);
-    if (s && hashSegment() !== segmentName(s)) history.replaceState(null, "", `#segment=${encodeURIComponent(segmentName(s))}`);
-  }, [segmentId, segments]);
+    if (s && !foundKey && hashSegment() !== segmentName(s)) history.replaceState(null, "", `#segment=${encodeURIComponent(segmentName(s))}`);
+  }, [segmentId, segments, foundKey]);
 
-  const toggle = (id: number) => setSelected((s) => { const n = new Set(s); if (!n.delete(id)) n.add(id); return n; });
-  const chosen = detail?.cores.filter((c) => selected.has(c.id)) ?? [];
   const changed = () => { setVersion((v) => v + 1); refreshBell(); };
   const drawn = detail?.cores.find((c) => c.id === drawerCore);
   const admin = me.role === "admin" && segmentId != null ? {
@@ -179,29 +166,22 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
       api.get("/api/admin/segments/{sid}", { path: { sid: segmentId } }).then((x) => setEditSite(end === "a" ? x.site_a_id : x.site_b_id)).catch(() => setError("Could not load the segment."));
     },
   } : null;
-  const goToRoute = () => {
-    const h = document.getElementById("route-h");
-    h?.scrollIntoView({ block: "start" });
-    h?.focus({ preventScroll: true });
-  };
   // Map: Esc clears the selection and the searched route.
   const clearSelection = () => {
-    setSegmentId(null); setDetail(null); setSelected(new Set()); setDrawerCore(null); setFound(null);
+    setSegmentId(null); setDetail(null); setDrawerCore(null); rp.clear();
     if (location.hash.startsWith("#segment=")) history.replaceState(null, "", location.pathname);
   };
-  const routeName = rp.option && `${rp.option.segments[0].site_a} to ${rp.option.segments[rp.option.segments.length - 1].site_b}`;
   const mapIds = found ? [...found.ids, ...(segmentId != null && !found.ids.includes(segmentId) ? [segmentId] : [])]
     : segmentId != null ? [segmentId] : [];
   const segmentLoss = loss?.segment_id === segmentId ? loss : null;
-  const measured = useMemo(() => new Set(segmentLoss?.cores.map((c) => c.core_id)), [segmentLoss]);
-  const toCores = () => document.getElementById("cores")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  const onRoute = op && detail && found?.ids.includes(detail.id) ? op : null;
 
   return (
     <div className="min-h-screen">
       <Header onPick={(r) => { if (r.segment_id != null) { setView("map"); open(r.segment_id, r.core_id ?? null); } }} view={view} onView={setView} me={me}
         approvals={me.role === "admin" ? bell?.approvals ?? null : null} stale={stale} onSignOut={onSignOut} onChangePassword={onChangePassword} />
       {error && <p role="alert" className="mx-6 mt-4 rounded-md border border-red bg-red-bg px-4 py-2 font-semibold text-red">{error}</p>}
-      {view !== "map" && view !== "reserve" && view !== "upload" && (
+      {view !== "map" && view !== "upload" && (
         <main className="space-y-4 px-6 pt-6 pb-10">
           {view === "mine" && (
             <>
@@ -218,99 +198,63 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
       )}
       {view === "map" && (
         <main className="grid grid-cols-12 gap-4 px-6 pt-6 pb-10">
-          <RouteSearch onFound={(f) => { setFound(f); if (f) open(f.ids[0]); }} />
+          <RouteSearch rp={rp} />
+          <RouteOptions rp={rp} />
           <section className="card col-span-8 flex flex-col p-3" aria-label="Network map" aria-describedby="map-instr">
             {/* ponytail: site clicks do nothing on the view-only map; wire them to Route A/B if planners ask */}
             <NetworkMap version={version} onSelectSegment={(id) => open(id)} onSite={() => {}} onClear={clearSelection}
-              selectedIds={mapIds} routeKey={found ? `found-${found.ids.join(",")}` : null} visible={() => true} />
+              selectedIds={mapIds} routeKey={found ? `found-${found.ids.join(",")}` : null} visible={(p) => inFilter(p, filter)} />
           </section>
-          {/* The Inspector fills the map card's height (absolute), so the map alone sets the row height. */}
+          {/* The list fills the map card's height (absolute), so the map alone sets the row height. */}
           <div className="relative col-span-4 min-w-0">
-            <Inspector detail={detail} loading={segmentId != null && !detail} loss={segmentLoss} admin={admin} onCores={toCores} fill />
+            <SegmentList segments={segments} selectedId={segmentId} onSelect={(id) => open(id)} filter={filter} onFilter={setFilter} />
           </div>
+          {segmentId != null && !detail && <p className="card empty col-span-12 text-center text-body text-muted-foreground">Loading segment...</p>}
           {detail && (
             <div className="col-span-12 space-y-4">
-              <SegmentDiagram segments={segments} found={found} d={detail} loss={lossList} selectedId={detail.id} onPick={(id) => open(id)} />
+              <SegmentDiagram segments={segments} found={found} d={detail} selectedId={detail.id} onPick={(id) => open(id)}
+                onSite={admin?.onEditSite} actions={<>
+                  {onRoute && <button type="button" className="btn btn-p" disabled={onRoute.insufficient} onClick={() => setReserving("route")}>Reserve on this route</button>}
+                  {detail.fiber_cut
+                    ? admin && <button type="button" className="btn" onClick={() => admin.onEditSegment("restore")}>Restore</button>
+                    : detail.survey_cores != null && <button type="button" className={onRoute ? "btn" : "btn btn-p"} onClick={() => setReserving("segment")}>Reserve cores</button>}
+                  {admin && <button type="button" className="btn" onClick={() => admin.onEditSegment()}>Edit segment</button>}
+                </>} />
               <section id="cores" className="card scroll-mt-4" aria-labelledby="cores-h">
-                <div className="card-h items-center"><h2 id="cores-h">Cores of {segmentName(detail)}</h2></div>
+                <div className="card-h items-center"><h2 id="cores-h">Cores</h2></div>
+                {sent != null && <Sent id={sent} onClose={() => setSent(null)} />}
                 {detail.survey_cores == null
                   ? <NotSurveyed d={detail} admin={admin} />
-                  : <CoresTable key={`${detail.id}-${focusCoreId}`} d={detail} loss={segmentLoss} focusCoreId={focusCoreId} onActions={(c) => setDrawerCore(c.id)} />}
+                  : <CoresTable key={`${detail.id}-${focusCoreId}`} d={detail} focusCoreId={focusCoreId} flash={sent} onOpen={(c) => setDrawerCore(c.id)} onAssign={me.role === "admin" ? setAssign : null} />}
               </section>
             </div>
           )}
         </main>
       )}
-      {view === "reserve" && (
-        <main className="grid grid-cols-12 items-start gap-4 px-6 pt-6 pb-10">
-          <div className="col-span-4 flex min-w-0 flex-col gap-4">
-            <FindCard segments={segments} selectedId={segmentId} onSelect={(id) => open(id)} loss={lossList} mode={mode} onMode={setMode} route={<RouteForm rp={rp} />} filter={filter} onFilter={setFilter} />
-            {mode === "route" && <Inspector detail={null} loading={false} loss={null} admin={null} onCores={() => {}}
-              route={<RouteSummary key={`${rp.idx}-${routeName}`} rp={rp} onGo={goToRoute} />} />}
-          </div>
-          <div className="col-span-8 min-w-0 space-y-4">
-            {mode === "route" ? rp.option && <RouteSection rp={rp} segments={segments} onDone={changed} />
-              : !detail ? <p className="card empty px-4 py-10 text-center text-body text-muted-foreground">{segmentId != null ? "Loading segment..." : "Choose a segment from the list in Find."}</p>
-              : (
-                <>
-                  <section className={`card ${detail.survey_cores != null ? "ccard" : ""}`} aria-labelledby="cores-h">
-                    <div className="card-h items-center">
-                      <div className="flex min-w-0 flex-wrap items-baseline gap-x-5 gap-y-1">
-                        <h2 id="cores-h">Cores</h2>
-                        {detail.survey_cores != null && <span className="text-body text-muted-foreground"><b className="font-semibold text-foreground">{detail.survey_cores}</b> surveyed of {detail.cable_size}</span>}
-                      </div>
-                    </div>
-                    {detail.survey_cores == null
-                      ? <NotSurveyed d={detail} admin={admin} />
-                      : <Cores d={detail} selected={selected} chosen={chosen} toggle={toggle} focusCoreId={focusCoreId} onOpen={(c) => setDrawerCore(c.id)} measured={measured} current={drawerCore}
-                          onClear={() => setSelected(new Set())}
-                          onDone={() => { setSelected(new Set()); setVersion((v) => v + 1); refreshBell(); }} />}
-                  </section>
-                  <HeldTable d={detail} admin={me.role === "admin"} onOpen={(c) => setDrawerCore(c.id)} onChanged={changed} />
-                </>
-              )}
-          </div>
-        </main>
+      {detail && drawn && <CoreDrawer key={drawn.id} core={drawn} segment={segmentName(detail)} ends={[detail.site_a, detail.site_b]} me={me} onClose={() => setDrawerCore(null)} onChanged={changed}
+        loss={segmentLoss?.cores.find((x) => x.core_id === drawn.id) ?? null} calc={segmentLoss?.cores.find((x) => x.core_id === drawn.id)?.calculated_db ?? segmentLoss?.calculated_db ?? null} />}
+      {reserving === "segment" && detail && (
+        <ReserveBox sites={[detail.site_a, detail.site_b]} onClose={() => setReserving(null)} onSent={(id) => { setSent(id); changed(); }}
+          mode={{ kind: "segment", cores: detail.cores, free: detail.free_to_reserve, km: detail.distance_km ? Number(detail.distance_km) : null, loss: segmentLoss }} />
       )}
-      {detail && drawn && <CoreDrawer key={drawn.id} core={drawn} segment={segmentName(detail)} ends={[detail.site_a, detail.site_b]} me={me} onClose={() => setDrawerCore(null)} onChanged={changed} />}
+      {reserving === "route" && op && found && (
+        <ReserveBox sites={found.sites} onClose={() => setReserving(null)} onSent={(id) => { setSent(id); changed(); }}
+          mode={{ kind: "route", need: rp.need ?? 1, legs: op.segments.map((s) => ({ segment_id: s.segment_id, name: s.name, free: s.free_to_reserve })) }} />
+      )}
       {editSegment && segmentId != null && <EditSegmentDialog segmentId={segmentId} focus={editSegment.focus} onClose={() => setEditSegment(null)} onSaved={changed} />}
+      {assign && detail && <AssignDialog d={detail} hold={assign} onClose={() => setAssign(null)} onSaved={changed} />}
       {editSite != null && <EditSiteDialog siteId={editSite} onClose={() => setEditSite(null)} onSaved={changed} />}
     </div>
   );
 }
 
-function Cores({ d, selected, chosen, toggle, focusCoreId, onOpen, onClear, onDone, measured, current }: {
-  d: Detail; selected: Set<number>; chosen: Detail["cores"]; toggle: (id: number) => void; focusCoreId: number | null;
-  onOpen: (c: Detail["cores"][number]) => void; onClear: () => void; onDone: () => void; measured: Set<number>; current: number | null;
-}) {
-  const n = countBy(d);
-  return (
-    <>
-      <ul aria-label="Status key" className="mb-1 flex flex-wrap gap-x-5 gap-y-2 text-body text-muted-foreground">
-        {(["Available", "Chosen", ...STATUS_ORDER.slice(1)] as const).map((s) => {
-          const st = s === "Chosen" ? STATUS.Available : STATUS[s];
-          return (
-            <li key={s} className="flex items-center gap-2" data-key={s}>
-              <span aria-hidden className={`core sw ${st.cls} ${s === "Chosen" ? "sw-chosen" : ""}`}><Icon name={s === "Chosen" ? "ch" : st.icon} /></span>
-              {statusLabel(s)} <b className="font-bold text-foreground">{s === "Chosen" ? chosen.length : n[s]}</b>
-            </li>
-          );
-        })}
-        <li className="flex items-center gap-2" data-key="measured"><span aria-hidden className="text-foreground">&#9650;</span>Loss measured</li>
-      </ul>
-      <PortGrid cores={d.cores} selected={selected} onToggle={toggle} onOpen={onOpen} focusCoreId={focusCoreId} measured={measured} current={current} />
-      <Unassigned d={d} />
-      {/* The stale note sticks with the chosen bar, directly above it, so the bar never covers it. */}
-      <div className="cstick">
-        {chosen.length > 0 && <p className="mx-5 mb-3 flex items-center gap-2 note px-3 py-2 text-body" data-testid="stale-note">
-          <Icon name="lo" className="ic flex-none text-amber" />
-          <span><b className="font-semibold text-amber">Stale after 3 months.</b> An approved reservation not kept for 3 months is flagged Stale. Keep or release it in My reservations.</span>
-        </p>}
-        <ChosenBar key={d.id} cores={chosen.map((c) => ({ id: c.id, number: c.number }))} free={d.free_to_reserve} onClear={onClear} onDone={onDone} />
-      </div>
-    </>
-  );
-}
+// Closable success box above the Cores table after a request.
+const Sent = ({ id, onClose }: { id: number; onClose: () => void }) => (
+  <div role="status" className="mb-3 flex items-center gap-3 rounded-md border border-green-bd bg-green-bg px-3 py-2 text-body font-semibold text-green" data-testid="request-sent">
+    <span className="flex-1">Request #{id} sent. Waiting for admin approval.</span>
+    <button type="button" className="btn btn-sm px-2.5" aria-label="Close" onClick={onClose}>×</button>
+  </div>
+);
 
 function NotSurveyed({ d, admin }: { d: Detail; admin: { onEditSegment: (focus?: SegmentFocus) => void } | null }) {
   return (
