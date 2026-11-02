@@ -10,7 +10,6 @@ export const STATUS: Record<CoreStatus, { icon: IconName; cls: string; tone: str
   Reserved: { icon: "rs", cls: "core-reserved", tone: "text-foreground" },
   "In use": { icon: "iu", cls: "core-inuse", tone: "text-use" },
 };
-export const STATUS_ORDER = Object.keys(STATUS) as CoreStatus[];
 // The API and the data keep "In use"; the screens say "In service".
 export const statusLabel = (s: string) => (s === "In use" ? "In service" : s);
 
@@ -31,34 +30,20 @@ export const countBy = (d: { cores: { status: CoreStatus }[] }) => {
   return n;
 };
 
-// Find filters live in the Dashboard so the map dims the same segments the list hides.
-export type SegmentFilter = { q: string; region: string; routeType: string; route: string };
-export const NO_FILTER: SegmentFilter = { q: "", region: "", routeType: "", route: "" };
-// Region, route type and route only; the text search narrows the list, not the map.
-export const inFilter = (s: { region: string | null; route_type: string | null; route?: string | null }, f: SegmentFilter) =>
-  (!f.region || s.region === f.region) && (!f.routeType || s.route_type === f.routeType) && (!f.route || s.route === f.route);
+// Segment list filters live in the Dashboard so the map dims the same segments the list hides.
+export type SegmentFilter = { q: string; region: string; routeType: string };
+export const NO_FILTER: SegmentFilter = { q: "", region: "", routeType: "" };
+// Region and route type only; the text search narrows the list, not the map.
+export const inFilter = (s: { region: string | null; route_type: string | null }, f: SegmentFilter) =>
+  (!f.region || s.region === f.region) && (!f.routeType || s.route_type === f.routeType);
 
 export const segmentName = (s: { site_a: string; site_b: string }) => `${s.site_a} - ${s.site_b}`;
 
 export const inputCls =
   "h-9 rounded-md border border-line bg-white px-3 text-sm outline-none focus-visible:outline-3 focus-visible:outline-blue";
 
-export type SegmentLoss = components["schemas"]["SegmentLoss"];
 export type LossDetail = components["schemas"]["SegmentLossDetail"];
-type Level = NonNullable<SegmentLoss["level"]>;
-
-// Symbol + word per band, never colour alone. Bands come from the API (deviation from calculated).
-export const LEVEL: Record<Level, { icon: IconName; cls: string; word: string }> = {
-  green: { icon: "ch", cls: "h-green", word: "Within 3%" },
-  amber: { icon: "lo", cls: "h-amber", word: "Over 3%" },
-  red: { icon: "fl", cls: "h-red", word: "Over 7%" },
-  off_scale: { icon: "ex", cls: "h-off", word: "Off scale (over 10%)" },
-};
-
-const sign = (n: number) => (n > 0 ? "+" : n < 0 ? "−" : "");
 export const db = (n: number) => `${n.toFixed(2)} dB`;
-export const signedDb = (n: number) => `${sign(n)}${Math.abs(n).toFixed(2)} dB`;
-export const pct = (n: number) => `${sign(n)}${Math.abs(n).toFixed(1)}%`;
 
 // Date and time in Asia/Kuala_Lumpur, e.g. "26 Oct 2026, 14:05".
 export const when = (iso: string) =>
@@ -69,9 +54,3 @@ export const EVENT_WORD: Record<string, string> = {
   requested: "Requested", approved: "Approved", rejected: "Rejected", withdrawn: "Withdrawn", kept: "Kept",
   release_requested: "Release requested", released: "Released", release_declined: "Release declined", corrected: "Corrected", assigned: "Cores assigned",
 };
-
-// Total loss of a segment: its worst measured core (dB); not measured -> the calculated loss (see docs: km x 0.25 + splices + connectors), flagged.
-type Loss = Pick<SegmentLoss, "measured_db" | "calculated_db">;
-export const totalLoss = (l: Loss | null | undefined) =>
-  l?.measured_db != null ? { db: l.measured_db, calc: false } : l?.calculated_db != null ? { db: l.calculated_db, calc: true } : null;
-export const perKm = (dB: number, km: number) => `${(dB / km).toFixed(2)} dB/km`;

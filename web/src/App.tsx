@@ -4,18 +4,17 @@ import { ChangePassword, Login } from "@/components/Auth";
 import type { components } from "@/api/schema";
 import { EditSiteDialog, EditSegmentDialog, type SegmentFocus } from "@/components/AdminEdit";
 import { CoreDrawer } from "@/components/CoreDrawer";
-import { FindCard, SegmentList } from "@/components/FindCard";
+import { SegmentList } from "@/components/FindCard";
 import { Header, type View } from "@/components/Header";
 import { AssignDialog } from "@/components/AssignDialog";
-import { Inspector } from "@/components/Inspector";
-import { CoresTable, RouteSearch, SegmentDiagram, type Found } from "@/components/NetworkDetail";
+import { CoresTable, SegmentDiagram, type Found } from "@/components/NetworkDetail";
 import { NetworkMap } from "@/components/NetworkMap";
 import { ReserveBox } from "@/components/ReserveBox";
-import { RouteForm, RouteSection, RouteSummary, useRoutePlanner } from "@/components/RoutePlanner";
+import { RouteOptions, RouteSearch, useRoutePlanner } from "@/components/RoutePlanner";
 import { Upload } from "@/components/Upload";
 import { Users } from "@/components/Users";
 import { Approvals, MyReservations, NeedsReview } from "@/components/Reservations";
-import { inFilter, NO_FILTER, segmentName, type LossDetail, type SegmentFilter, type SegmentLoss } from "@/lib/status";
+import { inFilter, NO_FILTER, segmentName, type LossDetail, type SegmentFilter } from "@/lib/status";
 
 type Segment = components["schemas"]["SegmentSummary"];
 type Detail = components["schemas"]["SegmentDetail"];
@@ -24,7 +23,7 @@ type Bell = components["schemas"]["Bell"];
 
 // Selection lives in the URL hash so links can be shared: #segment=<site A> - <site B>.
 // The API has no LRD codes on segments yet, so the hash uses the segment name, not the AABB-BBCC form of the PRD.
-// Route mode uses #route=<from site id>-<to site id>-<cores>-<km|free_cores>-<option index> (RoutePlanner.tsx).
+// A found route uses #route=<from site id>-<to site id>-<cores>-<km|free_cores>-<option index> (RoutePlanner.tsx).
 const hashSegment = () => {
   // Old links used #span=: rewrite them to #segment= in place.
   if (location.hash.startsWith("#span=")) history.replaceState(null, "", "#segment=" + location.hash.slice(6));
@@ -74,30 +73,26 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
   const [segmentId, setSegmentId] = useState<number | null>(null);
   const [detail, setDetail] = useState<Detail | null>(null);
   const [focusCoreId, setFocusCoreId] = useState<number | null>(null);
-  const [reserving, setReserving] = useState(false);
+  const [reserving, setReserving] = useState<"segment" | "route" | null>(null);
   const [sent, setSent] = useState<number | null>(null); // reservation id of the last request: success box and highlighted row
-  const [view, setViewState] = useState<View>(location.hash === "#users" ? "users" : location.hash.startsWith("#route=") ? "reserve" : "map");
+  const [view, setViewState] = useState<View>(location.hash === "#users" ? "users" : "map");
   const [bell, setBell] = useState<Bell | null>(null);
   const [stale, setStale] = useState(0);
   const [loss, setLoss] = useState<LossDetail | null>(null);
-  const [lossList, setLossList] = useState<SegmentLoss[]>([]);
   const [version, setVersion] = useState(0); // bumped after a booking or edit so the segment list and grid reload
   const [drawerCore, setDrawerCore] = useState<number | null>(null);
-  const [found, setFound] = useState<Found | null>(null); // route search result
   const [editSegment, setEditSegment] = useState<{ focus?: SegmentFocus } | null>(null);
   const [editSite, setEditSite] = useState<number | null>(null);
   const [assign, setAssign] = useState<Detail["unassigned"][number] | null>(null);
   const [filter, setFilter] = useState<SegmentFilter>(NO_FILTER);
-  // The old Reserve view now holds only the route planner (#route=); segments reserve in the box over Inventory.
-  const rp = useRoutePlanner(view === "reserve", version);
+  // Route A to B above the map; the chosen option is the found route, drawn on the map and the segment diagram.
+  const rp = useRoutePlanner(view === "map", version);
+  const op = rp.option;
+  const found: Found | null = op && { ids: op.segments.map((s) => s.segment_id), km: op.total_km, sites: [op.segments[0].site_a, ...op.segments.map((s) => s.site_b)] };
+  const foundKey = found?.ids.join(",");
   // Upload stays mounted once opened (hidden on other views) so a staged preview and its choices survive tab changes.
   const [uploadSeen, setUploadSeen] = useState(false);
   if (view === "upload" && !uploadSeen) setUploadSeen(true);
-  // Entering the route planner clears the segment selection and its hash.
-  const toRoute = useCallback(() => {
-    setSegmentId(null); setDetail(null); setDrawerCore(null);
-    if (location.hash.startsWith("#segment=")) history.replaceState(null, "", location.pathname);
-  }, []);
 
   const refreshBell = useCallback(() => {
     api.get("/api/bell").then(setBell).catch(() => {});
@@ -107,27 +102,21 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
   const setView = useCallback((v: View) => {
     setViewState(v);
     if (v === "users") history.replaceState(null, "", "#users");
-    else if (location.hash === "#users" || (v !== "reserve" && location.hash.startsWith("#route="))) history.replaceState(null, "", location.pathname);
+    else if (location.hash === "#users" || (v !== "map" && location.hash.startsWith("#route="))) history.replaceState(null, "", location.pathname);
   }, []);
   useEffect(() => {
     const sync = () => {
       if (location.hash === "#users") setViewState("users");
-      if (location.hash.startsWith("#route=")) { setViewState("reserve"); toRoute(); }
+      if (location.hash.startsWith("#route=")) setViewState("map");
     };
     addEventListener("hashchange", sync);
     return () => removeEventListener("hashchange", sync);
-  }, [toRoute]);
+  }, []);
   useEffect(refreshBell, [refreshBell, view]);
 
   useEffect(() => {
     api.get("/api/segments").then(setSegments).catch(() => setError("Could not load segments."));
   }, [version, view]);
-  // Loss is read-only here; one load per visit to the map is enough.
-  useEffect(() => {
-    if (view !== "map" && view !== "reserve") return;
-    api.get("/api/loss/segments").then(setLossList).catch(() => {});
-  }, [view, version]);
-
   useEffect(() => {
     if (segmentId == null) return;
     let stale = false;
@@ -138,12 +127,12 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
 
   const segmentRef = useRef(segmentId);
   useEffect(() => { segmentRef.current = segmentId; }, [segmentId]);
-  // Selects a segment on the current view (Map or Reserve); the Map and Reserve tabs share the selection.
+  // Selects a segment on Inventory.
   const open = useCallback((id: number, coreId: number | null = null) => {
     setDetail((d) => (d?.id === id ? d : null));
     setSegmentId(id);
     setFocusCoreId(coreId);
-    setReserving(false);
+    setReserving(null);
     setSent(null);
     setDrawerCore(null);
   }, []);
@@ -160,11 +149,14 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
     addEventListener("hashchange", sync);
     return () => removeEventListener("hashchange", sync);
   }, [segments, open]);
-  // Selection -> hash.
+  // A newly found route (or another option) selects its first segment.
+  const [seenRoute, setSeenRoute] = useState(foundKey);
+  if (seenRoute !== foundKey) { setSeenRoute(foundKey); if (found) open(found.ids[0]); }
+  // Selection -> hash; a found route keeps its #route= hash.
   useEffect(() => {
     const s = segments?.find((x) => x.id === segmentId);
-    if (s && hashSegment() !== segmentName(s)) history.replaceState(null, "", `#segment=${encodeURIComponent(segmentName(s))}`);
-  }, [segmentId, segments]);
+    if (s && !foundKey && hashSegment() !== segmentName(s)) history.replaceState(null, "", `#segment=${encodeURIComponent(segmentName(s))}`);
+  }, [segmentId, segments, foundKey]);
 
   const changed = () => { setVersion((v) => v + 1); refreshBell(); };
   const drawn = detail?.cores.find((c) => c.id === drawerCore);
@@ -174,27 +166,22 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
       api.get("/api/admin/segments/{sid}", { path: { sid: segmentId } }).then((x) => setEditSite(end === "a" ? x.site_a_id : x.site_b_id)).catch(() => setError("Could not load the segment."));
     },
   } : null;
-  const goToRoute = () => {
-    const h = document.getElementById("route-h");
-    h?.scrollIntoView({ block: "start" });
-    h?.focus({ preventScroll: true });
-  };
   // Map: Esc clears the selection and the searched route.
   const clearSelection = () => {
-    setSegmentId(null); setDetail(null); setDrawerCore(null); setFound(null);
+    setSegmentId(null); setDetail(null); setDrawerCore(null); rp.clear();
     if (location.hash.startsWith("#segment=")) history.replaceState(null, "", location.pathname);
   };
-  const routeName = rp.option && `${rp.option.segments[0].site_a} to ${rp.option.segments[rp.option.segments.length - 1].site_b}`;
   const mapIds = found ? [...found.ids, ...(segmentId != null && !found.ids.includes(segmentId) ? [segmentId] : [])]
     : segmentId != null ? [segmentId] : [];
   const segmentLoss = loss?.segment_id === segmentId ? loss : null;
+  const onRoute = op && detail && found?.ids.includes(detail.id) ? op : null;
 
   return (
     <div className="min-h-screen">
       <Header onPick={(r) => { if (r.segment_id != null) { setView("map"); open(r.segment_id, r.core_id ?? null); } }} view={view} onView={setView} me={me}
         approvals={me.role === "admin" ? bell?.approvals ?? null : null} stale={stale} onSignOut={onSignOut} onChangePassword={onChangePassword} />
       {error && <p role="alert" className="mx-6 mt-4 rounded-md border border-red bg-red-bg px-4 py-2 font-semibold text-red">{error}</p>}
-      {view !== "map" && view !== "reserve" && view !== "upload" && (
+      {view !== "map" && view !== "upload" && (
         <main className="space-y-4 px-6 pt-6 pb-10">
           {view === "mine" && (
             <>
@@ -211,7 +198,8 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
       )}
       {view === "map" && (
         <main className="grid grid-cols-12 gap-4 px-6 pt-6 pb-10">
-          <RouteSearch onFound={(f) => { setFound(f); if (f) open(f.ids[0]); }} />
+          <RouteSearch rp={rp} />
+          <RouteOptions rp={rp} />
           <section className="card col-span-8 flex flex-col p-3" aria-label="Network map" aria-describedby="map-instr">
             {/* ponytail: site clicks do nothing on the view-only map; wire them to Route A/B if planners ask */}
             <NetworkMap version={version} onSelectSegment={(id) => open(id)} onSite={() => {}} onClear={clearSelection}
@@ -224,11 +212,12 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
           {segmentId != null && !detail && <p className="card empty col-span-12 text-center text-body text-muted-foreground">Loading segment...</p>}
           {detail && (
             <div className="col-span-12 space-y-4">
-              <SegmentDiagram segments={segments} found={found} d={detail} loss={lossList} selectedId={detail.id} onPick={(id) => open(id)}
+              <SegmentDiagram segments={segments} found={found} d={detail} selectedId={detail.id} onPick={(id) => open(id)}
                 onSite={admin?.onEditSite} actions={<>
+                  {onRoute && <button type="button" className="btn btn-p" disabled={onRoute.insufficient} onClick={() => setReserving("route")}>Reserve on this route</button>}
                   {detail.fiber_cut
                     ? admin && <button type="button" className="btn" onClick={() => admin.onEditSegment("restore")}>Restore</button>
-                    : detail.survey_cores != null && <button type="button" className="btn btn-p" onClick={() => setReserving(true)}>Reserve cores</button>}
+                    : detail.survey_cores != null && <button type="button" className={onRoute ? "btn" : "btn btn-p"} onClick={() => setReserving("segment")}>Reserve cores</button>}
                   {admin && <button type="button" className="btn" onClick={() => admin.onEditSegment()}>Edit segment</button>}
                 </>} />
               <section id="cores" className="card scroll-mt-4" aria-labelledby="cores-h">
@@ -242,22 +231,15 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
           )}
         </main>
       )}
-      {view === "reserve" && (
-        <main className="grid grid-cols-12 items-start gap-4 px-6 pt-6 pb-10">
-          <div className="col-span-4 flex min-w-0 flex-col gap-4">
-            <FindCard segments={segments} selectedId={segmentId} onSelect={(id) => { setView("map"); open(id); }} loss={lossList} mode="route" onMode={(m) => m === "segment" && setView("map")} route={<RouteForm rp={rp} />} filter={filter} onFilter={setFilter} />
-            <Inspector detail={null} loading={false} loss={null} admin={null} onCores={() => {}}
-              route={<RouteSummary key={`${rp.idx}-${routeName}`} rp={rp} onGo={goToRoute} />} />
-          </div>
-          <div className="col-span-8 min-w-0 space-y-4">
-            {rp.option && <RouteSection rp={rp} segments={segments} onDone={changed} />}
-          </div>
-        </main>
-      )}
-      {detail && drawn && <CoreDrawer key={drawn.id} core={drawn} segment={segmentName(detail)} ends={[detail.site_a, detail.site_b]} me={me} onClose={() => setDrawerCore(null)} onChanged={changed} />}
-      {reserving && detail && (
-        <ReserveBox sites={[detail.site_a, detail.site_b]} onClose={() => setReserving(false)} onSent={(id) => { setSent(id); changed(); }}
+      {detail && drawn && <CoreDrawer key={drawn.id} core={drawn} segment={segmentName(detail)} ends={[detail.site_a, detail.site_b]} me={me} onClose={() => setDrawerCore(null)} onChanged={changed}
+        loss={segmentLoss?.cores.find((x) => x.core_id === drawn.id) ?? null} calc={segmentLoss?.cores.find((x) => x.core_id === drawn.id)?.calculated_db ?? segmentLoss?.calculated_db ?? null} />}
+      {reserving === "segment" && detail && (
+        <ReserveBox sites={[detail.site_a, detail.site_b]} onClose={() => setReserving(null)} onSent={(id) => { setSent(id); changed(); }}
           mode={{ kind: "segment", cores: detail.cores, free: detail.free_to_reserve, km: detail.distance_km ? Number(detail.distance_km) : null, loss: segmentLoss }} />
+      )}
+      {reserving === "route" && op && found && (
+        <ReserveBox sites={found.sites} onClose={() => setReserving(null)} onSent={(id) => { setSent(id); changed(); }}
+          mode={{ kind: "route", need: rp.need ?? 1, legs: op.segments.map((s) => ({ segment_id: s.segment_id, name: s.name, free: s.free_to_reserve })) }} />
       )}
       {editSegment && segmentId != null && <EditSegmentDialog segmentId={segmentId} focus={editSegment.focus} onClose={() => setEditSegment(null)} onSaved={changed} />}
       {assign && detail && <AssignDialog d={detail} hold={assign} onClose={() => setAssign(null)} onSaved={changed} />}

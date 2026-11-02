@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { pickSegment, signIn } from "./helpers";
+import { openCore, pickSegment, signIn } from "./helpers";
 
 // Loss belongs to a core. Dev seed: KL DC - Bukit Jalil has a measured core; Bukit Jalil - Kuantan has no distance.
 const SEGMENTS = {
@@ -18,8 +18,22 @@ test("segment-level views show no loss: diagram totals, segment list and Cores t
   await expect(page.getByRole("table", { name: /^Cores of / }).locator("thead")).not.toContainText("Loss"); // no loss column
 });
 
-// Per-core loss moves to core details in step C (docs/build-layout-plan.md); the inline row detail is gone.
-test.fixme("a measured core: its Calculated loss and Measured loss in core details", async () => {});
+test("a measured core: its Calculated loss and Measured loss in core details", async ({ page }) => {
+  await signIn(page);
+  await pick(page, SEGMENTS.measured);
+  const segs: { id: number; site_a: string; site_b: string }[] = await (await page.request.get("/api/segments")).json();
+  const seg = segs.find((s) => SEGMENTS.measured.test(`${s.site_a} - ${s.site_b}`))!;
+  const loss = await (await page.request.get(`/api/loss/segments/${seg.id}`)).json();
+  const core = loss.cores[0] as { core_number: number; measured_db: number; calculated_db: number | null; history: unknown[] };
+  await openCore(page, core.core_number);
+  const d = page.getByRole("dialog", { name: new RegExp(`^Core ${core.core_number} on `) });
+  const row = (k: string) => d.locator("dt", { hasText: new RegExp(`^${k}$`) }).locator("xpath=following-sibling::dd[1]");
+  await expect(row("Calculated loss")).toHaveText(/^\d+\.\d\d dB$/);
+  await expect(row("Measured loss")).toContainText(core.measured_db.toFixed(2) + " dB");
+  await expect(d.locator("dt", { hasText: /^Loss$/ })).toHaveCount(0); // never just "Loss"
+  await expect(d.getByRole("list", { name: "Measured loss tests, newest first" }).locator("li")).toHaveCount(core.history.length);
+  await d.screenshot({ path: "e2e/screenshots/core-details.png" });
+});
 
 test("no distance segment: dashes, never 0 dB", async ({ page }) => {
   await signIn(page);

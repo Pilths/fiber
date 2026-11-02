@@ -122,7 +122,7 @@ function GlobalSearch({ onPick }: { onPick: (r: Result) => void }) {
   );
 }
 
-export type View = "map" | "reserve" | "mine" | "approvals" | "upload" | "users";
+export type View = "map" | "mine" | "approvals" | "upload" | "users";
 
 export const LOGO = (
   <svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true">

@@ -67,12 +67,6 @@ export async function openReserve(page: Page, name: RegExp | string) {
   return box;
 }
 
-// The route planner has no tab: a #route= link opens it (empty form when the hash names no route).
-export async function openRoutePlanner(page: Page) {
-  await page.goto("/#route=");
-  await expect(page.getByTestId("route-form")).toBeVisible();
-}
-
 // Cores table: opens a core's details, first expanding the collapsed run ("10-12") that holds it.
 export async function openCore(page: Page, n: number) {
   const t = page.getByRole("table", { name: /^Cores of / });

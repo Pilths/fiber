@@ -1,71 +1,27 @@
-import { Fragment, useEffect, useState, type FormEvent, type ReactNode } from "react";
-import { api } from "@/api/client";
+import { Fragment, useState, type ReactNode } from "react";
 import type { components } from "@/api/schema";
 import { Icon } from "@/components/Icon";
 import { Blank } from "@/components/LossCard";
-import type { RouteOption } from "@/components/RoutePlanner";
 import { FreeBadge } from "@/components/FindCard";
-import { countBy, LEVEL, segmentName, STATUS, statusLabel, type CoreStatus, type SegmentLoss } from "@/lib/status";
+import { countBy, segmentName, STATUS, statusLabel, type CoreStatus } from "@/lib/status";
 
 type Detail = components["schemas"]["SegmentDetail"];
 type Core = Detail["cores"][number];
 type Segment = components["schemas"]["SegmentSummary"];
-type Endpoint = { id: number; name: string };
 export type Found = { ids: number[]; km: number; sites: string[] }; // sites in travel order, one more than ids
-
-// Route A to B over the whole network: the best (first) option of GET /api/routes, shown on the map and in the Inspector.
-export function RouteSearch({ onFound }: { onFound: (f: Found | null) => void }) {
-  const [eps, setEps] = useState<Endpoint[]>([]);
-  const [a, setA] = useState("");
-  const [b, setB] = useState("");
-  const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
-  useEffect(() => { api.get("/api/routes/endpoints").then((r) => setEps(r as unknown as Endpoint[])).catch(() => setMsg({ text: "Could not load the site list.", ok: false })); }, []);
-
-  const search = async (x = a, y = b) => {
-    const site = (t: string) => eps.find((e) => e.name.toLowerCase() === t.trim().toLowerCase());
-    const from = site(x), to = site(y);
-    const fail = (text: string) => { setMsg({ text, ok: false }); onFound(null); };
-    if (!from || !to) return fail("Choose sites from the list");
-    if (from.id === to.id) return fail("Choose two different sites");
-    try {
-      const r = (await api.get("/api/routes", { query: { from: from.id, to: to.id, cores_needed: 1, sort: "km" } })) as unknown as { options: RouteOption[] };
-      const op = r.options[0];
-      if (!op) return fail("No route found");
-      setMsg({ text: `${op.segments.length} ${op.segments.length === 1 ? "segment" : "segments"}, ${Number(op.total_km.toFixed(1))} km`, ok: true });
-      onFound({ ids: op.segments.map((s) => s.segment_id), km: op.total_km, sites: [op.segments[0].site_a, ...op.segments.map((s) => s.site_b)] });
-    } catch { fail("Could not load the route. Try again."); }
-  };
-  const submit = (e: FormEvent) => { e.preventDefault(); search(); };
-  const swap = () => { setA(b); setB(a); if (a && b) search(b, a); };
-
-  return (
-    <section className="card col-span-12 px-4 py-3" aria-label="Route search">
-      <form onSubmit={submit} className="flex flex-wrap items-end gap-3">
-        <label className="w-56"><span className="lbl">Route A</span><input id="route-a" className="field" list="route-sites" value={a} onChange={(e) => setA(e.target.value)} autoComplete="off" /></label>
-        <button type="button" className="btn px-3" onClick={swap} aria-label="Swap A and B">&#8646;</button>
-        <label className="w-56"><span className="lbl">Route B</span><input className="field" list="route-sites" value={b} onChange={(e) => setB(e.target.value)} autoComplete="off" /></label>
-        <button type="submit" className="btn btn-p" disabled={!eps.length}>Search</button>
-        {msg && <span role="status" data-testid="route-found" className={`self-center font-semibold ${msg.ok ? "text-foreground" : "text-red"}`}>{msg.text}</span>}
-        <datalist id="route-sites">{eps.map((e) => <option key={e.id} value={e.name} />)}</datalist>
-      </form>
-    </section>
-  );
-}
-
 
 const kmOf = (s: { distance_km: string | null }) => (s.distance_km ? Number(s.distance_km) : null);
 
 // Route (or the one selected segment) as a horizontal chain: site, segment, site ... Each segment is a button that selects it.
-export function SegmentDiagram({ segments, found, d, loss, selectedId, onPick, actions, onSite }: {
-  segments: Segment[] | null; found: Found | null; d: Detail; loss: SegmentLoss[]; selectedId: number; onPick: (id: number) => void;
+export function SegmentDiagram({ segments, found, d, selectedId, onPick, actions, onSite }: {
+  segments: Segment[] | null; found: Found | null; d: Detail; selectedId: number; onPick: (id: number) => void;
   actions?: ReactNode; // buttons at the right end (Reserve cores, admin edits)
   onSite?: (end: "a" | "b") => void; // admins: the site names of a single segment open the site editor
 }) {
   const onRoute = found?.ids.includes(d.id) ? found : null;
-  const chain = onRoute
+  const rows = onRoute
     ? onRoute.ids.map((id, i) => ({ s: segments?.find((x) => x.id === id), a: onRoute.sites[i], b: onRoute.sites[i + 1], id }))
     : [{ s: d, a: d.site_a, b: d.site_b, id: d.id }];
-  const rows = chain.map((c) => ({ ...c, l: loss.find((x) => x.segment_id === c.id) }));
   const km = rows.reduce((n, r) => n + (r.s ? kmOf(r.s) ?? 0 : 0), 0);
   const totals: [string, string][] = [
     ["Segments", String(rows.length)],
@@ -77,9 +33,9 @@ export function SegmentDiagram({ segments, found, d, loss, selectedId, onPick, a
       <h2 id="segment-h" className="sr-only">{segmentName(d)}</h2>
       {/* Site, segment, site ... in rows of up to PER_ROW segments; a row's last site starts the next row. */}
       <div className="flex items-center gap-4">
-      <ol aria-label="Segments on the route" aria-description={onRoute ? `Route ${chain[0].a} to ${chain[chain.length - 1].b}` : undefined} className="grid flex-1 gap-y-4 px-16" style={{ gridTemplateColumns: `repeat(${cols}, minmax(140px, 1fr))` }}>
+      <ol aria-label="Segments on the route" aria-description={onRoute ? `Route ${rows[0].a} to ${rows[rows.length - 1].b}` : undefined} className="grid flex-1 gap-y-4 px-16" style={{ gridTemplateColumns: `repeat(${cols}, minmax(140px, 1fr))` }}>
         {rows.map((r, i) => {
-          const cut = r.s?.fiber_cut, sel = r.id === selectedId, w = r.l?.level && r.l.level !== "green" ? LEVEL[r.l.level] : null;
+          const cut = r.s?.fiber_cut, sel = r.id === selectedId;
           const k = r.s ? kmOf(r.s) : null;
           return (
             <li key={r.id} className="relative h-[100px]">
@@ -89,7 +45,6 @@ export function SegmentDiagram({ segments, found, d, loss, selectedId, onPick, a
                 <span aria-hidden className="h-1" />
                 <span className="flex h-[22px] items-center gap-1.5">
                   {cut ? <span className="pill h-red"><Icon name="fl" />Cut</span> : r.s && <FreeBadge s={r.s} />}
-                  {w && <span className={`inline-flex items-center ${w.cls.replace("h-", "v-")}`} title={`Loss ${w.word}`} data-testid="loss-marker"><Icon name={w.icon} /><span className="sr-only">Loss {w.word}</span></span>}
                 </span>
               </button>
               {/* The line runs node to node, over the button's tint; clicks pass through to the button. */}

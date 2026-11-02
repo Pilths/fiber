@@ -125,32 +125,18 @@
   input.field[list]::-webkit-calendar-picker-indicator { width: 20px; height: 20px; margin: 0 0 0 4px; padding: 0; opacity: 0; cursor: pointer; }
   select.field { appearance: none; padding-right: 30px; cursor: pointer; background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 6l4 4 4-4' fill='none' stroke='%235b6068' stroke-width='1.5'/%3E%3C/svg%3E") no-repeat right 10px center / 16px; }
 
-  /* Inspector (B2): fixed-height card; fixed head, a body that scrolls inside the card, a pinned footer. Segment and route states share them.
-     A long title (DEV seed names, not 4-letter LRD pairs) drops to 24px and may wrap; it is never cut, admins click the site names in it. */
-  /* Top padding puts the title's first-line cap centre on the map toolbar's centre line (map card: 1px border + 12px inset
-     + 1px stage border + 12px toolbar offset + 16px half button = 42px; inspector-layout.spec.ts checks it). */
-  .ins-head { flex: none; padding: 22px 20px 10px; border-bottom: 1px solid var(--border); }
-  .ins-body { flex: 1; min-height: 0; overflow-y: auto; padding: 10px 20px 6px; }
-  .ins-foot { flex: none; display: flex; gap: 8px; padding: 12px 20px; border-top: 1px solid var(--border); }
-  .ins-title { min-width: 0; overflow-wrap: anywhere; font-size: 32px; line-height: 38px; font-weight: 700; letter-spacing: -.025em; }
-  .ins-title.long { margin-top: 4px; font-size: 24px; line-height: 30px; }
-  .ins-facts { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 16px; margin-top: 4px; font-size: 13px; color: var(--muted-ink); }
   .badge { display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--red); color: #fff; font-size: 11px; font-weight: 700; line-height: 1; }
   .later { display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border: 1px solid #7a808a; border-radius: 4px; background: var(--raised); color: var(--muted-ink); font-size: 11px; font-weight: 600; letter-spacing: .02em; }
   .pill { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; line-height: 20px; font-weight: 600; padding: 0 10px; border-radius: 999px; border: 1px solid; white-space: nowrap; }
   .h-green { color: var(--green); background: var(--green-bg); border-color: var(--green-bd); }
   .h-amber { color: var(--amber); background: var(--amber-bg); border-color: var(--amber-bd); }
   .h-red { color: var(--red); background: var(--red-bg); border-color: var(--red-bd); }
-  .h-off { color: #fff; background: var(--red); border-color: var(--red); }
   .h-blue { color: var(--blue); background: var(--blue-bg); border-color: var(--blue-bd); }
   .h-ns { color: var(--muted-ink); background: #fff; border: 1px dashed var(--ns); font-weight: 500; }
-  .v-green { color: var(--green); } .v-amber { color: var(--amber); } .v-red { color: var(--red); } .v-off { color: var(--red); }
 
   .chip { height: 32px; padding: 0 12px; border: 1px solid var(--line); border-radius: 6px; background: #fff; font-size: 13px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; }
   .chip b { font-weight: 700; }
   .chip[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: #fff; }
-  .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; flex: none; display: inline-block; }
-  .chip[aria-pressed="true"] .dot { box-shadow: 0 0 0 2px #fff; }
 
   /* Every table: fixed layout (widths from the header cells), one 16px side padding so a header sits exactly over its
      values, 40px rows, numbers right-aligned with .num. */
@@ -168,43 +154,23 @@
 /* Core cells: each status differs in border, fill pattern, symbol and word. Never colour alone. */
 .core { position: relative; height: 60px; padding: 7px 8px 6px; border: 1px solid var(--line); border-radius: 6px; background: #fff; color: var(--ink);
   display: grid; grid-template-columns: 1fr auto; grid-template-rows: 1fr auto; text-align: left; cursor: not-allowed; user-select: none; min-width: 0; }
-.core .n { font-size: 14px; font-weight: 600; line-height: 16px; align-self: start; }
 .core .ic { justify-self: end; }
-.core .w { grid-column: 1 / -1; font-size: 11px; font-weight: 500; line-height: 13px; white-space: nowrap; letter-spacing: -.02em; color: var(--muted-ink); }
 .core-available { cursor: pointer; }
 .core-available:hover { border-color: var(--ink); }
 .core-available .ic { color: var(--muted-ink); }
-.core-available[aria-selected="true"] { background: var(--blue); border: 3px solid #0f3a78; padding: 5px 6px 4px; color: #fff; }
-.core-available[aria-selected="true"] .w, .core-available[aria-selected="true"] .ic { color: #fff; }
 .core-reserved { background: var(--res) repeating-linear-gradient(45deg, var(--res) 0 5px, #3f444c 5px 6px); border-color: var(--res); color: #fff; }
 .core-inuse { background: var(--use); border-color: var(--use); color: #fff; }
-.core-reserved .w, .core-inuse .w { color: #fff; }
 .core-requested { background: var(--amber-bg) repeating-linear-gradient(135deg, var(--amber-bg) 0 5px, #f3d9b8 5px 6.5px); border: 1px dashed var(--amber); color: var(--amber); }
-.core-requested .n, .core-requested .w { background: var(--amber-bg); color: var(--amber); justify-self: start; border-radius: 2px; }
-.core[data-current] { box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--ink); }
-.core .lm { position: absolute; right: 6px; bottom: 4px; font-size: 9px; line-height: 1; }
 .core:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; z-index: 1; }
 /* legend swatches reuse the cell classes */
 .sw { width: 22px; height: 20px; display: inline-flex; align-items: center; justify-content: center; border-radius: 4px; padding: 0; }
-
-/* proportion bar keys */
-.k { width: 12px; height: 12px; border-radius: 3px; flex: none; display: inline-block; }
-.k-free { background: var(--green); }
-.k-hold { background: repeating-linear-gradient(135deg, #fff 0 2px, var(--use) 2px 3px); box-shadow: inset 0 0 0 1px var(--use); }
-.k-cores { background: var(--res); }
-.k-use { background: var(--use); }
-.k-fault { background: repeating-linear-gradient(135deg, var(--red-bg) 0 2px, var(--red) 2px 3px); box-shadow: inset 0 0 0 1px var(--red); }
 
 /* Cores table: the row of a request just sent fades from blue to its normal tint. */
 @keyframes flash { from { background: var(--blue-bg); } }
 .tbl tr.flash { animation: flash 3s ease-out; }
 @media (prefers-reduced-motion: reduce) { .tbl tr.flash { animation: none; background: var(--blue-bg); } }
 
-/* Route diagram (v4 lineSVG): segment groups are SVG <g role="button">; outline is unreliable on SVG, so the focus ring is the hit rect's stroke. */
-.rd-g { outline: none; }
-.rd-g:hover .hit { stroke: var(--line); stroke-width: 1; }
-.rd-g:focus-visible .hit { stroke: var(--blue); stroke-width: 3; }
-/* Site kind marker in the route From/To pickers. */
+/* Site kind marker in the map legend. */
 .rb-sh { display: block; flex: none; }
 .rb-sh.dc { width: 14px; height: 14px; background: var(--ink); }
 .rb-sh.st { width: 12px; height: 12px; transform: rotate(45deg); background: #fff; border: 2px solid var(--ink); }
