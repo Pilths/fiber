@@ -9,6 +9,7 @@ Read before working: `docs/PRD.md` (requirements), `docs/architecture.md` (desig
 - Lint: `docker compose exec web npm run lint` (oxlint, TypeScript).
 - `docker compose exec api alembic upgrade head`: apply migrations.
 - `docker compose exec api python -m app.create_admin USERNAME "Display name"`: first admin on an empty database; asks for the password (hidden). The dev seeds are for DEV data only.
+- `docker compose exec api python -m app.load_data --template data/fiber-data.xlsx` writes a blank Sites/Segments workbook to `api/data/` (git-ignored); `docker compose exec api python -m app.load_data ADMIN data/fiber-data.xlsx` loads it through the same code as the Upload tab, plus Surveyed cores and Total cores. Safe to run again.
 - Python dependencies: `api/requirements.lock` holds the runtime packages (exact pins, packages they need included); `api/requirements-dev.lock` holds test tools (pytest, httpx) and exists only on `dev`; the api Dockerfile installs it when present. Edit it, then check inside a `python:3.14.8-slim` container with `pip install -r requirements.lock && pip check`. npm dependencies: `npm install --save-exact` inside the web container so `web/package-lock.json` updates.
 - Host venv for the editor and pyright only (the app runs in Docker): `python3 -m venv --without-pip api/.venv && python3 -m pip --python api/.venv/bin/python install -r api/requirements.lock`.
 - UI tests: `docker compose exec web npx playwright install --with-deps chromium` once after each web image rebuild, then `docker compose exec web npm run test:e2e`.
