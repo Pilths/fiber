@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { signIn, tab } from "./helpers";
+import { signIn } from "./helpers";
 
 // Map card (TASK-054, TASK-055). Dev seed: 5 segments with coordinates (KL-CJ and CJ-BJ shaped), 2 not drawn (Kuantan Hut).
 const SEGMENT = "DEV Kuala Lumpur DC - DEV Cyberjaya DC"; // shaped, in the dense KL cluster
@@ -95,22 +95,16 @@ test("clicking a chip selects the segment; Enter on a chip too; Esc clears", asy
   expect(page.url()).not.toContain("#segment=");
 });
 
-test("Route filter on the Reserve tab lists the routes of the loaded segments (routes mocked)", async ({ page }) => {
-  // Dev segments have no route yet: give the two drawn Trunk segments route R1 in the list and in the segment detail.
-  const withRoute = (s: { id: number }) => ({ ...s, route: [4, 5].includes(s.id) ? "R1" : null, section: s.id === 4 ? "N-C" : null });
-  await page.route("**/api/segments", async (r) => r.fulfill({ json: ((await (await r.fetch()).json()) as { id: number }[]).map(withRoute) }));
-  await page.route("**/api/segments/*", async (r) => r.fulfill({ json: withRoute(await (await r.fetch()).json()) }));
+test("Type filter on the segment list dims the other segments on the map", async ({ page }) => {
   await signIn(page);
-  await tab(page, "Reserve");
-  const route = page.getByRole("combobox", { name: "Route", exact: true });
-  await expect(route.getByRole("option")).toHaveText(["All routes", "R1"]);
-  await route.selectOption("R1");
-  await expect(page.getByRole("list", { name: "Segments" }).getByRole("button")).toHaveCount(2);
-  await page.getByRole("list", { name: "Segments" }).getByRole("button", { name: /DEV Kuala Lumpur DC - DEV Ipoh Exchange/ }).click();
-  await tab(page, "Map");
-  await expect(page.getByRole("region", { name: "Inspector" })).toContainText("Route R1");
-  await expect(page.getByRole("region", { name: "Inspector" })).toContainText("Section N-C");
-  await page.unrouteAll({ behavior: "ignoreErrors" }); // the tab change refetches the segment list
+  await expect(chips(page)).toHaveCount(5);
+  const segs: { route_type: string | null }[] = await (await page.request.get("/api/segments")).json();
+  const types = [...new Set(segs.map((s) => s.route_type).filter((t): t is string => !!t))];
+  const count = (t: string) => segs.filter((s) => s.route_type === t).length;
+  const pick = types.sort((a, b) => count(a) - count(b))[0]; // fewer than the 5 drawn segments
+  await page.getByRole("region", { name: "Segment list" }).getByLabel("Type").selectOption(pick);
+  await expect(page.getByRole("region", { name: "Segment list" }).getByRole("list", { name: "Segments" }).getByRole("button")).toHaveCount(segs.filter((s) => s.route_type === pick).length);
+  await expect.poll(() => chips(page).count()).toBeLessThan(5);
 });
 
 // Route search shows the best option; the mock puts the 2-segment KL-CJ-BJ option first.
@@ -177,7 +171,6 @@ test("map page has no horizontal scroll at 1200, 1280, 1440 and 1920", async ({ 
 });
 
 // The map stage is the growing child of its card: no blank band under the map, in each state (TASK-054 follow-up).
-// The Inspector (420px) is shorter than the map now that Find has left the Map page, so only the stage is checked.
 test("the stage fills the map card: nothing, segment and route selected", async ({ page }) => {
   await signIn(page);
   await expect(chips(page)).toHaveCount(5);

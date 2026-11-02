@@ -1,84 +1,43 @@
 import { expect, test, type Page } from "@playwright/test";
-import { contrast, pickSegment, signIn } from "./helpers";
+import { pickSegment, signIn } from "./helpers";
 
-// Inspector alerts: fiber cut (segment state) and high loss. Responses are mocked, so dev data never changes.
+// Fiber cut (a segment state) on the segment diagram. Responses are mocked, so dev data never changes.
 const KLBJ = /^DEV Kuala Lumpur DC - DEV Bukit Jalil TOC/;
 
 test.use({ viewport: { width: 1440, height: 900 } });
 // A save reloads the segment; let mocked fetches still in flight end quietly.
 test.afterEach(({ page }) => page.unrouteAll({ behavior: "ignoreErrors" }));
 
-const inspector = (page: Page) => page.getByRole("region", { name: "Inspector" });
+const diagram = (page: Page) => page.getByTestId("segment-diagram");
 
-// Patch the real segment detail, admin segment and loss responses with the given fields.
-async function mock(page: Page, segment: object, loss?: object) {
+// Patch the real segment detail and admin segment responses with the given fields.
+async function mock(page: Page, segment: object) {
   await page.route(/\/api\/segments\/\d+$/, async (r) => r.fulfill({ json: { ...(await (await r.fetch()).json()), ...segment } }));
   await page.route(/\/api\/admin\/segments\/\d+$/, async (r) =>
     r.request().method() === "GET" ? r.fulfill({ json: { ...(await (await r.fetch()).json()), ...segment } }) : r.fallback());
-  if (loss) await page.route(/\/api\/loss\/segments\/\d+$/, async (r) => r.fulfill({ json: { ...(await (await r.fetch()).json()), ...loss } }));
 }
 const pick = (page: Page) => pickSegment(page, KLBJ);
-const measured = (level: string, db: number, pct: number) => ({ status: "measured", level, measured_db: db, deviation_pct: pct, worst_core_number: 12, measured_cores: 3, total_cores: 24 });
 
-test("no alert for a normal segment", async ({ page }) => {
-  await mock(page, { fiber_cut: false }, measured("green", 3.5, 1.2));
+test("a normal segment: no Cut chip, Reserve cores at the diagram's end, no loss alert", async ({ page }) => {
+  await mock(page, { fiber_cut: false });
   await signIn(page);
   await pick(page);
-  const i = inspector(page);
-  await expect(i.getByTestId("segment-facts")).toContainText("Total loss3.50 dB");
-  await expect(i.getByTestId("segment-facts").locator(".pill")).toHaveCount(0); // level shows in the number's colour only
-  await expect(i.getByTestId("segment-facts")).not.toContainText("Worst core");
-  await expect(i.getByTestId("fiber-cut")).toHaveCount(0);
-  await expect(i.getByTestId("loss-alert")).toHaveCount(0);
-  await expect(i.locator("dl").first()).not.toContainText("Fiber cut");
-  await i.screenshot({ path: "e2e/screenshots/inspector-normal.png" });
+  await expect(diagram(page).locator(".pill.h-red")).toHaveCount(0);
+  await expect(diagram(page).getByRole("button", { name: "Reserve cores" })).toBeVisible();
+  await expect(page.getByTestId("loss-alert")).toHaveCount(0);
+  await diagram(page).screenshot({ path: "e2e/screenshots/diagram-normal.png" });
 });
 
-test("red loss level: red alert strip and red loss row", async ({ page }) => {
-  await mock(page, { fiber_cut: false }, measured("red", 7.4, 29.5));
+test("fiber cut: Cut chip on a dashed red line, no Reserve cores; planner has no Restore", async ({ page }) => {
+  await mock(page, { fiber_cut: true, free_to_reserve: 0 });
   await signIn(page);
   await pick(page);
-  const i = inspector(page);
-  const strip = i.getByTestId("loss-alert");
-  await expect(strip).toHaveAttribute("data-level", "red");
-  await expect(strip).toContainText("High loss: 7.40 dB measured, +29.5% over calculated");
-  await expect(strip).toContainText("Over 7%");
-  await expect(strip.locator("svg")).toHaveAttribute("data-icon", "fl");
-  const row = i.getByTestId("inspector-loss");
-  await expect(row).toHaveAttribute("data-level", "red");
-  await expect(row.locator("dd [data-level=red]")).toHaveCSS("color", "rgb(180, 35, 24)");
-  await expect(row).toContainText("7.40 dB, Over 7%"); // sr-only word beside the coloured number
-  const r = await contrast(page, { strip: "[data-testid=loss-alert] b", row: "[data-testid=inspector-loss] dd [data-level]" });
-  expect(r.strip).toBeGreaterThanOrEqual(4.5);
-  expect(r.row).toBeGreaterThanOrEqual(4.5);
-  await i.screenshot({ path: "e2e/screenshots/inspector-highloss.png" });
-});
-
-test("amber loss level: amber strip", async ({ page }) => {
-  await mock(page, { fiber_cut: false }, measured("amber", 3.78, 5));
-  await signIn(page);
-  await pick(page);
-  const strip = inspector(page).getByTestId("loss-alert");
-  await expect(strip).toHaveAttribute("data-level", "amber");
-  await expect(strip).toContainText("Loss above calculated: 3.78 dB measured, +5.0% over calculated");
-});
-
-test("fiber cut: banner, 0 Cut, one red bar, Fiber cut key row; planner has no Restore", async ({ page }) => {
-  await mock(page, { fiber_cut: true, free_to_reserve: 0 }, measured("green", 3.5, 1.2));
-  await signIn(page);
-  await pick(page);
-  const i = inspector(page);
-  const banner = i.getByTestId("fiber-cut");
-  await expect(banner).toContainText("Fiber cut");
-  await expect(banner).toContainText("All cores on this segment are unavailable.");
-  await expect(banner.getByRole("button", { name: "Restore" })).toHaveCount(0);
-  await expect(i.locator(".pill.h-red").first()).toHaveText("Cut");
-  await expect(i.locator(".v-red").first()).toHaveText("0"); // the big number reads 0, red; the title chip says Cut
-  const bar = i.getByTestId("free-bar").locator("span");
-  await expect(bar).toHaveCount(1);
-  await expect(bar).toHaveClass(/k-fault/);
-  await expect(i.locator("dl").first()).toContainText("Fiber cut");
-  await i.screenshot({ path: "e2e/screenshots/inspector-cut.png" });
+  const d = diagram(page);
+  await expect(d.locator(".pill.h-red").first()).toHaveText("Cut"); // symbol and word, not colour alone
+  await expect(d.locator(".border-dashed.border-red")).toHaveCount(1);
+  await expect(d.getByRole("button", { name: "Reserve cores" })).toHaveCount(0);
+  await expect(d.getByRole("button", { name: "Restore" })).toHaveCount(0);
+  await d.screenshot({ path: "e2e/screenshots/diagram-cut.png" });
 });
 
 test("fiber cut: admin Restore opens the segment dialog unticked with focus on the reason", async ({ page }) => {
@@ -91,7 +50,7 @@ test("fiber cut: admin Restore opens the segment dialog unticked with focus on t
   });
   await signIn(page, "admin1");
   await pick(page);
-  await inspector(page).getByTestId("fiber-cut").getByRole("button", { name: "Restore" }).click();
+  await diagram(page).getByRole("button", { name: "Restore" }).click();
   const dlg = page.getByRole("dialog", { name: /^Edit segment/ });
   const reason = dlg.getByLabel("Reason (required)");
   await expect(reason).toBeFocused();
@@ -112,7 +71,7 @@ test("Edit segment: ticking Fiber cut sends fiber_cut true with the reason", asy
   });
   await signIn(page, "admin1");
   await pick(page);
-  await inspector(page).getByRole("button", { name: "Edit segment" }).click();
+  await diagram(page).getByRole("button", { name: "Edit segment" }).click();
   const dlg = page.getByRole("dialog", { name: /^Edit segment/ });
   const box = dlg.getByRole("checkbox", { name: /Fiber cut/ });
   await expect(box).not.toBeChecked();

@@ -158,7 +158,7 @@ test("site master sheets apply one at a time; the preview survives a tab change 
   await expect(dcs).toContainText("Apply Site Location first");
 
   // Switching the top tab keeps the staged preview and its choices.
-  await nav(page).getByRole("button", { name: "Map" }).click();
+  await nav(page).getByRole("button", { name: "Inventory" }).click();
   await expect(page.getByTestId("sm-preview")).toBeHidden();
   await nav(page).getByRole("button", { name: "Upload" }).click();
   await expect(sites.getByLabel(/^Override/)).toBeChecked();

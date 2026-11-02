@@ -151,7 +151,7 @@ export function Users({ me }: { me: Me }) {
                   </span>
                 </td>
                 <td className="whitespace-nowrap">{created(u.created_at)}</td>
-                <td className="pr-0!">
+                <td>
                   <span className="flex justify-end gap-2">
                     <button type="button" className="btn btn-sm" onClick={() => act(u, "reset-password")} aria-label={`Reset password for ${u.username}`}>Reset password</button>
                     {u.active

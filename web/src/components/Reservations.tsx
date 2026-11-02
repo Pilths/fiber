@@ -222,10 +222,10 @@ export function Approvals({ me, onChanged }: { me: Me; onChanged: () => void }) 
           <table className="tbl band" data-testid="approvals-table">
             <caption className="sr-only">Requests waiting for an admin, oldest first</caption>
             <thead><tr>
-              <th scope="col" className="w-px"><span className="sr-only">Details</span></th>
-              <th scope="col" className="w-px">Requested</th><th scope="col" className="w-px">Type</th><th scope="col">Planner</th><th scope="col">Customer</th>
-              <th scope="col">Segment or route</th><th scope="col" className="num w-px">Cores</th><th scope="col" className="w-px">Planned</th>
-              <th scope="col" className="w-px text-right!"><span className="sr-only">Actions</span></th>
+              <th scope="col" className="w-12"><span className="sr-only">Details</span></th>
+              <th scope="col" className="w-[140px]">Requested</th><th scope="col" className="w-20">Type</th><th scope="col">Planner</th><th scope="col">Customer</th>
+              <th scope="col">Segment or route</th><th scope="col" className="num w-24">Cores</th><th scope="col" className="w-28">Planned</th>
+              <th scope="col" className="w-[200px]"><span className="sr-only">Actions</span></th>
             </tr></thead>
             {data.map((r) => <ApprovalRow key={r.id} r={r} onChanged={() => { reload(); onChanged(); }} />)}
           </table>
@@ -245,7 +245,7 @@ function ApprovalRow({ r, onChanged }: { r: Res; onChanged: () => void }) {
   return (
     <tbody data-testid="approval" className="border-b border-rule last:border-b-0 [&>tr>*]:border-b-0!">
       <tr className={open ? "bg-subtle" : ""}>
-        <td className="pr-0!">
+        <td>
           <button type="button" className="grid size-7 place-items-center rounded-md hover:bg-rule" aria-expanded={open} aria-controls={detailId}
             aria-label={`Details of request #${r.id}`} onClick={() => setOpen((o) => !o)}>
             <svg viewBox="0 0 16 16" aria-hidden="true" className={`ni size-3.5! transition-transform ${open ? "rotate-90" : ""}`}><path d="M6 4l4 4-4 4" /></svg>
@@ -258,7 +258,7 @@ function ApprovalRow({ r, onChanged }: { r: Res; onChanged: () => void }) {
           {r.customer}
           {r.is_new_customer && <span className="ml-2 inline-flex items-center gap-1 text-xs font-semibold text-amber"><Icon name="lo" />New customer</span>}
         </th>
-        <td className="max-w-[320px] truncate" title={groupCores(r).map(([s]) => s).join(", ") || undefined}>{segmentText(r)}</td>
+        <td className="truncate" title={groupCores(r).map(([s]) => s).join(", ") || undefined}>{segmentText(r)}</td>
         <td className="num">{cores}{!release && r.unassigned_cores > 0 && <span className="text-muted-foreground"> by count</span>}</td>
         <td>{r.planned_date ?? "—"}</td>
         <td className="text-right">

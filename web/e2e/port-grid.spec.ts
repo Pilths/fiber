@@ -1,18 +1,16 @@
 import { expect, test, type Page } from "@playwright/test";
-import { contrast, signIn, tab } from "./helpers";
+import { contrast, openReserve, signIn } from "./helpers";
 
 const SEGMENT = "DEV Kuala Lumpur DC - DEV Cyberjaya DC"; // dev seed: has Available, Reserved and In use cores
 
-// Choosing cores lives on the Reserve tab.
-const pickSegment = async (page: Page, name: string | RegExp) => {
-  await tab(page, "Reserve");
-  await page.getByRole("list", { name: "Segments" }).getByRole("button", { name: typeof name === "string" ? new RegExp(name) : name }).click();
-};
+// Choosing cores opens from "Reserve cores" on Inventory.
+const pickSegment = (page: Page, name: string | RegExp) => openReserve(page, name);
 
 async function openSegment(page: Page) {
   await signIn(page);
   await pickSegment(page, SEGMENT);
   await expect(page.getByRole("grid", { name: "Cores" })).toBeVisible();
+  await page.mouse.move(0, 0); // off the grid: the "Reserve cores" click left the pointer over a cell
 }
 
 test("keyboard: roving tabindex, arrows, Space/Enter select only Available", async ({ page }) => {

@@ -152,15 +152,17 @@
   .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; flex: none; display: inline-block; }
   .chip[aria-pressed="true"] .dot { box-shadow: 0 0 0 2px #fff; }
 
-  .tbl { width: 100%; border-collapse: collapse; font-size: 14px; }
-  .tbl thead th { text-align: left; font-size: 12px; font-weight: 500; color: var(--muted-ink); padding: 8px 16px 8px 0; border-bottom: 1px solid var(--border); white-space: nowrap; }
-  .tbl td, .tbl tbody th { height: 48px; font-size: 14px; font-weight: inherit; color: inherit; padding: 0 16px 0 0; border-bottom: 1px solid var(--rule); }
+  /* Every table: fixed layout (widths from the header cells), one 16px side padding so a header sits exactly over its
+     values, 40px rows, numbers right-aligned with .num. */
+  .tbl { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 14px; }
+  .tbl thead th { text-align: left; font-size: 12px; font-weight: 500; color: var(--muted-ink); padding: 8px 16px; border-bottom: 1px solid var(--border); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tbl td, .tbl tbody th { height: 40px; font-size: 14px; font-weight: inherit; color: inherit; padding: 4px 16px; border-bottom: 1px solid var(--rule); overflow-wrap: anywhere; }
   .tbl tbody tr:last-child > * { border-bottom: 0; }
+  .tbl .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
   /* Band table: the route "Segments on this path" look. Grey header band, 40px rows, no wrapping, inside a bordered box. */
   .tbox { overflow-x: auto; border: 1px solid var(--border); border-radius: 6px; }
-  .band thead th { background: var(--subtle); padding: 8px 12px; }
-  .band td, .band tbody th { height: 40px; padding: 0 12px; white-space: nowrap; font-size: 13px; }
-  .band .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .band thead th { background: var(--subtle); }
+  .band td, .band tbody th { white-space: nowrap; font-size: 13px; overflow: hidden; text-overflow: ellipsis; }
 }
 
 /* Core cells: each status differs in border, fill pattern, symbol and word. Never colour alone. */

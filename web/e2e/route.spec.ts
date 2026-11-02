@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { contrast, signIn, tab } from "./helpers";
+import { contrast, openReserve, pickSegment, signIn } from "./helpers";
 
 // Dev seed: Cyberjaya DC to Kuantan Hut has several paths (via Bukit Jalil, via Kuala Lumpur, ...). Site ids vary by database.
 const FROM = "DEV Cyberjaya DC", TO = "DEV Kuantan Hut";
@@ -19,9 +19,10 @@ const noOldWords = async (page: Page) => {
 // Scroll the route section to the top, under the sticky header.
 const toSection = (page: Page) => page.evaluate(() => scrollTo(0, document.getElementById("route-h")!.getBoundingClientRect().top + scrollY - 84));
 
-// The route planner and its Reserve flow live on the Reserve tab.
+// The route planner and its Reserve flow open from "Reserve cores" on Inventory (any segment), then Route A to B.
+const SEG = /^DEV Kuala Lumpur DC - DEV Cyberjaya DC/;
 async function plan(page: Page, cores = "2", from = FROM, to = TO) {
-  await tab(page, "Reserve");
+  await openReserve(page, SEG);
   await page.getByRole("radio", { name: "Route A to B" }).check({ force: true });
   await page.getByLabel("From", { exact: true }).fill(from);
   await page.getByLabel("To", { exact: true }).fill(to);
@@ -158,7 +159,7 @@ test("too many cores: options short, diagram segment short, Reserve off naming t
 
 test("from equal to to shows the inline error", async ({ page }) => {
   await signIn(page);
-  await tab(page, "Reserve");
+  await openReserve(page, SEG);
   await page.getByRole("radio", { name: "Route A to B" }).check({ force: true });
   await page.getByLabel("From", { exact: true }).fill(FROM);
   await page.getByLabel("To", { exact: true }).fill(FROM);
@@ -199,8 +200,7 @@ test("#route= restores the selection; arrow keys move between diagram segments, 
   await expect(row(1)).toHaveAttribute("aria-selected", "true");
   // #segment= still works and switches back to segment mode
   await page.goto("/");
-  await tab(page, "Reserve");
-  await page.getByRole("list", { name: "Segments" }).getByRole("button").first().click();
+  await pickSegment(page, SEG);
   await expect(page).toHaveURL(/#segment=/);
 });
 

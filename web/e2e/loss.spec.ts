@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { contrast, pickSegment, signIn } from "./helpers";
+import { pickSegment, signIn } from "./helpers";
 
 // Loss belongs to a core. Dev seed: KL DC - Bukit Jalil has a measured core; Bukit Jalil - Kuantan has no distance.
 const SEGMENTS = {
@@ -10,42 +10,22 @@ const pick = (page: Page, name: RegExp) => pickSegment(page, name);
 
 test.use({ viewport: { width: 1440, height: 900 } });
 
-test("Inspector shows total loss in its level colour, no worst core", async ({ page }) => {
+test("segment-level views show no per-core loss; the diagram totals keep the segment loss", async ({ page }) => {
   await signIn(page);
   await pick(page, SEGMENTS.measured);
-  const line = page.getByTestId("inspector-loss");
-  await expect(line).toContainText(/^Total loss[\d.]+ dB/);
-  await expect(line.locator(".pill")).toHaveCount(0);
-  await expect(page.getByTestId("segment-facts")).not.toContainText(/Worst core|Cores measured|Difference/);
+  await expect(page.getByTestId("route-totals")).toContainText(/(Total|Calculated) loss[\d.]+ dB/);
+  await expect(page.getByRole("region", { name: "Segment list" })).not.toContainText("dB");
+  await expect(page.getByRole("table", { name: /^Cores of / }).locator("thead")).not.toContainText("Loss"); // no loss column
 });
 
-test("a measured core: its loss in the core table, its tests in the row detail", async ({ page }) => {
-  await signIn(page);
-  await pick(page, SEGMENTS.measured);
-  await page.getByRole("button", { name: "Go to cores" }).click();
-  const row = page.locator("tr[data-core]:has([data-level])").first();
-  const n = await row.getAttribute("data-core");
-  const latest = /[\d.]+ dB/.exec(await row.locator("td").last().innerText())![0];
-  await row.getByRole("button", { name: `Core ${n} details` }).click();
-  const rows = page.getByTestId("core-detail").getByTestId("core-tests").locator("tbody tr");
-  expect(await rows.count()).toBeGreaterThan(0);
-  // the newest test is the latest measured value in the row
-  await expect(rows.first().locator("td").first()).toHaveText(latest);
-  await expect(row.locator(".pill")).toHaveCount(0); // the level is the number's colour, no chip
-  await page.mouse.move(0, 0); // measured on the resting row, not the hover grey
-  const r = await contrast(page, { loss: "tr[data-core] td [data-level]" });
-  expect(r.loss).toBeGreaterThanOrEqual(4.5);
-  await page.getByTestId("core-detail").scrollIntoViewIfNeeded();
-  await page.screenshot({ path: "e2e/screenshots/core-loss.png" });
-});
+// Per-core loss moves to core details in step C (docs/build-layout-plan.md); the inline row detail is gone.
+test.fixme("a measured core: its Calculated loss and Measured loss in core details", async () => {});
 
 test("no distance segment: dashes, never 0 dB", async ({ page }) => {
   await signIn(page);
   await pick(page, SEGMENTS.noDistance);
-  const segment = page.getByTestId("segment-facts");
-  await expect(segment).toContainText("Distance-");
-  await expect(segment).toContainText("Total loss-Average loss per km-");
-  await expect(segment).not.toContainText("0.00 dB");
-  await page.getByRole("button", { name: "Core 1 details" }).click();
-  await expect(page.getByTestId("core-no-loss")).toHaveText("No loss test");
+  const totals = page.getByTestId("route-totals");
+  await expect(totals).toContainText("Distance-");
+  await expect(totals).toContainText(/loss-Average loss per km-/);
+  await expect(page.getByTestId("segment-diagram")).not.toContainText("0.00 dB");
 });

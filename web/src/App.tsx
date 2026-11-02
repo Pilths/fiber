@@ -5,9 +5,9 @@ import type { components } from "@/api/schema";
 import { EditSiteDialog, EditSegmentDialog, type SegmentFocus } from "@/components/AdminEdit";
 import { ChosenBar } from "@/components/ChosenBar";
 import { CoreDrawer } from "@/components/CoreDrawer";
-import { FindCard } from "@/components/FindCard";
+import { FindCard, SegmentList } from "@/components/FindCard";
 import { Header, type View } from "@/components/Header";
-import { HeldTable } from "@/components/HeldTable";
+import { AssignDialog } from "@/components/AssignDialog";
 import { Icon } from "@/components/Icon";
 import { Inspector } from "@/components/Inspector";
 import { CoresTable, RouteSearch, SegmentDiagram, Unassigned, type Found } from "@/components/NetworkDetail";
@@ -17,7 +17,7 @@ import { RouteForm, RouteSection, RouteSummary, useRoutePlanner } from "@/compon
 import { Upload } from "@/components/Upload";
 import { Users } from "@/components/Users";
 import { Approvals, MyReservations, NeedsReview } from "@/components/Reservations";
-import { countBy, NO_FILTER, segmentName, STATUS, STATUS_ORDER, statusLabel, type LossDetail, type SegmentFilter, type SegmentLoss } from "@/lib/status";
+import { countBy, inFilter, NO_FILTER, segmentName, STATUS, STATUS_ORDER, statusLabel, type LossDetail, type SegmentFilter, type SegmentLoss } from "@/lib/status";
 
 type Segment = components["schemas"]["SegmentSummary"];
 type Detail = components["schemas"]["SegmentDetail"];
@@ -87,6 +87,7 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
   const [found, setFound] = useState<Found | null>(null); // route search result
   const [editSegment, setEditSegment] = useState<{ focus?: SegmentFocus } | null>(null);
   const [editSite, setEditSite] = useState<number | null>(null);
+  const [assign, setAssign] = useState<Detail["unassigned"][number] | null>(null);
   const [filter, setFilter] = useState<SegmentFilter>(NO_FILTER);
   const [mode, setModeState] = useState<"segment" | "route">(location.hash.startsWith("#route=") ? "route" : "segment");
   const rp = useRoutePlanner(mode === "route" && view === "reserve", version);
@@ -194,7 +195,6 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
     : segmentId != null ? [segmentId] : [];
   const segmentLoss = loss?.segment_id === segmentId ? loss : null;
   const measured = useMemo(() => new Set(segmentLoss?.cores.map((c) => c.core_id)), [segmentLoss]);
-  const toCores = () => document.getElementById("cores")?.scrollIntoView({ behavior: "smooth", block: "start" });
 
   return (
     <div className="min-h-screen">
@@ -222,20 +222,27 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
           <section className="card col-span-8 flex flex-col p-3" aria-label="Network map" aria-describedby="map-instr">
             {/* ponytail: site clicks do nothing on the view-only map; wire them to Route A/B if planners ask */}
             <NetworkMap version={version} onSelectSegment={(id) => open(id)} onSite={() => {}} onClear={clearSelection}
-              selectedIds={mapIds} routeKey={found ? `found-${found.ids.join(",")}` : null} visible={() => true} />
+              selectedIds={mapIds} routeKey={found ? `found-${found.ids.join(",")}` : null} visible={(p) => inFilter(p, filter)} />
           </section>
-          {/* The Inspector fills the map card's height (absolute), so the map alone sets the row height. */}
+          {/* The list fills the map card's height (absolute), so the map alone sets the row height. */}
           <div className="relative col-span-4 min-w-0">
-            <Inspector detail={detail} loading={segmentId != null && !detail} loss={segmentLoss} admin={admin} onCores={toCores} fill />
+            <SegmentList segments={segments} selectedId={segmentId} onSelect={(id) => open(id)} filter={filter} onFilter={setFilter} />
           </div>
+          {segmentId != null && !detail && <p className="card empty col-span-12 text-center text-body text-muted-foreground">Loading segment...</p>}
           {detail && (
             <div className="col-span-12 space-y-4">
-              <SegmentDiagram segments={segments} found={found} d={detail} loss={lossList} selectedId={detail.id} onPick={(id) => open(id)} />
+              <SegmentDiagram segments={segments} found={found} d={detail} loss={lossList} selectedId={detail.id} onPick={(id) => open(id)}
+                onSite={admin?.onEditSite} actions={<>
+                  {detail.fiber_cut
+                    ? admin && <button type="button" className="btn" onClick={() => admin.onEditSegment("restore")}>Restore</button>
+                    : detail.survey_cores != null && <button type="button" className="btn btn-p" onClick={() => setView("reserve")}>Reserve cores</button>}
+                  {admin && <button type="button" className="btn" onClick={() => admin.onEditSegment()}>Edit segment</button>}
+                </>} />
               <section id="cores" className="card scroll-mt-4" aria-labelledby="cores-h">
-                <div className="card-h items-center"><h2 id="cores-h">Cores of {segmentName(detail)}</h2></div>
+                <div className="card-h items-center"><h2 id="cores-h">Cores</h2></div>
                 {detail.survey_cores == null
                   ? <NotSurveyed d={detail} admin={admin} />
-                  : <CoresTable key={`${detail.id}-${focusCoreId}`} d={detail} loss={segmentLoss} focusCoreId={focusCoreId} onActions={(c) => setDrawerCore(c.id)} />}
+                  : <CoresTable key={`${detail.id}-${focusCoreId}`} d={detail} focusCoreId={focusCoreId} onOpen={(c) => setDrawerCore(c.id)} onAssign={me.role === "admin" ? setAssign : null} />}
               </section>
             </div>
           )}
@@ -266,7 +273,6 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
                           onClear={() => setSelected(new Set())}
                           onDone={() => { setSelected(new Set()); setVersion((v) => v + 1); refreshBell(); }} />}
                   </section>
-                  <HeldTable d={detail} admin={me.role === "admin"} onOpen={(c) => setDrawerCore(c.id)} onChanged={changed} />
                 </>
               )}
           </div>
@@ -274,6 +280,7 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
       )}
       {detail && drawn && <CoreDrawer key={drawn.id} core={drawn} segment={segmentName(detail)} ends={[detail.site_a, detail.site_b]} me={me} onClose={() => setDrawerCore(null)} onChanged={changed} />}
       {editSegment && segmentId != null && <EditSegmentDialog segmentId={segmentId} focus={editSegment.focus} onClose={() => setEditSegment(null)} onSaved={changed} />}
+      {assign && detail && <AssignDialog d={detail} hold={assign} onClose={() => setAssign(null)} onSaved={changed} />}
       {editSite != null && <EditSiteDialog siteId={editSite} onClose={() => setEditSite(null)} onSaved={changed} />}
     </div>
   );

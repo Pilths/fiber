@@ -9,7 +9,7 @@ numbers right-aligned, no big empty gaps).
 
 ## Steps
 
-- [ ] A. Inventory page: tabs Inventory | My reservations (no Reserve tab; Approvals, Upload, Users stay for admins);
+- [x] A. Inventory page: tabs Inventory | My reservations (no Reserve tab; Approvals, Upload, Users stay for admins);
       map 8 of 12 columns with the segment list card beside it (search, Region, Type, rows of name, km, free count);
       `SegmentDiagram` under the map with a "Reserve cores" button; one merged Cores table replacing the core table
       and Allocations (chips All, Free, In use, Unassigned; columns Cores, Status, Customer, Planner, SRF, Planned,

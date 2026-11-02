@@ -69,7 +69,7 @@ export function LossCard({ loss }: { loss: LossDetail | null }) {
                 <caption className="sr-only">Loss tests on this segment, newest first</caption>
                 <thead><tr>
                   <th scope="col" className="w-[18%]">Tested</th><th scope="col" className="w-[18%]">Measured</th><th scope="col" className="w-[18%]">Difference</th>
-                  <th scope="col">Method</th><th scope="col" className="pr-0!">Verified by</th>
+                  <th scope="col">Method</th><th scope="col">Verified by</th>
                 </tr></thead>
                 <tbody>
                   {rows.map((h, i) => (
@@ -78,7 +78,7 @@ export function LossCard({ loss }: { loss: LossDetail | null }) {
                       <td>{db(h.loss_db)}</td>
                       <td>{calc ? pct(((h.loss_db - calc) / calc) * 100) : <Blank>Not applicable</Blank>}</td>
                       <td className="truncate">{h.test_method ?? <Blank />}</td>
-                      <td className="truncate pr-0">{h.field_team ?? <Blank />}</td>
+                      <td className="truncate">{h.field_team ?? <Blank />}</td>
                     </tr>
                   ))}
                 </tbody>
