@@ -208,7 +208,7 @@ export function ReserveBox({ sites, mode, onClose, onSent }: {
                       <td className="truncate">{c.port_a || c.port_b ? `${c.port_a ?? "-"} → ${c.port_b ?? "-"}` : <Blank>-</Blank>}</td>
                       <td className="num">{calc == null ? <Blank>-</Blank> : db(calc)}</td>
                       <td className="num">{m == null ? <Blank>Not tested</Blank>
-                        : high ? <b className="font-bold text-amber" title="Measured above calculated"><span aria-hidden>▲ </span><span className="sr-only">Above calculated: </span>{db(m)}</b>
+                        : high ? <>{db(m)} <span aria-hidden className="text-amber">▲</span><span className="sr-only"> above calculated</span></>
                         : db(m)}</td>
                     </tr>
                   );

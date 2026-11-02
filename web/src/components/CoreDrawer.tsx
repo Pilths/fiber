@@ -69,7 +69,7 @@ export function CoreDrawer({ core, segment, ends, me, onClose, onChanged, loss, 
     ["Calculated loss", calc == null ? <Blank key="cl">No distance</Blank> : db(calc)],
     ["Measured loss", !loss ? <Blank key="ml">Not tested</Blank> : <span key="ml">
       {loss.measured_db > (calc ?? Infinity)
-        ? <b className="font-bold text-amber"><span aria-hidden>▲ </span><span className="sr-only">Above calculated: </span>{db(loss.measured_db)}</b>
+        ? <>{db(loss.measured_db)} <span aria-hidden className="text-amber">▲</span><span className="sr-only"> above calculated</span></>
         : db(loss.measured_db)}
       {[loss.test_method, loss.tested_on, loss.field_team].filter(Boolean).map((x) => `, ${x}`).join("")}
     </span>],

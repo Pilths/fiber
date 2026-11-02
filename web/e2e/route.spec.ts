@@ -115,3 +115,19 @@ test("Reserve on a sufficient route sends one request (then withdrawn)", async (
   const r = await page.request.post(`/api/reservations/${id}/withdraw`); // leave the dev data as found
   expect(r.ok()).toBeTruthy();
 });
+
+test("Most free cores sends sort=free_cores, re-ranks and goes into the link", async ({ page }) => {
+  await signIn(page);
+  await search(page);
+  const s = page.getByRole("radiogroup", { name: "Optimise for" });
+  await expect(s.getByRole("radio", { name: "Shortest distance" })).toBeChecked();
+  const before = await options(page).count();
+  const req = page.waitForResponse((r) => r.url().includes("/api/routes?") && r.url().includes("sort=free_cores"));
+  await s.getByText("Most free cores").click();
+  const res = await req;
+  await expect(s.getByRole("radio", { name: "Most free cores" })).toBeChecked();
+  await expect(options(page)).toHaveCount(before);
+  const fewest = ((await res.json()) as { options: { fewest_free: number }[] }).options.map((o) => o.fewest_free);
+  for (let i = 1; i < fewest.length; i++) expect(fewest[i - 1]).toBeGreaterThanOrEqual(fewest[i]);
+  await expect(page).toHaveURL(/-free_cores-0$/);
+});

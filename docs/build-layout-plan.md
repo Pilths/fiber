@@ -23,4 +23,4 @@ numbers right-aligned, no big empty gaps).
       Requested row after submit. Route reservation uses the same box. Test: lint, typecheck, e2e.
 - [x] C. Core details: rows "Calculated loss" and "Measured loss" (never just "Loss"); remove leftovers of the old
       Inspector and Reserve tab code. Test: lint, typecheck, full e2e, pytest.
-- [ ] D. Copy to `main` (same excludes as in `docs/rename-and-branches-plan.md` step 1c), push `dev` and `main`.
+- [x] D. Copy to `main` (same excludes as in `docs/rename-and-branches-plan.md` step 1c), push `dev` and `main`.

@@ -104,7 +104,7 @@ export function useRoutePlanner(active: boolean, version: number) {
 
   return {
     clear: () => setIdx(null),
-    eps, fromText, toText, need, from, to, res, errs, option, idx,
+    eps, fromText, toText, need, from, to, res, errs, option, idx, sort, setSort,
     setFrom: (t: string) => { setFromText(t); setIdx(null); },
     setTo: (t: string) => { setToText(t); setIdx(null); },
     select: setIdx,
@@ -138,6 +138,13 @@ export function RouteSearch({ rp }: { rp: RoutePlanner }) {
         <button type="button" className="btn px-3" onClick={swap} aria-label="Swap A and B">&#8646;</button>
         <label className="w-56"><span className="lbl">Route B</span>
           <input className="field" list="route-sites" value={rp.toText} onChange={(e) => { setErr(null); rp.setTo(e.target.value); }} autoComplete="off" /></label>
+        <div role="radiogroup" aria-label="Optimise for" className="flex h-9 overflow-hidden rounded-md border border-line">
+          {([["km", "Shortest distance"], ["free_cores", "Most free cores"]] as const).map(([v, label], i) => (
+            <label key={v} className={`relative flex cursor-pointer items-center px-3 font-medium whitespace-nowrap has-checked:bg-foreground has-checked:font-semibold has-checked:text-white has-focus-visible:z-10 has-focus-visible:outline-3 has-focus-visible:outline-blue ${i ? "border-l border-line" : ""}`}>
+              <input type="radio" name="route-sort" className="absolute size-px opacity-0" checked={rp.sort === v} onChange={() => rp.setSort(v)} />{label}
+            </label>
+          ))}
+        </div>
         <button type="submit" className="btn btn-p" disabled={!rp.eps.length}>Search</button>
         {(bad || op) && (
           <span role="status" data-testid="route-found" className={`self-center font-semibold ${bad ? "text-red" : "text-foreground"}`}>
