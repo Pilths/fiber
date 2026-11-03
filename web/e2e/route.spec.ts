@@ -13,9 +13,9 @@ const chain = (page: Page) => page.getByTestId("segment-diagram").getByRole("lis
 const reserveRoute = (page: Page) => page.getByTestId("segment-actions").getByRole("button", { name: "Reserve on this route" });
 
 async function search(page: Page, from = FROM, to = TO) {
-  const s = page.getByRole("region", { name: "Route A to B" });
-  await s.getByLabel("Route A").fill(from);
-  await s.getByLabel("Route B").fill(to);
+  const s = page.getByRole("region", { name: "Site A to B" });
+  await s.getByLabel("Site A").fill(from);
+  await s.getByLabel("Site B").fill(to);
   await s.getByRole("button", { name: "Find route" }).click();
   await expect(options(page).first()).toBeVisible();
 }
@@ -55,7 +55,7 @@ test("route search on Inventory: up to 3 options, the route drawn with Reserve o
 test("#route= link opens Inventory with that route found and drawn; #segment= still works", async ({ page }) => {
   await signIn(page);
   await page.goto(`/${await routeHash(page, 1, 1)}`);
-  await expect(page.getByRole("region", { name: "Route A to B" }).getByLabel("Route A")).toHaveValue(FROM);
+  await expect(page.getByRole("region", { name: "Site A to B" }).getByLabel("Site A")).toHaveValue(FROM);
   await expect(options(page).nth(1)).toHaveAttribute("aria-pressed", "true");
   await expect(chain(page).first()).toBeVisible();
   await expect(page.getByTestId("network-map").locator("[data-testid=map-line][data-selected=true]").first()).toBeAttached();
@@ -81,12 +81,12 @@ test("too many cores: the option names the short segment, Reserve on this route 
 
 test("same site twice or an unknown site: inline message, no route", async ({ page }) => {
   await signIn(page);
-  const s = page.getByRole("region", { name: "Route A to B" });
-  await s.getByLabel("Route A").fill(FROM);
-  await s.getByLabel("Route B").fill(FROM);
+  const s = page.getByRole("region", { name: "Site A to B" });
+  await s.getByLabel("Site A").fill(FROM);
+  await s.getByLabel("Site B").fill(FROM);
   await s.getByRole("button", { name: "Find route" }).click();
   await expect(page.getByTestId("route-found")).toHaveText(/Choose two different sites|must differ/i);
-  await s.getByLabel("Route B").fill("Nowhere");
+  await s.getByLabel("Site B").fill("Nowhere");
   await s.getByRole("button", { name: "Find route" }).click();
   await expect(page.getByTestId("route-found")).toHaveText("Choose sites from the list");
   await expect(options(page)).toHaveCount(0);

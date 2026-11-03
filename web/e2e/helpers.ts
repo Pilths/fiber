@@ -62,13 +62,13 @@ export async function pickSegment(page: Page, name: RegExp | string) {
   await expect(page.locator("#segment-h")).toHaveText(name);
 }
 
-// Reserving goes through Route A to B: find A to B, choose the one-segment option (the direct segment), "Reserve on
+// Reserving goes through Site A to B: find A to B, choose the one-segment option (the direct segment), "Reserve on
 // this route", then select that single segment in the box diagram. Returns the box, its Available cores list showing.
 export async function openReserve(page: Page, a: string, b: string, cores = 1) {
   await tab(page, "Inventory");
-  const s = page.getByRole("region", { name: "Route A to B" });
-  await s.getByLabel("Route A").fill(a);
-  await s.getByLabel("Route B").fill(b);
+  const s = page.getByRole("region", { name: "Site A to B" });
+  await s.getByLabel("Site A").fill(a);
+  await s.getByLabel("Site B").fill(b);
   await s.getByLabel("Cores needed").fill(String(cores));
   await s.getByRole("button", { name: "Find route" }).click();
   await page.getByRole("list", { name: "Route options" }).getByRole("button", { name: /^Option \d+ (Best match )?1 segment,/ }).click();

@@ -85,7 +85,7 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
   const [editSite, setEditSite] = useState<number | null>(null);
   const [assign, setAssign] = useState<Detail["unassigned"][number] | null>(null);
   const [filter, setFilter] = useState<SegmentFilter>(NO_FILTER);
-  // Route A to B beside the map; the chosen option is the found route, drawn on the map and the segment diagram.
+  // Site A to B beside the map; the chosen option is the found route, drawn on the map and the segment diagram.
   const rp = useRoutePlanner(view === "map", version);
   const op = rp.option;
   const found: Found | null = op && { ids: op.segments.map((s) => s.segment_id), km: op.total_km, sites: [op.segments[0].site_a, ...op.segments.map((s) => s.site_b)] };
@@ -199,7 +199,7 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
       {view === "map" && (
         <main className="grid grid-cols-12 gap-4 px-6 pt-6 pb-10">
           <section className="card col-span-8 flex flex-col p-3" aria-label="Network map" aria-describedby="map-instr">
-            {/* ponytail: site clicks do nothing on the view-only map; wire them to Route A/B if planners ask */}
+            {/* ponytail: site clicks do nothing on the view-only map; wire them to Site A/B if planners ask */}
             <NetworkMap version={version} onSelectSegment={(id) => open(id)} onSite={() => {}} onClear={clearSelection}
               selectedIds={mapIds} routeKey={found ? `found-${found.ids.join(",")}` : null} visible={(p) => inFilter(p, filter)}
               tools={<MapFilters segments={segments} filter={filter} onFilter={setFilter} />} />

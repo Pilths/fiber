@@ -19,7 +19,7 @@ async function mock(page: Page, segment: object) {
 }
 const pick = (page: Page) => pickSegment(page, KLBJ);
 
-test("a normal segment: no Cut chip, no Reserve cores button (reserving is via Route A to B), no loss alert", async ({ page }) => {
+test("a normal segment: no Cut chip, no Reserve cores button (reserving is via Site A to B), no loss alert", async ({ page }) => {
   await mock(page, { fiber_cut: false });
   await signIn(page);
   await pick(page);

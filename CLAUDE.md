@@ -47,7 +47,7 @@ Read before working: `docs/PRD.md` (requirements), `docs/architecture.md` (desig
 - Core status words are Available, Requested, Reserved, In service (data value `In use`). There is no per-core Faulty: a fiber cut is a state of the segment. Route types are Trunk and Metro only. One merged "Cores" table (see `docs/DESIGN.md`).
 - Map chips show only the free-core number on the line, no icons. Status is never colour alone: symbol, pattern or word somewhere on the screen.
 - Do not add Collapse map, Site/Services "Later" tabs, a Reserve tab, or helper lines like "Reserve is off: ...".
-- Tabs: Inventory and My reservations. Inventory: map (8 of 12 columns, never shrunk, Region and Type filters in its toolbar) with the "Route A to B" panel beside it at map height, the segment diagram (the current `SegmentDiagram`), a row below it with "Reserve on this route" and "Edit segment" (same width), then the Cores table. Reserving opens as a box over Inventory. Full layout: `docs/DESIGN.md` section 3.
+- Tabs: Inventory and My reservations. Inventory: map (8 of 12 columns, never shrunk, Region and Type filters in its toolbar) with the "Site A to B" panel beside it at map height, the segment diagram (the current `SegmentDiagram`), a row below it with "Reserve on this route" and "Edit segment" (same width), then the Cores table. Reserving opens as a box over Inventory. Full layout: `docs/DESIGN.md` section 3.
 
 ## Delegating to subagents
 

@@ -103,7 +103,7 @@ To confirm against the mock files arriving 22 October 2026: KMZ lines are named 
    - The difference in dB and percent, last test date, and measured or calculated-only status are available per core. The source data has test method and field team, which the backend cleans; both are stored and shown with the measurement.
 5. As a planner, I want to pick two buildings and see route options, so that I can choose a route with enough free cores.
    - Routing runs over segments: each segment joins two sites, weighted by km. Routes stay as labels for display and as the KMZ line on the map.
-   - The route planner ("Route A to B") takes From, To, Optimise for (Shortest distance or Most free cores; no "lowest loss" until loss data exists) and Cores needed per segment.
+   - The route planner ("Site A to B") takes From, To, Optimise for (Shortest distance or Most free cores; no "lowest loss" until loss data exists) and Cores needed per segment.
    - Up to 3 route options are shown, each with its segments in order as building A to building B, with each segment's km and free cores, grouped under their route label where there is one. Each option shows total km, Calculated loss, and the fewest free cores on any segment of the path (the bottleneck, shown).
    - Options are ranked by the Optimise for choice: shortest km, or most free cores (the fewest free cores on any segment of the path, higher is better). Options without enough cores come last, and the best option carries a "Best match" tag.
    - The user must be able to see every option returned (up to 3), none hidden or cut off. A selected route shows as the 2D route ribbon (see Design decisions).

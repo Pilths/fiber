@@ -12,9 +12,9 @@ test("route search, pick a segment in the diagram: totals, one Cores table group
   });
   await signIn(page);
   await expect(page.getByRole("region", { name: "Inspector" })).toHaveCount(0);
-  const search = page.getByRole("region", { name: "Route A to B" });
-  await search.getByLabel("Route A").fill("DEV Cyberjaya DC");
-  await search.getByLabel("Route B").fill("DEV Kuantan Hut");
+  const search = page.getByRole("region", { name: "Site A to B" });
+  await search.getByLabel("Site A").fill("DEV Cyberjaya DC");
+  await search.getByLabel("Site B").fill("DEV Kuantan Hut");
   await search.getByRole("button", { name: "Find route" }).click();
   await expect(page.locator("[data-testid=route-option][aria-pressed=true]")).toContainText(/\d+ segments?, [\d.]+\+? km/);
 
@@ -66,7 +66,7 @@ test("route search, pick a segment in the diagram: totals, one Cores table group
   await page.screenshot({ path: "e2e/screenshots/network-detail.png", fullPage: true });
 });
 
-test("Reserve on this route (Route A to B) opens the Reserve box over Inventory", async ({ page }) => {
+test("Reserve on this route (Site A to B) opens the Reserve box over Inventory", async ({ page }) => {
   await signIn(page);
   const box = await openReserve(page, "DEV Kuala Lumpur DC", "DEV Cyberjaya DC");
   await expect(page.getByTestId("segment-diagram")).toBeAttached(); // Inventory stays behind the box

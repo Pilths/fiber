@@ -114,9 +114,9 @@ async function searchKlBj(page: Page) {
     const j = (await (await r.fetch()).json()) as { options: { segments: unknown[] }[] };
     r.fulfill({ json: { ...j, options: j.options.filter((o) => o.segments.length === 2) } });
   });
-  const search = page.getByRole("region", { name: "Route A to B" });
-  await search.getByLabel("Route A").fill("DEV Penang Tower");
-  await search.getByLabel("Route B").fill("DEV Ipoh Exchange");
+  const search = page.getByRole("region", { name: "Site A to B" });
+  await search.getByLabel("Site A").fill("DEV Penang Tower");
+  await search.getByLabel("Site B").fill("DEV Ipoh Exchange");
   await search.getByRole("button", { name: "Find route" }).click();
   await expect(page.locator("[data-testid=route-option][aria-pressed=true]")).toContainText(/2 segments,/);
 }
@@ -139,9 +139,9 @@ test("missing basemap file: note shown, segments still drawn, search still works
   const note = page.getByTestId("map-note");
   await expect(note).toContainText(/Basemap not installed on this machine: run \.\/scripts\/get-tiles\.sh|no WebGL/);
   await expect(chips(page)).toHaveCount(19);
-  const search = page.getByRole("region", { name: "Route A to B" });
-  await search.getByLabel("Route A").fill("DEV Ipoh Exchange");
-  await search.getByLabel("Route B").fill("DEV Penang Tower");
+  const search = page.getByRole("region", { name: "Site A to B" });
+  await search.getByLabel("Site A").fill("DEV Ipoh Exchange");
+  await search.getByLabel("Site B").fill("DEV Penang Tower");
   await search.getByRole("button", { name: "Find route" }).click();
   await expect(page.locator("[data-testid=route-option][aria-pressed=true]")).toContainText(/1 segment,/);
 });

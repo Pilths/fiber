@@ -39,7 +39,7 @@ Tabs: **Inventory | My reservations**. There is no Reserve tab; reserving opens 
 | Slot | Content |
 |---|---|
 | Top left, 8 of 12 columns | Map, full size. Never shrunk to make room for other content. Region and Type filters ("All regions", "All types") sit in the map toolbar beside Layers, zoom, Fit selection and Full screen; they dim the other segments. |
-| Top right, 4 columns, map height | "Route A to B" panel (prototype 9e), content scrolls inside: Route A and Route B with a swap button, Cores needed, a full-width blue "Find route", Shortest distance / Most free cores toggle, then up to 3 option rows (radio dot, Option N, segments and km, lowest free count in a coloured pill, Calculated loss; the selected one has a blue border and tint). Nothing below before a search. Segments are found with the header search or the map. |
+| Top right, 4 columns, map height | "Site A to B" panel (prototype 9e), content scrolls inside: Site A and Site B with a swap button, Cores needed, a full-width blue "Find route", Shortest distance / Most free cores toggle, then up to 3 option rows (radio dot, Option N, segments and km, lowest free count in a coloured pill, Calculated loss; the selected one has a blue border and tint). Nothing below before a search. Segments are found with the header search or the map. |
 | Under the map, full width | Segment diagram: keep the one the web app has now (`SegmentDiagram` in `web/src/components/NetworkDetail.tsx`), not the simplified line in the FigCraft mock. The selected segment's box reaches the site dots at both ends. |
 | Under the diagram, own row | "Reserve on this route" (when a route is found) and "Edit segment" (and "Restore" on a cut segment), right-aligned, all the same width. Not inside the diagram card. No row when it would be empty. |
 | Below, full width | Cores table (see below). Rows of holders come first, so every holder is above the fold. |
@@ -68,17 +68,17 @@ Segment facts are only the two site names and the distance. No numbers row, no l
 
 ### Reserve box (modal over Inventory)
 
-- Opens from "Reserve on this route" under the segment diagram, after a Route A to B search. All reserving goes
+- Opens from "Reserve on this route" under the segment diagram, after a Site A to B search. All reserving goes
   through a route; a one-segment reservation is a route between that segment's two sites. Page behind is dimmed;
   map and table stay in place.
 - About 1040 wide with compact spacing (about 20px padding, 36px rows); the core list scrolls inside.
 - Header: the route's sites in order, close. Body: "Cores needed per segment" stepper (sets N, starts at the
-  Route A to B "Cores needed"); per selected segment, a list of Available cores only: tick, core, ports (both ends), "Calculated loss", "Measured loss" ("Not tested"
+  Site A to B "Cores needed"); per selected segment, a list of Available cores only: tick, core, ports (both ends), "Calculated loss", "Measured loss" ("Not tested"
   when none; measured above calculated shows a triangle and bold amber). Even, fixed column widths. Footer: Customer (required), Planned date, SRF ID (optional), "Reserve N cores".
 - Closing with cores ticked asks "Discard N chosen cores?" (Keep editing, Discard).
 - After submit: the box closes, a closable "Request #N sent" box shows, and the new Requested row is highlighted
   in the Cores table.
-- Under the header, the route's segment diagram (site dots, line, km, site names; wraps like Inventory).
+- Under the header, the route's segment diagram (site dots, line, km, site names; one line like Inventory: segments shrink to 112px, then the line scrolls sideways).
   At open no segment is selected and no core is ticked; the area below shows only "Choose a segment". Clicking a
   segment selects it (blue box) and shows that segment's Available cores list (same columns as above); double-click,
   or Enter/Space, on the selected segment unselects it. Ticks are kept per segment. "Cores needed per segment" sets N
@@ -126,8 +126,8 @@ Circuits; a core result opens its segment and highlights the row.
 - 2 Nov 2026: segment actions moved out of the diagram card into their own row below it, one fixed width.
 - 3 Nov 2026: route reservations: the planner chooses the cores of each segment in the Reserve box from the route's
   segment diagram; the server no longer auto-picks them.
-- 3 Nov 2026: single-segment Reserve cores removed; reserve only through Route A to B.
-- 2 Nov 2026: prototype "9e": the segment list beside the map is replaced by the "Route A to B" panel (the route
+- 3 Nov 2026: single-segment Reserve cores removed; reserve only through Site A to B.
+- 2 Nov 2026: prototype "9e": the segment list beside the map is replaced by the "Site A to B" panel (the route
   row above the map is gone); Region and Type move into the map toolbar; the Cores table groups rows by status with
   counts in the group headers instead of filter chips.
 - 1 Nov 2026: a bottom-sheet segment drawer was considered and rejected (mobile pattern, hides the map).
