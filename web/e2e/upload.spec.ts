@@ -42,7 +42,7 @@ test("site master preview: counts per sheet, 10% drop override, blocked DC sheet
   await expect(sites).toContainText("found as worksheet “Site Location”, 2 rows");
   await expect(sites.getByRole("button", { name: "Added 1" })).toBeVisible();
   await expect(sites.getByRole("button", { name: "Problem 1" })).toBeVisible();
-  await expect(sites.getByRole("button", { name: "Missing 4" })).toBeVisible();
+  await expect(sites.getByRole("button", { name: "Missing 12" })).toBeVisible();
   await expect(sites).toContainText("Blocked: this sheet will not be applied unless you override");
   await expect(sites).toContainText("limit is 10%");
 
@@ -58,7 +58,7 @@ test("site master preview: counts per sheet, 10% drop override, blocked DC sheet
   await expect(sites.getByRole("columnheader")).toHaveText(["Row", "Site name", "Latitude", "Longitude", "Status or reason"]);
   const two = sites.getByRole("row", { name: /E2E Site Two/ });
   await expect(two.getByRole("cell")).toHaveText(["3", "TBA", "TBA", /^Needs review.*missing coordinates/]);
-  await sites.getByRole("button", { name: "Missing 4" }).click();
+  await sites.getByRole("button", { name: "Missing 12" }).click();
   await expect(sites.getByRole("table")).toContainText("in use, stays active");
 
   await expect(dcs.getByRole("button", { name: /^Apply/ })).toHaveCount(0);

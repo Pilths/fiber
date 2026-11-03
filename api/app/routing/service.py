@@ -16,6 +16,7 @@ from app.routing.graph import get_graph
 MAX_CANDIDATES = 20
 TIME_CAP_S = 2.0
 SHOWN = 3
+MAX_DETOUR = 1.5  # keep only paths up to this times the shortest path's weight
 
 
 def _bad(field: str, msg: str) -> HTTPException:
@@ -56,6 +57,12 @@ def _candidates(g: nx.Graph, a: int, b: int) -> list[list[int]]:
     return out
 
 
+def _reasonable(g: nx.Graph, paths: list[list[int]]) -> list[list[int]]:
+    """Paths come shortest first; keep those up to MAX_DETOUR x the shortest weight (never pad to SHOWN)."""
+    w = [sum(g[u][v]["weight"] for u, v in pairwise(p)) for p in paths]
+    return [p for p, x in zip(paths, w) if x <= MAX_DETOUR * w[0]]
+
+
 def find_routes(db: Session, frm: int, to: int, cores_needed: int, sort: str) -> dict[str, Any]:
     if frm == to:
         raise _bad("to", "from and to must differ")
@@ -67,6 +74,7 @@ def find_routes(db: Session, frm: int, to: int, cores_needed: int, sort: str) ->
         return {"options": [], "message": "No route connects these sites"}
 
     g = get_graph(db)
+    paths = _reasonable(g, paths)
     inv = {s["id"]: s for s in inventory.list_segments(db, None, None, None)}
     ls = {r["segment_id"]: r for r in loss.segment_rows(db)}
     labels = dict(db.execute(text(

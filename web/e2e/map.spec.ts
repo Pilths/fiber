@@ -1,9 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
 import { signIn } from "./helpers";
 
-// Map card (TASK-054, TASK-055). Dev seed: 5 segments with coordinates (KL-CJ and CJ-BJ shaped), 2 not drawn (Kuantan Hut).
-const SEGMENT = "DEV Kuala Lumpur DC - DEV Cyberjaya DC"; // shaped, in the dense KL cluster
-const FAR = "DEV Ipoh Exchange - DEV Penang Tower"; // alone in the north: its chip is never decluttered
+// Map card (TASK-054, TASK-055). Dev seed + seed_dev_network: 19 segments with coordinates, all road-shaped, 2 not drawn (Kuantan Hut).
+const SEGMENT = "DEV Kuala Lumpur DC - DEV Cyberjaya DC"; // in the dense KL cluster
+const FAR = "DEV Ipoh Exchange - DEV Teluk Intan Hut"; // long and N-S: its chip is never decluttered
 const map = (page: Page) => page.getByTestId("network-map");
 const chips = (page: Page) => map(page).getByTestId("map-chip");
 const chip = (page: Page, name: string) => map(page).getByRole("button", { name: new RegExp(`^Segment ${name},`) });
@@ -37,10 +37,10 @@ test("map loads with no request leaving the app origin; chips, sites, layers and
   await signIn(page);
   const m = await mode(page);
   test.info().annotations.push({ type: "map path", description: m ?? "" });
-  await expect(chips(page)).toHaveCount(5); // in the DOM; chips that would overlap are hidden until zoomed in
+  await expect(chips(page)).toHaveCount(19); // in the DOM; chips that would overlap are hidden until zoomed in
   await expect.poll(() => chips(page).filter({ visible: true }).count()).toBeGreaterThanOrEqual(2); // after the first fit eases in
-  await expect(map(page).getByTestId("map-site")).toHaveCount(5);
-  await expect(map(page).getByRole("button", { name: /^Site DEV Kuala Lumpur DC, data centre, 3 segments$/ })).toBeVisible();
+  await expect(map(page).getByTestId("map-site")).toHaveCount(13);
+  await expect(map(page).getByRole("button", { name: /^Site DEV Kuala Lumpur DC, data centre, 6 segments$/ })).toBeVisible();
   await expect(map(page).getByRole("button", { name: /^Site DEV Penang Tower, other site/ })).toBeVisible();
   await expect(chip(page, FAR)).toHaveText(/^(\d+|–)$/); // the free-core number only, no icon
   await expect(chips(page).locator("svg")).toHaveCount(0);
@@ -67,7 +67,7 @@ test("map loads with no request leaving the app origin; chips, sites, layers and
   await expect(chips(page)).toHaveCount(0);
   await page.getByRole("checkbox", { name: "Dark fibre" }).check();
   await page.getByRole("button", { name: "Layers" }).click();
-  await expect(chips(page)).toHaveCount(5);
+  await expect(chips(page)).toHaveCount(19);
   await page.screenshot({ path: "e2e/screenshots/map-overview.png" });
   expect(outside).toEqual([]);
 });
@@ -84,7 +84,7 @@ test("clicking a chip selects the segment; Enter on a chip too; Esc clears", asy
   await settle(page);
   await page.screenshot({ path: "e2e/screenshots/map-segment-selected.png" });
 
-  const other = "DEV Kuala Lumpur DC - DEV Ipoh Exchange";
+  const other = "DEV Tanjung Malim Hut - DEV Kuala Lumpur DC";
   await chip(page, other).focus();
   await page.keyboard.press("Enter");
   await expect(page.locator("#segment-h", { hasText: other })).toBeVisible();
@@ -95,38 +95,38 @@ test("clicking a chip selects the segment; Enter on a chip too; Esc clears", asy
   expect(page.url()).not.toContain("#segment=");
 });
 
-test("Type filter on the segment list dims the other segments on the map", async ({ page }) => {
+test("Type filter in the map toolbar dims the other segments on the map", async ({ page }) => {
   await signIn(page);
-  await expect(chips(page)).toHaveCount(5);
+  await expect(chips(page)).toHaveCount(19);
   const segs: { route_type: string | null }[] = await (await page.request.get("/api/segments")).json();
   const types = [...new Set(segs.map((s) => s.route_type).filter((t): t is string => !!t))];
   const count = (t: string) => segs.filter((s) => s.route_type === t).length;
-  const pick = types.sort((a, b) => count(a) - count(b))[0]; // fewer than the 5 drawn segments
-  await page.getByRole("region", { name: "Segment list" }).getByLabel("Type").selectOption(pick);
-  await expect(page.getByRole("region", { name: "Segment list" }).getByRole("list", { name: "Segments" }).getByRole("button")).toHaveCount(segs.filter((s) => s.route_type === pick).length);
-  await expect.poll(() => chips(page).count()).toBeLessThan(5);
+  const pick = types.sort((a, b) => count(a) - count(b))[0]; // fewer than the 19 drawn segments
+  await expect(map(page).getByLabel("Type").getByRole("option").first()).toHaveText("All types");
+  await expect(map(page).getByLabel("Region").getByRole("option").first()).toHaveText("All regions");
+  await map(page).getByLabel("Type").selectOption(pick);
+  await expect.poll(() => chips(page).count()).toBeLessThan(19);
 });
 
-// Route search shows the best option; the mock puts the 2-segment KL-CJ-BJ option first.
+// Route search shows the best option; only the 2-segment Penang - Butterworth - Ipoh option is kept.
 async function searchKlBj(page: Page) {
   await page.route("**/api/routes?*", async (r) => {
     const j = (await (await r.fetch()).json()) as { options: { segments: unknown[] }[] };
     r.fulfill({ json: { ...j, options: j.options.filter((o) => o.segments.length === 2) } });
   });
-  const search = page.getByRole("region", { name: "Route search" });
-  await search.getByLabel("Route A").fill("DEV Kuala Lumpur DC");
-  await search.getByLabel("Route B").fill("DEV Bukit Jalil TOC");
-  await search.getByRole("button", { name: "Search" }).click();
-  await expect(page.getByTestId("route-found")).toHaveText(/^2 segments/);
+  const search = page.getByRole("region", { name: "Route A to B" });
+  await search.getByLabel("Route A").fill("DEV Penang Tower");
+  await search.getByLabel("Route B").fill("DEV Ipoh Exchange");
+  await search.getByRole("button", { name: "Find route" }).click();
+  await expect(page.locator("[data-testid=route-option][aria-pressed=true]")).toContainText(/2 segments,/);
 }
 
-test("a route highlights its segments in blue, the shaped KL-CJ-BJ curve included", async ({ page }) => {
+test("a route highlights its segments in blue", async ({ page }) => {
   await signIn(page);
   await searchKlBj(page);
   await expect(map(page).locator("[data-testid=map-line][data-selected=true]")).toHaveCount(2);
   await expect(map(page).locator("[data-testid=map-chip][data-selected=true]")).toHaveCount(2);
-  await expect(chip(page, SEGMENT)).toHaveAttribute("aria-pressed", "true");
-  await expect(chip(page, "DEV Cyberjaya DC - DEV Bukit Jalil TOC")).toHaveAttribute("aria-pressed", "true");
+  await expect(chip(page, "DEV Butterworth Hut - DEV Ipoh Exchange")).toHaveAttribute("aria-pressed", "true");
   await page.evaluate(() => scrollTo(0, 0));
   await settle(page);
   await page.screenshot({ path: "e2e/screenshots/map-route.png" });
@@ -138,12 +138,12 @@ test("missing basemap file: note shown, segments still drawn, search still works
   await expect(map(page)).toHaveAttribute("data-mode", "svg");
   const note = page.getByTestId("map-note");
   await expect(note).toContainText(/Basemap not installed on this machine: run \.\/scripts\/get-tiles\.sh|no WebGL/);
-  await expect(chips(page)).toHaveCount(5);
-  const search = page.getByRole("region", { name: "Route search" });
+  await expect(chips(page)).toHaveCount(19);
+  const search = page.getByRole("region", { name: "Route A to B" });
   await search.getByLabel("Route A").fill("DEV Ipoh Exchange");
   await search.getByLabel("Route B").fill("DEV Penang Tower");
-  await search.getByRole("button", { name: "Search" }).click();
-  await expect(page.getByTestId("route-found")).toHaveText(/^1 segment,/);
+  await search.getByRole("button", { name: "Find route" }).click();
+  await expect(page.locator("[data-testid=route-option][aria-pressed=true]")).toContainText(/1 segment,/);
 });
 
 test("no WebGL: the SVG fallback draws segments and selects by click", async ({ page }) => {
@@ -152,7 +152,7 @@ test("no WebGL: the SVG fallback draws segments and selects by click", async ({ 
   await signIn(page);
   await expect(map(page)).toHaveAttribute("data-mode", "svg");
   await expect(page.getByTestId("map-note")).toContainText("no WebGL");
-  await expect(chips(page)).toHaveCount(5);
+  await expect(chips(page)).toHaveCount(19);
   await chip(page, FAR).click();
   await expect(page.locator("#segment-h", { hasText: FAR })).toBeVisible();
   await page.getByRole("button", { name: "Zoom in" }).click();
@@ -163,7 +163,7 @@ test("no WebGL: the SVG fallback draws segments and selects by click", async ({ 
 
 test("map page has no horizontal scroll at 1200, 1280, 1440 and 1920", async ({ page }) => {
   await signIn(page);
-  await expect(chips(page)).toHaveCount(5);
+  await expect(chips(page)).toHaveCount(19);
   for (const w of [1200, 1280, 1440, 1920]) {
     await page.setViewportSize({ width: w, height: 900 });
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
@@ -173,7 +173,7 @@ test("map page has no horizontal scroll at 1200, 1280, 1440 and 1920", async ({ 
 // The map stage is the growing child of its card: no blank band under the map, in each state (TASK-054 follow-up).
 test("the stage fills the map card: nothing, segment and route selected", async ({ page }) => {
   await signIn(page);
-  await expect(chips(page)).toHaveCount(5);
+  await expect(chips(page)).toHaveCount(19);
   const gaps = () => page.evaluate(() => {
     const card = document.querySelector('section[aria-label="Network map"]')!;
     const body = card.lastElementChild!; // NetworkMap root: stage, then the note line and "not on the map"

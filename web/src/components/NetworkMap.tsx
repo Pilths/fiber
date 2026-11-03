@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type PointerEvent as RPointerEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type PointerEvent as RPointerEvent, type ReactNode } from "react";
 import { api } from "@/api/client";
 import { health } from "@/lib/status";
 
@@ -62,7 +62,8 @@ const NOTE: Partial<Record<Basemap, string>> = {
 };
 const webgl = () => { try { return !!document.createElement("canvas").getContext("webgl2"); } catch { return false; } };
 
-export function NetworkMap({ selectedIds, routeKey, visible, onSelectSegment: selectSegment, onSite, onClear, version }: {
+export function NetworkMap({ selectedIds, routeKey, visible, onSelectSegment: selectSegment, onSite, onClear, version, tools }: {
+  tools?: ReactNode; // extra toolbar controls (Region and Type filters)
   selectedIds: number[]; routeKey: string | null; visible: (p: SegmentProps) => boolean;
   onSelectSegment: (id: number) => void; onSite: (name: string) => void; onClear: () => void; version: number;
 }) {
@@ -288,6 +289,7 @@ export function NetworkMap({ selectedIds, routeKey, visible, onSelectSegment: se
               {full ? "Exit full screen" : "Full screen"}
             </button>
           )}
+          {tools}
         </div>
 
         <div role="group" aria-label="Map key" className="mleg">

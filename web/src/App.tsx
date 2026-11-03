@@ -4,13 +4,13 @@ import { ChangePassword, Login } from "@/components/Auth";
 import type { components } from "@/api/schema";
 import { EditSiteDialog, EditSegmentDialog, type SegmentFocus } from "@/components/AdminEdit";
 import { CoreDrawer } from "@/components/CoreDrawer";
-import { SegmentList } from "@/components/FindCard";
+import { MapFilters } from "@/components/FindCard";
 import { Header, type View } from "@/components/Header";
 import { AssignDialog } from "@/components/AssignDialog";
 import { CoresTable, SegmentDiagram, type Found } from "@/components/NetworkDetail";
 import { NetworkMap } from "@/components/NetworkMap";
 import { ReserveBox } from "@/components/ReserveBox";
-import { RouteOptions, RouteSearch, useRoutePlanner } from "@/components/RoutePlanner";
+import { RouteSearch, useRoutePlanner } from "@/components/RoutePlanner";
 import { Upload } from "@/components/Upload";
 import { Users } from "@/components/Users";
 import { Approvals, MyReservations, NeedsReview } from "@/components/Reservations";
@@ -73,7 +73,7 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
   const [segmentId, setSegmentId] = useState<number | null>(null);
   const [detail, setDetail] = useState<Detail | null>(null);
   const [focusCoreId, setFocusCoreId] = useState<number | null>(null);
-  const [reserving, setReserving] = useState<"segment" | "route" | null>(null);
+  const [reserving, setReserving] = useState(false);
   const [sent, setSent] = useState<number | null>(null); // reservation id of the last request: success box and highlighted row
   const [view, setViewState] = useState<View>(location.hash === "#users" ? "users" : "map");
   const [bell, setBell] = useState<Bell | null>(null);
@@ -85,7 +85,7 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
   const [editSite, setEditSite] = useState<number | null>(null);
   const [assign, setAssign] = useState<Detail["unassigned"][number] | null>(null);
   const [filter, setFilter] = useState<SegmentFilter>(NO_FILTER);
-  // Route A to B above the map; the chosen option is the found route, drawn on the map and the segment diagram.
+  // Route A to B beside the map; the chosen option is the found route, drawn on the map and the segment diagram.
   const rp = useRoutePlanner(view === "map", version);
   const op = rp.option;
   const found: Found | null = op && { ids: op.segments.map((s) => s.segment_id), km: op.total_km, sites: [op.segments[0].site_a, ...op.segments.map((s) => s.site_b)] };
@@ -132,7 +132,7 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
     setDetail((d) => (d?.id === id ? d : null));
     setSegmentId(id);
     setFocusCoreId(coreId);
-    setReserving(null);
+    setReserving(false);
     setSent(null);
     setDrawerCore(null);
   }, []);
@@ -198,28 +198,29 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
       )}
       {view === "map" && (
         <main className="grid grid-cols-12 gap-4 px-6 pt-6 pb-10">
-          <RouteSearch rp={rp} />
-          <RouteOptions rp={rp} />
           <section className="card col-span-8 flex flex-col p-3" aria-label="Network map" aria-describedby="map-instr">
             {/* ponytail: site clicks do nothing on the view-only map; wire them to Route A/B if planners ask */}
             <NetworkMap version={version} onSelectSegment={(id) => open(id)} onSite={() => {}} onClear={clearSelection}
-              selectedIds={mapIds} routeKey={found ? `found-${found.ids.join(",")}` : null} visible={(p) => inFilter(p, filter)} />
+              selectedIds={mapIds} routeKey={found ? `found-${found.ids.join(",")}` : null} visible={(p) => inFilter(p, filter)}
+              tools={<MapFilters segments={segments} filter={filter} onFilter={setFilter} />} />
           </section>
-          {/* The list fills the map card's height (absolute), so the map alone sets the row height. */}
+          {/* The panel fills the map card's height (absolute, scrolls inside), so the map alone sets the row height. */}
           <div className="relative col-span-4 min-w-0">
-            <SegmentList segments={segments} selectedId={segmentId} onSelect={(id) => open(id)} filter={filter} onFilter={setFilter} />
+            <RouteSearch rp={rp} />
           </div>
           {segmentId != null && !detail && <p className="card empty col-span-12 text-center text-body text-muted-foreground">Loading segment...</p>}
           {detail && (
             <div className="col-span-12 space-y-4">
               <SegmentDiagram segments={segments} found={found} d={detail} selectedId={detail.id} onPick={(id) => open(id)}
-                onSite={admin?.onEditSite} actions={<>
-                  {onRoute && <button type="button" className="btn btn-p" disabled={onRoute.insufficient} onClick={() => setReserving("route")}>Reserve on this route</button>}
-                  {detail.fiber_cut
-                    ? admin && <button type="button" className="btn" onClick={() => admin.onEditSegment("restore")}>Restore</button>
-                    : detail.survey_cores != null && <button type="button" className={onRoute ? "btn" : "btn btn-p"} onClick={() => setReserving("segment")}>Reserve cores</button>}
+                onSite={admin?.onEditSite} />
+              {/* Actions sit in their own row under the diagram, one fixed width so they line up. */}
+              {(onRoute || admin) && (
+                <div className="flex justify-end gap-3 *:w-52 *:justify-center" data-testid="segment-actions">
+                  {onRoute && <button type="button" className="btn btn-p" disabled={onRoute.insufficient} onClick={() => setReserving(true)}>Reserve on this route</button>}
+                  {admin && detail.fiber_cut && <button type="button" className="btn" onClick={() => admin.onEditSegment("restore")}>Restore</button>}
                   {admin && <button type="button" className="btn" onClick={() => admin.onEditSegment()}>Edit segment</button>}
-                </>} />
+                </div>
+              )}
               <section id="cores" className="card scroll-mt-4" aria-labelledby="cores-h">
                 <div className="card-h items-center"><h2 id="cores-h">Cores</h2></div>
                 {sent != null && <Sent id={sent} onClose={() => setSent(null)} />}
@@ -233,13 +234,9 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
       )}
       {detail && drawn && <CoreDrawer key={drawn.id} core={drawn} segment={segmentName(detail)} ends={[detail.site_a, detail.site_b]} me={me} onClose={() => setDrawerCore(null)} onChanged={changed}
         loss={segmentLoss?.cores.find((x) => x.core_id === drawn.id) ?? null} calc={segmentLoss?.cores.find((x) => x.core_id === drawn.id)?.calculated_db ?? segmentLoss?.calculated_db ?? null} />}
-      {reserving === "segment" && detail && (
-        <ReserveBox sites={[detail.site_a, detail.site_b]} onClose={() => setReserving(null)} onSent={(id) => { setSent(id); changed(); }}
-          mode={{ kind: "segment", cores: detail.cores, free: detail.free_to_reserve, km: detail.distance_km ? Number(detail.distance_km) : null, loss: segmentLoss }} />
-      )}
-      {reserving === "route" && op && found && (
-        <ReserveBox sites={found.sites} onClose={() => setReserving(null)} onSent={(id) => { setSent(id); changed(); }}
-          mode={{ kind: "route", need: rp.need ?? 1, legs: op.segments.map((s) => ({ segment_id: s.segment_id, name: s.name, free: s.free_to_reserve })) }} />
+      {reserving && op && found && (
+        <ReserveBox sites={found.sites} onClose={() => setReserving(false)} onSent={(id) => { setSent(id); changed(); }}
+          need={rp.need ?? 1} legs={op.segments.map((s, i) => ({ segment_id: s.segment_id, free: s.free_to_reserve, a: found.sites[i], b: found.sites[i + 1], km: s.km }))} />
       )}
       {editSegment && segmentId != null && <EditSegmentDialog segmentId={segmentId} focus={editSegment.focus} onClose={() => setEditSegment(null)} onSaved={changed} />}
       {assign && detail && <AssignDialog d={detail} hold={assign} onClose={() => setAssign(null)} onSaved={changed} />}

@@ -153,7 +153,7 @@ function SheetPanel({ uploadId, s, override, onOverride, applied, children }: {
                     return (
                       <tr key={r.id}>
                         <td className="num text-muted-foreground">{r.row_number ?? "—"}</td>
-                        <th scope="row" className="truncate text-left font-semibold" title={r.key || undefined}>{r.key || <i className="font-normal text-muted-foreground">blank</i>}</th>
+                        <th scope="row" className="truncate font-semibold" title={r.key || undefined}>{r.key || <i className="font-normal text-muted-foreground">blank</i>}</th>
                         {s.kind === "dcs" && <>{tx(cell(r.parsed?.lrd, field(r.raw, /^lrd$/i)))}{tx(cell(field(r.parsed?.details, /^(state|city)$/i), null))}</>}
                         <td className="num truncate">{cell(r.parsed?.lat, field(r.raw, /^lat/i))}</td>
                         <td className="num truncate">{cell(r.parsed?.lon, field(r.raw, /^lon/i))}</td>

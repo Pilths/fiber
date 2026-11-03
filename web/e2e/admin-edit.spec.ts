@@ -13,7 +13,7 @@ test.use({ viewport: { width: 1440, height: 900 } });
 const pick = (page: Page, name: RegExp) => pickSegment(page, name);
 const drawer = (page: Page) => page.getByRole("dialog", { name: /^Core \d+ on / });
 const coreBtn = (page: Page, n: number) => page.getByRole("button", { name: `Core ${n} details`, exact: true });
-const editSegment = (page: Page) => page.getByTestId("segment-diagram").getByRole("button", { name: "Edit segment" });
+const editSegment = (page: Page) => page.getByTestId("segment-actions").getByRole("button", { name: "Edit segment" });
 const coresTable = (page: Page) => page.getByRole("table", { name: /^Cores of / });
 
 test("core drawer: opens from a taken core with history, Keep for the owner, Esc returns focus", async ({ page }) => {
@@ -108,7 +108,9 @@ test("lowering the survey count below taken cores is refused in plain words", as
   await dlg.getByRole("button", { name: "Save" }).click();
   await expect(dlg.getByRole("alert")).toContainText(/^Cores 2, .* are allocated or have history and cannot be removed/);
   await dlg.getByRole("button", { name: "Cancel" }).click();
-  await expect(page.getByRole("group", { name: "Filter cores" }).getByRole("button", { name: /^All/ })).toHaveText("All 24");
+  const n = await coresTable(page).getByTestId("core-group").evaluateAll((gs) => gs.filter((g) => g.getAttribute("data-status") !== "Unassigned")
+    .reduce((t, g) => t + Number(/(\d+)\s*$/.exec(g.querySelector("th[scope=rowgroup]")!.textContent!)![1]), 0));
+  expect(n).toBe(24); // survey count unchanged: the group counts add up to 24 cores
 });
 
 test("admin opens a site from the segment diagram: fields, reason required, history", async ({ page }) => {
@@ -179,8 +181,9 @@ test("one Unassigned row per reservation; admin assign dialog limits the choice"
   await expect(rows.first()).toBeVisible();
   const counts = (await rows.getByRole("rowheader").allInnerTexts()).map((t) => Number(/\d+/.exec(t)![0]));
   await expect(rows.first().getByRole("rowheader")).toHaveText(/^\d+ cores?$/);
-  await expect(rows.first()).toContainText("Unassigned");
-  await expect(page.getByRole("group", { name: "Filter cores" }).getByRole("button", { name: /^Unassigned/ })).toHaveText(`Unassigned ${counts.reduce((a, b) => a + b, 0)}`);
+  await expect(rows.first().locator("xpath=ancestor::tbody")).toHaveAttribute("data-status", "Unassigned"); // status lives in the group heading
+  const total = counts.reduce((a, b) => a + b, 0);
+  await expect(coresTable(page).locator('tbody[data-status="Unassigned"] th[scope=rowgroup]')).toHaveText(new RegExp(`Unassigned\\s*${total} cores?$`));
   const remaining = counts[0];
   let posted: unknown = null;
   await page.route("**/api/reservations/*/assign", (r) => { posted = r.request().postDataJSON(); return r.fulfill({ json: {} }); });

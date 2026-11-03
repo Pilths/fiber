@@ -1,8 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
 import { contrast, signIn } from "./helpers";
 
-// Dev seed: Cyberjaya DC to Kuantan Hut has several paths (via Bukit Jalil, via Kuala Lumpur, ...). Site ids vary by database.
-const FROM = "DEV Cyberjaya DC", TO = "DEV Kuantan Hut";
+// seed_dev_network: Ipoh Exchange to Kuala Lumpur DC has three paths within 1.5x of the shortest (direct, via Tanjung Malim, via Teluk Intan and Klang). Site ids vary by database.
+const FROM = "DEV Ipoh Exchange", TO = "DEV Kuala Lumpur DC";
 async function routeHash(page: Page, cores = 1, idx = 0, from = FROM, to = TO) {
   const eps: { id: number; name: string }[] = await (await page.request.get("/api/routes/endpoints")).json();
   const id = (n: string) => eps.find((e) => e.name === n)!.id;
@@ -10,13 +10,13 @@ async function routeHash(page: Page, cores = 1, idx = 0, from = FROM, to = TO) {
 }
 const options = (page: Page) => page.getByRole("list", { name: "Route options" }).getByTestId("route-option");
 const chain = (page: Page) => page.getByTestId("segment-diagram").getByRole("list", { name: "Segments on the route" }).getByRole("button");
-const reserveRoute = (page: Page) => page.getByTestId("segment-diagram").getByRole("button", { name: "Reserve on this route" });
+const reserveRoute = (page: Page) => page.getByTestId("segment-actions").getByRole("button", { name: "Reserve on this route" });
 
 async function search(page: Page, from = FROM, to = TO) {
-  const s = page.getByRole("region", { name: "Route search" });
+  const s = page.getByRole("region", { name: "Route A to B" });
   await s.getByLabel("Route A").fill(from);
   await s.getByLabel("Route B").fill(to);
-  await s.getByRole("button", { name: "Search" }).click();
+  await s.getByRole("button", { name: "Find route" }).click();
   await expect(options(page).first()).toBeVisible();
 }
 
@@ -31,7 +31,7 @@ test("route search on Inventory: up to 3 options, the route drawn with Reserve o
   await expect(options(page).first()).toHaveAttribute("aria-pressed", "true");
   await expect(options(page).first()).toContainText("Best match");
   await expect(options(page).first()).toContainText(/Option 1/);
-  await expect(options(page).first()).toContainText(/\d+ segments?, [\d.]+\+? km, \d+ free/);
+  await expect(options(page).first()).toContainText(/\d+ segments?, [\d.]+\+? km\d+ free/); // free count in a pill
   await expect(options(page).first()).toContainText(/Calculated loss ([\d.]+ dB|-)/);
   await expect(options(page).first().getByTestId("route-short")).toHaveCount(0);
   await expect(page).toHaveURL(new RegExp(`${await routeHash(page)}$`));
@@ -55,7 +55,7 @@ test("route search on Inventory: up to 3 options, the route drawn with Reserve o
 test("#route= link opens Inventory with that route found and drawn; #segment= still works", async ({ page }) => {
   await signIn(page);
   await page.goto(`/${await routeHash(page, 1, 1)}`);
-  await expect(page.getByRole("region", { name: "Route search" }).getByLabel("Route A")).toHaveValue(FROM);
+  await expect(page.getByRole("region", { name: "Route A to B" }).getByLabel("Route A")).toHaveValue(FROM);
   await expect(options(page).nth(1)).toHaveAttribute("aria-pressed", "true");
   await expect(chain(page).first()).toBeVisible();
   await expect(page.getByTestId("network-map").locator("[data-testid=map-line][data-selected=true]").first()).toBeAttached();
@@ -81,13 +81,13 @@ test("too many cores: the option names the short segment, Reserve on this route 
 
 test("same site twice or an unknown site: inline message, no route", async ({ page }) => {
   await signIn(page);
-  const s = page.getByRole("region", { name: "Route search" });
+  const s = page.getByRole("region", { name: "Route A to B" });
   await s.getByLabel("Route A").fill(FROM);
   await s.getByLabel("Route B").fill(FROM);
-  await s.getByRole("button", { name: "Search" }).click();
+  await s.getByRole("button", { name: "Find route" }).click();
   await expect(page.getByTestId("route-found")).toHaveText(/Choose two different sites|must differ/i);
   await s.getByLabel("Route B").fill("Nowhere");
-  await s.getByRole("button", { name: "Search" }).click();
+  await s.getByRole("button", { name: "Find route" }).click();
   await expect(page.getByTestId("route-found")).toHaveText("Choose sites from the list");
   await expect(options(page)).toHaveCount(0);
 });
@@ -100,14 +100,37 @@ test("Reserve on a sufficient route sends one request (then withdrawn)", async (
   const box = page.getByTestId("reserve-box");
   await expect(box.getByRole("heading", { level: 2 })).toContainText("DEV Kuala Lumpur DC");
   await expect(box.getByRole("group", { name: "Cores needed per segment" }).locator("output")).toHaveText("1");
-  const legs = await box.getByRole("table", { name: "Segments on this route" }).locator("tbody tr").count();
+  // Nothing chosen at open: no segment selected, no cores ticked
+  const segs = box.getByTestId("route-chain").getByRole("button");
+  const legs = await segs.count();
   expect(legs).toBeGreaterThan(1);
+  await expect(box.locator("[aria-pressed=true]")).toHaveCount(0);
+  await expect(box.getByText("Choose a segment")).toBeVisible();
+  await expect(box.getByTestId("leg-count").first()).toHaveText("0 of 1");
+  const reserve = box.getByRole("button", { name: /^Reserve \d+ cores?$/ });
+  await expect(reserve).toBeDisabled();
+  // Double-click the selected segment unselects it
+  await segs.first().click();
+  await expect(segs.first()).toHaveAttribute("aria-pressed", "true");
+  await segs.first().dblclick();
+  await expect(segs.first()).toHaveAttribute("aria-pressed", "false");
+  await expect(box.getByText("Choose a segment")).toBeVisible();
+  // Each segment: select it, tick its first Available core; the pill reads 1 of 1
+  for (let i = 0; i < legs; i++) {
+    await segs.nth(i).click();
+    const list = box.getByRole("table", { name: "Available cores" });
+    await list.getByRole("checkbox").first().check();
+    await expect(list.getByRole("checkbox", { checked: false }).first()).toBeDisabled(); // N reached: others locked
+    await expect(box.getByTestId("leg-count").nth(i)).toHaveText("1 of 1");
+  }
   await box.getByLabel("Search customers").fill("DEV Telco Alpha");
   await box.getByRole("button", { name: "DEV Telco Alpha", exact: true }).click();
   await box.getByLabel("SRF ID (optional)").fill("SRF-E2E");
   const sent = page.waitForRequest((q) => q.method() === "POST" && q.url().endsWith("/api/reservations"));
   await box.getByRole("button", { name: `Reserve ${legs} cores` }).click();
-  expect((await sent).postDataJSON().srf_id).toBe("SRF-E2E");
+  const body = (await sent).postDataJSON();
+  expect(body.srf_id).toBe("SRF-E2E");
+  expect(body.cores).toHaveLength(legs);
   await expect(box).toBeHidden();
   const status = page.getByTestId("request-sent");
   await expect(status).toContainText(/Request #\d+ sent/);

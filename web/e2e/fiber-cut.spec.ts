@@ -9,6 +9,7 @@ test.use({ viewport: { width: 1440, height: 900 } });
 test.afterEach(({ page }) => page.unrouteAll({ behavior: "ignoreErrors" }));
 
 const diagram = (page: Page) => page.getByTestId("segment-diagram");
+const actions = (page: Page) => page.getByTestId("segment-actions");
 
 // Patch the real segment detail and admin segment responses with the given fields.
 async function mock(page: Page, segment: object) {
@@ -18,25 +19,25 @@ async function mock(page: Page, segment: object) {
 }
 const pick = (page: Page) => pickSegment(page, KLBJ);
 
-test("a normal segment: no Cut chip, Reserve cores at the diagram's end, no loss alert", async ({ page }) => {
+test("a normal segment: no Cut chip, no Reserve cores button (reserving is via Route A to B), no loss alert", async ({ page }) => {
   await mock(page, { fiber_cut: false });
   await signIn(page);
   await pick(page);
   await expect(diagram(page).locator(".pill.h-red")).toHaveCount(0);
-  await expect(diagram(page).getByRole("button", { name: "Reserve cores" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Reserve cores" })).toHaveCount(0);
+  await expect(actions(page)).toHaveCount(0); // planner, no route found: no empty actions row
   await expect(page.getByTestId("loss-alert")).toHaveCount(0);
   await diagram(page).screenshot({ path: "e2e/screenshots/diagram-normal.png" });
 });
 
-test("fiber cut: Cut chip on a dashed red line, no Reserve cores; planner has no Restore", async ({ page }) => {
+test("fiber cut: Cut chip on a dashed red line; planner has no Restore", async ({ page }) => {
   await mock(page, { fiber_cut: true, free_to_reserve: 0 });
   await signIn(page);
   await pick(page);
   const d = diagram(page);
   await expect(d.locator(".pill.h-red").first()).toHaveText("Cut"); // symbol and word, not colour alone
   await expect(d.locator(".border-dashed.border-red")).toHaveCount(1);
-  await expect(d.getByRole("button", { name: "Reserve cores" })).toHaveCount(0);
-  await expect(d.getByRole("button", { name: "Restore" })).toHaveCount(0);
+  await expect(actions(page).getByRole("button", { name: "Restore" })).toHaveCount(0);
   await d.screenshot({ path: "e2e/screenshots/diagram-cut.png" });
 });
 
@@ -50,7 +51,7 @@ test("fiber cut: admin Restore opens the segment dialog unticked with focus on t
   });
   await signIn(page, "admin1");
   await pick(page);
-  await diagram(page).getByRole("button", { name: "Restore" }).click();
+  await actions(page).getByRole("button", { name: "Restore" }).click();
   const dlg = page.getByRole("dialog", { name: /^Edit segment/ });
   const reason = dlg.getByLabel("Reason (required)");
   await expect(reason).toBeFocused();
@@ -71,7 +72,7 @@ test("Edit segment: ticking Fiber cut sends fiber_cut true with the reason", asy
   });
   await signIn(page, "admin1");
   await pick(page);
-  await diagram(page).getByRole("button", { name: "Edit segment" }).click();
+  await actions(page).getByRole("button", { name: "Edit segment" }).click();
   const dlg = page.getByRole("dialog", { name: /^Edit segment/ });
   const box = dlg.getByRole("checkbox", { name: /Fiber cut/ });
   await expect(box).not.toBeChecked();

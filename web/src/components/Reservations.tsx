@@ -254,14 +254,14 @@ function ApprovalRow({ r, onChanged }: { r: Res; onChanged: () => void }) {
         <td>{day(r.last_event_at)} <span className="text-muted-foreground">· {r.age_days} d</span></td>
         <td>{release ? "Release" : "New"}</td>
         <td>{r.planner}</td>
-        <th scope="row" className="text-left font-semibold">
+        <th scope="row" className="font-semibold">
           {r.customer}
           {r.is_new_customer && <span className="ml-2 inline-flex items-center gap-1 text-xs font-semibold text-amber"><Icon name="lo" />New customer</span>}
         </th>
         <td className="truncate" title={groupCores(r).map(([s]) => s).join(", ") || undefined}>{segmentText(r)}</td>
         <td className="num">{cores}{!release && r.unassigned_cores > 0 && <span className="text-muted-foreground"> by count</span>}</td>
         <td>{r.planned_date ?? "—"}</td>
-        <td className="text-right">
+        <td>
           <span className="inline-flex gap-2">
             {release ? (
               <>

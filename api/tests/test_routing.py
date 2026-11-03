@@ -23,7 +23,7 @@ def fresh_graph():
 @pytest.fixture
 def g(db):
     """Sites A..F. Paths A->D: short A-B-D (3+3=6 km, B-D has 1 free core), mid A-C-D (4+4=8 km, 3 free),
-    long A-E-D (5+5=10 km, E-D has no distance), plus A-D direct (7 km, not surveyed). F has no segment.
+    plus A-D direct (7 km, not surveyed). A-E-D (E-D has no distance, weighs 15) is over 1.5 x 6 and never shown. F has no segment.
     Route 'A - D' labels A-B, B-D. B-C exists too (more paths)."""
     w = {}
     for u, role in [("planner1", "planner"), ("admin1", "admin")]:
@@ -55,13 +55,11 @@ def routes(client, g, a="A", b="D", n=1, sort=None, user="planner1"):
     return client.get(q, headers=H(user))
 
 
-def test_012_km_order_max_three_and_shape(client, g):
+def test_012_km_order_and_shape(client, g):
     r = routes(client, g, n=1)
     assert r.status_code == 200
     opts = r.json()["options"]
-    assert len(opts) == 3  # 4+ candidates exist; only 3 returned
-    kms = [o["total_km"] for o in opts]
-    assert kms[:2] == [6, 8] and opts[2]["estimated_db"] is None  # third is A-E-D: unknown km weighs the 10 km fallback (15)
+    assert [o["total_km"] for o in opts] == [6, 8, 7]  # A-E-D (15) is over 1.5 x 6 and dropped; the unsurveyed A-D is last
     first = opts[0]
     assert [s["name"] for s in first["segments"]] == ["A - B", "B - D"]
     assert [(s["site_a"], s["site_b"]) for s in first["segments"]] == [("A", "B"), ("B", "D")]
@@ -81,25 +79,28 @@ def test_012_travel_order_flips_reversed_segment(client, g):
 
 def test_012_insufficient_last_and_best_match_first_that_fits(client, g):
     opts = routes(client, g, n=2).json()["options"]  # A-B-D has only 1 free
-    assert [o["insufficient"] for o in opts[:2]] == [False, False] and opts[0]["total_km"] == 8
+    assert [o["insufficient"] for o in opts] == [False, True, True] and opts[0]["total_km"] == 8
     assert opts[0]["best_match"] is True and not any(o["best_match"] for o in opts[1:])
-    assert opts[-1]["insufficient"] is True  # the not surveyed direct segment or the 1-free path
 
 
 def test_012_free_cores_sort(client, g):
     opts = routes(client, g, n=1, sort="free_cores").json()["options"]
-    assert [o["fewest_free"] for o in opts[:2]] == [4, 3]  # A-E-D, then A-C-D; A-B-D (1 free) last
-    assert opts[2]["fewest_free"] == 1
+    assert [o["fewest_free"] for o in opts] == [3, 1, 0]  # A-C-D, A-B-D (1 free), then the unsurveyed A-D (insufficient)
     assert opts[0]["best_match"] is True
 
 
-def test_012_null_db_when_segment_has_no_distance_and_not_surveyed_insufficient(client, g):
-    opts = routes(client, g, n=1).json()["options"]
-    e = next(o for o in opts if o["segments"][1]["segment_id"] == g["ED"])
+def test_012_null_db_when_segment_has_no_distance_and_not_surveyed_insufficient(client, g, db):
+    for k in ("AB", "AC", "AD"):  # leave only A-E-D, which is then the shortest and so shown
+        db.execute(text("UPDATE segments SET fiber_cut = true WHERE id = :s"), {"s": g[k]})
+    invalidate()
+    opts = routes(client, g, n=4).json()["options"]
+    assert len(opts) == 1 and opts[0]["segments"][1]["segment_id"] == g["ED"]
+    e = opts[0]
     assert e["estimated_db"] is None and e["distance_incomplete"] is True and e["segments"][1]["km"] is None
-    opts = routes(client, g, n=4).json()["options"]  # only A-E-D has 4 free; the others are insufficient, by weight
-    assert [o["insufficient"] for o in opts] == [False, True, True] and opts[0]["best_match"]
-    direct = opts[-1]
+    assert e["insufficient"] is False and e["best_match"] is True
+    db.execute(text("UPDATE segments SET fiber_cut = false WHERE id = :s"), {"s": g["AD"]})
+    invalidate()
+    direct = routes(client, g, n=4).json()["options"][0]  # A-D is shortest now, but not surveyed
     assert [s["segment_id"] for s in direct["segments"]] == [g["AD"]]
     assert direct["insufficient"] is True and direct["segments"][0]["surveyed"] is False and direct["fewest_free"] == 0
 
@@ -187,3 +188,39 @@ def test_fiber_cut_segment_is_not_routed(client, g, db):
     opts = routes(client, g, n=1).json()["options"]
     assert opts and all(g["BD"] not in [s["segment_id"] for s in o["segments"]] for o in opts)
     assert opts[0]["total_km"] == 8  # next best is A-C-D
+
+
+def graph(db, edges):
+    """Make sites for the letters in edges [(a, b, km)] with segments (2 cores each); returns {letter: site id}."""
+    one(db, "INSERT INTO users (username, display_name, role) VALUES ('planner1','planner1','planner') RETURNING id")
+    s = {n: one(db, "INSERT INTO sites (name, kind) VALUES (:n,'site') RETURNING id", n=n) for n in sorted({x for a, b, _ in edges for x in (a, b)})}
+    for a, b, km in edges:
+        sid = one(db, "INSERT INTO segments (site_a_id, site_b_id, distance_km, survey_cores) VALUES (:a,:b,:k,2) RETURNING id", a=s[a], b=s[b], k=km)
+        db.execute(text("INSERT INTO cores (segment_id, number) VALUES (:s,1)"), {"s": sid})
+    return s
+
+
+def kms(client, s, a, b):
+    r = client.get(f"/api/routes?from={s[a]}&to={s[b]}&cores_needed=1", headers=H())
+    return [o["total_km"] for o in r.json()["options"]]
+
+
+def test_only_alternative_over_1_5x_gives_one_option(client, db):
+    s = graph(db, [("A", "B", 10), ("A", "C", 10), ("C", "B", 10)])  # A-C-B is 20 km > 15
+    assert kms(client, s, "A", "B") == [10]
+
+
+def test_alternative_just_inside_1_5x_is_shown(client, db):
+    s = graph(db, [("A", "B", 10), ("A", "C", 7.5), ("C", "B", 7.5)])  # 15 km = 1.5 x 10
+    assert kms(client, s, "A", "B") == [10, 15]
+
+
+def test_two_reasonable_alternatives(client, db):
+    s = graph(db, [("A", "B", 10), ("A", "C", 6), ("C", "B", 6)])
+    assert kms(client, s, "A", "B") == [10, 12]
+
+
+def test_three_shown_when_more_are_reasonable(client, db):
+    s = graph(db, [("A", "B", 10), ("A", "C", 6), ("C", "B", 6), ("A", "D", 5), ("D", "B", 8), ("A", "E", 9), ("E", "B", 5)])
+    assert kms(client, s, "A", "B") == [10, 12, 13]  # A-E-B (14) also qualifies; only 3 shown
+

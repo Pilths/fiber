@@ -38,35 +38,52 @@ Tabs: **Inventory | My reservations**. There is no Reserve tab; reserving opens 
 
 | Slot | Content |
 |---|---|
-| Top left, 8 of 12 columns | Map, full size. Never shrunk to make room for other content. |
-| Top right, 4 columns, map height | Segment list: search, Region and Type filters, rows of segment name, km and free count (0 in red). |
-| Under the map, full width | Segment diagram: keep the one the web app has now (`SegmentDiagram` in `web/src/components/NetworkDetail.tsx`), not the simplified line in the FigCraft mock. "Reserve cores" button at its right end. |
+| Top left, 8 of 12 columns | Map, full size. Never shrunk to make room for other content. Region and Type filters ("All regions", "All types") sit in the map toolbar beside Layers, zoom, Fit selection and Full screen; they dim the other segments. |
+| Top right, 4 columns, map height | "Route A to B" panel (prototype 9e), content scrolls inside: Route A and Route B with a swap button, Cores needed, a full-width blue "Find route", Shortest distance / Most free cores toggle, then up to 3 option rows (radio dot, Option N, segments and km, lowest free count in a coloured pill, Calculated loss; the selected one has a blue border and tint). Nothing below before a search. Segments are found with the header search or the map. |
+| Under the map, full width | Segment diagram: keep the one the web app has now (`SegmentDiagram` in `web/src/components/NetworkDetail.tsx`), not the simplified line in the FigCraft mock. The selected segment's box reaches the site dots at both ends. |
+| Under the diagram, own row | "Reserve on this route" (when a route is found) and "Edit segment" (and "Restore" on a cut segment), right-aligned, all the same width. Not inside the diagram card. No row when it would be empty. |
 | Below, full width | Cores table (see below). Rows of holders come first, so every holder is above the fold. |
 
 Segment facts are only the two site names and the distance. No numbers row, no loss, no region or type on the segment
-(region and type live in the segment list filters).
+(region and type live in the map toolbar filters).
 
 ### Cores table (one table)
 
-- Filter chips with counts, the only place the counts appear: All, Free, In use, Unassigned.
-- Columns: Cores, Status, Customer, Planner, SRF, Planned, Age, Ports. No loss column.
-- Consecutive cores of one reservation collapse into one row ("10-12"); runs of Available cores collapse into one
-  row ("3-9 Available (7)"). The row's arrow expands it per core.
+- Grouped by status, in this order: Requested, Reserved, In service, Unassigned, Available. Each group has a grey
+  header row with a disclosure arrow, the status symbol and word, and its count (Unassigned: "N cores"), the only
+  place the counts appear. Empty groups are not shown. Available starts collapsed; a focused or just-requested core
+  opens its group. No filter chips.
+- No table header at the top and no Status column: the group heading shows the status. Under each group heading
+  sits that group's own row of column labels (12px, muted, 32px tall): Cores, Customer, Planner, SRF, Planned, Age,
+  Ports. Available shows only Cores and Ports (the other columns are always empty there). A collapsed group hides
+  its labels too. No loss column.
+- One `<colgroup>` with fixed widths, so columns line up down every group. Group heading 40px on the light grey
+  (subtle) background, 12px gap above every group but the first. Cells and labels are centred (as in every table);
+  the group heading stays left-aligned. No zebra. A Stale chip sits in the Age cell after the number.
+- One row per core everywhere (no ranges); the core number sits centred under "Cores". (Owner, 3 Nov 2026.)
 - Unassigned row: a reservation for a number of cores whose core numbers are not picked yet (Excel import).
-  Shown as "4 cores", status "Unassigned".
+  Shown as "4 cores" in the Unassigned group.
 - Row click opens core details (side panel): customer, planner, SRF, circuit, ports both ends, "Measured loss",
   "Calculated loss", test date, history, Keep, Release.
 
 ### Reserve box (modal over Inventory)
 
-- Opens from "Reserve cores" on the segment diagram. Page behind is dimmed; map and table stay in place.
+- Opens from "Reserve on this route" under the segment diagram, after a Route A to B search. All reserving goes
+  through a route; a one-segment reservation is a route between that segment's two sites. Page behind is dimmed;
+  map and table stay in place.
 - About 1040 wide with compact spacing (about 20px padding, 36px rows); the core list scrolls inside.
-- Header: segment line, free count, close. Body: "Cores needed" stepper that ticks the first N available cores;
-  list of Available cores only: tick, core, ports (both ends), "Calculated loss", "Measured loss" ("Not tested"
+- Header: the route's sites in order, close. Body: "Cores needed per segment" stepper (sets N, starts at the
+  Route A to B "Cores needed"); per selected segment, a list of Available cores only: tick, core, ports (both ends), "Calculated loss", "Measured loss" ("Not tested"
   when none; measured above calculated shows a triangle and bold amber). Even, fixed column widths. Footer: Customer (required), Planned date, SRF ID (optional), "Reserve N cores".
 - Closing with cores ticked asks "Discard N chosen cores?" (Keep editing, Discard).
 - After submit: the box closes, a closable "Request #N sent" box shows, and the new Requested row is highlighted
-  in the Cores table. A route reservation uses the same box with the route chain in the header.
+  in the Cores table.
+- Under the header, the route's segment diagram (site dots, line, km, site names; wraps like Inventory).
+  At open no segment is selected and no core is ticked; the area below shows only "Choose a segment". Clicking a
+  segment selects it (blue box) and shows that segment's Available cores list (same columns as above); double-click,
+  or Enter/Space, on the selected segment unselects it. Ticks are kept per segment. "Cores needed per segment" sets N
+  only (no auto-tick); each segment shows an "x of N" pill under its line, amber until x = N, then green; more than N
+  cannot be ticked. "Reserve N cores" is enabled when every segment has exactly N ticked; one request with all cores.
 
 ### My reservations
 
@@ -94,7 +111,8 @@ Circuits; a core result opens its segment and highlights the row.
 ## 4. Patterns (agreed)
 
 - Tables: header row, status as symbol plus word, empty values shown with the shared `Blank` component.
-- Filter chips with counts above a table; counts appear only there.
+- Filter chips with counts above a table (My reservations); counts appear only there. The Cores table uses status
+  group headers instead.
 - After a reservation request: a closable success box "Request #N sent. Waiting for admin approval."
   No hint lines beside buttons.
 
@@ -105,6 +123,13 @@ Circuits; a core result opens its segment and highlights the row.
 - 31 Oct 2026: density A: key facts and the main action above the fold, tables below.
 - 31 Oct 2026: Cores table columns: Cores, Status, Customer, Planner, SRF, Planned date, Age, Ports.
   Age is computed (`age_days` from the API), never stored.
+- 2 Nov 2026: segment actions moved out of the diagram card into their own row below it, one fixed width.
+- 3 Nov 2026: route reservations: the planner chooses the cores of each segment in the Reserve box from the route's
+  segment diagram; the server no longer auto-picks them.
+- 3 Nov 2026: single-segment Reserve cores removed; reserve only through Route A to B.
+- 2 Nov 2026: prototype "9e": the segment list beside the map is replaced by the "Route A to B" panel (the route
+  row above the map is gone); Region and Type move into the map toolbar; the Cores table groups rows by status with
+  counts in the group headers instead of filter chips.
 - 1 Nov 2026: a bottom-sheet segment drawer was considered and rejected (mobile pattern, hides the map).
 - 1 Nov 2026: rejected layouts: one page with no map, full-screen map with floating panels, reserve inside the
   Inventory card with a shrunk map, a separate Reserve tab. Agreed: section 3.

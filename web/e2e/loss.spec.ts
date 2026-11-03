@@ -10,12 +10,11 @@ const pick = (page: Page, name: RegExp) => pickSegment(page, name);
 
 test.use({ viewport: { width: 1440, height: 900 } });
 
-test("segment-level views show no loss: diagram totals, segment list and Cores table", async ({ page }) => {
+test("segment-level views show no loss: diagram totals and Cores table", async ({ page }) => {
   await signIn(page);
   await pick(page, SEGMENTS.measured);
   await expect(page.getByTestId("route-totals")).toHaveText(/^Segments1Distance[\d.]+ km$/);
-  await expect(page.getByRole("region", { name: "Segment list" })).not.toContainText("dB");
-  await expect(page.getByRole("table", { name: /^Cores of / }).locator("thead")).not.toContainText("Loss"); // no loss column
+  await expect(page.getByRole("table", { name: /^Cores of / }).getByRole("columnheader", { name: /loss/i })).toHaveCount(0); // no loss column
 });
 
 test("a measured core: its Calculated loss and Measured loss in core details", async ({ page }) => {

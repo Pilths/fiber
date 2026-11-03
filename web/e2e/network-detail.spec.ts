@@ -4,7 +4,7 @@ import { openReserve, signIn } from "./helpers";
 // Dev seed: Cyberjaya DC to Kuantan Hut has several paths; the search shows the best one.
 test.use({ viewport: { width: 1440, height: 900 } });
 
-test("route search, pick a segment in the diagram: totals, one Cores table with chips, ranges and core details", async ({ page }) => {
+test("route search, pick a segment in the diagram: totals, one Cores table grouped by status, one row per core and core details", async ({ page }) => {
   // The option with the most segments first, so the diagram shows a long chain.
   await page.route("**/api/routes?*", async (r) => {
     const j = (await (await r.fetch()).json()) as { options: { segments: unknown[] }[] };
@@ -12,11 +12,11 @@ test("route search, pick a segment in the diagram: totals, one Cores table with 
   });
   await signIn(page);
   await expect(page.getByRole("region", { name: "Inspector" })).toHaveCount(0);
-  const search = page.getByRole("region", { name: "Route search" });
+  const search = page.getByRole("region", { name: "Route A to B" });
   await search.getByLabel("Route A").fill("DEV Cyberjaya DC");
   await search.getByLabel("Route B").fill("DEV Kuantan Hut");
-  await search.getByRole("button", { name: "Search" }).click();
-  await expect(page.getByTestId("route-found")).toHaveText(/^\d+ segments?, [\d.]+ km$/);
+  await search.getByRole("button", { name: "Find route" }).click();
+  await expect(page.locator("[data-testid=route-option][aria-pressed=true]")).toContainText(/\d+ segments?, [\d.]+\+? km/);
 
   const diagram = page.getByTestId("segment-diagram");
   const segs = diagram.getByRole("list", { name: "Segments on the route" }).getByRole("button");
@@ -32,38 +32,43 @@ test("route search, pick a segment in the diagram: totals, one Cores table with 
   await expect(page.locator("#segment-h")).toHaveText(name);
   await expect(page.locator("body")).not.toContainText("Worst core");
 
-  // One Cores table: chips with counts, columns, holders first, ranges collapsed.
+  // One Cores table: groups by status with counts in their headers, holders first, Available collapsed.
   const table = page.getByRole("table", { name: `Cores of ${name}` });
-  await expect(table.locator("thead th")).toHaveText(["Cores", "Status", "Customer", "Planner", "SRF", "Planned", "Age", "Ports"]);
-  const chips = page.getByRole("group", { name: "Filter cores" });
-  await expect(chips.getByRole("button")).toHaveText([/^All \d+$/, /^Free \d+$/, /^In use \d+$/, /^Unassigned \d+$/]);
-  const statuses = await table.locator("tbody > tr > td:nth-child(2)").allInnerTexts();
-  const firstFree = statuses.findIndex((t) => t.startsWith("Available"));
-  if (firstFree >= 0) expect(statuses.slice(firstFree).every((t) => t.startsWith("Available"))).toBe(true); // holders first
-  await chips.getByRole("button", { name: /^Free/ }).click();
-  await expect(table.locator("tbody > tr > td:nth-child(2)").filter({ hasNotText: "Available" })).toHaveCount(0);
-  await expect(table.locator("tbody")).not.toContainText("None"); // empty cells show "-"
-  await chips.getByRole("button", { name: /^All/ }).click();
-
-  // A run of cores expands to one row per core; a row click opens core details.
-  const run = table.getByRole("button", { name: /^Cores \d+-\d+, show each core$/ }).first();
-  if (await run.count()) {
-    const [lo, hi] = /(\d+)-(\d+)/.exec((await run.getAttribute("aria-label"))!)!.slice(1).map(Number);
-    await run.click();
-    await expect(run).toHaveAttribute("aria-expanded", "true");
-    await expect(table.getByRole("button", { name: `Core ${hi} details`, exact: true })).toBeVisible();
-    expect(hi).toBeGreaterThan(lo);
+  await expect(table.locator("thead")).toHaveCount(0); // column labels sit inside each group, no Status column
+  await expect(table.locator('tbody:not([data-status="Available"]) tr.colhead').first().getByRole("columnheader"))
+    .toHaveText(["Cores", "Customer", "Planner", "SRF", "Planned", "Age", "Ports"]);
+  await expect(page.getByRole("group", { name: "Filter cores" })).toHaveCount(0); // no chips
+  const groups = table.getByTestId("core-group");
+  const order = ["Requested", "Reserved", "In use", "Unassigned", "Available"];
+  const shown = await groups.evaluateAll((gs) => gs.map((g) => g.getAttribute("data-status")!));
+  expect(shown).toEqual(order.filter((s) => shown.includes(s))); // holders first, Available last
+  const heads = groups.getByRole("rowheader").filter({ has: page.getByRole("button", { expanded: true }) });
+  await expect(heads.first()).toHaveText(/^\S\s*(Requested|Reserved|In service|Unassigned)\s*\d+( cores?)?$/);
+  const avail = table.locator('tbody[data-status="Available"]');
+  if (await avail.count()) {
+    const toggle = avail.getByRole("button", { expanded: false });
+    await expect(avail.locator("tr")).toHaveCount(1); // starts collapsed: only its header row
+    await toggle.click();
+    await expect(avail.getByRole("button", { name: /^Available \d+$/ })).toHaveAttribute("aria-expanded", "true");
+    await expect(avail.locator("tr.colhead").getByRole("columnheader")).toHaveText(["Cores", "Ports"]);
+    await expect(avail.locator("tr[data-core] > td[colspan='5']").filter({ hasText: /\S/ })).toHaveCount(0); // free cores: no holder columns
   }
-  await table.locator("tbody > tr").first().click();
+  await expect(table).not.toContainText("None"); // empty cells show "-"
+
+  // One row per core (no ranges); a row click opens core details.
+  await expect(table.getByRole("button", { name: /show each core/ })).toHaveCount(0);
+  const nums = await table.locator("tr[data-core]").evaluateAll((rs) => rs.map((r) => r.getAttribute("data-core")));
+  expect(nums.every((x) => /^\d+$/.test(x ?? ""))).toBe(true);
+  await table.locator("tbody > tr[data-core]").first().click();
   await expect(page.getByRole("dialog", { name: /^Core \d+ on / })).toBeVisible();
   await page.keyboard.press("Escape");
   await page.evaluate(() => scrollTo(0, 0)); // the sticky header stays at the top of the full-page shot
   await page.screenshot({ path: "e2e/screenshots/network-detail.png", fullPage: true });
 });
 
-test("Reserve cores on the segment diagram opens the Reserve box over Inventory", async ({ page }) => {
+test("Reserve on this route (Route A to B) opens the Reserve box over Inventory", async ({ page }) => {
   await signIn(page);
-  const box = await openReserve(page, /^DEV Kuala Lumpur DC - DEV Cyberjaya DC/);
+  const box = await openReserve(page, "DEV Kuala Lumpur DC", "DEV Cyberjaya DC");
   await expect(page.getByTestId("segment-diagram")).toBeAttached(); // Inventory stays behind the box
   await expect(page.getByRole("grid", { name: "Cores" })).toHaveCount(0); // no core grid any more
   await expect(box.getByRole("table", { name: "Available cores" })).toBeVisible();

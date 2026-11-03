@@ -51,32 +51,43 @@ export function contrast(page: Page, sel: Record<string, string>) {
 export const tab = (page: Page, name: "Inventory" | "My reservations") =>
   page.getByRole("navigation", { name: "Main" }).getByRole("button", { name, exact: true }).click();
 
-// Inventory: pick the segment from the segment list beside the map.
+// Inventory: select the segment through its #segment= link (the header search and the map are the UI ways in).
 export async function pickSegment(page: Page, name: RegExp | string) {
   await tab(page, "Inventory");
-  await page.getByRole("region", { name: "Segment list" }).getByRole("button", { name: typeof name === "string" ? new RegExp(name) : name }).click();
+  const re = typeof name === "string" ? new RegExp(name) : name;
+  const segs: { site_a: string; site_b: string }[] = await (await page.request.get("/api/segments")).json();
+  const full = segs.map((s) => `${s.site_a} - ${s.site_b}`).find((n) => re.test(n));
+  expect(full, `segment ${name}`).toBeTruthy();
+  await page.evaluate((h) => { location.hash = h; }, `#segment=${encodeURIComponent(full!)}`);
   await expect(page.locator("#segment-h")).toHaveText(name);
 }
 
-// The Reserve box opens from "Reserve cores" on the segment diagram; returns the box.
-export async function openReserve(page: Page, name: RegExp | string) {
-  await pickSegment(page, name);
-  await page.getByTestId("segment-diagram").getByRole("button", { name: "Reserve cores" }).click();
+// Reserving goes through Route A to B: find A to B, choose the one-segment option (the direct segment), "Reserve on
+// this route", then select that single segment in the box diagram. Returns the box, its Available cores list showing.
+export async function openReserve(page: Page, a: string, b: string, cores = 1) {
+  await tab(page, "Inventory");
+  const s = page.getByRole("region", { name: "Route A to B" });
+  await s.getByLabel("Route A").fill(a);
+  await s.getByLabel("Route B").fill(b);
+  await s.getByLabel("Cores needed").fill(String(cores));
+  await s.getByRole("button", { name: "Find route" }).click();
+  await page.getByRole("list", { name: "Route options" }).getByRole("button", { name: /^Option \d+ (Best match )?1 segment,/ }).click();
+  await page.getByTestId("segment-actions").getByRole("button", { name: "Reserve on this route" }).click();
   const box = page.getByTestId("reserve-box");
   await expect(box).toBeVisible();
+  const legs = box.getByTestId("route-chain").getByRole("button");
+  await expect(legs).toHaveCount(1);
+  await legs.first().click();
+  await expect(box.getByRole("table", { name: "Available cores" })).toBeVisible();
   return box;
 }
 
-// Cores table: opens a core's details, first expanding the collapsed run ("10-12") that holds it.
+// Cores table: opens a core's details, first opening collapsed status groups and the collapsed run ("10-12") that holds it.
 export async function openCore(page: Page, n: number) {
   const t = page.getByRole("table", { name: /^Cores of / });
   await t.locator("tbody tr").first().waitFor();
+  const shut = t.locator("th[scope=rowgroup] button[aria-expanded=false]");
+  while (await shut.count()) await shut.first().click();
   const one = t.getByRole("button", { name: `Core ${n} details`, exact: true });
-  if (!(await one.count())) {
-    for (const b of await t.getByRole("button", { name: /^Cores \d+-\d+, show each core$/ }).all()) {
-      const [lo, hi] = /(\d+)-(\d+)/.exec((await b.getAttribute("aria-label"))!)!.slice(1).map(Number);
-      if (n >= lo && n <= hi) { await b.click(); break; }
-    }
-  }
   await one.click();
 }

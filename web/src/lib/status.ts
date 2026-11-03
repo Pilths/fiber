@@ -24,16 +24,9 @@ export function health(s: { survey_cores: number | null; free_to_reserve: number
   return { cls: "h-red", icon: "fl", word: "Full", value: "0 full" };
 }
 
-export const countBy = (d: { cores: { status: CoreStatus }[] }) => {
-  const n: Record<CoreStatus, number> = { Available: 0, Requested: 0, Reserved: 0, "In use": 0 };
-  for (const c of d.cores) n[c.status]++;
-  return n;
-};
-
-// Segment list filters live in the Dashboard so the map dims the same segments the list hides.
+// Map filters (Region, Type) live in the Dashboard; q stays "" now that the header search finds segments.
 export type SegmentFilter = { q: string; region: string; routeType: string };
 export const NO_FILTER: SegmentFilter = { q: "", region: "", routeType: "" };
-// Region and route type only; the text search narrows the list, not the map.
 export const inFilter = (s: { region: string | null; route_type: string | null }, f: SegmentFilter) =>
   (!f.region || s.region === f.region) && (!f.routeType || s.route_type === f.routeType);
 

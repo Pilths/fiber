@@ -23,17 +23,17 @@ test("tabs by role: planner sees Inventory and My reservations; admin (via dev s
   await expect(page.getByRole("menu", { name: "Account" }).getByRole("menuitem", { name: "Users" })).toBeVisible();
 });
 
-test("selecting a segment from the segment list writes the hash and shows its diagram and cores; the hash restores it", async ({ page }) => {
+test("selecting a segment from the header search writes the hash and shows its diagram and cores; the hash restores it", async ({ page }) => {
   await signIn(page);
-  await pickSegment(page, SEGMENT);
-  await expect(page.getByRole("region", { name: "Segment list" }).getByRole("button", { pressed: true })).toContainText(SEGMENT);
+  await page.getByRole("combobox", { name: /^Find a segment/ }).fill(SEGMENT.split(" - ")[0]);
+  await page.getByRole("listbox", { name: "Search results" }).getByRole("option", { name: SEGMENT, exact: true }).click();
+  await expect(page.locator("#segment-h")).toHaveText(SEGMENT);
   await expect(page.getByRole("heading", { name: "Cores", exact: true })).toBeVisible();
   await expect(page).toHaveURL(new RegExp(`#segment=${encodeURIComponent(SEGMENT)}$`));
 
   const other = await page.context().newPage();
   await other.goto(`/#segment=${encodeURIComponent(SEGMENT)}`);
   await expect(other.locator("#segment-h", { hasText: SEGMENT })).toBeVisible();
-  await expect(other.getByRole("region", { name: "Segment list" }).getByRole("button", { pressed: true })).toContainText(SEGMENT);
 });
 
 test("Inventory has no Inspector and no eyebrow labels", async ({ page }) => {

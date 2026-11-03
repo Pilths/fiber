@@ -57,7 +57,7 @@ function Rows({ staged }: { staged: Staged }) {
                   return (
                     <tr key={r.id}>
                       <td className="num text-muted-foreground">{r.row_number}</td>
-                      <th scope="row" className="truncate text-left font-semibold" title={link === "—" ? undefined : link}>{link}</th>
+                      <th scope="row" className="truncate font-semibold" title={link === "—" ? undefined : link}>{link}</th>
                       {tx(cell(r.parsed.distance_km, field(r.raw, /^(distance|km)/i)), "num")}
                       {tx(cell(r.parsed.route, null))}
                       {tx(cell(r.parsed.section, null))}
