@@ -106,7 +106,7 @@ To confirm against the mock files arriving 22 October 2026: KMZ lines are named 
    - The route planner ("Site A to B") takes From, To, Optimise for (Shortest distance or Most free cores; no "lowest loss" until loss data exists) and Cores needed per segment.
    - Up to 3 route options are shown, each with its segments in order as building A to building B, with each segment's km and free cores, grouped under their route label where there is one. Each option shows total km, Calculated loss, and the fewest free cores on any segment of the path (the bottleneck, shown).
    - Options are ranked by the Optimise for choice: shortest km, or most free cores (the fewest free cores on any segment of the path, higher is better). Options without enough cores come last, and the best option carries a "Best match" tag.
-   - The user must be able to see every option returned (up to 3), none hidden or cut off. A selected route shows as the 2D route ribbon (see Design decisions).
+   - The user must be able to see every option returned (as many as the network gives, up to 5), none hidden or cut off. A selected route shows as the 2D route ribbon (see Design decisions).
    - From and To list all sites, so any site can route to any site, including starting or ending a route inside a route.
    - A route option's Calculated loss is the sum of its segments' Calculated loss (each segment counts its own 2 connectors).
    - Each option shows loss confidence, as measured segments out of segments on the path.

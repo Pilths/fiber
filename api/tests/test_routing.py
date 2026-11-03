@@ -220,7 +220,12 @@ def test_two_reasonable_alternatives(client, db):
     assert kms(client, s, "A", "B") == [10, 12]
 
 
-def test_three_shown_when_more_are_reasonable(client, db):
+def test_count_follows_the_network_not_a_fixed_three(client, db):
     s = graph(db, [("A", "B", 10), ("A", "C", 6), ("C", "B", 6), ("A", "D", 5), ("D", "B", 8), ("A", "E", 9), ("E", "B", 5)])
-    assert kms(client, s, "A", "B") == [10, 12, 13]  # A-E-B (14) also qualifies; only 3 shown
+    assert kms(client, s, "A", "B") == [10, 12, 13, 14]  # four separate reasonable paths, all shown
+
+
+def test_near_copy_of_a_kept_path_is_dropped(client, db):
+    s = graph(db, [("A", "C", 8), ("C", "B", 4), ("C", "D", 1), ("D", "B", 4), ("A", "E", 7), ("E", "B", 7)])
+    assert kms(client, s, "A", "B") == [12, 14]  # A-C-D-B (13) shares 8 of its 13 km with A-C-B
 

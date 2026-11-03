@@ -22,12 +22,12 @@ async function search(page: Page, from = FROM, to = TO) {
 
 test.use({ viewport: { width: 1440, height: 900 } });
 
-test("route search on Inventory: up to 3 options, the route drawn with Reserve on this route", async ({ page }) => {
+test("route search on Inventory: up to 5 options, the route drawn with Reserve on this route", async ({ page }) => {
   await signIn(page);
   await search(page);
   const n = await options(page).count();
   expect(n).toBeGreaterThan(1);
-  expect(n).toBeLessThanOrEqual(3);
+  expect(n).toBeLessThanOrEqual(5);
   await expect(options(page).first()).toHaveAttribute("aria-pressed", "true");
   await expect(options(page).first()).toContainText("Best match");
   await expect(options(page).first()).toContainText(/Option 1/);
@@ -153,4 +153,30 @@ test("Most free cores sends sort=free_cores, re-ranks and goes into the link", a
   const fewest = ((await res.json()) as { options: { fewest_free: number }[] }).options.map((o) => o.fewest_free);
   for (let i = 1; i < fewest.length; i++) expect(fewest[i - 1]).toBeGreaterThanOrEqual(fewest[i]);
   await expect(page).toHaveURL(/-free_cores-0$/);
+});
+
+test("route mode on the map: other options' segments switch option, the rest are faint and not clickable; Clear route ends it", async ({ page }) => {
+  await signIn(page);
+  await search(page);
+  const eps: { id: number; name: string }[] = await (await page.request.get("/api/routes/endpoints")).json();
+  const id = (n: string) => eps.find((e) => e.name === n)!.id;
+  const opts: { segments: { segment_id: number }[] }[] = (await (await page.request.get(`/api/routes?from=${id(FROM)}&to=${id(TO)}&cores_needed=1`)).json()).options;
+  const [first, second] = opts.map((o) => o.segments.map((x) => x.segment_id));
+  const other = second.find((x) => !first.includes(x))!;
+  const line = (id: number) => page.locator(`[data-testid=map-line][data-segment-id="${id}"]`);
+  // a segment on no option: faint, no chip to click
+  const all = await page.locator("[data-testid=map-line]").evaluateAll((es) => es.map((e) => Number(e.getAttribute("data-segment-id"))));
+  const off = all.find((x) => !first.includes(x) && !second.includes(x))!;
+  await expect(line(off)).toHaveAttribute("data-state", "hidden");
+  await expect(page.locator(`[data-testid=map-chip][data-segment-id="${off}"]`)).toHaveCount(0);
+  // a segment of option 2: clicking its chip switches to option 2 and selects that segment
+  await page.locator(`[data-testid=map-chip][data-segment-id="${other}"]`).click({ force: true });
+  await expect(options(page).nth(1)).toHaveAttribute("aria-pressed", "true");
+  await expect(line(other)).toHaveAttribute("data-selected", "true");
+  await expect(chain(page).and(page.locator("[aria-pressed=true]"))).toHaveCount(1);
+  // Clear route: back to the normal map, no options, no #route=
+  await page.getByRole("button", { name: "Clear route" }).click();
+  await expect(options(page)).toHaveCount(0);
+  await expect(line(off)).not.toHaveAttribute("data-state", "hidden");
+  expect(page.url()).not.toContain("#route=");
 });

@@ -133,7 +133,10 @@ export function RouteSearch({ rp }: { rp: RoutePlanner }) {
   const bad = err ?? rp.errs.from ?? rp.errs.to ?? rp.errs.cores_needed ?? rp.errs.form ?? (none ? rp.res?.message ?? "No route found" : null);
   return (
     <section className="card absolute inset-0 flex flex-col overflow-auto" aria-labelledby="route-h">
-      <h2 id="route-h" className="card-title mb-3">Site A to B</h2>
+      <div className="mb-3 flex items-baseline justify-between">
+        <h2 id="route-h" className="card-title">Site A to B</h2>
+        {rp.idx != null && <button type="button" className="cursor-pointer text-body font-semibold text-blue hover:underline" onClick={rp.clear}>Clear route</button>}
+      </div>
       <form onSubmit={submit} className="flex flex-col gap-3">
         <label><span className="lbl">Site A</span>
           <input id="route-a" className="field" list="route-sites" value={rp.fromText} onChange={(e) => { setErr(null); rp.setFrom(e.target.value); }} autoComplete="off" /></label>
@@ -163,7 +166,7 @@ export function RouteSearch({ rp }: { rp: RoutePlanner }) {
   );
 }
 
-// Up to 3 options under Find route; a click draws that option on the map and the diagram.
+// The options under Find route (as many as the network gives, up to 5); a click draws that option on the map and the diagram.
 function RouteOptions({ rp }: { rp: RoutePlanner }) {
   const o = rp.res?.options ?? [];
   if (rp.idx == null || !o.length) return null;
