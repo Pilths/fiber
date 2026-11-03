@@ -157,7 +157,7 @@ export function CoresTable({ d, focusCoreId, flash, onOpen, onAssign }: {
       <td className="truncate" title={c.planner ?? undefined}>{c.planner || <Dash />}</td>
       <td className="truncate" title={c.srf_id ?? undefined}>{c.srf_id || <Dash />}</td>
       <td className="whitespace-nowrap">{c.planned_date || <Dash />}</td>
-      <td className="num">{c.age_days != null ? `${c.age_days} d` : <Dash />}<Stale c={c} /></td>
+      <td className="num">{c.age_days ?? <Dash />}<Stale c={c} /></td>
     </>
   );
   return (
@@ -180,7 +180,7 @@ export function CoresTable({ d, focusCoreId, flash, onOpen, onAssign }: {
             </tr>
             {!shut && (g.s === "Available"
               ? <tr className="colhead"><th scope="col">Cores</th><td colSpan={5} /><th scope="col">Ports</th></tr>
-              : <tr className="colhead">{["Cores", "Customer", "Planner", "SRF", "Planned", "Age", "Ports"].map((h) => <th key={h} scope="col">{h}</th>)}</tr>)}
+              : <tr className="colhead">{["Cores", "Customer", "Planner", "SRF", "Planned", "Days held", "Ports"].map((h) => <th key={h} scope="col">{h}</th>)}</tr>)}
             {!shut && g.rows.map((r) => {
               if (r.hold) {
                 const h = r.hold;
@@ -191,7 +191,7 @@ export function CoresTable({ d, focusCoreId, flash, onOpen, onAssign }: {
                     <td className="truncate" title={h.planner ?? undefined}>{h.planner ?? <Dash />}</td>
                     <td className="truncate" title={h.srf_id ?? undefined}>{h.srf_id ?? <Dash />}</td>
                     <td className="whitespace-nowrap">{h.planned_date ?? <Dash />}</td>
-                    <td className="num">{h.age_days} d</td>
+                    <td className="num">{h.age_days}</td>
                     <td>{onAssign ? <button type="button" className="btn btn-sm" onClick={() => onAssign(h)}>Assign cores</button> : <Blank>No ports yet</Blank>}</td>
                   </tr>
                 );

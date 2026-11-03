@@ -14,6 +14,17 @@ export function FreeBadge({ s }: { s: Parameters<typeof health>[0] }) {
 
 const options = (all: Segment[], k: "region" | "route_type") => [...new Set(all.map((s) => s[k]).filter((v): v is string => !!v))].sort();
 
+// Trunk routes (R1, R3, ...) found on trunk segments, in name order.
+function trunkRoutes(all: Segment[]): string[] {
+  const routes = new Set<string>();
+  for (const segment of all) {
+    if (segment.route_type === "Trunk" && segment.route) {
+      routes.add(segment.route);
+    }
+  }
+  return [...routes].sort();
+}
+
 // Region and Type in the map toolbar: they dim the other segments on the map.
 export function MapFilters({ segments, filter, onFilter }: { segments: Segment[] | null; filter: SegmentFilter; onFilter: (f: SegmentFilter) => void }) {
   const all = segments ?? [];
@@ -24,9 +35,11 @@ export function MapFilters({ segments, filter, onFilter }: { segments: Segment[]
         <option value="">All regions</option>
         {options(all, "region").map((o) => <option key={o}>{o}</option>)}
       </select>
-      <select className={cls} aria-label="Type" value={filter.routeType} onChange={(e) => onFilter({ ...filter, routeType: e.target.value })}>
+      <select className={cls} aria-label="Type" value={filter.network} onChange={(e) => onFilter({ ...filter, network: e.target.value })}>
         <option value="">All types</option>
-        {options(all, "route_type").map((o) => <option key={o}>{o}</option>)}
+        {trunkRoutes(all).map((route) => <option key={route} value={`trunk:${route}`}>Trunk {route}</option>)}
+        <option value="dc">DC</option>
+        <option value="toc">TOC</option>
       </select>
     </>
   );

@@ -18,6 +18,8 @@ class SegmentSummary(BaseModel):
     id: int
     site_a: str
     site_b: str
+    site_a_kind: str  # sites.kind: site, data_center, toc, ...
+    site_b_kind: str
     route_type: str | None
     region: str | None
     route: str | None

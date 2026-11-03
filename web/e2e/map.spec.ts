@@ -95,17 +95,18 @@ test("clicking a chip selects the segment; Enter on a chip too; Esc clears", asy
   expect(page.url()).not.toContain("#segment=");
 });
 
-test("Type filter in the map toolbar dims the other segments on the map", async ({ page }) => {
+test("Type filter in the map toolbar: trunk routes, DC and TOC; the others dim", async ({ page }) => {
   await signIn(page);
   await expect(chips(page)).toHaveCount(19);
-  const segs: { route_type: string | null }[] = await (await page.request.get("/api/segments")).json();
-  const types = [...new Set(segs.map((s) => s.route_type).filter((t): t is string => !!t))];
-  const count = (t: string) => segs.filter((s) => s.route_type === t).length;
-  const pick = types.sort((a, b) => count(a) - count(b))[0]; // fewer than the 19 drawn segments
-  await expect(map(page).getByLabel("Type").getByRole("option").first()).toHaveText("All types");
+  const segs: { route_type: string | null; route: string | null }[] = await (await page.request.get("/api/segments")).json();
+  const routes = [...new Set(segs.filter((s) => s.route_type === "Trunk" && s.route).map((s) => `Trunk ${s.route}`))].sort();
+  const type = map(page).getByLabel("Type");
+  await expect(type.getByRole("option")).toHaveText(["All types", ...routes, "DC", "TOC"]);
   await expect(map(page).getByLabel("Region").getByRole("option").first()).toHaveText("All regions");
-  await map(page).getByLabel("Type").selectOption(pick);
+  await type.selectOption("toc"); // only the segments at DEV Bukit Jalil TOC stay bright
   await expect.poll(() => chips(page).count()).toBeLessThan(19);
+  await expect(page.getByRole("group", { name: "Map key" })).toContainText("TOC");
+  await expect(page.getByRole("button", { name: /^Site DEV Bukit Jalil TOC, TOC,/ })).toBeVisible();
 });
 
 // Route search shows the best option; only the 2-segment Penang - Butterworth - Ipoh option is kept.

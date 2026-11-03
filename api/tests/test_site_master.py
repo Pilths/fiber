@@ -411,3 +411,68 @@ def test_add_only_keeps_sites_missing_from_the_file_and_skips_the_row_count_chec
     assert apply(client, r.json()["upload_id"]).status_code == 200
     assert count(db, "SELECT count(*) FROM sites WHERE active") == 31  # 30 kept + 1 new, none deactivated
     assert count(db, "SELECT ST_Y(geom) FROM sites WHERE name = 'S000'") == pytest.approx(3.5)  # S000 was updated by the file
+
+
+TYPED_HEAD = ["SITE_NAME", "LATITUDE_IN_DECIMAL", "LONGITUDE_IN_DECIMAL", "REGION", "Type"]
+
+
+def typed_workbook(*pairs):
+    return workbook([[name, 3.1, 101.6, "Central", kind] for name, kind in pairs], None, site_head=TYPED_HEAD)
+
+
+def kind_of(db, name):
+    return count(db, f"SELECT kind FROM sites WHERE name = '{name}'")
+
+
+def test_type_column_sets_kind_on_insert(client, admin, db):
+    r = post(client, typed_workbook(("AAAA", None), ("BBBB", "dc"), ("CCCC", " TOC "), ("DDDD", "Toc")))
+    uid = r.json()["upload_id"]
+    assert apply(client, uid).status_code == 200
+    assert [kind_of(db, n) for n in ("AAAA", "BBBB", "CCCC", "DDDD")] == ["site", "data_center", "toc", "toc"]
+    assert count(db, "SELECT count(*) FROM sites WHERE details ? 'Type'") == 0  # Type never lands in details
+
+
+def test_bad_type_is_needs_review(client, admin, db):
+    r = post(client, typed_workbook(("AAAA", "Tower"), ("BBBB", "DC")))
+    uid = r.json()["upload_id"]
+    bad = row_of(client, uid, "sites", "problem", "AAAA")
+    assert "Type must be DC, TOC or blank" in bad["reason"]
+    apply(client, uid)
+    assert count(db, "SELECT count(*) FROM sites WHERE name = 'AAAA'") == 0
+    assert kind_of(db, "BBBB") == "data_center"
+
+
+def test_rerun_same_file_is_unchanged_for_dc_and_toc(client, admin, db):
+    data = typed_workbook(("AAAA", None), ("BBBB", "DC"), ("CCCC", "TOC"))
+    apply(client, post(client, data).json()["upload_id"])
+    second = post(client, data)
+    assert sheets(second)["sites"]["counts"]["unchanged"] == 3
+    assert sheets(second)["sites"]["counts"]["problem"] == 0
+
+
+def test_type_change_updates_kind_with_history(client, admin, db):
+    apply(client, post(client, typed_workbook(("AAAA", "TOC"))).json()["upload_id"])
+    uid = post(client, typed_workbook(("AAAA", None))).json()["upload_id"]
+    assert apply(client, uid).json()["sheets"]["sites"]["changed"] == 1
+    assert kind_of(db, "AAAA") == "site"
+    edit = db.execute(text("SELECT old_value, new_value FROM data_edits WHERE entity = 'site' AND field = 'kind' "
+                           "ORDER BY id DESC")).first()
+    assert tuple(edit) == ("toc", "site")
+
+
+def test_dashboard_edited_kind_is_protected(client, admin, db):
+    apply(client, post(client, typed_workbook(("AAAA", "TOC"))).json()["upload_id"])
+    db.execute(text("INSERT INTO data_edits (entity, entity_id, field, old_value, new_value, reason, user_id) "
+                    "SELECT 'site', id, 'kind', 'site', 'toc', 'fixed by hand', :u FROM sites WHERE name = 'AAAA'"), {"u": admin})
+    uid = post(client, typed_workbook(("AAAA", "DC"))).json()["upload_id"]
+    res = apply(client, uid).json()["sheets"]["sites"]
+    assert res["protected_kept"] == 1 and res["changed"] == 0
+    assert kind_of(db, "AAAA") == "toc"
+
+
+def test_sheet_without_type_column_leaves_kinds_alone(client, admin, db):
+    seed_sites(db, ["AAAA"], kind="toc")
+    seed_sites(db, ["BBBB"], kind="building")
+    uid = post(client, workbook([site("AAAA"), site("BBBB"), site("NEWW")], None)).json()["upload_id"]
+    apply(client, uid)
+    assert [kind_of(db, n) for n in ("AAAA", "BBBB", "NEWW")] == ["toc", "building", "site"]

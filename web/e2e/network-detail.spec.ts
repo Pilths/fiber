@@ -36,7 +36,7 @@ test("route search, pick a segment in the diagram: totals, one Cores table group
   const table = page.getByRole("table", { name: `Cores of ${name}` });
   await expect(table.locator("thead")).toHaveCount(0); // column labels sit inside each group, no Status column
   await expect(table.locator('tbody:not([data-status="Available"]) tr.colhead').first().getByRole("columnheader"))
-    .toHaveText(["Cores", "Customer", "Planner", "SRF", "Planned", "Age", "Ports"]);
+    .toHaveText(["Cores", "Customer", "Planner", "SRF", "Planned", "Days held", "Ports"]);
   await expect(page.getByRole("group", { name: "Filter cores" })).toHaveCount(0); // no chips
   const groups = table.getByTestId("core-group");
   const order = ["Requested", "Reserved", "In use", "Unassigned", "Available"];

@@ -38,7 +38,7 @@ Tabs: **Inventory | My reservations**. There is no Reserve tab; reserving opens 
 
 | Slot | Content |
 |---|---|
-| Top left, 8 of 12 columns | Map, full size. Never shrunk to make room for other content. Region and Type filters ("All regions", "All types") sit in the map toolbar beside Layers, zoom, Fit selection and Full screen; they dim the other segments. |
+| Top left, 8 of 12 columns | Map, full size. Never shrunk to make room for other content. Region and Type filters ("All regions", "All types") sit in the map toolbar beside Layers, zoom, Fit selection and Full screen; they dim the other segments. Type lists "Trunk <route>" for each route on trunk segments (R1, R3, ...), then "DC" and "TOC" (segments with a DC or TOC end). Map key, Sites: Data centre (dark square), TOC (dark triangle), Other site (diamond). |
 | Top right, 4 columns, map height | "Site A to B" panel (prototype 9e), content scrolls inside: Site A and Site B with a swap button, Cores needed, a full-width blue "Find route", Shortest distance / Most free cores toggle, then the option rows (as many as the network gives, up to 5; near-copies dropped) (radio dot, Option N, segments and km, lowest free count in a coloured pill, Calculated loss; the selected one has a blue border and tint). Nothing below before a search. Segments are found with the header search or the map. |
 | Under the map, full width | Segment diagram: keep the one the web app has now (`SegmentDiagram` in `web/src/components/NetworkDetail.tsx`), not the simplified line in the FigCraft mock. The selected segment's box reaches the site dots at both ends. |
 | Under the diagram, own row | "Reserve on this route" (when a route is found) and "Edit segment" (and "Restore" on a cut segment), right-aligned, all the same width. Not inside the diagram card. No row when it would be empty. |
@@ -54,12 +54,12 @@ Segment facts are only the two site names and the distance. No numbers row, no l
   place the counts appear. Empty groups are not shown. Available starts collapsed; a focused or just-requested core
   opens its group. No filter chips.
 - No table header at the top and no Status column: the group heading shows the status. Under each group heading
-  sits that group's own row of column labels (12px, muted, 32px tall): Cores, Customer, Planner, SRF, Planned, Age,
+  sits that group's own row of column labels (12px, muted, 32px tall): Cores, Customer, Planner, SRF, Planned, Days held,
   Ports. Available shows only Cores and Ports (the other columns are always empty there). A collapsed group hides
   its labels too. No loss column.
 - One `<colgroup>` with fixed widths, so columns line up down every group. Group heading 40px on the light grey
   (subtle) background, 12px gap above every group but the first. Cells and labels are centred (as in every table);
-  the group heading stays left-aligned. No zebra. A Stale chip sits in the Age cell after the number.
+  the group heading stays left-aligned. No zebra. A Stale chip sits in the Days held cell after the number.
 - One row per core everywhere (no ranges); the core number sits centred under "Cores". (Owner, 3 Nov 2026.)
 - Unassigned row: a reservation for a number of cores whose core numbers are not picked yet (Excel import).
   Shown as "4 cores" in the Unassigned group.
@@ -122,7 +122,7 @@ Circuits; a core result opens its segment and highlights the row.
   icons, segment list in a left navigation.
 - 31 Oct 2026: density A: key facts and the main action above the fold, tables below.
 - 31 Oct 2026: Cores table columns: Cores, Status, Customer, Planner, SRF, Planned date, Age, Ports.
-  Age is computed (`age_days` from the API), never stored.
+  Age (shown as "Days held" since 4 Nov 2026: days since the request, a plain number) is computed (`age_days` from the API), never stored.
 - 2 Nov 2026: segment actions moved out of the diagram card into their own row below it, one fixed width.
 - 3 Nov 2026: route reservations: the planner chooses the cores of each segment in the Reserve box from the route's
   segment diagram; the server no longer auto-picks them.

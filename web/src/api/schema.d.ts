@@ -1616,6 +1616,10 @@ export interface components {
             site_a: string;
             /** Site B */
             site_b: string;
+            /** Site A Kind */
+            site_a_kind: string;
+            /** Site B Kind */
+            site_b_kind: string;
             /** Route Type */
             route_type: string | null;
             /** Region */
@@ -1783,6 +1787,10 @@ export interface components {
             site_a: string;
             /** Site B */
             site_b: string;
+            /** Site A Kind */
+            site_a_kind: string;
+            /** Site B Kind */
+            site_b_kind: string;
             /** Route Type */
             route_type: string | null;
             /** Region */

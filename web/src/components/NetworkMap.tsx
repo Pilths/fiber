@@ -12,6 +12,7 @@ import { health } from "@/lib/status";
 
 export type SegmentProps = {
   segment_id: number; name: string; site_a_id: number; site_b_id: number; route_type: string | null; region: string | null;
+  route: string | null; site_a_kind: string; site_b_kind: string;
   distance_km: string | null; free_to_reserve: number; surveyed: boolean; chip: "ok" | "low" | "full" | "not_surveyed"; fiber_cut?: boolean;
   route_id: number | null; shaped?: boolean;
 };
@@ -52,6 +53,17 @@ function midpoint(p: [number, number][]): [number, number] {
 const COLOR = { ok: "var(--green)", low: "var(--amber)", full: "var(--red)", not_surveyed: "var(--ns)" } as const;
 const kindOf = (t: string | null) => (t ?? "").toLowerCase();
 // Chip text: the free-core number only; a cut segment reads 0, not surveyed a dash.
+// Map shape and spoken word per site kind: DC a dark square, TOC a dark triangle, any other site a diamond.
+function siteLook(kind: string): { shape: string; word: string } {
+  if (kind === "data_center") {
+    return { shape: "dc", word: "data centre" };
+  }
+  if (kind === "toc") {
+    return { shape: "toc", word: "TOC" };
+  }
+  return { shape: "st", word: "other site" };
+}
+
 const chipText = (p: SegmentProps) => (p.fiber_cut ? "0" : p.surveyed ? String(p.free_to_reserve) : "–");
 
 type Basemap = "loading" | "gl" | "missing" | "nogl" | "failed";
@@ -232,12 +244,13 @@ export function NetworkMap({ selectedIds, routeKey, visible, onSelectSegment: se
               })}
             </svg>
             {(sites?.features ?? []).map((f, i) => {
-              const s = f.properties, [x, y] = siteXY[i], dc = s.kind === "data_center", end = ends.has(s.site_id), n = segmentCount(s.site_id);
+              const s = f.properties, [x, y] = siteXY[i], end = ends.has(s.site_id), n = segmentCount(s.site_id);
+              const look = siteLook(s.kind);
               return (
                 <button key={s.site_id} type="button" data-testid="map-site" data-site-id={s.site_id} data-end={end}
-                  aria-label={`Site ${s.name}, ${dc ? "data centre" : "other site"}, ${n} segment${n === 1 ? "" : "s"}${end ? ", end of the selection" : ""}`}
+                  aria-label={`Site ${s.name}, ${look.word}, ${n} segment${n === 1 ? "" : "s"}${end ? ", end of the selection" : ""}`}
                   className={`msite ${end ? "end" : ""}`} style={{ left: x, top: y }} onClick={() => onSite(s.name)}>
-                  <span className={`shape ${dc ? "dc" : "st"}`} />
+                  <span className={`shape ${look.shape}`} />
                   {(nameShown[i] || end) && <span className="code" aria-hidden="true">{s.name}</span>}
                 </button>
               );
@@ -299,6 +312,7 @@ export function NetworkMap({ selectedIds, routeKey, visible, onSelectSegment: se
           <span><i className="slot" aria-hidden="true"><i className="ll s" /></i>Selected</span>
           <p className="mleg-h col-span-2">Sites</p>
           <span><i className="slot" aria-hidden="true"><i className="rb-sh dc size-3!" /></i>Data centre</span>
+          <span><i className="slot" aria-hidden="true"><i className="rb-sh toc" /></i>TOC</span>
           <span><i className="slot" aria-hidden="true"><i className="rb-sh st size-2.5!" /></i>Other site</span>
         </div>
         {(NOTE[base] || err) && (

@@ -25,10 +25,35 @@ export function health(s: { survey_cores: number | null; free_to_reserve: number
 }
 
 // Map filters (Region, Type) live in the Dashboard; q stays "" now that the header search finds segments.
-export type SegmentFilter = { q: string; region: string; routeType: string };
-export const NO_FILTER: SegmentFilter = { q: "", region: "", routeType: "" };
-export const inFilter = (s: { region: string | null; route_type: string | null }, f: SegmentFilter) =>
-  (!f.region || s.region === f.region) && (!f.routeType || s.route_type === f.routeType);
+// network: "" (all), "trunk:<route>" (a trunk route such as R1), "dc" or "toc" (segments with a DC or TOC end)
+export type SegmentFilter = { q: string; region: string; network: string };
+export const NO_FILTER: SegmentFilter = { q: "", region: "", network: "" };
+type Filterable = {
+  region: string | null; route_type: string | null; route?: string | null; site_a_kind?: string; site_b_kind?: string;
+};
+
+function hasEnd(segment: Filterable, kind: string): boolean {
+  return segment.site_a_kind === kind || segment.site_b_kind === kind;
+}
+
+function inNetwork(segment: Filterable, network: string): boolean {
+  if (network === "") {
+    return true;
+  }
+  if (network === "dc") {
+    return hasEnd(segment, "data_center");
+  }
+  if (network === "toc") {
+    return hasEnd(segment, "toc");
+  }
+  const route = network.slice("trunk:".length);
+  return segment.route_type === "Trunk" && segment.route === route;
+}
+
+export function inFilter(segment: Filterable, filter: SegmentFilter): boolean {
+  const inRegion = !filter.region || segment.region === filter.region;
+  return inRegion && inNetwork(segment, filter.network);
+}
 
 export const segmentName = (s: { site_a: string; site_b: string }) => `${s.site_a} - ${s.site_b}`;
 
