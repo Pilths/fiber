@@ -137,13 +137,19 @@
   .chip b { font-weight: 700; }
   .chip[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: #fff; }
 
-  /* Every table: fixed layout (widths from the header cells), one 16px side padding so a header sits exactly over its
-     values, 40px rows, numbers right-aligned with .num. */
+  /* Every table: fixed layout (widths from the header cells or a colgroup), one 16px side padding, 40px rows, headers
+     and values centred (owner decision); .num keeps tabular figures. */
   .tbl { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 14px; }
-  .tbl thead th { text-align: left; font-size: 12px; font-weight: 500; color: var(--muted-ink); padding: 8px 16px; border-bottom: 1px solid var(--border); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tbl th, .tbl td { text-align: center; }
+  .tbl thead th { font-size: 12px; font-weight: 500; color: var(--muted-ink); padding: 8px 16px; border-bottom: 1px solid var(--border); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .tbl td, .tbl tbody th { height: 40px; font-size: 14px; font-weight: inherit; color: inherit; padding: 4px 16px; border-bottom: 1px solid var(--rule); overflow-wrap: anywhere; }
   .tbl tbody tr:last-child > * { border-bottom: 0; }
-  .tbl .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  /* Cores table: per status group a 40px grey heading row (left-aligned), 12px gap above all but the first, then a
+     32px row of column labels. */
+  .tbl th.grp { height: 40px; text-align: left; background: var(--subtle); border-bottom: 1px solid var(--rule); }
+  .tbl tbody + tbody th.grp { border-top: 12px solid var(--card); }
+  .tbl tr.colhead > * { height: 32px; padding: 4px 16px; font-size: 12px; font-weight: 500; color: var(--muted-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tbl .num { font-variant-numeric: tabular-nums; white-space: nowrap; }
   /* Band table: the route "Segments on this path" look. Grey header band, 40px rows, no wrapping, inside a bordered box. */
   .tbox { overflow-x: auto; border: 1px solid var(--border); border-radius: 6px; }
   .band thead th { background: var(--subtle); }

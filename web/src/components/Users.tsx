@@ -141,7 +141,7 @@ export function Users({ me }: { me: Me }) {
           <tbody>
             {users.map((u) => (
               <tr key={u.id} data-testid="user-row" data-username={u.username}>
-                <th scope="row" className="text-left font-semibold">{u.username}{u.id === me.id && <span className="ml-2 text-xs font-medium text-muted-foreground">(you)</span>}</th>
+                <th scope="row" className="font-semibold">{u.username}{u.id === me.id && <span className="ml-2 text-xs font-medium text-muted-foreground">(you)</span>}</th>
                 <td>{u.display_name}</td>
                 <td>{ROLE[u.role] ?? u.role}</td>
                 <td>

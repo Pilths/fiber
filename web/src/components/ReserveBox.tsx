@@ -2,6 +2,7 @@ import { Fragment, useEffect, useId, useRef, useState } from "react";
 import { api, errorText } from "@/api/client";
 import type { components } from "@/api/schema";
 import { Blank } from "@/components/LossCard";
+import { Chain } from "@/components/NetworkDetail";
 import { Dialog } from "@/components/upload-parts";
 import { db } from "@/lib/status";
 
@@ -84,31 +85,40 @@ export function useCustomerPicker(onError: (text: string) => void) {
   return { customer, field, warning };
 }
 
-export type RouteLeg = { segment_id: number; name: string; free: number };
-type Mode =
-  | { kind: "segment"; cores: Core[]; free: number; km: number | null; loss: LossDetail | null }
-  | { kind: "route"; legs: RouteLeg[]; need: number };
+export type RouteLeg = { segment_id: number; free: number; a: string; b: string; km: number | null }; // a, b in travel order
 
 const cores = (n: number) => `${n} ${n === 1 ? "core" : "cores"}`;
 
-// Reserve box: a modal over Inventory (or the route planner). Segment mode ticks Available cores; route mode takes
-// N cores per segment through GET /api/routes/pick. Both send one POST /api/reservations.
-export function ReserveBox({ sites, mode, onClose, onSent }: {
-  sites: string[]; // the chain in travel order: two for a segment
-  mode: Mode;
+// Reserve box: a modal over Inventory for a found route (one segment is a route between its two sites). Pick a segment
+// in the chain and tick N of its Available cores, for every segment; one POST /api/reservations with the chosen core ids.
+export function ReserveBox({ sites, legs, need, onClose, onSent }: {
+  sites: string[]; // the chain in travel order
+  legs: RouteLeg[];
+  need: number;
   onClose: () => void;
   onSent: (reservationId: number) => void;
 }) {
   const id = useId();
   const ref = useRef<HTMLDialogElement>(null);
   const back = useRef<Element | null>(null);
-  const seg = mode.kind === "segment" ? mode : null;
-  const avail = seg ? seg.cores.filter((c) => c.status === "Available").sort((a, b) => a.number - b.number) : [];
-  const max = seg ? Math.min(seg.free, avail.length) : Math.min(...(mode.kind === "route" ? mode.legs.map((l) => l.free) : [0]));
+  const max = Math.min(...legs.map((l) => l.free));
   const [ticked, setTicked] = useState<Set<number>>(new Set());
-  const [perLeg, setPerLeg] = useState(mode.kind === "route" ? Math.max(1, Math.min(mode.need, max)) : 1);
-  const n = seg ? ticked.size : perLeg;
-  const total = seg ? n : n * sites.slice(1).length;
+  const [n, setN] = useState(Math.max(1, Math.min(need, max)));
+  // The selected segment and each segment's cores and loss, fetched on its first select.
+  const [picked, setPicked] = useState<number | null>(null);
+  const [legData, setLegData] = useState<Record<number, { cores: Core[]; loss: LossDetail | null }>>({});
+  const availOf = (cs: Core[]) => cs.filter((c) => c.status === "Available").sort((a, b) => a.number - b.number);
+  const countOf = (legId: number) => legData[legId]?.cores.filter((c) => ticked.has(c.id)).length ?? 0;
+  const ready = legs.every((l) => countOf(l.segment_id) === n);
+  const pick = (legId: number) => {
+    setPicked(legId);
+    if (legData[legId]) return;
+    Promise.all([
+      api.get("/api/segments/{segment_id}", { path: { segment_id: legId } }),
+      api.get("/api/loss/segments/{segment_id}", { path: { segment_id: legId } }).catch(() => null),
+    ]).then(([d, loss]) => setLegData((x) => ({ ...x, [legId]: { cores: d.cores, loss } })))
+      .catch((err) => setError(errorText(err, "Could not load the cores. Try again.")));
+  };
   const [date, setDate] = useState("");
   const [srf, setSrf] = useState("");
   const [tried, setTried] = useState(false);
@@ -117,7 +127,7 @@ export function ReserveBox({ sites, mode, onClose, onSent }: {
   const [asking, setAsking] = useState(false);
   const { customer, field, warning } = useCustomerPicker(setError);
 
-  // Focus returns to the opener (the "Reserve cores" button). Kept from the first mount: StrictMode mounts twice.
+  // Focus returns to the opener (the "Reserve on this route" button). Kept from the first mount: StrictMode mounts twice.
   useEffect(() => {
     back.current ??= document.activeElement;
     const d = ref.current!;
@@ -125,24 +135,18 @@ export function ReserveBox({ sites, mode, onClose, onSent }: {
     return () => { d.close(); (back.current as HTMLElement | null)?.focus?.(); };
   }, []);
 
-  const close = () => (seg && ticked.size ? setAsking(true) : onClose());
-  const step = (to: number) => {
-    const k = Math.max(1, Math.min(max, to));
-    if (seg) setTicked(new Set(avail.slice(0, k).map((c) => c.id)));
-    else setPerLeg(k);
-  };
+  const close = () => (ticked.size ? setAsking(true) : onClose());
+  const step = (to: number) => setN(Math.max(1, Math.min(max, to)));
   const toggle = (cid: number) => setTicked((s) => { const x = new Set(s); if (!x.delete(cid)) x.add(cid); return x; });
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setTried(true);
-    if (!customer || !n) return;
+    if (!customer || !ready) return;
     setBusy(true);
     setError(null);
     try {
-      const ids = seg ? [...ticked]
-        : ((await api.get("/api/routes/pick", { query: { segment_ids: mode.kind === "route" ? mode.legs.map((l) => l.segment_id) : [], cores_needed: n } })) as unknown as { core_ids: number[] }).core_ids;
-      const r = await api.post("/api/reservations", { body: { customer_id: customer.id, planned_date: date || null, ...(srf.trim() && { srf_id: srf.trim() }), cores: ids } });
+      const r = await api.post("/api/reservations", { body: { customer_id: customer.id, planned_date: date || null, ...(srf.trim() && { srf_id: srf.trim() }), cores: [...ticked] } });
       onSent(r.id);
       onClose();
     } catch (err) {
@@ -151,9 +155,7 @@ export function ReserveBox({ sites, mode, onClose, onSent }: {
     }
   };
 
-  // Per core: calculated from the core's loss row when it has one, else the segment's calculated loss (same formula per segment).
-  const lossOf = (c: Core) => seg?.loss?.cores.find((x) => x.core_id === c.id);
-  const calcOf = (c: Core) => lossOf(c)?.calculated_db ?? seg?.loss?.calculated_db ?? null;
+  const shown = picked == null ? null : legData[picked];
 
   return (
     <dialog ref={ref} aria-labelledby={`${id}-h`} data-testid="reserve-box"
@@ -164,70 +166,36 @@ export function ReserveBox({ sites, mode, onClose, onSent }: {
           <span className="sr-only">Reserve on </span>
           {sites.map((s, i) => (
             <Fragment key={i}>
-              {i > 0 && (seg
-                ? <span aria-hidden className="flex items-center gap-1.5 text-blue">●<span className="h-0.5 w-6 bg-blue" /><span className="text-body font-semibold text-foreground">{seg.km == null ? "-" : `${seg.km} km`}</span><span className="h-0.5 w-6 bg-blue" />●</span>
-                : <span aria-hidden className="flex items-center gap-1 text-blue">●<span className="h-0.5 w-6 bg-blue" /></span>)}
+              {i > 0 && <span aria-hidden className="flex items-center gap-1 text-blue">●<span className="h-0.5 w-6 bg-blue" /></span>}
               {i > 0 && <span className="sr-only">to</span>}
               <span className="truncate">{s}</span>
             </Fragment>
           ))}
         </h2>
-        {seg && <span className="font-semibold text-green" data-testid="reserve-free">{seg.free} free</span>}
         <button type="button" className="btn btn-sm px-2.5" aria-label="Close" onClick={close}>×</button>
       </header>
 
       <form onSubmit={submit} noValidate aria-label="Reserve cores" className="flex min-h-0 flex-1 flex-col">
+        <div className="border-b px-5 pt-4 pb-2" data-testid="route-chain">
+            <Chain legs={legs.map((l) => ({ id: l.segment_id, a: l.a, b: l.b, km: l.km }))} selectedId={picked}
+              onPick={pick} onUnpick={() => setPicked(null)} describe={(legId) => `${countOf(legId)} of ${n} cores chosen`}
+              badge={(legId) => {
+                const x = countOf(legId), full = x === n;
+                return <span className={`pill min-w-11 justify-center ${full ? "h-green" : "h-amber"}`} data-testid="leg-count">{x} of {n}</span>;
+              }} />
+          </div>
         <div className="min-h-0 flex-1 overflow-y-auto px-5 pt-4">
           <div className="mb-3 flex items-center gap-3">
-            <span id={`${id}-n`} className="font-semibold">{seg ? "Cores needed" : "Cores needed per segment"}</span>
+            <span id={`${id}-n`} className="font-semibold">Cores needed per segment</span>
             <div role="group" aria-labelledby={`${id}-n`} className="flex items-center gap-1">
               <button type="button" className="btn btn-sm w-8 px-0" aria-label="One fewer" disabled={n <= 1} onClick={() => step(n - 1)}>−</button>
               <output aria-live="polite" className="w-10 text-center text-base font-semibold tabular-nums" data-testid="reserve-n">{n}</output>
               <button type="button" className="btn btn-sm w-8 px-0" aria-label="One more" disabled={n >= max} onClick={() => step(n + 1)}>+</button>
             </div>
           </div>
-          {seg ? (
-            <table className="tbl [&_td]:h-9 [&_th]:h-9">
-              <caption className="sr-only">Available cores</caption>
-              <thead className="sticky top-0 bg-white"><tr>
-                <th scope="col" className="w-12"><span className="sr-only">Chosen</span></th>
-                <th scope="col" className="w-[14%]">Core</th>
-                <th scope="col">Ports</th>
-                <th scope="col" className="num w-[20%]">Calculated loss</th>
-                <th scope="col" className="num w-[20%]">Measured loss</th>
-              </tr></thead>
-              <tbody>
-                {avail.map((c) => {
-                  const on = ticked.has(c.id), m = lossOf(c)?.measured_db, calc = calcOf(c);
-                  const high = m != null && calc != null && m > calc;
-                  return (
-                    <tr key={c.id} className={on ? "bg-blue-bg" : ""} data-core={c.number}>
-                      <td><input type="checkbox" className="size-4 accent-blue" aria-label={`Core ${c.number}`} checked={on}
-                        disabled={!on && ticked.size >= max} onChange={() => toggle(c.id)} /></td>
-                      <th scope="row" className="text-left font-semibold">{c.number}</th>
-                      <td className="truncate">{c.port_a || c.port_b ? `${c.port_a ?? "-"} → ${c.port_b ?? "-"}` : <Blank>-</Blank>}</td>
-                      <td className="num">{calc == null ? <Blank>-</Blank> : db(calc)}</td>
-                      <td className="num">{m == null ? <Blank>Not tested</Blank>
-                        : high ? <>{db(m)} <span aria-hidden className="text-amber">▲</span><span className="sr-only"> above calculated</span></>
-                        : db(m)}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          ) : mode.kind === "route" && (
-            <table className="tbl [&_td]:h-9 [&_th]:h-9">
-              <caption className="sr-only">Segments on this route</caption>
-              <thead className="sticky top-0 bg-white"><tr>
-                <th scope="col">Segment</th><th scope="col" className="num w-[18%]">Free</th><th scope="col" className="num w-[18%]">Cores to take</th>
-              </tr></thead>
-              <tbody>
-                {mode.legs.map((l) => (
-                  <tr key={l.segment_id}><th scope="row" className="truncate text-left font-semibold">{l.name}</th><td className="num">{l.free}</td><td className="num">{n}</td></tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+          {picked == null ? <p className="empty pb-4 text-body text-muted-foreground">Choose a segment</p>
+            : !shown ? <p className="empty pb-4 text-body text-muted-foreground">Loading cores...</p>
+            : <CoreList avail={availOf(shown.cores)} loss={shown.loss} ticked={ticked} full={countOf(picked) >= n} toggle={toggle} />}
         </div>
 
         <div className="border-t px-5 py-4">
@@ -240,7 +208,7 @@ export function ReserveBox({ sites, mode, onClose, onSent }: {
             <label className="grid w-[150px] gap-1"><span className="lbl">SRF ID (optional)</span>
               <input className="field" value={srf} onChange={(e) => setSrf(e.target.value)} autoComplete="off" />
             </label>
-            <button type="submit" className="btn btn-p ml-auto min-w-[150px]" disabled={busy || !n}>{`Reserve ${cores(total)}`}</button>
+            <button type="submit" className="btn btn-p ml-auto min-w-[150px]" disabled={busy || !ready}>{`Reserve ${cores(ticked.size)}`}</button>
           </div>
           {warning}
           {tried && !customer && <p role="alert" className="mt-2.5 text-body font-bold text-red">Choose a customer before submitting.</p>}
@@ -256,5 +224,44 @@ export function ReserveBox({ sites, mode, onClose, onSent }: {
         </Dialog>
       )}
     </dialog>
+  );
+}
+
+// Available cores of one segment: tick, core, ports, Calculated loss, Measured loss. Unticked rows lock once full.
+function CoreList({ avail, loss, ticked, full, toggle }: {
+  avail: Core[]; loss: LossDetail | null; ticked: Set<number>; full: boolean; toggle: (id: number) => void;
+}) {
+  // Per core: calculated from the core's loss row when it has one, else the segment's calculated loss (same formula per segment).
+  const lossOf = (c: Core) => loss?.cores.find((x) => x.core_id === c.id);
+  const calcOf = (c: Core) => lossOf(c)?.calculated_db ?? loss?.calculated_db ?? null;
+  return (
+    <table className="tbl [&_td]:h-9 [&_th]:h-9">
+      <caption className="sr-only">Available cores</caption>
+      <thead className="sticky top-0 bg-white"><tr>
+        <th scope="col" className="w-12"><span className="sr-only">Chosen</span></th>
+        <th scope="col" className="w-[14%]">Core</th>
+        <th scope="col">Ports</th>
+        <th scope="col" className="num w-[20%]">Calculated loss</th>
+        <th scope="col" className="num w-[20%]">Measured loss</th>
+      </tr></thead>
+      <tbody>
+        {avail.map((c) => {
+          const on = ticked.has(c.id), m = lossOf(c)?.measured_db, calc = calcOf(c);
+          const high = m != null && calc != null && m > calc;
+          return (
+            <tr key={c.id} className={on ? "bg-blue-bg" : ""} data-core={c.number}>
+              <td><input type="checkbox" className="size-4 accent-blue" aria-label={`Core ${c.number}`} checked={on}
+                disabled={!on && full} onChange={() => toggle(c.id)} /></td>
+              <th scope="row" className="font-semibold">{c.number}</th>
+              <td className="truncate">{c.port_a || c.port_b ? `${c.port_a ?? "-"} → ${c.port_b ?? "-"}` : <Blank>-</Blank>}</td>
+              <td className="num">{calc == null ? <Blank>-</Blank> : db(calc)}</td>
+              <td className="num">{m == null ? <Blank>Not tested</Blank>
+                : high ? <>{db(m)} <span aria-hidden className="text-amber">▲</span><span className="sr-only"> above calculated</span></>
+                : db(m)}</td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
   );
 }

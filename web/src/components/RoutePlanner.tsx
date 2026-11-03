@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { api, ApiError, errorText } from "@/api/client";
 import { Icon } from "@/components/Icon";
-import { db } from "@/lib/status";
+import { db, health } from "@/lib/status";
 
 // Route A to B on Inventory (TASK-051, TASK-076). The routes API returns plain dicts, so the shapes live here.
 type Sort = "km" | "free_cores";
@@ -104,7 +104,7 @@ export function useRoutePlanner(active: boolean, version: number) {
 
   return {
     clear: () => setIdx(null),
-    eps, fromText, toText, need, from, to, res, errs, option, idx, sort, setSort,
+    eps, fromText, toText, need, from, to, res, errs, option, idx, sort, setSort, coresText: cores, setCores,
     setFrom: (t: string) => { setFromText(t); setIdx(null); },
     setTo: (t: string) => { setToText(t); setIdx(null); },
     select: setIdx,
@@ -112,7 +112,8 @@ export function useRoutePlanner(active: boolean, version: number) {
 }
 export type RoutePlanner = ReturnType<typeof useRoutePlanner>;
 
-// Search bar above the map: Route A, swap, Route B. Search picks the best (first) option; the options card shows all.
+// "Route A to B" panel beside the map (prototype 9e): sites, cores needed, Find route, sort, then the options.
+// Find route picks the best (first) option; the options below show all.
 export function RouteSearch({ rp }: { rp: RoutePlanner }) {
   const [err, setErr] = useState<string | null>(null);
   const check = (a: typeof rp.from, b: typeof rp.to) =>
@@ -128,62 +129,74 @@ export function RouteSearch({ rp }: { rp: RoutePlanner }) {
     rp.setFrom(rp.toText); rp.setTo(a);
     if (picked) rp.select(0);
   };
-  const op = rp.option, none = rp.idx != null && rp.res?.options.length === 0;
+  const none = rp.idx != null && rp.res?.options.length === 0;
   const bad = err ?? rp.errs.from ?? rp.errs.to ?? rp.errs.cores_needed ?? rp.errs.form ?? (none ? rp.res?.message ?? "No route found" : null);
   return (
-    <section className="card col-span-12 px-4 py-3" aria-label="Route search">
-      <form onSubmit={submit} className="flex flex-wrap items-end gap-3">
-        <label className="w-56"><span className="lbl">Route A</span>
+    <section className="card absolute inset-0 flex flex-col overflow-auto" aria-labelledby="route-h">
+      <h2 id="route-h" className="card-title mb-3">Route A to B</h2>
+      <form onSubmit={submit} className="flex flex-col gap-3">
+        <label><span className="lbl">Route A</span>
           <input id="route-a" className="field" list="route-sites" value={rp.fromText} onChange={(e) => { setErr(null); rp.setFrom(e.target.value); }} autoComplete="off" /></label>
-        <button type="button" className="btn px-3" onClick={swap} aria-label="Swap A and B">&#8646;</button>
-        <label className="w-56"><span className="lbl">Route B</span>
-          <input className="field" list="route-sites" value={rp.toText} onChange={(e) => { setErr(null); rp.setTo(e.target.value); }} autoComplete="off" /></label>
-        <div role="radiogroup" aria-label="Optimise for" className="flex h-9 overflow-hidden rounded-md border border-line">
+        <div>
+          {/* Swap sits on Route B's label line so every field keeps the panel's full width. */}
+          <div className="flex items-end justify-between">
+            <label htmlFor="route-b" className="lbl">Route B</label>
+            <button type="button" className="mb-1 cursor-pointer text-body font-semibold text-blue hover:underline" onClick={swap} aria-label="Swap A and B">&#8645; Swap</button>
+          </div>
+          <input id="route-b" className="field" list="route-sites" value={rp.toText} onChange={(e) => { setErr(null); rp.setTo(e.target.value); }} autoComplete="off" />
+        </div>
+        <label><span className="lbl">Cores needed</span>
+          <input type="number" min={1} inputMode="numeric" className="field" value={rp.coresText} onChange={(e) => rp.setCores(e.target.value)} /></label>
+        <button type="submit" className="btn btn-p w-full border-blue! bg-blue! hover:brightness-95" disabled={!rp.eps.length}>Find route</button>
+        <div role="radiogroup" aria-label="Optimise for" className="grid h-9 grid-cols-2 overflow-hidden rounded-md border border-line">
           {([["km", "Shortest distance"], ["free_cores", "Most free cores"]] as const).map(([v, label], i) => (
-            <label key={v} className={`relative flex cursor-pointer items-center px-3 font-medium whitespace-nowrap has-checked:bg-foreground has-checked:font-semibold has-checked:text-white has-focus-visible:z-10 has-focus-visible:outline-3 has-focus-visible:outline-blue ${i ? "border-l border-line" : ""}`}>
+            <label key={v} className={`relative flex cursor-pointer items-center justify-center px-2 font-medium whitespace-nowrap has-checked:bg-foreground has-checked:font-semibold has-checked:text-white has-focus-visible:z-10 has-focus-visible:outline-3 has-focus-visible:outline-blue ${i ? "border-l border-line" : ""}`}>
               <input type="radio" name="route-sort" className="absolute size-px opacity-0" checked={rp.sort === v} onChange={() => rp.setSort(v)} />{label}
             </label>
           ))}
         </div>
-        <button type="submit" className="btn btn-p" disabled={!rp.eps.length}>Search</button>
-        {(bad || op) && (
-          <span role="status" data-testid="route-found" className={`self-center font-semibold ${bad ? "text-red" : "text-foreground"}`}>
-            {bad ?? `${op!.segments.length} ${op!.segments.length === 1 ? "segment" : "segments"}, ${km(op!.total_km)} km`}
-          </span>
-        )}
+        {bad && <p role="status" data-testid="route-found" className="font-semibold text-red">{bad}</p>}
         <datalist id="route-sites">{rp.eps.map((e) => <option key={e.id} value={e.name} />)}</datalist>
       </form>
+      <RouteOptions rp={rp} />
     </section>
   );
 }
 
-// Up to 3 options under the search once a route is found; a click draws that option on the map and the diagram.
-export function RouteOptions({ rp }: { rp: RoutePlanner }) {
+// Up to 3 options under Find route; a click draws that option on the map and the diagram.
+function RouteOptions({ rp }: { rp: RoutePlanner }) {
   const o = rp.res?.options ?? [];
   if (rp.idx == null || !o.length) return null;
   const need = rp.need ?? 1;
   return (
-    <section className="card col-span-12 px-4 py-3" aria-label="Route options">
-      <ul aria-label="Route options" className="grid grid-cols-3 gap-3">
+    <section className="mt-3" aria-label="Route options">
+      <ul aria-label="Route options" className="flex flex-col gap-2">
         {o.map((op, i) => {
           const short = op.insufficient ? op.segments.find((s) => isShort(s, need)) : undefined;
+          const on = rp.idx === i;
           return (
             <li key={i}>
-              <button type="button" aria-pressed={rp.idx === i} onClick={() => rp.select(i)} data-testid="route-option"
-                className="block h-full w-full rounded-md border border-l-3 border-border border-l-transparent px-3.5 py-2.5 text-left text-body hover:bg-ground focus-visible:-outline-offset-3 aria-pressed:border-l-blue aria-pressed:bg-blue-bg">
-                <span className="mb-0.5 flex items-start justify-between gap-2">
-                  <b className="text-sm font-semibold">Option {i + 1}</b>
-                  {op.best_match && <span className="pill h-blue">Best match</span>}
+              <button type="button" aria-pressed={on} onClick={() => rp.select(i)} data-testid="route-option"
+                className="flex w-full items-start gap-2.5 rounded-md border border-line px-3 py-2.5 text-left text-body hover:bg-ground focus-visible:-outline-offset-3 aria-pressed:border-blue aria-pressed:bg-blue-bg">
+                <span aria-hidden className={`mt-[3px] grid size-4 flex-none place-items-center rounded-full border-2 bg-white ${on ? "border-blue" : "border-line"}`}>
+                  {on && <span className="size-2 rounded-full bg-blue" />}
                 </span>
-                <span className="block">
-                  {op.total_segments} {op.total_segments === 1 ? "segment" : "segments"}, {totalKm(op)} km, <b className="font-semibold">{op.fewest_free}</b> free
-                </span>
-                <span className="block">Calculated loss {op.estimated_db == null ? "-" : db(op.estimated_db)}</span>
-                {short && (
-                  <span className="mt-0.5 flex items-start gap-1.5 font-semibold text-red" data-testid="route-short">
-                    <Icon name="fl" className="ic mt-[3px]" /><span>{shortText(short, need)}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-center justify-between gap-2">
+                    <b className="text-sm font-semibold">Option {i + 1}</b>
+                    {op.best_match && <span className="pill h-blue">Best match</span>}
                   </span>
-                )}
+                  <span className="mt-1 flex items-center justify-between gap-2">
+                    <span>{op.total_segments} {op.total_segments === 1 ? "segment" : "segments"}, {totalKm(op)} km</span>
+                    <span className={`pill ${health({ survey_cores: 1, free_to_reserve: op.fewest_free }).cls}`}>{op.fewest_free} free</span>
+                  </span>
+                  <span className="block">Calculated loss {op.estimated_db == null ? "-" : db(op.estimated_db)}</span>
+                  {short && (
+                    <span className="mt-0.5 flex items-start gap-1.5 font-semibold text-red" data-testid="route-short">
+                      <Icon name="fl" className="ic mt-[3px]" /><span>{shortText(short, need)}</span>
+                    </span>
+                  )}
+                </span>
               </button>
             </li>
           );

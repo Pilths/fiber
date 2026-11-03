@@ -120,7 +120,7 @@ function Reservations({ uploadId, total }: { uploadId: number; total: number }) 
                 return (
                   <tr key={r.id}>
                     <td className="num text-muted-foreground">{r.row_number}</td>
-                    <th scope="row" className="text-left font-semibold">{s.customer}</th>
+                    <th scope="row" className="font-semibold">{s.customer}</th>
                     <td>{s.segment}</td>
                     <td className="num">{cores(s)}</td>
                     <td>{date(s.planned_date)}{r.warnings.length > 0 && <span className="ml-2 inline-flex items-center gap-1 text-xs font-semibold text-amber" title={r.warnings.join("; ")}><Icon name="lo" />{r.warnings.length === 1 ? r.warnings[0] : `${r.warnings.length} warnings`}</span>}</td>
@@ -161,7 +161,7 @@ function GroupRows({ uploadId, counts, wins, onWin }: { uploadId: number; counts
               {data.items.map((r) => (
                 <tr key={r.id} className="align-top [&>*]:py-2.5! [&>*]:h-auto!">
                   {segment
-                    ? <><th scope="row" className="text-left font-semibold">{r.data.key}</th><td className="text-muted-foreground">{r.data.rows?.join(", ") ?? "—"}</td></>
+                    ? <><th scope="row" className="font-semibold">{r.data.key}</th><td className="text-muted-foreground">{r.data.rows?.join(", ") ?? "—"}</td></>
                     : <><td className="num text-muted-foreground">{r.row_number}</td><td className="text-muted-foreground">{r.sheet_name}</td></>}
                   <td><Pill g={group} /></td>
                   <td className="whitespace-normal!">
