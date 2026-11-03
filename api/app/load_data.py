@@ -21,7 +21,7 @@ from sqlalchemy.orm import Session
 from app.db import engine
 from app.ingest import segment_list as sl
 from app.ingest import site_master as sm
-from app.ingest.checks import blank
+from app.ingest.checks import blank, clean
 from app.ingest.reservation_import import add_cores
 from app.routing.graph import invalidate as invalidate_routes
 
@@ -64,7 +64,7 @@ def survey_counts(db: Session, admin_id: int, path: str, filename: str) -> tuple
         return 0, []
     done, notes = 0, []
     for n, r in enumerate(rows, 2):
-        cell = lambda k: r[col[k]] if k in col and col[k] < len(r) else None  # noqa: E731
+        cell = lambda k: clean(r[col[k]]) if k in col and col[k] < len(r) else None  # noqa: E731
         link = cell("link")
         if blank(link):
             continue

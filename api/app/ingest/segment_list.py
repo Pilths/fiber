@@ -15,7 +15,7 @@ import openpyxl
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app.ingest.checks import blank, split_nodes
+from app.ingest.checks import blank, clean, split_nodes
 from app.ingest.excel import _json
 from app.ingest.reservation_upload import REASON as RESERVATION_REASON
 from app.ingest.site_master import ApplyError, hkey
@@ -74,7 +74,7 @@ def _parse_row(headers: list[str], values: tuple[Any, ...]) -> Item:
     f: dict[str, Any] = {}
     for h, v in zip(headers, values):
         if h and ALIASES.get(hkey(h)):
-            f.setdefault(ALIASES[hkey(h)], v)
+            f.setdefault(ALIASES[hkey(h)], clean(v))
     item = Item(0, {h: _json(v) for h, v in zip(headers, values) if h and not blank(v)}, {})
     reasons: list[str] = []
     link = _cell(f.get("link"))
@@ -102,7 +102,7 @@ def _find_sheet(wb: Any) -> tuple[Any, int, list[str]] | None:
     """First sheet with a row holding the Link header (any column) and a Distance header."""
     for ws in wb.worksheets:
         for n, row in enumerate(ws.iter_rows(values_only=True), 1):
-            headers = [" ".join(str(c).split()) if not blank(c) else "" for c in row]
+            headers = [" ".join(str(clean(c)).split()) if not blank(c) else "" for c in row]
             fields = {ALIASES.get(hkey(h)) for h in headers if h}
             if {"link", "distance"} <= fields:
                 return ws, n, headers

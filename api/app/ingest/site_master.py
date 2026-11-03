@@ -15,6 +15,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.ingest import checks
+from app.ingest.checks import clean
 from app.ingest.checks import blank, norm
 from app.ingest.excel import _json
 from app.routing.graph import invalidate as invalidate_routes
@@ -34,7 +35,7 @@ GROUP_COL = {"added": "new", "changed": "changed", "missing": "missing", "proble
 
 def isblank(v: Any) -> bool:
     """Empty, TBA, N/A, NA, -, TBC (any case) are blank, never invalid text."""
-    return v is None or str(v).strip().casefold() in BLANKS
+    return v is None or str(clean(v)).strip().casefold() in BLANKS
 
 
 def hkey(h: Any) -> str:
@@ -135,7 +136,7 @@ def _find_sheet(wb: Any, kind: str, taken: set[str]) -> tuple[Any, int, list[str
         for n, row in enumerate(ws.iter_rows(values_only=True), 1):
             if not any(not blank(c) and hkey(c) == anchor for c in row):
                 continue
-            headers = [" ".join(str(c).split()) if not blank(c) else "" for c in row]
+            headers = [" ".join(str(clean(c)).split()) if not blank(c) else "" for c in row]
             if set(rest) <= {hkey(h) for h in headers if h}:
                 return ws, n, headers
     return None
@@ -143,8 +144,9 @@ def _find_sheet(wb: Any, kind: str, taken: set[str]) -> tuple[Any, int, list[str
 
 def _parse_row(kind: str, headers: list[str], values: tuple[Any, ...]) -> Item:
     own = SHEETS[kind][3]
+    item = Item(0, {h: _json(v) for h, v in zip(headers, values) if h and not blank(v)}, {})  # raw, as read
+    values = tuple(clean(v) for v in values)
     f = {hkey(h): v for h, v in zip(headers, values) if h}
-    item = Item(0, {h: _json(v) for h, v in zip(headers, values) if h and not blank(v)}, {})
     reasons: list[str] = []
     key = None if isblank(f.get("sitename" if kind == "sites" else "dcnamelink")) else str(f.get("sitename" if kind == "sites" else "dcnamelink")).strip()
     lat_src = f.get("latitudeindecimal") if kind == "sites" else next((f[k] for k in ("lat", "latitude") if k in f), None)

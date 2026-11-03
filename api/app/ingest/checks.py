@@ -13,12 +13,21 @@ REGIONS = {
 }
 
 
+# Invisible characters that ride along when cells are copied from web pages or PDFs (zero-width space, joiners,
+# word joiner, BOM) are dropped; a non-breaking space becomes a plain space. Parsed values only: raw cells stay as read.
+_INVISIBLE = dict.fromkeys(map(ord, "\u200b\u200c\u200d\u2060\ufeff"), None) | {0xA0: " "}
+
+
+def clean(v: object) -> object:
+    return v.translate(_INVISIBLE) if isinstance(v, str) else v
+
+
 def norm(v: object) -> str:
-    return " ".join(str(v).split()).casefold()
+    return " ".join(str(clean(v)).split()).casefold()
 
 
 def blank(v: object) -> bool:
-    return v is None or not str(v).strip()
+    return v is None or not str(clean(v)).strip()
 
 
 def _in_box(lat: float, lon: float) -> bool:

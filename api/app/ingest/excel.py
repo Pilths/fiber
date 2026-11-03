@@ -8,7 +8,7 @@ import openpyxl
 from openpyxl.utils.datetime import from_excel
 
 from app.ingest import checks
-from app.ingest.checks import blank, norm
+from app.ingest.checks import blank, clean, norm
 
 SITE_HEADER_ROW = 4
 
@@ -57,7 +57,7 @@ def _read(ws: Any, header_row: int) -> tuple[list[str], list[tuple[int, list[Any
         for rc in itertools.product(range(rng.min_row, rng.max_row + 1), range(rng.min_col, rng.max_col + 1)):
             merged[rc] = v
     rows = [(r[0].row, [merged.get((c.row, c.column), c.value) for c in r]) for r in ws.iter_rows(min_row=header_row)]
-    headers = [" ".join(str(v).split()) if not blank(v) else "" for v in rows[0][1]] if rows else []
+    headers = [" ".join(str(clean(v)).split()) if not blank(v) else "" for v in rows[0][1]] if rows else []
     return headers, rows[1:]
 
 
@@ -72,7 +72,7 @@ def _header_row(ws: Any, anchor: str) -> int | None:
 
 def _row(sheet: str, n: int, headers: list[str], values: list[Any]) -> tuple[RowResult, dict[str, Any]]:
     raw = {h: _json(v) for h, v in zip(headers, values) if h}
-    return RowResult(sheet, n, raw), {norm(h): v for h, v in zip(headers, values) if h}
+    return RowResult(sheet, n, raw), {norm(h): clean(v) for h, v in zip(headers, values) if h}
 
 
 def _finish(r: RowResult, reasons: list[str], reject: bool = False) -> None:
