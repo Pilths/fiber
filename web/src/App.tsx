@@ -150,8 +150,17 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
     return () => removeEventListener("hashchange", sync);
   }, [segments, open]);
   // A newly found route (or another option) selects its first segment.
+  // A segment of another option clicked on the map switches to that option and selects that segment.
   const [seenRoute, setSeenRoute] = useState(foundKey);
-  if (seenRoute !== foundKey) { setSeenRoute(foundKey); if (found) open(found.ids[0]); }
+  const [pickAfter, setPickAfter] = useState<number | null>(null);
+  if (seenRoute !== foundKey) { setSeenRoute(foundKey); setPickAfter(null); if (found) open(pickAfter != null && found.ids.includes(pickAfter) ? pickAfter : found.ids[0]); }
+  // Route mode: only the options' segments can be clicked on the map; the rest stay faint.
+  const optionIds = found ? new Set(rp.res?.options.flatMap((o) => o.segments.map((x) => x.segment_id)) ?? found.ids) : null;
+  const pickOnMap = (id: number) => {
+    if (!found || found.ids.includes(id)) return open(id);
+    const i = rp.res?.options.findIndex((o) => o.segments.some((x) => x.segment_id === id)) ?? -1;
+    if (i >= 0) { setPickAfter(id); rp.select(i); }
+  };
   // Selection -> hash; a found route keeps its #route= hash.
   useEffect(() => {
     const s = segments?.find((x) => x.id === segmentId);
@@ -178,7 +187,7 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
 
   return (
     <div className="min-h-screen">
-      <Header onPick={(r) => { if (r.segment_id != null) { setView("map"); open(r.segment_id, r.core_id ?? null); } }} view={view} onView={setView} me={me}
+      <Header onPick={(r) => { if (r.segment_id != null) { setView("map"); rp.clear(); open(r.segment_id, r.core_id ?? null); } }} view={view} onView={setView} me={me}
         approvals={me.role === "admin" ? bell?.approvals ?? null : null} stale={stale} onSignOut={onSignOut} onChangePassword={onChangePassword} />
       {error && <p role="alert" className="mx-6 mt-4 rounded-md border border-red bg-red-bg px-4 py-2 font-semibold text-red">{error}</p>}
       {view !== "map" && view !== "upload" && (
@@ -200,8 +209,9 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
         <main className="grid grid-cols-12 gap-4 px-6 pt-6 pb-10">
           <section className="card col-span-8 flex flex-col p-3" aria-label="Network map" aria-describedby="map-instr">
             {/* ponytail: site clicks do nothing on the view-only map; wire them to Site A/B if planners ask */}
-            <NetworkMap version={version} onSelectSegment={(id) => open(id)} onSite={() => {}} onClear={clearSelection}
-              selectedIds={mapIds} routeKey={found ? `found-${found.ids.join(",")}` : null} visible={(p) => inFilter(p, filter)}
+            <NetworkMap version={version} onSelectSegment={pickOnMap} onSite={() => {}} onClear={clearSelection}
+              selectedIds={mapIds} routeKey={found ? `found-${found.ids.join(",")}` : null}
+              visible={(p) => (optionIds ? optionIds.has(p.segment_id) : inFilter(p, filter))}
               tools={<MapFilters segments={segments} filter={filter} onFilter={setFilter} />} />
           </section>
           {/* The panel fills the map card's height (absolute, scrolls inside), so the map alone sets the row height. */}

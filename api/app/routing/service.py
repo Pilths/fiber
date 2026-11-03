@@ -15,8 +15,9 @@ from app.routing.graph import get_graph
 
 MAX_CANDIDATES = 20
 TIME_CAP_S = 2.0
-SHOWN = 3
+SHOWN = 5  # sanity cap; usually fewer survive MAX_DETOUR and MAX_SHARED
 MAX_DETOUR = 1.5  # keep only paths up to this times the shortest path's weight
+MAX_SHARED = 0.5  # drop a path when more than this share of its km is on one already kept path (a near-copy)
 
 
 def _bad(field: str, msg: str) -> HTTPException:
@@ -58,9 +59,19 @@ def _candidates(g: nx.Graph, a: int, b: int) -> list[list[int]]:
 
 
 def _reasonable(g: nx.Graph, paths: list[list[int]]) -> list[list[int]]:
-    """Paths come shortest first; keep those up to MAX_DETOUR x the shortest weight (never pad to SHOWN)."""
-    w = [sum(g[u][v]["weight"] for u, v in pairwise(p)) for p in paths]
-    return [p for p, x in zip(paths, w) if x <= MAX_DETOUR * w[0]]
+    """Paths come shortest first; keep those up to MAX_DETOUR x the shortest weight that are not near-copies of a
+    kept path. The count depends on the network: one, two or up to SHOWN, never padded."""
+    def km(edges: set[frozenset[int]]) -> float:
+        return sum(g[u][v]["weight"] for u, v in map(tuple, edges))
+    kept: list[tuple[list[int], set[frozenset[int]]]] = []
+    for p in paths:
+        e = {frozenset(x) for x in pairwise(p)}
+        w = km(e)
+        if kept and w > MAX_DETOUR * km(kept[0][1]):
+            break  # shortest first: every later path is longer
+        if all(km(e & k) <= MAX_SHARED * w for _, k in kept):
+            kept.append((p, e))
+    return [p for p, _ in kept]
 
 
 def find_routes(db: Session, frm: int, to: int, cores_needed: int, sort: str) -> dict[str, Any]:
