@@ -3,7 +3,7 @@ import { api, ApiError, errorText } from "@/api/client";
 import { Icon } from "@/components/Icon";
 import { db, health } from "@/lib/status";
 
-// Route A to B on Inventory (TASK-051, TASK-076). The routes API returns plain dicts, so the shapes live here.
+// Site A to B on Inventory (TASK-051, TASK-076). The routes API returns plain dicts, so the shapes live here.
 type Sort = "km" | "free_cores";
 type Endpoint = { id: number; name: string; kind: string };
 export type RouteSegment = {
@@ -112,7 +112,7 @@ export function useRoutePlanner(active: boolean, version: number) {
 }
 export type RoutePlanner = ReturnType<typeof useRoutePlanner>;
 
-// "Route A to B" panel beside the map (prototype 9e): sites, cores needed, Find route, sort, then the options.
+// "Site A to B" panel beside the map (prototype 9e): sites, cores needed, Find route, sort, then the options.
 // Find route picks the best (first) option; the options below show all.
 export function RouteSearch({ rp }: { rp: RoutePlanner }) {
   const [err, setErr] = useState<string | null>(null);
@@ -133,14 +133,14 @@ export function RouteSearch({ rp }: { rp: RoutePlanner }) {
   const bad = err ?? rp.errs.from ?? rp.errs.to ?? rp.errs.cores_needed ?? rp.errs.form ?? (none ? rp.res?.message ?? "No route found" : null);
   return (
     <section className="card absolute inset-0 flex flex-col overflow-auto" aria-labelledby="route-h">
-      <h2 id="route-h" className="card-title mb-3">Route A to B</h2>
+      <h2 id="route-h" className="card-title mb-3">Site A to B</h2>
       <form onSubmit={submit} className="flex flex-col gap-3">
-        <label><span className="lbl">Route A</span>
+        <label><span className="lbl">Site A</span>
           <input id="route-a" className="field" list="route-sites" value={rp.fromText} onChange={(e) => { setErr(null); rp.setFrom(e.target.value); }} autoComplete="off" /></label>
         <div>
-          {/* Swap sits on Route B's label line so every field keeps the panel's full width. */}
+          {/* Swap sits on Site B's label line so every field keeps the panel's full width. */}
           <div className="flex items-end justify-between">
-            <label htmlFor="route-b" className="lbl">Route B</label>
+            <label htmlFor="route-b" className="lbl">Site B</label>
             <button type="button" className="mb-1 cursor-pointer text-body font-semibold text-blue hover:underline" onClick={swap} aria-label="Swap A and B">&#8645; Swap</button>
           </div>
           <input id="route-b" className="field" list="route-sites" value={rp.toText} onChange={(e) => { setErr(null); rp.setTo(e.target.value); }} autoComplete="off" />

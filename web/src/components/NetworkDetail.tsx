@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { components } from "@/api/schema";
 import { Icon } from "@/components/Icon";
 import { Blank } from "@/components/LossCard";
@@ -41,7 +41,8 @@ export function SegmentDiagram({ segments, found, d, selectedId, onPick, onSite 
 
 export type Leg = { id: number; a: string; b: string; km: number | null; cut?: boolean; s?: Segment | Detail };
 
-// The chain itself: site, segment, site ... in rows of up to PER_ROW segments; a row's last site starts the next row.
+// The chain itself: site, segment, site ... on one line. Segments shrink to MIN_W to fit, then the line scrolls sideways
+// and keeps the selected segment in view.
 // Each segment is a button. With onUnpick, double-click (or Enter/Space) on the selected segment unselects it.
 // badge replaces the free badge under the line (a cut segment always shows Cut).
 export function Chain({ legs, selectedId, onPick, onUnpick, badge, describe, route, onSite }: {
@@ -50,9 +51,15 @@ export function Chain({ legs, selectedId, onPick, onUnpick, badge, describe, rou
   route?: string; onSite?: (end: "a" | "b") => void;
 }) {
   const fresh = useRef<number | null>(null); // the segment the first click of a double-click selected: not unselected
-  const cols = Math.min(legs.length, PER_ROW);
+  const list = useRef<HTMLOListElement>(null);
+  useEffect(() => { // scroll only the line, never the page
+    const ol = list.current, b = ol?.querySelector("[aria-pressed=true]")?.closest("li");
+    if (!ol || !b) return;
+    const l = b.offsetLeft - ol.scrollLeft, r = l + b.offsetWidth;
+    if (l < 0 || r > ol.clientWidth) ol.scrollLeft += l - (ol.clientWidth - b.offsetWidth) / 2;
+  }, [selectedId, legs.length]);
   return (
-    <ol aria-label="Segments on the route" aria-description={route} className="grid gap-y-4 px-16" style={{ gridTemplateColumns: `repeat(${cols}, minmax(140px, 1fr))` }}>
+    <ol ref={list} aria-label="Segments on the route" aria-description={route} className="relative grid overflow-x-auto px-16 pb-2" style={{ gridTemplateColumns: `repeat(${legs.length}, minmax(${MIN_W}px, 1fr))` }}>
       {legs.map((r, i) => {
         const sel = r.id === selectedId;
         return (
@@ -74,7 +81,7 @@ export function Chain({ legs, selectedId, onPick, onUnpick, badge, describe, rou
             {/* The line runs node to node, over the button's tint; clicks pass through to the button. */}
             <span aria-hidden className={`pointer-events-none absolute inset-x-0 top-[31px] border-t-4 ${r.cut ? "border-dashed border-red" : "border-blue"}`} />
             <Site name={r.a} onEdit={onSite ? () => onSite("a") : undefined} />
-            {(i % PER_ROW === PER_ROW - 1 || i === legs.length - 1) && <Site name={r.b} end onEdit={onSite ? () => onSite("b") : undefined} />}
+            {i === legs.length - 1 && <Site name={r.b} end onEdit={onSite ? () => onSite("b") : undefined} />}
           </li>
         );
       })}
@@ -82,7 +89,8 @@ export function Chain({ legs, selectedId, onPick, onUnpick, badge, describe, rou
   );
 }
 
-const PER_ROW = 6;
+// Narrowest segment: fits "999.9 km" and the free badge, and keeps 16px between neighbouring site names (longer names truncate, full name on hover).
+const MIN_W = 112;
 // A site on the chain: a dark node on the line and its name under it, at the segment's start (or end).
 const Site = ({ name, end, onEdit }: { name: string; end?: boolean; onEdit?: () => void }) => (
   <>
