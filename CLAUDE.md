@@ -49,6 +49,35 @@ Read before working: `docs/PRD.md` (requirements), `docs/architecture.md` (desig
 - Do not add Collapse map, Site/Services "Later" tabs, a Reserve tab, or helper lines like "Reserve is off: ...".
 - Tabs: Inventory and My reservations. Inventory: map (8 of 12 columns, never shrunk, Region and Type filters in its toolbar) with the "Site A to B" panel beside it at map height, the segment diagram (the current `SegmentDiagram`), a row below it with "Reserve on this route" and "Edit segment" (same width), then the Cores table. Reserving opens as a box over Inventory. Full layout: `docs/DESIGN.md` section 3.
 
+## Code style (owner decision: readable over short)
+
+Applies to all new and changed code. Existing code is tidied in the cleanup session, not during feature work.
+
+- One step per line. Lines at most 110 characters.
+- Full, plain names: `planner`, `option`, `segment`, `site`, not `rp`, `op`, `s`, `g`, `x`. Short names only for loop counters (`i`) and tiny arrow functions over one item.
+- If/else is never on one line. Put the condition on its own line and the body indented below, also for a single statement:
+  ```python
+  # no
+  if seg is None: continue
+  # yes
+  if seg is None:
+      continue
+  ```
+  ```tsx
+  // no
+  if (!ol || !b) return;
+  // yes
+  if (!ol || !b) {
+    return;
+  }
+  ```
+- No `cond && doSomething()` for actions in TypeScript; write an `if`. `cond && <Element />` in JSX is fine.
+- Ternaries only for a simple value choice (`x ? "on" : "off"`). Never nested, never for actions.
+- No several statements joined with `;` on one line.
+- Small functions with one job and a name that says it. A React component that grows past one screen part is split; its state and handlers go in a hook.
+- SQL goes in named functions near the top of the module, not inline in the logic.
+- Comments say why, not what. If code needs a comment to explain a trick, rewrite it plainly.
+
 ## Delegating to subagents
 
 The main chat stays on one model so its cache is kept. Hand work to a subagent by setting `model` on the Agent call:
