@@ -43,3 +43,15 @@ def test_unknown_admin_and_template(db, monkeypatch, tmp_path):
     p = tmp_path / "t.xlsx"
     assert ld.main(["--template", str(p)]) == 0
     assert [c.value for c in openpyxl.load_workbook(p)["Segments"][1]] == ld.SEGMENTS
+
+
+def test_invisible_characters_from_copied_cells_are_ignored(db, monkeypatch, tmp_path):
+    mkuser(db, "boss1", "admin")
+    zw, nb = "​", " "
+    sites = [["AAAA" + zw, f"3.1{zw}", f"{nb}101.6", None], ["BBBB", "3.2", f"101.7{zw}", None]]
+    segs = [[f"AAAA-BBBB{zw}", f"32.5{zw}", None, None, "Trunk", f"24{zw}", None]]
+    assert run(monkeypatch, db, tmp_path, sites, segs) == 0
+    assert db.exec_driver_sql("SELECT count(*) FROM sites WHERE name IN ('AAAA', 'BBBB') AND geom IS NOT NULL").scalar() == 2
+    assert db.exec_driver_sql("SELECT survey_cores FROM segments").scalar() == 24
+    raw = db.exec_driver_sql("SELECT raw->>'latitude_in_decimal' FROM upload_rows WHERE raw->>'site_name' LIKE 'AAAA%%'").scalar()
+    assert raw == f"3.1{zw}"  # raw cell kept exactly as read
