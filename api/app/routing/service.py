@@ -80,12 +80,14 @@ def find_routes(db: Session, frm: int, to: int, cores_needed: int, sort: str) ->
     for field, sid in (("from", frm), ("to", to)):
         if not db.execute(text("SELECT 1 FROM sites WHERE id = :i"), {"i": sid}).first():
             raise _bad(field, "Unknown site")
-    paths = _candidates(get_graph(db), frm, to)
+    # One graph for the whole request: a second get_graph could return a rebuilt graph after an upload,
+    # and the paths found in the first one might not match it.
+    graph = get_graph(db)
+    paths = _candidates(graph, frm, to)
     if not paths:
         return {"options": [], "message": "No route connects these sites"}
 
-    g = get_graph(db)
-    paths = _reasonable(g, paths)
+    paths = _reasonable(graph, paths)
     inv = {s["id"]: s for s in inventory.list_segments(db, None, None, None)}
     ls = {r["segment_id"]: r for r in loss.segment_rows(db)}
     labels = dict(db.execute(text(
@@ -99,7 +101,7 @@ def find_routes(db: Session, frm: int, to: int, cores_needed: int, sort: str) ->
     for path in paths:
         segments = []
         for u, v in pairwise(path):
-            sid = g[u][v]["segment_id"]
+            sid = graph[u][v]["segment_id"]
             s, lo = inv[sid], ls[sid]
             segments.append({"segment_id": sid, "name": f"{s['site_a']} - {s['site_b']}", "site_a": names[u], "site_b": names[v],  # travel order
                           "km": None if s["distance_km"] is None else float(s["distance_km"]),
@@ -111,7 +113,7 @@ def find_routes(db: Session, frm: int, to: int, cores_needed: int, sort: str) ->
         fewest = bottleneck["free_to_reserve"]
         options.append({
             "segments": segments, "total_km": round(sum(x["km"] or 0 for x in segments), 3),
-            "_weight": sum(g[u][v]["weight"] for u, v in pairwise(path)),  # fallback km for segments without distance
+            "_weight": sum(graph[u][v]["weight"] for u, v in pairwise(path)),  # fallback km for segments without distance
             "distance_incomplete": any(x["km"] is None for x in segments),
             "estimated_db": None if None in calc else round(float(sum(calc)), 2),
             "fewest_free": fewest, "bottleneck_segment_id": bottleneck["segment_id"],
