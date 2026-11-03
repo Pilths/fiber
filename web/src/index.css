@@ -178,6 +178,7 @@
 /* Site kind marker in the map legend. */
 .rb-sh { display: block; flex: none; }
 .rb-sh.dc { width: 14px; height: 14px; background: var(--ink); }
+.rb-sh.toc { width: 13px; height: 11px; background: var(--ink); clip-path: polygon(50% 0, 100% 100%, 0 100%); }
 .rb-sh.st { width: 12px; height: 12px; transform: rotate(45deg); background: #fff; border: 2px solid var(--ink); }
 
 /* Network map overlay (NetworkMap.tsx), from the map mock: chips and site markers are DOM buttons over the lines. */
@@ -195,6 +196,7 @@
 .msite { position: absolute; z-index: 4; transform: translate(-50%, -50%); width: 26px; height: 26px; display: grid; place-items: center; border: 0; border-radius: 50%; background: none; cursor: pointer; padding: 0; }
 .msite .shape { display: block; }
 .msite .shape.dc { width: 14px; height: 14px; background: var(--ink); border: 1.5px solid #fff; outline: 1px solid var(--ink); }
+.msite .shape.toc { width: 16px; height: 14px; background: var(--ink); clip-path: polygon(50% 0, 100% 100%, 0 100%); }
 .msite .shape.st { width: 12px; height: 12px; transform: rotate(45deg); background: #fff; border: 2px solid var(--ink); }
 .msite .code { position: absolute; top: 24px; left: 50%; transform: translateX(-50%); padding: 0 6px; border-radius: 3px; background: rgb(255 255 255 / .9); font-size: 12px; line-height: 18px; font-weight: 700; white-space: nowrap; }
 .msite.end::before { content: ""; position: absolute; inset: -1px; border: 2.5px solid var(--blue); border-radius: 50%; }

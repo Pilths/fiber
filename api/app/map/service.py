@@ -93,7 +93,8 @@ def map_segments(db: Session) -> dict[str, Any]:
         seg_id, coords = shaped.get(s["id"], (None, None))
         surveyed = s["survey_cores"] is not None
         props = {"segment_id": s["id"], "name": name, "site_a_id": g["site_a_id"], "site_b_id": g["site_b_id"],
-                 "route_type": s["route_type"], "region": s["region"], "distance_km": s["distance_km"],
+                 "route_type": s["route_type"], "route": s["route"], "region": s["region"],
+                 "site_a_kind": s["site_a_kind"], "site_b_kind": s["site_b_kind"], "distance_km": s["distance_km"],
                  "free_to_reserve": s["free_to_reserve"], "surveyed": surveyed, "fiber_cut": s["fiber_cut"],
                  "chip": _chip(s["free_to_reserve"], surveyed), "route_id": seg_id}
         if coords:

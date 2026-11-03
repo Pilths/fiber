@@ -6,7 +6,7 @@
 Put the file in api/data/ (git-ignored; real data is never committed). ADMIN is an existing admin username
 (make one with app.create_admin); every write is attributed to that admin and kept as history.
 
-Sheet "Sites": site_name (4-letter LRD), latitude_in_decimal, longitude_in_decimal, region (optional).
+Sheet "Sites": site_name (4-letter LRD), latitude_in_decimal, longitude_in_decimal, region (optional), Type (optional: DC, TOC or blank).
 Sheet "Segments": Link (AAAA-BBBB), Distance (km), Route, Section, Type (Trunk/Metro), Surveyed cores, Total cores.
 Safe to run again: sites missing from the file are left alone, fields edited in the dashboard are kept,
 and a survey count is only filled in where the segment has none yet.
@@ -25,7 +25,7 @@ from app.ingest.checks import blank, clean
 from app.ingest.reservation_import import add_cores
 from app.routing.graph import invalidate as invalidate_routes
 
-SITES = ["site_name", "latitude_in_decimal", "longitude_in_decimal", "region"]
+SITES = ["site_name", "latitude_in_decimal", "longitude_in_decimal", "region", "Type"]
 SEGMENTS = ["Link", "Distance", "Route", "Section", "Type", "Surveyed cores", "Total cores"]
 REASON = "data file load"
 

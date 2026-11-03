@@ -26,6 +26,12 @@ SITES = [
 ]
 KL, CJ, IPH, PEN = "DEV Kuala Lumpur DC", "DEV Cyberjaya DC", "DEV Ipoh Exchange", "DEV Penang Tower"
 BW, TP, TI, TM, KG, SB, ML, KJ = (s[0] for s in SITES)
+DEV_TRUNK_ROUTES_SQL = """
+UPDATE segments s SET route = CASE WHEN s.region = 'South' THEN 'R3' ELSE 'R1' END
+FROM sites a, sites b
+WHERE a.id = s.site_a_id AND b.id = s.site_b_id AND a.name LIKE 'DEV %' AND b.name LIKE 'DEV %'
+  AND s.route_type = 'Trunk' AND s.route IS NULL
+"""
 # site A, site B, route_type, region, cable_size
 SEGMENTS = [
     (PEN, BW, "Metro", "North", 48), (BW, TP, "Trunk", "North", 144), (TP, IPH, "Trunk", "North", 144),
@@ -93,6 +99,8 @@ def main() -> None:
                       a=site[a], b=site[b], g=json.dumps({"type": "LineString", "coordinates": coords}))
             db.execute(text("INSERT INTO route_segments (route_id, segment_id, position) VALUES (:r, :s, 1)"), {"r": rid, "s": sid})
             shaped += 1
+        # DEV trunk route labels: R1 up north and central, R3 down south. Only fills a blank route.
+        db.execute(text(DEV_TRUNK_ROUTES_SQL))
         db.commit()
     print(f"sites added {added_sites}, segments added {added_segments}, shaped routes added {shaped}")
 

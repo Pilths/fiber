@@ -26,10 +26,13 @@ UPLOAD_REASON = "site master upload"
 LOCATION_FIELDS = {"location", "geom", "lat", "lon", "latitude", "longitude"}
 SHEETS = {  # kind: (required header keys, expected-headers text, entity, own header keys)
     "sites": (("sitename", "latitudeindecimal", "longitudeindecimal"), "site_name, latitude_in_decimal, longitude_in_decimal",
-              "site", {"sitename", "latitudeindecimal", "longitudeindecimal", "region"}),
+              "site", {"sitename", "latitudeindecimal", "longitudeindecimal", "region", "type"}),
     "dcs": (("dcnamelink", "lrd"), "DC Name / Link, LRD", "dc",
             {"dcnamelink", "lrd", "lat", "long", "latitude", "longitude", "lon"}),
 }
+SITE_KINDS = {"dc": "data_center", "toc": "toc"}  # Type column of the Sites sheet; blank means 'site'
+# Sites a Site Location DC can hang off: every site except Site Location DCs themselves (those have an LRD site)
+LRD_TARGETS_SQL = "SELECT name, id FROM sites WHERE NOT (kind = 'data_center' AND lrd_site_id IS NOT NULL)"
 GROUP_COL = {"added": "new", "changed": "changed", "missing": "missing", "problem": "needs_review", "unchanged": "unchanged"}
 
 
@@ -85,7 +88,10 @@ class DbSite:
 
     @property
     def cls(self) -> str:
-        return "dcs" if self.kind == "data_center" else "sites"
+        # a DC from the Site Location sheet always has an LRD site; a DC from the Sites sheet has none
+        if self.kind == "data_center" and self.lrd_id is not None:
+            return "dcs"
+        return "sites"
 
 
 @dataclass
@@ -167,6 +173,10 @@ def _parse_row(kind: str, headers: list[str], values: tuple[Any, ...]) -> Item:
     else:
         p["lrd"] = None if isblank(f.get("lrd")) else str(f["lrd"]).strip()
         p["own_coords_note"] = coord_why  # not a problem by itself: the DC falls back to its site
+    if kind == "sites" and "type" in f:  # no Type column: p has no "kind" and existing kinds are left alone
+        p["kind"] = "site" if isblank(f["type"]) else SITE_KINDS.get(str(f["type"]).strip().casefold())
+        if p["kind"] is None:
+            reasons.append("Type must be DC, TOC or blank")
     p["reasons"] = reasons
     item.p = p
     return item
@@ -236,6 +246,8 @@ def _new_fields(kind: str, p: dict[str, Any]) -> dict[str, Any]:
     f: dict[str, Any] = {"location": _fmt(p["lat"], p["lon"])}
     if kind == "dcs":  # Site Location has no region: it is neither checked nor compared nor written
         f["lrd"] = p["lrd"]
+    if p.get("kind"):
+        f["kind"] = p["kind"]
     f.update({"details." + k: v for k, v in p["details"].items()})
     return f
 
@@ -244,6 +256,7 @@ def _old_fields(kind: str, row: DbSite) -> dict[str, Any]:
     details = dict(row.details)
     f: dict[str, Any] = {"location": _fmt(row.lat, row.lon)}
     if kind == "sites":
+        f["kind"] = row.kind
         details.pop(next((k for k in details if norm(k) == "region"), ""), None)  # an old region stays as it is
     else:
         f["lrd"] = row.lrd
@@ -253,6 +266,8 @@ def _old_fields(kind: str, row: DbSite) -> dict[str, Any]:
 
 def diff_fields(kind: str, p: dict[str, Any], row: DbSite, prot: dict[int, set[str]]) -> list[dict[str, Any]]:
     new, old = _new_fields(kind, p), _old_fields(kind, row)
+    if "kind" not in new:
+        old.pop("kind", None)  # the file has no Type column
     oldn = {norm(k): k for k in old}
     changes = []
     for k, v in new.items():
@@ -427,7 +442,8 @@ def load_staged(db: Session, upload_id: int, summary: dict[str, Any]) -> dict[st
 
 def _apply_changes(kind: str, row: DbSite, it: Item, lrd_ids: dict[str, int], warnings: list[str]) -> tuple[dict[str, Any], list[tuple]]:
     """Final column values for a site and the data_edits rows (field, old, new) actually applied."""
-    fin: dict[str, Any] = {"n": row.name, "lat": row.lat, "lon": row.lon, "d": dict(row.details), "l": row.lrd_id, "a": row.active}
+    fin: dict[str, Any] = {"n": row.name, "lat": row.lat, "lon": row.lon, "d": dict(row.details), "l": row.lrd_id, "a": row.active,
+                           "k": row.kind}
     done: list[tuple] = []
 
     def setd(key: str, val: Any) -> None:
@@ -451,6 +467,8 @@ def _apply_changes(kind: str, row: DbSite, it: Item, lrd_ids: dict[str, int], wa
             fin["a"] = True
         elif f == "name":
             fin["n"] = new
+        elif f == "kind":
+            fin["k"] = new
         else:
             setd(f[8:], new)
         done.append((f, c["old"], new))
@@ -462,7 +480,9 @@ def apply_sheet(db: Session, admin_id: int, kind: str, r: SheetResult, reason: s
     out = dict.fromkeys(["added", "changed", "protected_kept", "renamed", "deactivated", "kept_active", "skipped"], 0)
     by_id = {s.id: s for s in snap.values()}
     # DC links resolve against the database now, so sites inserted earlier in this transaction count
-    lrd_ids = dict(db.execute(text("SELECT name, id FROM sites WHERE kind <> 'data_center'")).all()) if kind == "dcs" else {}
+    lrd_ids: dict[str, int] = {}
+    if kind == "dcs":
+        lrd_ids = dict(db.execute(text(LRD_TARGETS_SQL)).all())
     renamed_new = {id(i) for i in pairs.values()}
     inserts, updates, edits = [], [], []
 
@@ -474,7 +494,8 @@ def apply_sheet(db: Session, admin_id: int, kind: str, r: SheetResult, reason: s
                 out["skipped"] += 1
                 continue
             d = dict(it.p["details"])
-            inserts.append({"n": it.p["key"], "k": "site" if kind == "sites" else "data_center", "lat": it.p["lat"],
+            default_kind = "site" if kind == "sites" else "data_center"
+            inserts.append({"n": it.p["key"], "k": it.p.get("kind") or default_kind, "lat": it.p["lat"],
                             "lon": it.p["lon"], "d": json.dumps(d), "l": lid})
         elif it.group == "changed":
             row = by_id[it.db_id]  # type: ignore[index]
@@ -505,7 +526,8 @@ def apply_sheet(db: Session, admin_id: int, kind: str, r: SheetResult, reason: s
         elif is_protected(prot, m.id, "active"):
             out["protected_kept"] += 1
         else:
-            updates.append({"n": m.name, "lat": m.lat, "lon": m.lon, "d": json.dumps(m.details), "l": m.lrd_id, "a": False, "i": m.id})
+            updates.append({"n": m.name, "lat": m.lat, "lon": m.lon, "d": json.dumps(m.details), "l": m.lrd_id, "a": False, "k": m.kind,
+                            "i": m.id})
             edits.append((m.id, "active", True, False))
             out["deactivated"] += 1
     if inserts:
@@ -514,7 +536,7 @@ def apply_sheet(db: Session, admin_id: int, kind: str, r: SheetResult, reason: s
                         "CAST(:d AS jsonb), :l)"), inserts)
         out["added"] = len(inserts)
     if updates:
-        db.execute(text("UPDATE sites SET name = :n, geom = ST_SetSRID(ST_MakePoint(CAST(:lon AS double precision), "
+        db.execute(text("UPDATE sites SET name = :n, kind = :k, geom = ST_SetSRID(ST_MakePoint(CAST(:lon AS double precision), "
                         "CAST(:lat AS double precision)), 4326), details = CAST(:d AS jsonb), lrd_site_id = :l, active = :a "
                         "WHERE id = :i"), updates)
     if edits:

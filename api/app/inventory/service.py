@@ -20,7 +20,7 @@ PER_TYPE = 20
 
 # Segment list with free cores and status mix; status always comes from core_status_v.
 SEGMENT_SQL = """
-SELECT s.id, a.name AS site_a, b.name AS site_b, s.route_type, s.region, s.route, s.section, s.distance_km,
+SELECT s.id, a.name AS site_a, b.name AS site_b, a.kind AS site_a_kind, b.kind AS site_b_kind, s.route_type, s.region, s.route, s.section, s.distance_km,
        s.survey_cores, s.cable_size, s.fiber_cut, COALESCE(mix.m, '{}'::jsonb) AS status_mix,
        COALESCE((SELECT sum(u.remaining) FROM reservation_unassigned_v u WHERE u.segment_id = s.id), 0)::int AS unassigned_reserved
 FROM segments s
