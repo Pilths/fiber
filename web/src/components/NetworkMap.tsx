@@ -56,16 +56,98 @@ const LINE_WIDTH: Record<string, number> = { trunk: 6, "dc-dc": 7, "dc-toc": 4, 
 const LINE_COLOR: Record<string, string> = {
   trunk: "var(--line-trunk)", metro: "var(--line-metro)", "dc-dc": "var(--line-dcdc)", "dc-toc": "var(--line-dctoc)",
 };
-// Layers: which site kinds show on the map. The ends of the selection always show.
+// Layers: which route types, trunk routes and site kinds show on the map. A hidden line or site is not drawn at
+// all; the selected segment or route and its end sites always show. Route search still uses hidden segments.
 type SiteLayers = { data_center: boolean; toc: boolean; site: boolean };
 const ALL_SITES: SiteLayers = { data_center: true, toc: true, site: true };
-const SITE_LAYERS: [keyof SiteLayers, string][] = [["data_center", "Data centres"], ["toc", "TOC"], ["site", "Trunk sites"]];
+const SITE_LAYERS: [keyof SiteLayers, string, string][] = [
+  ["data_center", "Data centres", "rb-sh dc size-3!"],
+  ["toc", "TOC", "rb-sh toc"],
+  ["site", "Trunk sites", "rb-sh st size-2.5!"],
+];
+const ROUTE_LAYERS: [string, string][] = [["Trunk", "ll"], ["Metro", "ll m"], ["DC-DC", "ll dd"], ["DC-TOC", "ll dt"]];
+type RouteLayers = Record<string, boolean>;
+const ALL_ROUTES: RouteLayers = { Trunk: true, Metro: true, "DC-DC": true, "DC-TOC": true };
 
 function siteLayerOn(layers: SiteLayers, kind: string): boolean {
   if (kind === "data_center" || kind === "toc") {
     return layers[kind];
   }
   return layers.site;
+}
+
+function routeLayerOn(layers: RouteLayers, trunkOff: Set<string>, segment: SegmentProps): boolean {
+  const type = segment.route_type ?? "";
+  if (layers[type] === false) {
+    return false;
+  }
+  if (type === "Trunk" && segment.route && trunkOff.has(segment.route)) {
+    return false;
+  }
+  return true;
+}
+
+// Trunk routes (R1, R3, ...) on the map, in name order: one on/off chip each on the Trunk row.
+function trunkRoutesOf(features: { properties: SegmentProps }[]): string[] {
+  const routes = new Set<string>();
+  for (const feature of features) {
+    const segment = feature.properties;
+    if (segment.route_type === "Trunk" && segment.route) {
+      routes.add(segment.route);
+    }
+  }
+  return [...routes].sort();
+}
+
+// The Layers panel: Routes (type tick boxes with their key swatch, trunk route chips) and Sites.
+function LayersPanel({ open, routes, setRoutes, trunkRoutes, trunkOff, setTrunkOff, sites, setSites }: {
+  open: boolean; routes: RouteLayers; setRoutes: (layers: RouteLayers) => void;
+  trunkRoutes: string[]; trunkOff: Set<string>; setTrunkOff: (off: Set<string>) => void;
+  sites: SiteLayers; setSites: (layers: SiteLayers) => void;
+}) {
+  const toggleTrunk = (route: string) => {
+    const next = new Set(trunkOff);
+    if (next.has(route)) {
+      next.delete(route);
+    } else {
+      next.add(route);
+    }
+    setTrunkOff(next);
+  };
+  return (
+    <div id="map-layers" hidden={!open} className="absolute top-[38px] left-0 w-[270px] rounded-lg border border-line bg-white px-3.5 py-3">
+      <fieldset>
+        <legend className="lbl mb-1.5">Routes</legend>
+        {ROUTE_LAYERS.map(([type, swatch]) => (
+          <div key={type} className="flex items-center gap-2">
+            <label className="lrow flex-1">
+              <input type="checkbox" checked={routes[type]}
+                onChange={(event) => setRoutes({ ...routes, [type]: event.target.checked })} />
+              <i className="slot" aria-hidden="true"><i className={swatch} /></i>
+              {type}
+            </label>
+            {type === "Trunk" && trunkRoutes.map((route) => (
+              <button key={route} type="button" className="chip h-6! px-2! text-xs" aria-pressed={!trunkOff.has(route)}
+                aria-label={`Trunk ${route}`} disabled={!routes.Trunk} onClick={() => toggleTrunk(route)}>
+                {route}
+              </button>
+            ))}
+          </div>
+        ))}
+      </fieldset>
+      <fieldset className="mt-2.5">
+        <legend className="lbl mb-1.5">Sites</legend>
+        {SITE_LAYERS.map(([kind, label, shape]) => (
+          <label key={kind} className="lrow">
+            <input type="checkbox" checked={sites[kind]}
+              onChange={(event) => setSites({ ...sites, [kind]: event.target.checked })} />
+            <i className="slot" aria-hidden="true"><i className={shape} /></i>
+            {label}
+          </label>
+        ))}
+      </fieldset>
+    </div>
+  );
 }
 
 const kindOf = (t: string | null) => (t ?? "").toLowerCase();
@@ -92,7 +174,7 @@ const NOTE: Partial<Record<Basemap, string>> = {
 const webgl = () => { try { return !!document.createElement("canvas").getContext("webgl2"); } catch { return false; } };
 
 export function NetworkMap({ selectedIds, routeKey, visible, onSelectSegment: selectSegment, onSite, onClear, version, tools }: {
-  tools?: ReactNode; // extra toolbar controls (Region and Type filters)
+  tools?: ReactNode; // extra toolbar controls (the Region filter)
   selectedIds: number[]; routeKey: string | null; visible: (p: SegmentProps) => boolean;
   onSelectSegment: (id: number) => void; onSite: (name: string) => void; onClear: () => void; version: number;
 }) {
@@ -106,7 +188,8 @@ export function NetworkMap({ selectedIds, routeKey, visible, onSelectSegment: se
   const [segments, setSegments] = useState<Geo<SegmentProps> | null>(null);
   const [sites, setSites] = useState<Geo<SiteProps> | null>(null);
   const [err, setErr] = useState(false);
-  const [layerOn, setLayerOn] = useState(true);
+  const [routeLayers, setRouteLayers] = useState<RouteLayers>(ALL_ROUTES);
+  const [trunkOff, setTrunkOff] = useState<Set<string>>(new Set());
   const [siteLayers, setSiteLayers] = useState<SiteLayers>(ALL_SITES);
   const [layersOpen, setLayersOpen] = useState(false);
   const [full, setFull] = useState(false);
@@ -210,9 +293,13 @@ export function NetworkMap({ selectedIds, routeKey, visible, onSelectSegment: se
   };
   const ends = new Set(feats.filter((f) => sel.has(f.properties.segment_id)).flatMap((f) => [f.properties.site_a_id, f.properties.site_b_id]));
   const segmentCount = (id: number) => feats.filter((f) => f.properties.site_a_id === id || f.properties.site_b_id === id).length;
-  const drawn = view && size.w ? feats.map((f) => {
+  const layered = feats.filter((f) => {
+    const selected = sel.has(f.properties.segment_id);
+    return selected || routeLayerOn(routeLayers, trunkOff, f.properties);
+  });
+  const drawn = view && size.w ? layered.map((f) => {
     const p = f.properties, pts = f.geometry.coordinates.map(P);
-    const on = sel.has(p.segment_id), show = layerOn && (on || visible(p));
+    const on = sel.has(p.segment_id), show = on || visible(p);
     return { p, pts, on, show, dim: show && !on && sel.size > 0, mid: midpoint(pts) };
   }) : [];
   const order = [...drawn].sort((a, b) => Number(a.on) - Number(b.on)); // selected on top
@@ -303,25 +390,9 @@ export function NetworkMap({ selectedIds, routeKey, visible, onSelectSegment: se
               <svg className="ni" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2l6 3.2-6 3.2-6-3.2zM2 8.4l6 3.2 6-3.2M2 11.4l6 3.2 6-3.2" /></svg>Layers
               <svg className="ni size-3!" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4" /></svg>
             </button>
-            <div id="map-layers" hidden={!layersOpen} className="absolute top-[38px] left-0 w-[270px] rounded-lg border border-line bg-white px-3.5 py-3">
-              <fieldset>
-                <legend className="lbl mb-1.5">Sites</legend>
-                {SITE_LAYERS.map(([kind, label]) => (
-                  <label key={kind} className="lrow">
-                    <input type="checkbox" checked={siteLayers[kind]}
-                      onChange={(event) => setSiteLayers({ ...siteLayers, [kind]: event.target.checked })} />
-                    {label}
-                  </label>
-                ))}
-              </fieldset>
-              <fieldset className="mt-2.5">
-                <legend className="lbl mb-1.5">Lines</legend>
-                <label className="lrow">
-                  <input type="checkbox" checked={layerOn} onChange={(event) => setLayerOn(event.target.checked)} />
-                  Dark fibre
-                </label>
-              </fieldset>
-            </div>
+            <LayersPanel open={layersOpen} routes={routeLayers} setRoutes={setRouteLayers}
+              trunkRoutes={trunkRoutesOf(feats)} trunkOff={trunkOff} setTrunkOff={setTrunkOff}
+              sites={siteLayers} setSites={setSiteLayers} />
           </div>
           <div className="flex" role="group" aria-label="Zoom">
             <button type="button" className="mbtn w-[34px] justify-center rounded-r-none! px-0! text-base" aria-label="Zoom in" onClick={() => view && go({ ...view, zoom: Math.min(18, view.zoom + 1) })}>+</button>

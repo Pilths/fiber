@@ -12,38 +12,16 @@ export function FreeBadge({ s }: { s: Parameters<typeof health>[0] }) {
   );
 }
 
-const options = (all: Segment[], k: "region" | "route_type") => [...new Set(all.map((s) => s[k]).filter((v): v is string => !!v))].sort();
+const regions = (all: Segment[]) => [...new Set(all.map((s) => s.region).filter((v): v is string => !!v))].sort();
 
-// Route types worked out by the backend from the two end sites (Trunk is listed per route above them).
-const LINK_TYPES = ["Metro", "DC-DC", "DC-TOC"];
-
-// Trunk routes (R1, R3, ...) found on trunk segments, in name order.
-function trunkRoutes(all: Segment[]): string[] {
-  const routes = new Set<string>();
-  for (const segment of all) {
-    if (segment.route_type === "Trunk" && segment.route) {
-      routes.add(segment.route);
-    }
-  }
-  return [...routes].sort();
-}
-
-// Region and route Type in the map toolbar: they dim the other segments on the map. Site types are in Layers.
+// Region in the map toolbar: it dims the other segments on the map. Route types and site kinds are in Layers.
 export function MapFilters({ segments, filter, onFilter }: { segments: Segment[] | null; filter: SegmentFilter; onFilter: (f: SegmentFilter) => void }) {
   const all = segments ?? [];
   const cls = "field h-8 w-auto text-[13px] font-semibold";
   return (
-    <>
-      <select className={cls} aria-label="Region" value={filter.region} onChange={(e) => onFilter({ ...filter, region: e.target.value })}>
-        <option value="">All regions</option>
-        {options(all, "region").map((o) => <option key={o}>{o}</option>)}
-      </select>
-      <select className={cls} aria-label="Type" value={filter.network} onChange={(e) => onFilter({ ...filter, network: e.target.value })}>
-        <option value="">All types</option>
-        <option value="type:Trunk">Trunk</option>
-        {trunkRoutes(all).map((route) => <option key={route} value={`trunk:${route}`}>Trunk {route}</option>)}
-        {LINK_TYPES.map((type) => <option key={type} value={`type:${type}`}>{type}</option>)}
-      </select>
-    </>
+    <select className={cls} aria-label="Region" value={filter.region} onChange={(e) => onFilter({ ...filter, region: e.target.value })}>
+      <option value="">All regions</option>
+      {regions(all).map((o) => <option key={o}>{o}</option>)}
+    </select>
   );
 }
