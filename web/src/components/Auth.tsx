@@ -4,7 +4,7 @@ import type { components } from "@/api/schema";
 import { LOGO } from "@/components/Header";
 
 type Me = components["schemas"]["CurrentUser"];
-const MIN = 10; // same as the API (app/auth/router.py MIN_PASSWORD)
+const MIN = 8; // same as the API (app/auth/router.py MIN_PASSWORD)
 
 function Shell({ title, children }: { title: string; children: React.ReactNode }) {
   return (

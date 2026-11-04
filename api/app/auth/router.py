@@ -17,7 +17,7 @@ router = APIRouter(prefix="/api")
 DB = Annotated[Session, Depends(get_db)]
 ph = PasswordHasher()
 DUMMY_HASH = ph.hash("not-a-real-password")  # verified against for unknown users, so timing does not reveal them
-MIN_PASSWORD = 10
+MIN_PASSWORD = 8  # temporary, while the dashboard is in trial use
 BAD_LOGIN = HTTPException(401, "Wrong username or password")
 
 
