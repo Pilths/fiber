@@ -104,6 +104,12 @@ export function useRoutePlanner(active: boolean, version: number) {
 
   return {
     clear: () => setIdx(null),
+    // The "Clear route" link: the route and the two site boxes, so the next search starts empty.
+    reset: () => {
+      setIdx(null);
+      setFromText("");
+      setToText("");
+    },
     eps, fromText, toText, need, from, to, res, errs, option, idx, sort, setSort, coresText: cores, setCores,
     setFrom: (t: string) => { setFromText(t); setIdx(null); },
     setTo: (t: string) => { setToText(t); setIdx(null); },
@@ -135,7 +141,7 @@ export function RouteSearch({ rp }: { rp: RoutePlanner }) {
     <section className="card absolute inset-0 flex flex-col overflow-auto" aria-labelledby="route-h">
       <div className="mb-3 flex items-baseline justify-between">
         <h2 id="route-h" className="card-title">Site A to B</h2>
-        {rp.idx != null && <button type="button" className="cursor-pointer text-body font-semibold text-blue hover:underline" onClick={rp.clear}>Clear route</button>}
+        {rp.idx != null && <button type="button" className="cursor-pointer text-body font-semibold text-blue hover:underline" onClick={rp.reset}>Clear route</button>}
       </div>
       <form onSubmit={submit} className="flex flex-col gap-3">
         <label><span className="lbl">Site A</span>

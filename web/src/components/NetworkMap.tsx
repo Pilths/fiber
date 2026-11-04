@@ -50,7 +50,24 @@ function midpoint(p: [number, number][]): [number, number] {
   return p[0];
 }
 
-const COLOR = { ok: "var(--green)", low: "var(--amber)", full: "var(--red)", not_surveyed: "var(--ns)" } as const;
+// Line width and colour per route type. Each type also has its own pattern (DC-DC double, DC-TOC dashed), so the
+// colour is never the only cue. Free-core health is on the chips, not the lines.
+const LINE_WIDTH: Record<string, number> = { trunk: 6, "dc-dc": 7, "dc-toc": 4, metro: 4 };
+const LINE_COLOR: Record<string, string> = {
+  trunk: "var(--line-trunk)", metro: "var(--line-metro)", "dc-dc": "var(--line-dcdc)", "dc-toc": "var(--line-dctoc)",
+};
+// Layers: which site kinds show on the map. The ends of the selection always show.
+type SiteLayers = { data_center: boolean; toc: boolean; site: boolean };
+const ALL_SITES: SiteLayers = { data_center: true, toc: true, site: true };
+const SITE_LAYERS: [keyof SiteLayers, string][] = [["data_center", "Data centres"], ["toc", "TOC"], ["site", "Trunk sites"]];
+
+function siteLayerOn(layers: SiteLayers, kind: string): boolean {
+  if (kind === "data_center" || kind === "toc") {
+    return layers[kind];
+  }
+  return layers.site;
+}
+
 const kindOf = (t: string | null) => (t ?? "").toLowerCase();
 // Chip text: the free-core number only; a cut segment reads 0, not surveyed a dash.
 // Map shape and spoken word per site kind: DC a dark square, TOC a dark triangle, a trunk site a diamond.
@@ -90,6 +107,7 @@ export function NetworkMap({ selectedIds, routeKey, visible, onSelectSegment: se
   const [sites, setSites] = useState<Geo<SiteProps> | null>(null);
   const [err, setErr] = useState(false);
   const [layerOn, setLayerOn] = useState(true);
+  const [siteLayers, setSiteLayers] = useState<SiteLayers>(ALL_SITES);
   const [layersOpen, setLayersOpen] = useState(false);
   const [full, setFull] = useState(false);
   useEffect(() => {
@@ -231,18 +249,19 @@ export function NetworkMap({ selectedIds, routeKey, visible, onSelectSegment: se
             <svg className="pointer-events-none absolute inset-0 size-full" aria-hidden="true" data-testid="map-lines">
               {order.map(({ p, pts, on, show, dim }) => {
                 const d = "M" + pts.map((q) => `${q[0].toFixed(1)} ${q[1].toFixed(1)}`).join("L");
-                const t = kindOf(p.route_type), w = (t === "trunk" ? 6 : t === "dc-dc" ? 5 : 3) + (on ? 3 : 0);
+                const t = kindOf(p.route_type), w = (LINE_WIDTH[t] ?? 4) + (on ? 3 : 0);
                 const dotted = p.chip === "not_surveyed" && !on;
-                const dash = dotted ? "1 7" : t === "dc-toc" ? "10 6" : undefined;
+                const dash = dotted ? "1 7" : t === "dc-toc" ? "9 5" : undefined;
                 return (
-                  <g key={p.segment_id} data-testid="map-line" data-segment-id={p.segment_id} data-selected={on} data-state={!show ? "hidden" : dim ? "dim" : ""} opacity={!show ? 0.12 : dim ? 0.35 : 1}>
-                    {on && <path d={d} fill="none" stroke="#fff" strokeWidth={w + 4} strokeLinecap="round" strokeLinejoin="round" />}
-                    <path d={d} fill="none" stroke={on ? "var(--blue)" : COLOR[p.chip]} strokeWidth={p.chip === "not_surveyed" && !on ? 4 : w}
+                  <g key={p.segment_id} data-testid="map-line" data-segment-id={p.segment_id} data-selected={on} data-state={!show ? "hidden" : dim ? "dim" : ""} opacity={!show ? 0.12 : dim ? 0.5 : 1}>
+                    {/* white casing on every line: keeps the dash and double-line patterns readable over the basemap */}
+                    <path d={d} fill="none" stroke="#fff" strokeWidth={w + (on ? 4 : 3)} strokeLinecap="round" strokeLinejoin="round" />
+                    <path d={d} fill="none" stroke={on ? "var(--blue)" : LINE_COLOR[t] ?? "var(--line-metro)"} strokeWidth={p.chip === "not_surveyed" && !on ? 4 : w}
                       strokeLinecap="round" strokeLinejoin="round"
                       strokeDasharray={dash} />
                     {/* DC-DC: a double line, the colour with a thin white centre */}
                     {t === "dc-dc" && !dotted && (
-                      <path d={d} fill="none" stroke="#fff" strokeWidth={on ? 2.5 : 1.5} strokeLinecap="round" strokeLinejoin="round" />
+                      <path d={d} fill="none" stroke="#fff" strokeWidth={on ? 3 : 2.5} strokeLinecap="round" strokeLinejoin="round" />
                     )}
                     {show && <path d={d} data-hit fill="none" stroke="transparent" strokeWidth={18} className="cursor-pointer" style={{ pointerEvents: "stroke" }} onClick={() => onSelectSegment(p.segment_id)} />}
                   </g>
@@ -252,6 +271,9 @@ export function NetworkMap({ selectedIds, routeKey, visible, onSelectSegment: se
             {(sites?.features ?? []).map((f, i) => {
               const s = f.properties, [x, y] = siteXY[i], end = ends.has(s.site_id), n = segmentCount(s.site_id);
               const look = siteLook(s.kind);
+              if (!end && !siteLayerOn(siteLayers, s.kind)) {
+                return null;
+              }
               return (
                 <button key={s.site_id} type="button" data-testid="map-site" data-site-id={s.site_id} data-end={end}
                   aria-label={`Site ${s.name}, ${look.word}, ${n} segment${n === 1 ? "" : "s"}${end ? ", end of the selection" : ""}`}
@@ -283,16 +305,22 @@ export function NetworkMap({ selectedIds, routeKey, visible, onSelectSegment: se
             </button>
             <div id="map-layers" hidden={!layersOpen} className="absolute top-[38px] left-0 w-[270px] rounded-lg border border-line bg-white px-3.5 py-3">
               <fieldset>
-                <legend className="lbl mb-1.5">Show on the map</legend>
-                <label className="lrow"><input type="checkbox" checked={layerOn} onChange={(e) => setLayerOn(e.target.checked)} />Dark fibre</label>
-                {["Services", "Data centres"].map((l) => (
-                  <label key={l} className="lrow text-muted-foreground">
-                    <input type="checkbox" aria-disabled="true" aria-describedby="later-t" checked={false} onChange={() => {}} onClick={(e) => e.preventDefault()} />
-                    {l}<span className="later ml-auto">Later</span>
+                <legend className="lbl mb-1.5">Sites</legend>
+                {SITE_LAYERS.map(([kind, label]) => (
+                  <label key={kind} className="lrow">
+                    <input type="checkbox" checked={siteLayers[kind]}
+                      onChange={(event) => setSiteLayers({ ...siteLayers, [kind]: event.target.checked })} />
+                    {label}
                   </label>
                 ))}
               </fieldset>
-              <p id="later-t" className="sr-only">Planned for a later release: services (bandwidth) and data centre details.</p>
+              <fieldset className="mt-2.5">
+                <legend className="lbl mb-1.5">Lines</legend>
+                <label className="lrow">
+                  <input type="checkbox" checked={layerOn} onChange={(event) => setLayerOn(event.target.checked)} />
+                  Dark fibre
+                </label>
+              </fieldset>
             </div>
           </div>
           <div className="flex" role="group" aria-label="Zoom">

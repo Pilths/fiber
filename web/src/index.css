@@ -56,6 +56,8 @@
 :root {
     --ground: #f2f4f7; --ink: #0a0a0a; --muted-ink: #5b6068; --line: #868c96; --rule: #eceef2; --raised: #eceef2;
     --blue: #1d5fbf; --blue-bg: #eff5fd; --blue-bd: #bcd2f2;
+    /* map line colour per route type (selected stays --blue) */
+    --line-trunk: #3b3f46; --line-metro: #7a3fd1; --line-dcdc: #0f8a80; --line-dctoc: #c7307a;
     --green: #1a7f4b; --green-bg: #ecfdf3; --green-bd: #b7e4c7;
     --amber: #b45309; --amber-bg: #fff7ed; --amber-bd: #eec9a0;
     --red: #b42318; --red-bg: #fef3f2; --red-bd: #f1b4ad;
@@ -210,7 +212,8 @@
 .mleg-h { font-weight: 600; color: var(--muted-ink); white-space: nowrap; }
 .mleg .lc { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 16px; border-radius: 999px; border: 1px solid; font-weight: 700; font-size: 11px; line-height: 1; }
 .mleg .lc.h-green { border-color: var(--green); } .mleg .lc.h-amber { border-color: var(--amber); } .mleg .lc.h-red { border-color: var(--red); }
-.ll { width: 26px; height: 0; border-top: 6px solid var(--ink); flex: none; }
-.ll.m { border-top-width: 3px; } .ll.dd { border-top: 5px double var(--ink); } .ll.dt { border-top: 3px dashed var(--ink); } .ll.s { border-top: 4px solid var(--blue); }
+.ll { width: 26px; height: 0; border-top: 6px solid var(--line-trunk); flex: none; }
+.ll.m { border-top: 4px solid var(--line-metro); } .ll.dd { border-top: 7px double var(--line-dcdc); }
+.ll.dt { border-top: 4px dashed var(--line-dctoc); } .ll.s { border-top: 4px solid var(--blue); }
 /* MapLibre's attribution sits bottom right, clear of the key. */
 .maplibregl-ctrl-attrib { font-size: 11px; }
