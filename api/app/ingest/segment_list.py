@@ -23,11 +23,10 @@ from app.routing.graph import invalidate as invalidate_routes
 
 UPLOAD_REASON = "segment list upload"
 ALIASES = {"link": "link", "links": "link", "sitea": "site_a", "section": "section", "segment": "section",
-           "distance": "distance", "distancekm": "distance", "km": "distance", "route": "route", "type": "type", "routetype": "type"}
+           "distance": "distance", "distancekm": "distance", "km": "distance", "route": "route"}
 EXPECTED = "Link, Distance"
 GROUP_COL = {"new": "new", "changed": "changed", "unchanged": "unchanged", "problem": "needs_review"}
-TYPES = {"trunk": "Trunk", "metro": "Metro"}
-FIELDS = ("distance_km", "route_type", "route", "section")  # segment columns a row may change
+FIELDS = ("distance_km", "route", "section")  # segment columns a row may change
 MAX_DISTANCE = Decimal("9999999.999")  # numeric(10,3)
 
 
@@ -90,11 +89,8 @@ def _parse_row(headers: list[str], values: tuple[Any, ...]) -> Item:
     dist, why = _distance(f.get("distance"))
     if why:
         reasons.append(why)
-    typ = _cell(f.get("type"))
-    if typ is not None and typ.casefold() not in TYPES:
-        reasons.append("type must be Trunk or Metro")
     item.p = {"link": link, "a": a, "b": b, "distance": dist, "route": _cell(f.get("route")), "section": _cell(f.get("section")),
-              "type": TYPES.get((typ or "").casefold()), "reasons": reasons}
+              "reasons": reasons}
     return item
 
 
@@ -124,7 +120,7 @@ def parse_workbook(data: Any) -> Parsed:
             it = _parse_row(headers, values)
         except Exception as e:  # a bad row never stops the import
             it = Item(0, {h: _json(v) for h, v in zip(headers, values) if h and not blank(v)},
-                      {"link": None, "a": None, "b": None, "distance": None, "route": None, "section": None, "type": None,
+                      {"link": None, "a": None, "b": None, "distance": None, "route": None, "section": None,
                        "reasons": [f"could not parse row: {type(e).__name__}: {e}"]})
         it.row_number = n
         items.append(it)
@@ -150,7 +146,7 @@ def evaluate(db: Session, parsed: Parsed) -> list[Item]:
     names = {n for it in parsed.items for n in (it.p["a"], it.p["b"]) if n}
     sites = {r.name: r for r in db.execute(text("SELECT id, name, active FROM sites WHERE name = ANY(:n)"), {"n": sorted(names)})}
     segments = {frozenset((r["site_a_id"], r["site_b_id"])): r for r in db.execute(text(
-        "SELECT id, site_a_id, site_b_id, distance_km, route_type, route, section FROM segments")).mappings()}
+        "SELECT id, site_a_id, site_b_id, distance_km, route, section FROM segments")).mappings()}
     prot = load_protected(db)
     pairs = Counter(frozenset((it.p["a"], it.p["b"])) for it in parsed.items if it.p["a"])
     for it in parsed.items:
@@ -177,7 +173,7 @@ def evaluate(db: Session, parsed: Parsed) -> list[Item]:
             it.group = "new"
             continue
         it.db_id, old = row["id"], _old(row)
-        new = {"distance_km": p["distance"], "route_type": p["type"], "route": p["route"], "section": p["section"]}
+        new = {"distance_km": p["distance"], "route": p["route"], "section": p["section"]}
         for f in FIELDS:  # a blank file cell never clears a value
             if new[f] is not None and new[f] != old[f]:
                 prot_f = f in prot.get(row["id"], ())
@@ -249,9 +245,9 @@ def apply_upload(db: Session, admin_id: int, upload_id: int) -> dict[str, Any]:
                 out["skipped"] += 1
             elif it.group == "new":
                 p = it.p
-                db.execute(text("INSERT INTO segments (site_a_id, site_b_id, route_type, distance_km, route, section) "
-                                "VALUES (:a, :b, :t, CAST(:d AS numeric), :r, :s)"),
-                           {"a": it.ids[0], "b": it.ids[1], "t": p["type"], "d": p["distance"], "r": p["route"], "s": p["section"]})  # type: ignore[index]
+                db.execute(text("INSERT INTO segments (site_a_id, site_b_id, distance_km, route, section) "
+                                "VALUES (:a, :b, CAST(:d AS numeric), :r, :s)"),
+                           {"a": it.ids[0], "b": it.ids[1], "d": p["distance"], "r": p["route"], "s": p["section"]})  # type: ignore[index]
                 out["created"] += 1
             elif it.group == "changed":
                 out["protected_kept"] += sum(c["protected"] for c in it.changes)

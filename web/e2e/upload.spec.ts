@@ -209,9 +209,9 @@ test("segment list preview: header found, problem rows in the table, nothing to 
   await expect(preview.getByRole("button", { name: "New 0" })).toBeVisible();
   await expect(preview.getByRole("button", { name: "Problem 2", pressed: true })).toBeVisible();
   const table = preview.getByRole("table", { name: "Segment list: Problem rows" });
-  await expect(table.getByRole("columnheader")).toHaveText(["Row", "Link", "Distance (km)", "Route", "Section", "Type", "Status or reason"]);
+  await expect(table.getByRole("columnheader")).toHaveText(["Row", "Link", "Distance (km)", "Route", "Section", "Status or reason"]);
   const one = table.getByRole("row", { name: /ZZQA-ZZQB/ });
-  await expect(one.getByRole("cell")).toHaveText(["3", "12.500", "R1", "N-C", "Trunk", /^Needs review.*site ZZQA is not in the dashboard/]);
+  await expect(one.getByRole("cell")).toHaveText(["3", "12.500", "R1", "N-C", /^Needs review.*site ZZQA is not in the dashboard/]);
   await expect(table.getByRole("row", { name: /bad link/ })).toContainText("distance is not a number");
   await expect(preview.getByRole("button", { name: "Apply segment list…" })).toBeDisabled();
   await expect(preview).toContainText("Nothing new or changed to apply.");

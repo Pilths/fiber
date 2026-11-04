@@ -80,7 +80,7 @@ def test_happy_path_new_changed_unchanged_and_apply(client, admin, sites, db):
     assert j["found"] and j["sheet_name"] == "Segments" and j["counts"] == {"rows": 4, "new": 1, "changed": 1, "unchanged": 1, "problem": 1}
     ch = rows(client, j["upload_id"], "changed")["items"][0]
     assert {(c["field"], c["old"], c["new"]) for c in ch["changes"]} == {
-        ("distance_km", "5.000", "6.000"), ("route_type", "Metro", "Trunk"), ("route", "R9", "R1"), ("section", "S9", "S1")}
+        ("distance_km", "5.000", "6.000"), ("route", "R9", "R1"), ("section", "S9", "S1")}
     assert ch["parsed"]["site_a"] == "BBBB" and ch["raw"]["lat"] == 1.0  # ignored column stays in the raw row
     assert problems(client, j["upload_id"]) == {5: "site ZZZZ is not in the dashboard"}
     assert segment(db, "AAAA", "BBBB") is None  # staging writes no segment
@@ -88,7 +88,7 @@ def test_happy_path_new_changed_unchanged_and_apply(client, admin, sites, db):
     assert res.status_code == 200
     assert res.json() == {"upload_id": j["upload_id"], "created": 1, "changed": 1, "protected_kept": 0, "skipped": 1, "warnings": []}
     new = segment(db, "AAAA", "BBBB")
-    assert (str(new["distance_km"]), new["route_type"], new["route"], new["section"]) == ("10.500", "Trunk", "R1", "S1")
+    assert (str(new["distance_km"]), new["route"], new["section"]) == ("10.500", "R1", "S1")
     assert new["survey_cores"] is None and new["region"] is None and new["cable_size"] == 144
     assert db.execute(text("SELECT count(*) FROM cores WHERE segment_id = :i"), {"i": new["id"]}).scalar_one() == 0
     assert str(segment(db, "BBBB", "CCCC")["distance_km"]) == "6.000"
@@ -101,7 +101,7 @@ def test_history_rows_written(client, admin, sites, db):
     apply(client, uid)
     h = db.execute(text("SELECT field, old_value, new_value, reason, user_id FROM data_edits WHERE entity = 'segment' AND entity_id = :i "
                         "ORDER BY field"), {"i": sid}).all()
-    assert [(x[0], x[1], x[2]) for x in h] == [("distance_km", "5.000", "6.000"), ("route", None, "R1"), ("route_type", "Metro", "Trunk"),
+    assert [(x[0], x[1], x[2]) for x in h] == [("distance_km", "5.000", "6.000"), ("route", None, "R1"),
                                                 ("section", None, "S1")]
     assert all(x[3] == f"segment list upload my.xlsx #{uid}" and x[4] == admin for x in h)
 
@@ -112,7 +112,7 @@ def test_header_below_row_one_away_from_column_a_other_sheet_name_and_aliases(cl
     j = post(client, data).json()
     assert j["found"] and j["sheet_name"] == "zz" and j["counts"]["new"] == 1
     p = rows(client, j["upload_id"], "new")["items"][0]["parsed"]
-    assert (p["section"], p["type"], p["distance_km"], p["route"]) == ("Seg", "Metro", "3.500", None)
+    assert (p["section"], p["distance_km"], p["route"]) == ("Seg", "3.500", None)
     j = post(client, workbook([["AAAA-BBBB", 2]], head=["Link", "Distance (km)"])).json()
     assert j["counts"]["new"] == 1
 
@@ -132,7 +132,6 @@ def test_row_rules(client, admin, sites):
     p = problems(client, uid)
     assert 2 not in p  # Site A is not checked, so a different Site A is fine
     assert p[3] == p[4] == p[5] == "distance is not a number"
-    assert p[6] == "type must be Trunk or Metro"
     assert all("Link" in p[n] for n in (7, 8, 10, 11))
     assert p[9] == "site OFFF is not active in the dashboard"
     assert p[12] == p[13] == "duplicate link in file (rows 12, 13)"
@@ -152,7 +151,7 @@ def test_blank_cells_never_clear(client, admin, sites, db):
     assert j["counts"]["unchanged"] == 1
     assert apply(client, j["upload_id"]).json()["changed"] == 0
     s = segment(db, "AAAA", "BBBB")
-    assert (str(s["distance_km"]), s["route_type"], s["route"], s["section"]) == ("5.000", "Metro", "R9", "S9")
+    assert (str(s["distance_km"]), s["route"], s["section"]) == ("5.000", "R9", "S9")
 
 
 def test_protected_field_kept(client, admin, sites, db):
@@ -166,7 +165,7 @@ def test_protected_field_kept(client, admin, sites, db):
     res = apply(client, uid).json()
     assert res["protected_kept"] == 1 and res["changed"] == 1
     s = segment(db, "AAAA", "BBBB")
-    assert str(s["distance_km"]) == "5.000" and s["route_type"] == "Trunk" and s["route"] == "R1"
+    assert str(s["distance_km"]) == "5.000" and s["route"] == "R1"
 
 
 def test_reverse_order_matches_and_keeps_site_order(client, admin, sites, db):
@@ -212,7 +211,9 @@ def test_segment_api_shows_route_section_and_route_filter(client, admin, sites, 
     assert client.get(f"/api/segments/{got[0]['id']}").json()["section"] == "Sx"
 
 
-def test_bespoke_type_is_no_longer_accepted(client, admin, sites):
-    uid = post(client, workbook([row("AAAA-BBBB", typ="Bespoke"), row("BBBB-CCCC", typ="metro")])).json()["upload_id"]
-    p = problems(client, uid)
-    assert p == {2: "type must be Trunk or Metro"}
+def test_type_column_is_ignored(client, admin, sites, db):
+    data = workbook([row("AAAA-BBBB", typ="Bespoke"), row("BBBB-CCCC", typ="metro")])
+    j = post(client, data).json()
+    assert j["counts"]["new"] == 2 and j["counts"]["problem"] == 0
+    assert apply(client, j["upload_id"]).json()["created"] == 2
+    assert segment(db, "AAAA", "BBBB")["route_type"] is None

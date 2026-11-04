@@ -100,6 +100,7 @@ class Segment(Base):
     id: Mapped[int] = _id()
     site_a_id: Mapped[int] = _fk("sites")
     site_b_id: Mapped[int] = _fk("sites")
+    # ponytail: unused since route type is derived from the end sites (app/link_type.py); drop in a later migration
     route_type: Mapped[str | None] = mapped_column(Text)
     region: Mapped[str | None] = mapped_column(Text)
     route: Mapped[str | None] = mapped_column(Text)

@@ -92,7 +92,7 @@ export type SegmentFocus = "survey" | "restore";
 
 export function EditSegmentDialog({ segmentId, focus, onClose, onSaved }: { segmentId: number; focus?: SegmentFocus; onClose: () => void; onSaved: () => void }) {
   const [s, setS] = useState<SegmentEdit | null>(null);
-  const [f, setF] = useState({ distance: "", route: "", region: "", survey: "", cable: "", reason: "", cut: false });
+  const [f, setF] = useState({ distance: "", region: "", survey: "", cable: "", reason: "", cut: false });
   const [a, setA] = useState<Site | null>(null);
   const [b, setB] = useState<Site | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -105,7 +105,7 @@ export function EditSegmentDialog({ segmentId, focus, onClose, onSaved }: { segm
     api.get("/api/admin/segments/{sid}", { path: { sid: segmentId } }).then((x) => {
       if (stale) return;
       setS(x);
-      setF({ distance: x.distance_km == null ? "" : String(Number(x.distance_km)), route: x.route_type ?? "", region: x.region ?? "",
+      setF({ distance: x.distance_km == null ? "" : String(Number(x.distance_km)), region: x.region ?? "",
         survey: x.survey_cores == null ? "" : String(x.survey_cores), cable: String(x.cable_size), reason: "", cut: focus !== "restore" && x.fiber_cut });
       setA({ id: x.site_a_id, name: x.site_a });
       setB({ id: x.site_b_id, name: x.site_b });
@@ -122,7 +122,6 @@ export function EditSegmentDialog({ segmentId, focus, onClose, onSaved }: { segm
     // Only changed fields are sent.
     const body: components["schemas"]["SegmentBody"] = { reason: f.reason.trim() };
     if (f.distance !== "" && (s.distance_km == null || Number(f.distance) !== Number(s.distance_km))) body.distance_km = f.distance;
-    if (f.route && f.route !== s.route_type) body.route_type = f.route as "Trunk" | "Metro";
     if (f.region && f.region !== s.region) body.region = f.region;
     if (a.id !== s.site_a_id) body.site_a_id = a.id;
     if (b.id !== s.site_b_id) body.site_b_id = b.id;
@@ -149,19 +148,12 @@ export function EditSegmentDialog({ segmentId, focus, onClose, onSaved }: { segm
         <form onSubmit={submit} noValidate aria-label="Edit segment">
           <div className="mt-4 grid grid-cols-2 gap-3">
             <label><span className={lbl}>Distance (km)</span><input className="field" type="number" min="0" step="0.001" value={f.distance} onChange={set("distance")} /></label>
-            <label><span className={lbl}>Route type</span>
-              <select className="field" value={f.route} onChange={set("route")}>
-                {!s.route_type && <option value="">Not set</option>}
-                {["Trunk", "Metro"].map((r) => <option key={r}>{r}</option>)}
-              </select>
-            </label>
             <label><span className={lbl}>Region</span>
               <select className="field" value={f.region} onChange={set("region")}>
                 {!s.region && <option value="">Not set</option>}
                 {REGIONS.map((r) => <option key={r}>{r}</option>)}
               </select>
             </label>
-            <span />
             <SitePicker label="Site A" site={a} onPick={setA} />
             <SitePicker label="Site B" site={b} onPick={setB} />
             <label><span className={lbl}>Survey count</span>

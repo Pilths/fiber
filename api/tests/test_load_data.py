@@ -23,16 +23,16 @@ def run(monkeypatch, db, tmp_path, sites, segments):
 def test_loads_sites_segments_and_counts_then_reruns_cleanly(db, monkeypatch, tmp_path, capsys):
     mkuser(db, "boss1", "admin")
     sites = [["AAAA", 3.1, 101.6, None], ["BBBB", 3.2, 101.7, None], ["CCCC", 0, 0, None]]
-    segs = [["AAAA-BBBB", 32.5, "R1", None, "Trunk", 24, 144], ["AAAA-CCCC", 5, None, None, None, 12, None]]
+    segs = [["AAAA-BBBB", 32.5, "R1", None, 24, 144], ["AAAA-CCCC", 5, None, None, 12, None]]
     assert run(monkeypatch, db, tmp_path, sites, segs) == 0
     out = capsys.readouterr().out
     assert "CCCC" in out and "needs review" in out  # bad coordinates and unknown site are reported, not guessed
-    seg = db.exec_driver_sql("SELECT s.distance_km, s.route_type, s.survey_cores, s.cable_size, "
+    seg = db.exec_driver_sql("SELECT s.distance_km, s.survey_cores, s.cable_size, "
                              "(SELECT count(*) FROM cores c WHERE c.segment_id = s.id) FROM segments s").all()
-    assert [(str(d), t, sc, cs, n) for d, t, sc, cs, n in seg] == [("32.500", "Trunk", 24, 144, 24)]
+    assert [(str(d), sc, cs, n) for d, sc, cs, n in seg] == [("32.500", 24, 144, 24)]
     assert db.exec_driver_sql("SELECT count(*) FROM data_edits WHERE reason LIKE 'data file load%%'").scalar() == 1  # survey count
     # second run with a different survey count keeps the first one
-    segs[0][5] = 48
+    segs[0][4] = 48
     assert run(monkeypatch, db, tmp_path, sites, segs[:1]) == 0
     assert "already has 24" in capsys.readouterr().out
     assert db.exec_driver_sql("SELECT survey_cores FROM segments").scalar() == 24
@@ -49,7 +49,7 @@ def test_invisible_characters_from_copied_cells_are_ignored(db, monkeypatch, tmp
     mkuser(db, "boss1", "admin")
     zw, nb = "​", " "
     sites = [["AAAA" + zw, f"3.1{zw}", f"{nb}101.6", None], ["BBBB", "3.2", f"101.7{zw}", None]]
-    segs = [[f"AAAA-BBBB{zw}", f"32.5{zw}", None, None, "Trunk", f"24{zw}", None]]
+    segs = [[f"AAAA-BBBB{zw}", f"32.5{zw}", None, None, f"24{zw}", None]]
     assert run(monkeypatch, db, tmp_path, sites, segs) == 0
     assert db.exec_driver_sql("SELECT count(*) FROM sites WHERE name IN ('AAAA', 'BBBB') AND geom IS NOT NULL").scalar() == 2
     assert db.exec_driver_sql("SELECT survey_cores FROM segments").scalar() == 24

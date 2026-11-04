@@ -53,19 +53,18 @@ def test_011_distance_edit_changes_calculated_loss(client, w):
 
 def test_segment_edit_each_field_own_row_and_noop(client, w, db):
     s = w["s1"]
-    r = post(client, f"segments/{s}", reason="survey", route_type="Trunk", region="north", cable_size=96, distance_km="4.5")
-    assert r.status_code == 200 and sorted(r.json()["changed"]) == ["cable_size", "distance_km", "region", "route_type"]
+    r = post(client, f"segments/{s}", reason="survey", region="north", cable_size=96, distance_km="4.5")
+    assert r.status_code == 200 and sorted(r.json()["changed"]) == ["cable_size", "distance_km", "region"]
     assert {e[0]: e[2:] for e in edits(db, "segment", s)} == {
-        "route_type": ("Trunk", "survey"), "region": ("North", "survey"), "cable_size": ("96", "survey"), "distance_km": ("4.5", "survey")}
+        "region": ("North", "survey"), "cable_size": ("96", "survey"), "distance_km": ("4.5", "survey")}
     assert one(db, "SELECT cable_size FROM segments WHERE id = :s", s=s) == 96
-    assert len(r.json()["history"]) == 4
+    assert len(r.json()["history"]) == 3
     n = len(edits(db, "segment", s))
-    assert post(client, f"segments/{s}", reason="same", route_type="Trunk", distance_km="4.500").status_code == 400
+    assert post(client, f"segments/{s}", reason="same", distance_km="4.500").status_code == 400
     assert post(client, f"segments/{s}", reason="x").status_code == 400
     assert len(edits(db, "segment", s)) == n
     assert post(client, f"segments/{s}", reason="x", region="Atlantis").status_code == 422
-    assert post(client, f"segments/{s}", reason="x", route_type="Wire").status_code == 422
-    assert post(client, f"segments/{s}", reason=" ", route_type="Metro").status_code == 422
+    assert post(client, f"segments/{s}", reason=" ", cable_size=1).status_code == 422
     assert post(client, f"segments/{s}", reason="x", distance_km="-1").status_code == 422
     assert post(client, "segments/999999", reason="x", cable_size=1).status_code == 404
 

@@ -41,7 +41,7 @@ test("map loads with no request leaving the app origin; chips, sites, layers and
   await expect.poll(() => chips(page).filter({ visible: true }).count()).toBeGreaterThanOrEqual(2); // after the first fit eases in
   await expect(map(page).getByTestId("map-site")).toHaveCount(13);
   await expect(map(page).getByRole("button", { name: /^Site DEV Kuala Lumpur DC, data centre, 6 segments$/ })).toBeVisible();
-  await expect(map(page).getByRole("button", { name: /^Site DEV Penang Tower, other site/ })).toBeVisible();
+  await expect(map(page).getByRole("button", { name: /^Site DEV Penang Tower, trunk site/ })).toBeVisible();
   await expect(chip(page, FAR)).toHaveText(/^(\d+|–)$/); // the free-core number only, no icon
   await expect(chips(page).locator("svg")).toHaveCount(0);
   await expect(page.getByTestId("map-not-drawn")).toContainText("2 segments not on the map (no coordinates)");
@@ -101,7 +101,7 @@ test("Type filter in the map toolbar: trunk routes, DC and TOC; the others dim",
   const segs: { route_type: string | null; route: string | null }[] = await (await page.request.get("/api/segments")).json();
   const routes = [...new Set(segs.filter((s) => s.route_type === "Trunk" && s.route).map((s) => `Trunk ${s.route}`))].sort();
   const type = map(page).getByLabel("Type");
-  await expect(type.getByRole("option")).toHaveText(["All types", ...routes, "DC", "TOC"]);
+  await expect(type.getByRole("option")).toHaveText(["All types", ...routes, "Metro", "DC-DC", "DC-TOC", "DC", "TOC"]);
   await expect(map(page).getByLabel("Region").getByRole("option").first()).toHaveText("All regions");
   await type.selectOption("toc"); // only the segments at DEV Bukit Jalil TOC stay bright
   await expect.poll(() => chips(page).count()).toBeLessThan(19);

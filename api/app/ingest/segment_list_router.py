@@ -36,8 +36,12 @@ class UploadOut(BaseModel):
     counts: Counts
 
 
+# Rows staged before route type was derived may still hold a route_type change; it is skipped when shown.
+CHANGE_FIELDS = ("distance_km", "route", "section")
+
+
 class Change(BaseModel):
-    field: Literal["distance_km", "route_type", "route", "section"]
+    field: Literal["distance_km", "route", "section"]
     old: str | None
     new: str | None
     protected: bool  # edited in the dashboard: shown, not applied
@@ -51,7 +55,6 @@ class Parsed(BaseModel):
     distance_km: str | None
     route: str | None
     section: str | None
-    type: str | None
 
 
 class RowOut(BaseModel):
@@ -115,8 +118,9 @@ def rows(db: DB, upload_id: int, group: Group, page: Annotated[int, Query(ge=1)]
         items.append(RowOut(
             id=r["id"], row_number=r["row_number"], sheet_name=r["sheet"], group=group, status=r["status"], reason=r["reason"],
             raw=r["raw"] or {}, parsed=Parsed(link=pp["link"], site_a=pp["a"], site_b=pp["b"], distance_km=pp["distance"],
-                                              route=pp["route"], section=pp["section"], type=pp["type"]),
-            changes=[Change(**c) for c in p.get("changes", [])], edited_in_dashboard=p.get("edited_in_dashboard", False),
+                                              route=pp["route"], section=pp["section"]),
+            changes=[Change(**c) for c in p.get("changes", []) if c["field"] in CHANGE_FIELDS],
+            edited_in_dashboard=p.get("edited_in_dashboard", False),
             segment_id=p.get("db_id")))
     return RowsOut(total=total, page=page, page_size=page_size, items=items)
 

@@ -1031,7 +1031,7 @@ export interface components {
              * Field
              * @enum {string}
              */
-            field: "distance_km" | "route_type" | "route" | "section";
+            field: "distance_km" | "route" | "section";
             /** Old */
             old: string | null;
             /** New */
@@ -1432,8 +1432,6 @@ export interface components {
             route: string | null;
             /** Section */
             section: string | null;
-            /** Type */
-            type: string | null;
         };
         /** RenameIn */
         RenameIn: {
@@ -1593,8 +1591,6 @@ export interface components {
             reason: string;
             /** Distance Km */
             distance_km?: number | string | null;
-            /** Route Type */
-            route_type?: ("Trunk" | "Metro") | null;
             /** Region */
             region?: string | null;
             /** Site A Id */

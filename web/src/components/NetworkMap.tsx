@@ -53,7 +53,7 @@ function midpoint(p: [number, number][]): [number, number] {
 const COLOR = { ok: "var(--green)", low: "var(--amber)", full: "var(--red)", not_surveyed: "var(--ns)" } as const;
 const kindOf = (t: string | null) => (t ?? "").toLowerCase();
 // Chip text: the free-core number only; a cut segment reads 0, not surveyed a dash.
-// Map shape and spoken word per site kind: DC a dark square, TOC a dark triangle, any other site a diamond.
+// Map shape and spoken word per site kind: DC a dark square, TOC a dark triangle, a trunk site a diamond.
 function siteLook(kind: string): { shape: string; word: string } {
   if (kind === "data_center") {
     return { shape: "dc", word: "data centre" };
@@ -61,7 +61,7 @@ function siteLook(kind: string): { shape: string; word: string } {
   if (kind === "toc") {
     return { shape: "toc", word: "TOC" };
   }
-  return { shape: "st", word: "other site" };
+  return { shape: "st", word: "trunk site" };
 }
 
 const chipText = (p: SegmentProps) => (p.fiber_cut ? "0" : p.surveyed ? String(p.free_to_reserve) : "–");
@@ -201,7 +201,7 @@ export function NetworkMap({ selectedIds, routeKey, visible, onSelectSegment: se
 
   // Declutter, greedy: site markers, then chips (selected first), then site names. A chip or name that would overlap
   // something already placed is hidden (visibility: hidden) until the user zooms in; the Find list still reaches it.
-  const placed: number[][] = [[0, 0, 380, 50], [0, size.h - 170, 300, size.h]]; // controls, key
+  const placed: number[][] = [[0, 0, 380, 50], [0, size.h - 200, 300, size.h]]; // controls, key
   const fits = (x: number, y: number, w: number, h: number) => {
     const r = [x - w / 2, y - h / 2, x + w / 2, y + h / 2];
     if (placed.some((q) => r[0] < q[2] && r[2] > q[0] && r[1] < q[3] && r[3] > q[1])) return false;
@@ -231,13 +231,19 @@ export function NetworkMap({ selectedIds, routeKey, visible, onSelectSegment: se
             <svg className="pointer-events-none absolute inset-0 size-full" aria-hidden="true" data-testid="map-lines">
               {order.map(({ p, pts, on, show, dim }) => {
                 const d = "M" + pts.map((q) => `${q[0].toFixed(1)} ${q[1].toFixed(1)}`).join("L");
-                const t = kindOf(p.route_type), w = (t === "trunk" ? 6 : 3) + (on ? 3 : 0);
+                const t = kindOf(p.route_type), w = (t === "trunk" ? 6 : t === "dc-dc" ? 5 : 3) + (on ? 3 : 0);
+                const dotted = p.chip === "not_surveyed" && !on;
+                const dash = dotted ? "1 7" : t === "dc-toc" ? "10 6" : undefined;
                 return (
                   <g key={p.segment_id} data-testid="map-line" data-segment-id={p.segment_id} data-selected={on} data-state={!show ? "hidden" : dim ? "dim" : ""} opacity={!show ? 0.12 : dim ? 0.35 : 1}>
                     {on && <path d={d} fill="none" stroke="#fff" strokeWidth={w + 4} strokeLinecap="round" strokeLinejoin="round" />}
                     <path d={d} fill="none" stroke={on ? "var(--blue)" : COLOR[p.chip]} strokeWidth={p.chip === "not_surveyed" && !on ? 4 : w}
                       strokeLinecap="round" strokeLinejoin="round"
-                      strokeDasharray={p.chip === "not_surveyed" && !on ? "1 7" : undefined} />
+                      strokeDasharray={dash} />
+                    {/* DC-DC: a double line, the colour with a thin white centre */}
+                    {t === "dc-dc" && !dotted && (
+                      <path d={d} fill="none" stroke="#fff" strokeWidth={on ? 2.5 : 1.5} strokeLinecap="round" strokeLinejoin="round" />
+                    )}
                     {show && <path d={d} data-hit fill="none" stroke="transparent" strokeWidth={18} className="cursor-pointer" style={{ pointerEvents: "stroke" }} onClick={() => onSelectSegment(p.segment_id)} />}
                   </g>
                 );
@@ -309,11 +315,13 @@ export function NetworkMap({ selectedIds, routeKey, visible, onSelectSegment: se
           <p className="mleg-h col-span-2">Route type</p>
           <span><i className="slot" aria-hidden="true"><i className="ll" /></i>Trunk</span>
           <span><i className="slot" aria-hidden="true"><i className="ll m" /></i>Metro</span>
+          <span><i className="slot" aria-hidden="true"><i className="ll dd" /></i>DC-DC</span>
+          <span><i className="slot" aria-hidden="true"><i className="ll dt" /></i>DC-TOC</span>
           <span><i className="slot" aria-hidden="true"><i className="ll s" /></i>Selected</span>
           <p className="mleg-h col-span-2">Sites</p>
           <span><i className="slot" aria-hidden="true"><i className="rb-sh dc size-3!" /></i>Data centre</span>
           <span><i className="slot" aria-hidden="true"><i className="rb-sh toc" /></i>TOC</span>
-          <span><i className="slot" aria-hidden="true"><i className="rb-sh st size-2.5!" /></i>Other site</span>
+          <span><i className="slot" aria-hidden="true"><i className="rb-sh st size-2.5!" /></i>Trunk site</span>
         </div>
         {(NOTE[base] || err) && (
           <p role="status" data-testid="map-note" className="absolute top-3 right-3 z-10 max-w-[340px] note px-3 py-1.5 text-xs font-medium text-amber">

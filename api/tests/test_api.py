@@ -122,3 +122,42 @@ def test_customer_create_and_confirm_new(client, net):
     assert r["created"] is False and r["customer"]["name"] == "Telekom Zetta"
     assert client.post("/api/customers", json={"name": "Unrelated Name Ltd"}, headers=H).json()["created"] is True
     assert client.post("/api/customers", json={"name": "  "}, headers=H).status_code == 422
+
+
+def derived_types(client, db, kinds_a_b):
+    """Insert one segment per (kind A, kind B) pair; return {pair: route_type from the API}."""
+    ids = {}
+    for n, (ka, kb) in enumerate(kinds_a_b):
+        a = one(db, "INSERT INTO sites (name, kind) VALUES (:n,:k) RETURNING id", n=f"A{n}", k=ka)
+        b = one(db, "INSERT INTO sites (name, kind) VALUES (:n,:k) RETURNING id", n=f"B{n}", k=kb)
+        ids[(ka, kb)] = one(db, "INSERT INTO segments (site_a_id, site_b_id) VALUES (:a,:b) RETURNING id", a=a, b=b)
+    got = {s["id"]: s["route_type"] for s in client.get("/api/segments", headers=H).json()}
+    return {pair: got[sid] for pair, sid in ids.items()}, ids
+
+
+def test_route_type_is_derived_from_end_sites(client, net, db):
+    pairs = [("data_center", "data_center"), ("data_center", "toc"), ("toc", "data_center"),
+             ("data_center", "site"), ("site", "data_center"), ("toc", "site"), ("site", "site")]
+    types, _ = derived_types(client, db, pairs)
+    assert types == {
+        ("data_center", "data_center"): "DC-DC", ("data_center", "toc"): "DC-TOC", ("toc", "data_center"): "DC-TOC",
+        ("data_center", "site"): "Metro", ("site", "data_center"): "Metro",
+        ("toc", "site"): "Trunk", ("site", "site"): "Trunk"}
+
+
+def test_site_kind_change_changes_route_type_without_segment_write(client, net, db):
+    _, ids = derived_types(client, db, [("site", "site")])
+    sid = ids[("site", "site")]
+    site_a = one(db, "SELECT site_a_id FROM segments WHERE id = :s", s=sid)
+    db.execute(text("UPDATE sites SET kind = 'data_center' WHERE id = :i"), {"i": site_a})
+    got = {s["id"]: s["route_type"] for s in client.get("/api/segments", headers=H).json()}
+    assert got[sid] == "Metro"
+    assert one(db, "SELECT route_type IS NULL FROM segments WHERE id = :s", s=sid)
+
+
+def test_route_type_filter_uses_derived_value(client, net, db):
+    _, ids = derived_types(client, db, [("data_center", "site"), ("site", "site")])
+    metro = client.get("/api/segments", params={"route_type": "Metro"}, headers=H).json()
+    assert [s["id"] for s in metro] == [ids[("data_center", "site")]]
+    trunk = client.get("/api/segments", params={"route_type": "Trunk"}, headers=H).json()
+    assert ids[("site", "site")] in [s["id"] for s in trunk] and net["s1"] in [s["id"] for s in trunk]

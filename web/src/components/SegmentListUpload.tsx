@@ -16,7 +16,7 @@ const GROUPS: { g: Group; label: string; icon: IconName; cls: string }[] = [
   { g: "unchanged", label: "Unchanged", icon: "av", cls: "h-ns" },
   { g: "problem", label: "Problem", icon: "lo", cls: "h-amber" },
 ];
-const FIELD: Record<Row["changes"][number]["field"], string> = { distance_km: "Distance (km)", route_type: "Type", route: "Route", section: "Section" };
+const FIELD: Record<Row["changes"][number]["field"], string> = { distance_km: "Distance (km)", route: "Route", section: "Section" };
 
 function Rows({ staged }: { staged: Staged }) {
   const [group, setGroup] = useState<Group>(GROUPS.find((x) => staged.counts[x.g] > 0)?.g ?? "new");
@@ -47,7 +47,6 @@ function Rows({ staged }: { staged: Staged }) {
                 <th scope="col" className="num w-28">Distance (km)</th>
                 <th scope="col" className="w-[9%]">Route</th>
                 <th scope="col" className="w-[9%]">Section</th>
-                <th scope="col" className="w-[9%]">Type</th>
                 <th scope="col">Status or reason</th>
               </tr></thead>
               <tbody>
@@ -61,7 +60,6 @@ function Rows({ staged }: { staged: Staged }) {
                       {tx(cell(r.parsed.distance_km, field(r.raw, /^(distance|km)/i)), "num")}
                       {tx(cell(r.parsed.route, null))}
                       {tx(cell(r.parsed.section, null))}
-                      {tx(cell(r.parsed.type, field(r.raw, /^(route\s*)?type$/i)))}
                       <td className="whitespace-normal! [&:has(*)]:h-auto! [&:has(*)]:py-1.5!">
                         <span className={`inline-flex items-center gap-1.5 ${g.cls === "h-amber" ? "font-semibold text-amber" : ""}`}><Icon name={g.icon} />{group === "problem" ? "Needs review" : g.label}</span>
                         {r.reason && <p className="text-body">{r.reason}</p>}

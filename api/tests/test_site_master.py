@@ -436,7 +436,7 @@ def test_bad_type_is_needs_review(client, admin, db):
     r = post(client, typed_workbook(("AAAA", "Tower"), ("BBBB", "DC")))
     uid = r.json()["upload_id"]
     bad = row_of(client, uid, "sites", "problem", "AAAA")
-    assert "Type must be DC, TOC or blank" in bad["reason"]
+    assert "Type must be Trunk, DC, TOC or blank" in bad["reason"]
     apply(client, uid)
     assert count(db, "SELECT count(*) FROM sites WHERE name = 'AAAA'") == 0
     assert kind_of(db, "BBBB") == "data_center"
