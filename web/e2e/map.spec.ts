@@ -53,19 +53,26 @@ test("map loads with no request leaving the app origin; chips, sites, layers and
   }
 
   await page.getByRole("button", { name: "Layers" }).click();
-  await expect(page.getByRole("checkbox", { name: "Dark fibre" })).toBeChecked();
+  for (const type of ["Trunk", "Metro", "DC-DC", "DC-TOC"]) {
+    await expect(page.getByRole("checkbox", { name: type, exact: true })).toBeChecked();
+  }
   // Site layers: hiding TOC removes the TOC marker, showing it brings it back
   const toc = page.getByRole("button", { name: /^Site DEV Bukit Jalil TOC, TOC,/ });
   await expect(toc).toBeVisible();
-  await page.getByRole("checkbox", { name: "TOC" }).uncheck();
+  await page.getByRole("checkbox", { name: "TOC", exact: true }).uncheck();
   await expect(toc).toHaveCount(0);
-  await page.getByRole("checkbox", { name: "TOC" }).check();
+  await page.getByRole("checkbox", { name: "TOC", exact: true }).check();
   await expect(toc).toBeVisible();
   await expect(page.getByRole("checkbox", { name: "Data centres" })).toBeChecked();
   await expect(page.getByRole("checkbox", { name: "Trunk sites" })).toBeChecked();
-  await page.getByRole("checkbox", { name: "Dark fibre" }).uncheck();
+  // Route types: unticking all four hides every line and chip
+  for (const type of ["Trunk", "Metro", "DC-DC", "DC-TOC"]) {
+    await page.getByRole("checkbox", { name: type, exact: true }).uncheck();
+  }
   await expect(chips(page)).toHaveCount(0);
-  await page.getByRole("checkbox", { name: "Dark fibre" }).check();
+  for (const type of ["Trunk", "Metro", "DC-DC", "DC-TOC"]) {
+    await page.getByRole("checkbox", { name: type, exact: true }).check();
+  }
   await page.getByRole("button", { name: "Layers" }).click();
   await expect(chips(page)).toHaveCount(19);
   await page.screenshot({ path: "e2e/screenshots/map-overview.png" });
@@ -95,19 +102,45 @@ test("clicking a chip selects the segment; Enter on a chip too; Esc clears", asy
   expect(page.url()).not.toContain("#segment=");
 });
 
-test("Type filter in the map toolbar: route types only; the others dim", async ({ page }) => {
+test("Layers: route types and trunk routes hide their lines; the selected segment always shows", async ({ page }) => {
   await signIn(page);
   await expect(chips(page)).toHaveCount(19);
-  const segs: { route_type: string | null; route: string | null }[] = await (await page.request.get("/api/segments")).json();
-  const routes = [...new Set(segs.filter((s) => s.route_type === "Trunk" && s.route).map((s) => `Trunk ${s.route}`))].sort();
-  const type = map(page).getByLabel("Type");
-  await expect(type.getByRole("option")).toHaveText(["All types", "Trunk", ...routes, "Metro", "DC-DC", "DC-TOC"]);
-  await expect(map(page).getByLabel("Region").getByRole("option").first()).toHaveText("All regions");
-  await type.selectOption("type:DC-TOC"); // only the segments between a DC and DEV Bukit Jalil TOC stay bright
-  await expect.poll(() => chips(page).count()).toBeLessThan(19);
-  await expect(page.getByRole("group", { name: "Map key" })).toContainText("DC-TOC");
-  await expect(page.getByRole("button", { name: /^Site DEV Bukit Jalil TOC, TOC,/ })).toBeVisible();
+  const segs: { id: number; route_type: string | null; route: string | null }[] =
+    await (await page.request.get("/api/segments")).json();
+  const lines = page.locator("[data-testid=map-line]");
+  const total = await lines.count();
+  const drawnIds = await lines.evaluateAll((es) => es.map((e) => Number(e.getAttribute("data-segment-id"))));
+  const drawn = segs.filter((s) => drawnIds.includes(s.id)); // segments without coordinates are not drawn
+  const count = (test: (s: { route_type: string | null; route: string | null }) => boolean) => drawn.filter(test).length;
+  await expect(map(page).getByLabel("Type")).toHaveCount(0); // route types are in Layers, not a filter
+  await page.getByRole("button", { name: "Layers" }).click();
+  const metro = page.getByRole("checkbox", { name: "Metro", exact: true });
+  await metro.uncheck();
+  await expect(lines).toHaveCount(total - count((s) => s.route_type === "Metro"));
+  await metro.check();
+  await expect(lines).toHaveCount(total);
+  // a trunk route chip hides that route's trunk lines
+  const route = drawn.find((s) => s.route_type === "Trunk" && s.route)!.route!;
+  const chip = page.getByRole("button", { name: `Trunk ${route}` });
+  await expect(chip).toHaveAttribute("aria-pressed", "true");
+  await chip.click();
+  await expect(chip).toHaveAttribute("aria-pressed", "false");
+  await expect(lines).toHaveCount(total - count((s) => s.route_type === "Trunk" && s.route === route));
+  await chip.click();
+  await expect(lines).toHaveCount(total);
+  // a selected Metro segment stays on the map with Metro unticked
+  const picked = drawn.find((s) => s.route_type === "Metro")!;
+  const hash = `#segment=${encodeURIComponent(await segmentNameOf(page, picked.id))}`;
+  await page.evaluate((value) => { location.hash = value; }, hash);
+  await expect(page.locator(`[data-testid=map-line][data-segment-id="${picked.id}"]`)).toHaveAttribute("data-selected", "true");
+  await page.getByRole("checkbox", { name: "Metro", exact: true }).uncheck();
+  await expect(page.locator(`[data-testid=map-line][data-segment-id="${picked.id}"]`)).toHaveCount(1);
 });
+
+async function segmentNameOf(page: Page, id: number): Promise<string> {
+  const segment: { site_a: string; site_b: string } = await (await page.request.get(`/api/segments/${id}`)).json();
+  return `${segment.site_a} - ${segment.site_b}`;
+}
 
 // Route search shows the best option; only the 2-segment Penang - Butterworth - Ipoh option is kept.
 async function searchKlBj(page: Page) {
