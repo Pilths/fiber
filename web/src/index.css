@@ -211,6 +211,6 @@
 .mleg .lc { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 16px; border-radius: 999px; border: 1px solid; font-weight: 700; font-size: 11px; line-height: 1; }
 .mleg .lc.h-green { border-color: var(--green); } .mleg .lc.h-amber { border-color: var(--amber); } .mleg .lc.h-red { border-color: var(--red); }
 .ll { width: 26px; height: 0; border-top: 6px solid var(--ink); flex: none; }
-.ll.m { border-top-width: 3px; } .ll.s { border-top: 4px solid var(--blue); }
+.ll.m { border-top-width: 3px; } .ll.dd { border-top: 5px double var(--ink); } .ll.dt { border-top: 3px dashed var(--ink); } .ll.s { border-top: 4px solid var(--blue); }
 /* MapLibre's attribution sits bottom right, clear of the key. */
 .maplibregl-ctrl-attrib { font-size: 11px; }

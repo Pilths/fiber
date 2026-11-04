@@ -3,6 +3,7 @@ from typing import Any, get_args
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.link_type import ROUTE_TYPE_SQL
 from app.reservations.service import TZ
 from app.inventory.schemas import (
     CoreDetail,
@@ -18,9 +19,10 @@ from app.inventory.schemas import (
 
 PER_TYPE = 20
 
+
 # Segment list with free cores and status mix; status always comes from core_status_v.
 SEGMENT_SQL = """
-SELECT s.id, a.name AS site_a, b.name AS site_b, a.kind AS site_a_kind, b.kind AS site_b_kind, s.route_type, s.region, s.route, s.section, s.distance_km,
+SELECT s.id, a.name AS site_a, b.name AS site_b, a.kind AS site_a_kind, b.kind AS site_b_kind, @@ROUTE_TYPE@@ AS route_type, s.region, s.route, s.section, s.distance_km,
        s.survey_cores, s.cable_size, s.fiber_cut, COALESCE(mix.m, '{}'::jsonb) AS status_mix,
        COALESCE((SELECT sum(u.remaining) FROM reservation_unassigned_v u WHERE u.segment_id = s.id), 0)::int AS unassigned_reserved
 FROM segments s
@@ -34,12 +36,12 @@ LEFT JOIN LATERAL (
   ) t
 ) mix ON true
 WHERE (CAST(:region AS text) IS NULL OR s.region = :region)
-  AND (CAST(:route_type AS text) IS NULL OR s.route_type = :route_type)
+  AND (CAST(:route_type AS text) IS NULL OR @@ROUTE_TYPE@@ = :route_type)
   AND (CAST(:route AS text) IS NULL OR lower(s.route) = lower(:route))
   AND (CAST(:q AS text) IS NULL OR a.name ILIKE '%' || :q || '%' OR b.name ILIKE '%' || :q || '%')
   AND (CAST(:id AS bigint) IS NULL OR s.id = :id)
 ORDER BY s.id
-"""
+""".replace("@@ROUTE_TYPE@@", ROUTE_TYPE_SQL)
 
 # Customer and planned date: each field takes its latest 'corrected' value, else the reservation row.
 # (A correction may set only one of the two fields.)

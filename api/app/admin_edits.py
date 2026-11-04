@@ -2,7 +2,7 @@
 
 Every changed field is its own data_edits row (old, new, reason, user). Field names match what the upload
 modules compare for protection: site name/location ("lat,lon")/region (stored in details.region)/active,
-segment distance_km/route_type/region/site_a_id/site_b_id/survey_cores/cable_size, core status.
+segment distance_km/region/site_a_id/site_b_id/survey_cores/cable_size, core status.
 """
 from decimal import Decimal
 from typing import Annotated, Any, Literal
@@ -19,6 +19,7 @@ from app.ingest import checks
 from app.ingest.reservation_import import add_cores, port
 from app.inventory import service as inventory
 from app.inventory.schemas import CoreHolderDetail
+from app.link_type import ROUTE_TYPE_SQL
 from app.reservations.schemas import Reason
 from app.reservations.service import conflict
 from app.routing.graph import invalidate as invalidate_routes
@@ -113,7 +114,6 @@ def set_core_ports(db: DB, admin: Admin, core_id: int, body: CorePortsBody) -> C
 class SegmentBody(BaseModel):
     reason: Reason
     distance_km: Decimal | None = Field(None, ge=0, max_digits=10, decimal_places=3)
-    route_type: Literal["Trunk", "Metro"] | None = None
     region: str | None = None
     site_a_id: int | None = None
     site_b_id: int | None = None
@@ -137,7 +137,8 @@ class SegmentEdit(BaseModel):
     history: list[HistoryRow]
 
 
-SEGMENT_Q = ("SELECT s.id, s.site_a_id, s.site_b_id, a.name AS site_a, b.name AS site_b, s.route_type, s.region, s.distance_km, "
+SEGMENT_Q = ("SELECT s.id, s.site_a_id, s.site_b_id, a.name AS site_a, b.name AS site_b, "
+          + ROUTE_TYPE_SQL + " AS route_type, s.region, s.distance_km, "
           "s.survey_cores, s.cable_size, s.fiber_cut FROM segments s JOIN sites a ON a.id = s.site_a_id JOIN sites b ON b.id = s.site_b_id "
           "WHERE s.id = :i")
 

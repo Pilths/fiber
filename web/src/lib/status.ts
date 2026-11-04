@@ -25,7 +25,8 @@ export function health(s: { survey_cores: number | null; free_to_reserve: number
 }
 
 // Map filters (Region, Type) live in the Dashboard; q stays "" now that the header search finds segments.
-// network: "" (all), "trunk:<route>" (a trunk route such as R1), "dc" or "toc" (segments with a DC or TOC end)
+// network: "" (all), "trunk:<route>" (a trunk route such as R1), "type:<route type>" (Metro, DC-DC, DC-TOC),
+// "dc" or "toc" (segments with a DC or TOC end)
 export type SegmentFilter = { q: string; region: string; network: string };
 export const NO_FILTER: SegmentFilter = { q: "", region: "", network: "" };
 type Filterable = {
@@ -45,6 +46,9 @@ function inNetwork(segment: Filterable, network: string): boolean {
   }
   if (network === "toc") {
     return hasEnd(segment, "toc");
+  }
+  if (network.startsWith("type:")) {
+    return segment.route_type === network.slice("type:".length);
   }
   const route = network.slice("trunk:".length);
   return segment.route_type === "Trunk" && segment.route === route;

@@ -5,6 +5,8 @@ from typing import Literal
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.link_type import ROUTE_TYPE_SQL
+
 DB_PER_KM = Decimal("0.25")
 DB_PER_SPLICE = Decimal("0.1")
 DB_PER_CONNECTOR = Decimal("0.5")
@@ -45,7 +47,7 @@ def worst(levels: list[Level | None]) -> Level | None:
 
 
 _ROWS = """
-SELECT s.id AS segment_id, a.name || ' - ' || b.name AS segment_name, s.region, s.route_type, s.distance_km,
+SELECT s.id AS segment_id, a.name || ' - ' || b.name AS segment_name, s.region, @@ROUTE_TYPE@@ AS route_type, s.distance_km,
        m.loss_db AS measured_db, m.test_method, m.field_team, c.number AS worst_core_number,
        (SELECT count(DISTINCT core_id) FROM measurements WHERE segment_id = s.id) AS measured_cores,
        coalesce(s.survey_cores, 0) AS total_cores,
@@ -58,8 +60,8 @@ LEFT JOIN LATERAL (
 LEFT JOIN cores c ON c.id = m.core_id
 WHERE (CAST(:segment_id AS bigint) IS NULL OR s.id = :segment_id)
   AND (CAST(:region AS text) IS NULL OR s.region = :region)
-  AND (CAST(:route_type AS text) IS NULL OR s.route_type = :route_type)
-"""
+  AND (CAST(:route_type AS text) IS NULL OR @@ROUTE_TYPE@@ = :route_type)
+""".replace("@@ROUTE_TYPE@@", ROUTE_TYPE_SQL)
 
 
 def _row(r: dict) -> dict:

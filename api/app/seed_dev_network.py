@@ -30,7 +30,7 @@ DEV_TRUNK_ROUTES_SQL = """
 UPDATE segments s SET route = CASE WHEN s.region = 'South' THEN 'R3' ELSE 'R1' END
 FROM sites a, sites b
 WHERE a.id = s.site_a_id AND b.id = s.site_b_id AND a.name LIKE 'DEV %' AND b.name LIKE 'DEV %'
-  AND s.route_type = 'Trunk' AND s.route IS NULL
+  AND a.kind <> 'data_center' AND b.kind <> 'data_center' AND s.route IS NULL
 """
 # site A, site B, route_type, region, cable_size
 SEGMENTS = [

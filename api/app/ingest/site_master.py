@@ -30,7 +30,8 @@ SHEETS = {  # kind: (required header keys, expected-headers text, entity, own he
     "dcs": (("dcnamelink", "lrd"), "DC Name / Link, LRD", "dc",
             {"dcnamelink", "lrd", "lat", "long", "latitude", "longitude", "lon"}),
 }
-SITE_KINDS = {"dc": "data_center", "toc": "toc"}  # Type column of the Sites sheet; blank means 'site'
+# Type column of the Sites sheet; blank or Trunk means a trunk site ('site')
+SITE_KINDS = {"trunk": "site", "dc": "data_center", "toc": "toc"}
 # Sites a Site Location DC can hang off: every site except Site Location DCs themselves (those have an LRD site)
 LRD_TARGETS_SQL = "SELECT name, id FROM sites WHERE NOT (kind = 'data_center' AND lrd_site_id IS NOT NULL)"
 GROUP_COL = {"added": "new", "changed": "changed", "missing": "missing", "problem": "needs_review", "unchanged": "unchanged"}
@@ -174,9 +175,13 @@ def _parse_row(kind: str, headers: list[str], values: tuple[Any, ...]) -> Item:
         p["lrd"] = None if isblank(f.get("lrd")) else str(f["lrd"]).strip()
         p["own_coords_note"] = coord_why  # not a problem by itself: the DC falls back to its site
     if kind == "sites" and "type" in f:  # no Type column: p has no "kind" and existing kinds are left alone
-        p["kind"] = "site" if isblank(f["type"]) else SITE_KINDS.get(str(f["type"]).strip().casefold())
+        site_type = f["type"]
+        if isblank(site_type):
+            p["kind"] = "site"
+        else:
+            p["kind"] = SITE_KINDS.get(str(site_type).strip().casefold())
         if p["kind"] is None:
-            reasons.append("Type must be DC, TOC or blank")
+            reasons.append("Type must be Trunk, DC, TOC or blank")
     p["reasons"] = reasons
     item.p = p
     return item

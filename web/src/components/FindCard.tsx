@@ -14,6 +14,9 @@ export function FreeBadge({ s }: { s: Parameters<typeof health>[0] }) {
 
 const options = (all: Segment[], k: "region" | "route_type") => [...new Set(all.map((s) => s[k]).filter((v): v is string => !!v))].sort();
 
+// Route types worked out by the backend from the two end sites (Trunk is listed per route above them).
+const LINK_TYPES = ["Metro", "DC-DC", "DC-TOC"];
+
 // Trunk routes (R1, R3, ...) found on trunk segments, in name order.
 function trunkRoutes(all: Segment[]): string[] {
   const routes = new Set<string>();
@@ -38,6 +41,7 @@ export function MapFilters({ segments, filter, onFilter }: { segments: Segment[]
       <select className={cls} aria-label="Type" value={filter.network} onChange={(e) => onFilter({ ...filter, network: e.target.value })}>
         <option value="">All types</option>
         {trunkRoutes(all).map((route) => <option key={route} value={`trunk:${route}`}>Trunk {route}</option>)}
+        {LINK_TYPES.map((type) => <option key={type} value={`type:${type}`}>{type}</option>)}
         <option value="dc">DC</option>
         <option value="toc">TOC</option>
       </select>
