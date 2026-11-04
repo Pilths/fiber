@@ -2,12 +2,27 @@ import { useRef, useState } from "react";
 import { ReservationUpload } from "@/components/ReservationUpload";
 import { SiteMasterUpload } from "@/components/SiteMasterUpload";
 import { SegmentListUpload } from "@/components/SegmentListUpload";
+import { KmzUpload } from "@/components/KmzUpload";
 
-const TABS = [["site-master", "Site master workbook"], ["segment-list", "Segment list"], ["reservations", "Reservation workbook"]] as const;
+const TABS = [["site-master", "Site master workbook"], ["segment-list", "Segment list"], ["kmz", "KMZ route lines"],
+  ["reservations", "Reservation workbook"]] as const;
 type Tab = (typeof TABS)[number][0];
 
-// Admin Upload page: three separate files, each Upload -> Preview -> Apply/Confirm. All panels stay mounted so a
+// Admin Upload page: four separate files, each Upload -> Preview -> Apply/Confirm. All panels stay mounted so a
 // preview survives switching tabs.
+function UploadPanel({ tab }: { tab: Tab }) {
+  if (tab === "site-master") {
+    return <SiteMasterUpload />;
+  }
+  if (tab === "segment-list") {
+    return <SegmentListUpload />;
+  }
+  if (tab === "kmz") {
+    return <KmzUpload />;
+  }
+  return <ReservationUpload />;
+}
+
 export function Upload() {
   const [tab, setTab] = useState<Tab>("site-master");
   const refs = useRef<Record<string, HTMLButtonElement | null>>({});
@@ -30,7 +45,7 @@ export function Upload() {
       </div>
       {TABS.map(([t]) => (
         <div key={t} role="tabpanel" id={`up-panel-${t}`} aria-labelledby={`up-tab-${t}`} hidden={tab !== t}>
-          {t === "site-master" ? <SiteMasterUpload /> : t === "segment-list" ? <SegmentListUpload /> : <ReservationUpload />}
+          <UploadPanel tab={t} />
         </div>
       ))}
     </div>

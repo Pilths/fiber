@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { signIn } from "./helpers";
-import { xlsx, type Sheet } from "./xlsx";
+import { xlsx, zip, type Sheet } from "./xlsx";
 
 // Admin Upload page (TASK-045, TASK-083). Workbooks are synthetic and built per run, so the suite repeats against the
 // same dev database: the site master DC file is idempotent, the rename file is never applied, the reservation uses a
@@ -24,7 +24,9 @@ const resRow = (customer: string | null) => ["East Coast", SEGMENT, null, null, 
 const file = (name: string, sheets: Sheet[]) => ({ name, mimeType: XLSX, buffer: xlsx(sheets) });
 const nav = (page: Page) => page.getByRole("navigation", { name: "Main" });
 
-async function openUpload(page: Page, tab: "Site master workbook" | "Segment list" | "Reservation workbook") {
+type UploadTab = "Site master workbook" | "Segment list" | "KMZ route lines" | "Reservation workbook";
+
+async function openUpload(page: Page, tab: UploadTab) {
   await signIn(page, "admin1");
   await nav(page).getByRole("button", { name: "Upload" }).click();
   await page.getByRole("tab", { name: tab }).click();
@@ -359,4 +361,42 @@ test("planner does not see the Upload tab", async ({ page }) => {
   await signIn(page, "planner1");
   await expect(nav(page).getByRole("button", { name: "Upload" })).toHaveCount(0);
   expect((await page.request.get("/api/admin/reservation-import")).status()).toBe(403);
+});
+
+// A KMZ shaped like the real files: site pins and an "ex infra" line are ignored, only "propose route" is read.
+// The line runs from DEV Kuala Lumpur DC to DEV Cyberjaya DC with a bend. Preview is real; apply is mocked so the
+// dev road shape of that segment is not replaced.
+function kmz(folder: string) {
+  const path = "101.6869,3.139,0 101.70,3.03,0 101.65,2.9213,0";
+  const kml = `<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><Folder>
+<name>Asbuilt Cable E2E</name>
+<Folder><name>site</name><Placemark><name>KL</name><Point><coordinates>101.6869,3.139,0</coordinates></Point></Placemark></Folder>
+<Folder><name>ex infra</name><Placemark><LineString><coordinates>101.6869,3.139,0 101.65,2.9213,0</coordinates></LineString></Placemark></Folder>
+<Folder><name>${folder}</name><Placemark><name>Untitled Path</name><LineString><coordinates>${path}</coordinates></LineString></Placemark></Folder>
+</Folder></Document></kml>`;
+  return { name: `e2e-${stamp}.kmz`, mimeType: "application/vnd.google-earth.kmz", buffer: zip([["doc.kml", kml]]) };
+}
+
+test("KMZ route lines: preview lists the segment to draw, apply shows the count (apply mocked)", async ({ page }) => {
+  await openUpload(page, "KMZ route lines");
+  await page.getByLabel("Upload a KMZ file").setInputFiles(kmz("propose route"));
+  const preview = page.getByTestId("kmz-preview");
+  await expect(preview).toContainText("1 line in folder “propose route”");
+  const row = preview.getByRole("table", { name: "Segments to draw" }).getByRole("row", { name: /DEV Kuala Lumpur DC - DEV Cyberjaya DC/ });
+  await expect(row).toBeVisible();
+  await page.screenshot({ path: "e2e/screenshots/upload-kmz-preview.png", fullPage: true });
+  await page.route("**/api/admin/kmz/uploads/*/apply", (route) => route.fulfill({ json: { upload_id: 1, shaped: 1 } }));
+  await preview.getByRole("button", { name: "Apply KMZ…" }).click();
+  await page.getByRole("dialog", { name: "Apply KMZ?" }).getByRole("button", { name: "Apply" }).click();
+  await expect(page.getByTestId("kmz-result")).toContainText("1 segment lines drawn on the map.");
+  await expect(preview).toHaveCount(0);
+});
+
+test("KMZ route lines: a folder with no lines blocks apply and names the folders found", async ({ page }) => {
+  await openUpload(page, "KMZ route lines");
+  await page.getByLabel("Folder").fill("route");
+  await page.getByLabel("Upload a KMZ file").setInputFiles(kmz("propose route"));
+  const preview = page.getByTestId("kmz-preview");
+  await expect(preview.getByRole("alert")).toContainText("No lines in folder 'route'. Folders in the file:");
+  await expect(preview.getByRole("button", { name: "Apply KMZ…" })).toHaveCount(0);
 });

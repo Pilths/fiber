@@ -27,8 +27,12 @@ export function Note({ tone, title, children, role }: { tone: Tone; title: React
   );
 }
 
-// File input (.xlsx only) that also takes a dropped file.
-export function FilePick({ label, busy, onFile }: { label: string; busy: boolean; onFile: (f: File) => void }) {
+// File input (.xlsx unless `kind` says otherwise) that also takes a dropped file.
+const XLSX = { accept: ".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", button: "Choose .xlsx file" };
+
+export function FilePick({ label, busy, onFile, kind = XLSX }: {
+  label: string; busy: boolean; onFile: (f: File) => void; kind?: { accept: string; button: string };
+}) {
   const id = useId();
   const [over, setOver] = useState(false);
   const input = useRef<HTMLInputElement>(null);
@@ -39,8 +43,8 @@ export function FilePick({ label, busy, onFile }: { label: string; busy: boolean
       onDrop={(e) => { e.preventDefault(); setOver(false); const f = e.dataTransfer.files[0]; if (f && !busy) onFile(f); }}
       className={`flex items-center gap-4 rounded-md border border-dashed px-4 py-3.5 ${over ? "border-blue bg-blue-bg" : "border-line bg-subtle"}`}
     >
-      <label htmlFor={id} className="btn btn-p">{busy ? "Reading…" : "Choose .xlsx file"}</label>
-      <input id={id} ref={input} type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" aria-label={label}
+      <label htmlFor={id} className="btn btn-p">{busy ? "Reading…" : kind.button}</label>
+      <input id={id} ref={input} type="file" accept={kind.accept} aria-label={label}
         className="sr-only" disabled={busy}
         onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.target.value = ""; }} />
       <span className="text-body text-muted-foreground">{label}. Or drop the file here. Up to 20 MB.</span>
