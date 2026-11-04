@@ -65,6 +65,8 @@ const SITE_LAYERS: [keyof SiteLayers, string, string][] = [
   ["toc", "TOC", "rb-sh toc"],
   ["site", "Trunk sites", "rb-sh st size-2.5!"],
 ];
+// Singular words for the map key ("Data centre"); the Layers panel uses the plural.
+const KEY_LABEL: Record<keyof SiteLayers, string> = { data_center: "Data centre", toc: "TOC", site: "Trunk site" };
 const ROUTE_LAYERS: [string, string][] = [["Trunk", "ll"], ["Metro", "ll m"], ["DC-DC", "ll dd"], ["DC-TOC", "ll dt"]];
 type RouteLayers = Record<string, boolean>;
 const ALL_ROUTES: RouteLayers = { Trunk: true, Metro: true, "DC-DC": true, "DC-TOC": true };
@@ -410,17 +412,23 @@ export function NetworkMap({ selectedIds, routeKey, visible, onSelectSegment: se
           {tools}
         </div>
 
+        {/* The key doubles as Layers: click an entry to show or hide it (same state as the Layers panel). */}
         <div role="group" aria-label="Map key" className="mleg">
           <p className="mleg-h col-span-2">Route type</p>
-          <span><i className="slot" aria-hidden="true"><i className="ll" /></i>Trunk</span>
-          <span><i className="slot" aria-hidden="true"><i className="ll m" /></i>Metro</span>
-          <span><i className="slot" aria-hidden="true"><i className="ll dd" /></i>DC-DC</span>
-          <span><i className="slot" aria-hidden="true"><i className="ll dt" /></i>DC-TOC</span>
+          {ROUTE_LAYERS.map(([type, swatch]) => (
+            <button key={type} type="button" aria-pressed={routeLayers[type]} aria-label={`Show ${type} lines`}
+              onClick={() => setRouteLayers({ ...routeLayers, [type]: !routeLayers[type] })}>
+              <i className="slot" aria-hidden="true"><i className={swatch} /></i>{type}
+            </button>
+          ))}
           <span><i className="slot" aria-hidden="true"><i className="ll s" /></i>Selected</span>
           <p className="mleg-h col-span-2">Sites</p>
-          <span><i className="slot" aria-hidden="true"><i className="rb-sh dc size-3!" /></i>Data centre</span>
-          <span><i className="slot" aria-hidden="true"><i className="rb-sh toc" /></i>TOC</span>
-          <span><i className="slot" aria-hidden="true"><i className="rb-sh st size-2.5!" /></i>Trunk site</span>
+          {SITE_LAYERS.map(([kind, label, shape]) => (
+            <button key={kind} type="button" aria-pressed={siteLayers[kind]} aria-label={`Show ${label}`}
+              onClick={() => setSiteLayers({ ...siteLayers, [kind]: !siteLayers[kind] })}>
+              <i className="slot" aria-hidden="true"><i className={shape} /></i>{KEY_LABEL[kind]}
+            </button>
+          ))}
         </div>
         {(NOTE[base] || err) && (
           <p role="status" data-testid="map-note" className="absolute top-3 right-3 z-10 max-w-[340px] note px-3 py-1.5 text-xs font-medium text-amber">

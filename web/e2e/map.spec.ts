@@ -128,6 +128,14 @@ test("Layers: route types and trunk routes hide their lines; the selected segmen
   await expect(lines).toHaveCount(total - count((s) => s.route_type === "Trunk" && s.route === route));
   await chip.click();
   await expect(lines).toHaveCount(total);
+  // the map key toggles the same layers: click Metro in the key, the Layers tick box follows
+  const keyMetro = page.getByRole("group", { name: "Map key" }).getByRole("button", { name: "Show Metro lines" });
+  await keyMetro.click();
+  await expect(keyMetro).toHaveAttribute("aria-pressed", "false");
+  await expect(page.getByRole("checkbox", { name: "Metro", exact: true })).not.toBeChecked();
+  await expect(lines).toHaveCount(total - count((s) => s.route_type === "Metro"));
+  await keyMetro.click();
+  await expect(lines).toHaveCount(total);
   // a selected Metro segment stays on the map with Metro unticked
   const picked = drawn.find((s) => s.route_type === "Metro")!;
   const hash = `#segment=${encodeURIComponent(await segmentNameOf(page, picked.id))}`;
