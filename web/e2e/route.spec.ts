@@ -179,4 +179,7 @@ test("route mode on the map: other options' segments switch option, the rest are
   await expect(options(page)).toHaveCount(0);
   await expect(line(off)).not.toHaveAttribute("data-state", "hidden");
   expect(page.url()).not.toContain("#route=");
+  const panel = page.getByRole("region", { name: "Site A to B" });
+  await expect(panel.getByLabel("Site A")).toHaveValue("");
+  await expect(panel.getByLabel("Site B")).toHaveValue("");
 });

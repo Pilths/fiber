@@ -51,6 +51,9 @@ function midpoint(p: [number, number][]): [number, number] {
 }
 
 const COLOR = { ok: "var(--green)", low: "var(--amber)", full: "var(--red)", not_surveyed: "var(--ns)" } as const;
+// Line width per route type. DC-DC is wide enough for its white centre to read as a double line.
+const LINE_WIDTH: Record<string, number> = { trunk: 6, "dc-dc": 7, "dc-toc": 4, metro: 4 };
+
 const kindOf = (t: string | null) => (t ?? "").toLowerCase();
 // Chip text: the free-core number only; a cut segment reads 0, not surveyed a dash.
 // Map shape and spoken word per site kind: DC a dark square, TOC a dark triangle, a trunk site a diamond.
@@ -231,18 +234,19 @@ export function NetworkMap({ selectedIds, routeKey, visible, onSelectSegment: se
             <svg className="pointer-events-none absolute inset-0 size-full" aria-hidden="true" data-testid="map-lines">
               {order.map(({ p, pts, on, show, dim }) => {
                 const d = "M" + pts.map((q) => `${q[0].toFixed(1)} ${q[1].toFixed(1)}`).join("L");
-                const t = kindOf(p.route_type), w = (t === "trunk" ? 6 : t === "dc-dc" ? 5 : 3) + (on ? 3 : 0);
+                const t = kindOf(p.route_type), w = (LINE_WIDTH[t] ?? 4) + (on ? 3 : 0);
                 const dotted = p.chip === "not_surveyed" && !on;
-                const dash = dotted ? "1 7" : t === "dc-toc" ? "10 6" : undefined;
+                const dash = dotted ? "1 7" : t === "dc-toc" ? "9 5" : undefined;
                 return (
-                  <g key={p.segment_id} data-testid="map-line" data-segment-id={p.segment_id} data-selected={on} data-state={!show ? "hidden" : dim ? "dim" : ""} opacity={!show ? 0.12 : dim ? 0.35 : 1}>
-                    {on && <path d={d} fill="none" stroke="#fff" strokeWidth={w + 4} strokeLinecap="round" strokeLinejoin="round" />}
+                  <g key={p.segment_id} data-testid="map-line" data-segment-id={p.segment_id} data-selected={on} data-state={!show ? "hidden" : dim ? "dim" : ""} opacity={!show ? 0.12 : dim ? 0.5 : 1}>
+                    {/* white casing on every line: keeps the dash and double-line patterns readable over the basemap */}
+                    <path d={d} fill="none" stroke="#fff" strokeWidth={w + (on ? 4 : 3)} strokeLinecap="round" strokeLinejoin="round" />
                     <path d={d} fill="none" stroke={on ? "var(--blue)" : COLOR[p.chip]} strokeWidth={p.chip === "not_surveyed" && !on ? 4 : w}
                       strokeLinecap="round" strokeLinejoin="round"
                       strokeDasharray={dash} />
                     {/* DC-DC: a double line, the colour with a thin white centre */}
                     {t === "dc-dc" && !dotted && (
-                      <path d={d} fill="none" stroke="#fff" strokeWidth={on ? 2.5 : 1.5} strokeLinecap="round" strokeLinejoin="round" />
+                      <path d={d} fill="none" stroke="#fff" strokeWidth={on ? 3 : 2.5} strokeLinecap="round" strokeLinejoin="round" />
                     )}
                     {show && <path d={d} data-hit fill="none" stroke="transparent" strokeWidth={18} className="cursor-pointer" style={{ pointerEvents: "stroke" }} onClick={() => onSelectSegment(p.segment_id)} />}
                   </g>
