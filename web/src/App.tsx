@@ -128,8 +128,8 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
   const segmentRef = useRef(segmentId);
   useEffect(() => { segmentRef.current = segmentId; }, [segmentId]);
   // Selects a segment on Inventory.
+  // The old detail stays on screen (faded) until the new one loads, so the page keeps its height and scroll.
   const open = useCallback((id: number, coreId: number | null = null) => {
-    setDetail((d) => (d?.id === id ? d : null));
     setSegmentId(id);
     setFocusCoreId(coreId);
     setReserving(false);
@@ -220,8 +220,10 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
           </div>
           {segmentId != null && !detail && <p className="card empty col-span-12 text-center text-body text-muted-foreground">Loading segment...</p>}
           {detail && (
-            <div className="col-span-12 space-y-4">
-              <SegmentDiagram segments={segments} found={found} d={detail} selectedId={detail.id} onPick={(id) => open(id)}
+            <div className="col-span-12 space-y-4 aria-busy:pointer-events-none aria-busy:opacity-60"
+              aria-busy={detail.id !== segmentId}>
+              <SegmentDiagram segments={segments} found={found} d={detail} selectedId={segmentId ?? detail.id}
+                onPick={(id) => open(id)}
                 onSite={admin?.onEditSite} />
               {/* Actions sit in their own row under the diagram, one fixed width so they line up. */}
               {(onRoute || admin) && (
