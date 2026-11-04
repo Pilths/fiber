@@ -1,7 +1,8 @@
 """Load sites and segments from one workbook typed by hand, through the same code as the Upload tab.
 
-    docker compose exec api python -m app.load_data --template data/fiber-data.xlsx   # blank file to fill in
-    docker compose exec api python -m app.load_data ADMIN data/fiber-data.xlsx        # load it
+    docker compose exec api python -m app.load_data --template data/fiber-data.xlsx   # blank Sites/Segments file
+    docker compose exec api python -m app.load_data --reservation-template data/reservations.xlsx  # blank Reservation file
+    docker compose exec api python -m app.load_data ADMIN data/fiber-data.xlsx        # load either file
 
 Put the file in api/data/ (git-ignored; real data is never committed). ADMIN is an existing admin username
 (make one with app.create_admin); every write is attributed to that admin and kept as history.
@@ -9,8 +10,8 @@ Put the file in api/data/ (git-ignored; real data is never committed). ADMIN is 
 Sheet "Sites": site_name (4-letter LRD), latitude_in_decimal, longitude_in_decimal, region (optional),
     Type (optional: Trunk, DC, TOC; blank means Trunk).
 Sheet "Segments": Link (AAAA-BBBB), Distance (km), Route, Section, Surveyed cores, Total cores.
-Sheet "Reservation" (optional): Region (North, Central, South or East Coast; a blank or unknown region makes the
-    row Needs review and it is not imported), Nodes (site pair AAAA-BBBB; both sites must exist, the segment is
+Sheet "Reservation" (its own file; load sites and segments first): Region (optional: North, Central, South or
+    East Coast; an unknown region makes the row Needs review and it is not imported), Nodes (site pair AAAA-BBBB; both sites must exist, the segment is
     matched by the pair), No of core requested (whole number, 1 or more: a count-only reservation, no specific cores),
     Fiber core requestor (the customer; a row without one is rejected), Fiber core request date and Expected CV Ready
     (Excel dates, or text as yyyy-mm-dd; other text makes the row Needs review), Contractor, Remark, SRF,
@@ -49,7 +50,15 @@ def template(path: str) -> None:
     ws.title = "Sites"  # type: ignore[union-attr]
     ws.append(SITES)  # type: ignore[union-attr]
     wb.create_sheet("Segments").append(SEGMENTS)
-    wb.create_sheet("Reservation").append(RESERVATIONS)
+    wb.save(path)
+    print(f"Blank file written to {path}")
+
+
+def reservation_template(path: str) -> None:
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Reservation"  # type: ignore[union-attr]
+    ws.append(RESERVATIONS)  # type: ignore[union-attr]
     wb.save(path)
     print(f"Blank file written to {path}")
 
@@ -199,6 +208,9 @@ def load(db: Session, admin: str, path: str) -> int:
 def main(argv: list[str]) -> int:
     if len(argv) == 2 and argv[0] == "--template":
         template(argv[1])
+        return 0
+    if len(argv) == 2 and argv[0] == "--reservation-template":
+        reservation_template(argv[1])
         return 0
     if len(argv) != 2:
         print(__doc__)

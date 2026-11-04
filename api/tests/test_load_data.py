@@ -48,9 +48,13 @@ def test_unknown_admin_and_template(db, monkeypatch, tmp_path):
     p = tmp_path / "t.xlsx"
     assert ld.main(["--template", str(p)]) == 0
     wb = openpyxl.load_workbook(p)
-    assert wb.sheetnames == ["Sites", "Segments", "Reservation"]
+    assert wb.sheetnames == ["Sites", "Segments"]
     assert [c.value for c in wb["Sites"][1]] == ld.SITES
     assert [c.value for c in wb["Segments"][1]] == ld.SEGMENTS
+    p = tmp_path / "r.xlsx"
+    assert ld.main(["--reservation-template", str(p)]) == 0
+    wb = openpyxl.load_workbook(p)
+    assert wb.sheetnames == ["Reservation"]
     assert [c.value for c in wb["Reservation"][1]] == [
         "Region", "Nodes", "No of core requested", "Fiber core requestor", "Fiber core request date",
         "Expected CV Ready", "Contractor", "Remark", "SRF", "Port Info", "Fiber monitored Y/N/WIP"]
@@ -108,8 +112,8 @@ def test_no_reservation_rows_creates_no_upload(db, monkeypatch, tmp_path, capsys
     assert db.exec_driver_sql("SELECT count(*) FROM uploads WHERE filename = 'data.xlsx' AND summary ? 'ignored_sheets'").scalar() == 0
 
 
-def test_reservation_row_without_region_needs_review(db, monkeypatch, tmp_path, capsys):
+def test_reservation_region_is_optional_but_an_unknown_one_needs_review(db, monkeypatch, tmp_path, capsys):
     mkuser(db, "boss1", "admin")
-    assert run(monkeypatch, db, tmp_path, SITES, SEGS, [[None, *GOOD[1:]]]) == 0
-    assert "Reservation row 2 (needs_review): " in capsys.readouterr().out
-    assert reservations(db) == []
+    assert run(monkeypatch, db, tmp_path, SITES, SEGS, [[None, *GOOD[1:]], ["Atlantis", *GOOD[1:]]]) == 0
+    assert "Reservation row 3 (needs_review): unknown region 'Atlantis'" in capsys.readouterr().out
+    assert len(reservations(db)) == 1
