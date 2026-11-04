@@ -78,7 +78,7 @@ test("new user: temporary password, forced change, deactivate blocks, activate r
   await user.getByLabel("New password", { exact: true }).fill("short");
   await user.getByLabel("Confirm new password").fill("short");
   await user.getByRole("button", { name: "Change password" }).click();
-  await expect(user.getByRole("alert")).toContainText("at least 10 characters");
+  await expect(user.getByRole("alert")).toContainText("at least 8 characters");
   await user.getByLabel("Current password").fill("wrong-current-pw");
   await user.getByLabel("New password", { exact: true }).fill(newPw);
   await user.getByLabel("Confirm new password").fill(newPw);
