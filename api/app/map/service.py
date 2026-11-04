@@ -5,6 +5,7 @@ junction site keeps every vertex of the drawn shape and needs no extra SQL. pony
 point on the line; fine for a hand-drawn shape that passes through the site, revisit if KMZ shapes drift.
 """
 import json
+from xml.sax.saxutils import escape
 import math
 from typing import Any
 
@@ -117,3 +118,42 @@ def map_sites(db: Session) -> dict[str, Any]:
                 continue
         feats.append({"type": "Feature", "properties": props, "geometry": {"type": "Point", "coordinates": [x, y]}})
     return {"type": "FeatureCollection", "features": feats, "not_drawn": not_drawn}
+
+
+SEGMENT_SITES_SQL = """
+SELECT a.name AS site_a, b.name AS site_b
+FROM segments s JOIN sites a ON a.id = s.site_a_id JOIN sites b ON b.id = s.site_b_id
+WHERE s.id = :segment_id
+"""
+
+
+def _kml_point(name: str, lon: float, lat: float) -> str:
+    return (f"<Placemark><name>{escape(name)}</name>"
+            f"<Point><coordinates>{lon},{lat},0</coordinates></Point></Placemark>")
+
+
+def segment_kml(db: Session, segment_id: int) -> tuple[str, str] | None:
+    """(file name, KML text) of one segment: its line as drawn on the map plus its two sites; None if not drawn."""
+    sites = db.execute(text(SEGMENT_SITES_SQL), {"segment_id": segment_id}).mappings().first()
+    if sites is None:
+        return None
+    # ponytail: builds the whole map to pick one line; fine for a few hundred segments
+    features = map_segments(db)["features"]
+    feature = next((f for f in features if f["properties"]["segment_id"] == segment_id), None)
+    if feature is None:
+        return None
+    coords = feature["geometry"]["coordinates"]
+    name = f"{sites['site_a']} - {sites['site_b']}"
+    line_text = " ".join(f"{lon},{lat},0" for lon, lat in coords)
+    kml = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<kml xmlns="http://www.opengis.net/kml/2.2"><Document>'
+        f"<name>{escape(name)}</name>"
+        "<Style id=\"line\"><LineStyle><color>ff0000ff</color><width>4</width></LineStyle></Style>"
+        f"<Placemark><name>{escape(name)}</name><styleUrl>#line</styleUrl>"
+        f"<LineString><tessellate>1</tessellate><coordinates>{line_text}</coordinates></LineString></Placemark>"
+        + _kml_point(sites["site_a"], *coords[0])
+        + _kml_point(sites["site_b"], *coords[-1])
+        + "</Document></kml>"
+    )
+    return name, kml

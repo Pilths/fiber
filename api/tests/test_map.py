@@ -94,3 +94,21 @@ def test_segments_expose_fiber_cut_as_full(client, db):
     by = {f["properties"]["segment_id"]: f["properties"] for f in client.get("/api/map/segments", headers=H()).json()["features"]}
     assert (by[ok]["fiber_cut"], by[ok]["chip"]) == (False, "ok")
     assert (by[cut]["fiber_cut"], by[cut]["chip"], by[cut]["free_to_reserve"]) == (True, "full", 0)
+
+
+def test_segment_kmz_download(client, db):
+    import io
+    import zipfile
+
+    mkuser(db)
+    a = site(db, "EJH1", xy=(101.60, 3.10))
+    b = site(db, "RINI", xy=(101.70, 3.20))
+    sid = segment(db, a, b, 4)
+    response = client.get(f"/api/map/segments/{sid}/kmz", headers=H())
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "application/vnd.google-earth.kmz"
+    assert 'filename="EJH1 - RINI.kmz"' in response.headers["content-disposition"]
+    kml = zipfile.ZipFile(io.BytesIO(response.content)).read("doc.kml").decode()
+    assert "<name>EJH1 - RINI</name>" in kml
+    assert "101.6,3.1,0 101.7,3.2,0" in kml
+    assert client.get("/api/map/segments/999999/kmz", headers=H()).status_code == 404

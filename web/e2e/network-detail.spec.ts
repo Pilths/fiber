@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { openReserve, signIn } from "./helpers";
+import { openReserve, pickSegment, signIn } from "./helpers";
 
 // Dev seed: Cyberjaya DC to Kuantan Hut has several paths; the search shows the best one.
 test.use({ viewport: { width: 1440, height: 900 } });
@@ -72,4 +72,12 @@ test("Reserve on this route (Site A to B) opens the Reserve box over Inventory",
   await expect(page.getByTestId("segment-diagram")).toBeAttached(); // Inventory stays behind the box
   await expect(page.getByRole("grid", { name: "Cores" })).toHaveCount(0); // no core grid any more
   await expect(box.getByRole("table", { name: "Available cores" })).toBeVisible();
+});
+
+test("Download KMZ saves the selected segment's line as a KMZ file", async ({ page }) => {
+  await signIn(page);
+  await pickSegment(page, /^DEV Kuala Lumpur DC - DEV Bukit Jalil TOC/);
+  const link = page.getByRole("link", { name: /^Download KMZ of segment DEV Kuala Lumpur DC - DEV Bukit Jalil TOC/ });
+  const [download] = await Promise.all([page.waitForEvent("download"), link.click()]);
+  expect(download.suggestedFilename()).toMatch(/^DEV Kuala Lumpur DC - DEV Bukit Jalil TOC.*\.kmz$/);
 });

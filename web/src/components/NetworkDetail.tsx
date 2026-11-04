@@ -32,10 +32,24 @@ export function SegmentDiagram({ segments, found, d, selectedId, onPick, onSite 
       <Chain legs={rows.map((r) => ({ id: r.id, a: r.a, b: r.b, km: r.s ? kmOf(r.s) : null, cut: r.s?.fiber_cut, s: r.s }))}
         selectedId={selectedId} onPick={onPick} route={onRoute ? `Route ${rows[0].a} to ${rows[rows.length - 1].b}` : undefined}
         onSite={!onRoute && onSite ? onSite : undefined} />
-      <dl className="mt-2 flex flex-wrap gap-x-10 gap-y-2 border-t pt-3 text-body" data-testid="route-totals">
-        {totals.map(([k, v]) => <div key={k} className="flex gap-2"><dt className="text-muted-foreground">{k}</dt><dd className="font-semibold">{v}</dd></div>)}
-      </dl>
+      <div className="mt-2 flex items-center gap-4 border-t pt-3">
+        <dl className="flex flex-1 flex-wrap gap-x-10 gap-y-2 text-body" data-testid="route-totals">
+          {totals.map(([k, v]) => <div key={k} className="flex gap-2"><dt className="text-muted-foreground">{k}</dt><dd className="font-semibold">{v}</dd></div>)}
+        </dl>
+        <KmzLink segment={d} />
+      </div>
     </section>
+  );
+}
+
+// The selected segment's line as drawn on the map, as a KMZ for Google Earth. A plain link: the login cookie goes with it.
+function KmzLink({ segment }: { segment: Detail }) {
+  const name = segmentName(segment);
+  return (
+    <a className="btn" href={`/api/map/segments/${segment.id}/kmz`} download={`${name}.kmz`}
+      aria-label={`Download KMZ of segment ${name}`}>
+      Download KMZ
+    </a>
   );
 }
 
