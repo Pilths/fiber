@@ -110,11 +110,14 @@ _SRF = ("srf", "srf id", "srf no", "srf number", "srf ref")  # optional header, 
 def _reservation(r: RowResult, f: dict[str, Any], label: str | None, known: set[str]) -> None:
     reasons: list[str] = []
     no_customer = checks.check_requestor(f.get("fiber core requestor"))
-    region, why = checks.map_region(f.get("region"))
+    # Region belongs to the segment, which the segment list already made, so a blank one is fine
+    region = None
+    if not blank(f.get("region")):
+        region, why = checks.map_region(f.get("region"))
+        if why:
+            reasons.append(why)
     nodes = checks.split_nodes(f.get("nodes"))
     p = r.parsed = {"group_label": label, "region": region}
-    if why:
-        reasons.append(why)
     if nodes:
         p["site_a"], p["site_b"], p["additional"] = nodes
         if why := checks.check_known_sites(nodes[:2], known):
