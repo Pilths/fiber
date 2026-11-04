@@ -28,7 +28,7 @@ function trunkRoutes(all: Segment[]): string[] {
   return [...routes].sort();
 }
 
-// Region and Type in the map toolbar: they dim the other segments on the map.
+// Region and route Type in the map toolbar: they dim the other segments on the map. Site types are in Layers.
 export function MapFilters({ segments, filter, onFilter }: { segments: Segment[] | null; filter: SegmentFilter; onFilter: (f: SegmentFilter) => void }) {
   const all = segments ?? [];
   const cls = "field h-8 w-auto text-[13px] font-semibold";
@@ -40,10 +40,9 @@ export function MapFilters({ segments, filter, onFilter }: { segments: Segment[]
       </select>
       <select className={cls} aria-label="Type" value={filter.network} onChange={(e) => onFilter({ ...filter, network: e.target.value })}>
         <option value="">All types</option>
+        <option value="type:Trunk">Trunk</option>
         {trunkRoutes(all).map((route) => <option key={route} value={`trunk:${route}`}>Trunk {route}</option>)}
         {LINK_TYPES.map((type) => <option key={type} value={`type:${type}`}>{type}</option>)}
-        <option value="dc">DC</option>
-        <option value="toc">TOC</option>
       </select>
     </>
   );
