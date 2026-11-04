@@ -9,6 +9,14 @@ Put the file in api/data/ (git-ignored; real data is never committed). ADMIN is 
 Sheet "Sites": site_name (4-letter LRD), latitude_in_decimal, longitude_in_decimal, region (optional),
     Type (optional: Trunk, DC, TOC; blank means Trunk).
 Sheet "Segments": Link (AAAA-BBBB), Distance (km), Route, Section, Surveyed cores, Total cores.
+Sheet "Reservation" (optional): Region (North, Central, South or East Coast; a blank or unknown region makes the
+    row Needs review and it is not imported), Nodes (site pair AAAA-BBBB; both sites must exist, the segment is
+    matched by the pair), No of core requested (whole number, 1 or more: a count-only reservation, no specific cores),
+    Fiber core requestor (the customer; a row without one is rejected), Fiber core request date and Expected CV Ready
+    (Excel dates, or text as yyyy-mm-dd; other text makes the row Needs review), Contractor, Remark, SRF,
+    Port Info, Fiber monitored Y/N/WIP (Y, N or WIP).
+    Loaded like the Upload tab's Reservation workbook: reservations are only added, never changed, a row already
+    imported is skipped on a re-run, and nothing is added once "Close reservation import" is closed.
 Safe to run again: sites missing from the file are left alone, fields edited in the dashboard are kept,
 and a survey count is only filled in where the segment has none yet.
 """
@@ -20,14 +28,18 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.db import engine
+from app.ingest import reservation_upload as ru
 from app.ingest import segment_list as sl
 from app.ingest import site_master as sm
 from app.ingest.checks import blank, clean
+from app.ingest.excel import parse_reservation_workbook
 from app.ingest.reservation_import import add_cores
 from app.routing.graph import invalidate as invalidate_routes
 
 SITES = ["site_name", "latitude_in_decimal", "longitude_in_decimal", "region", "Type"]
 SEGMENTS = ["Link", "Distance", "Route", "Section", "Surveyed cores", "Total cores"]
+RESERVATIONS = ["Region", "Nodes", "No of core requested", "Fiber core requestor", "Fiber core request date",
+                "Expected CV Ready", "Contractor", "Remark", "SRF", "Port Info", "Fiber monitored Y/N/WIP"]
 REASON = "data file load"
 
 
@@ -37,6 +49,7 @@ def template(path: str) -> None:
     ws.title = "Sites"  # type: ignore[union-attr]
     ws.append(SITES)  # type: ignore[union-attr]
     wb.create_sheet("Segments").append(SEGMENTS)
+    wb.create_sheet("Reservation").append(RESERVATIONS)
     wb.save(path)
     print(f"Blank file written to {path}")
 
@@ -107,6 +120,43 @@ def problems(db: Session, upload_id: int) -> list[str]:
         {"u": upload_id})]
 
 
+def reservation_problems(db: Session, upload_id: int) -> list[str]:
+    """Reservation rows carry their review state in row_group; their status column stays 'ready'."""
+    rows = db.execute(text(
+        "SELECT sheet, row_number, row_group, reason FROM upload_rows WHERE upload_id = :u AND entity = 'row' "
+        "AND row_group IN ('needs_review', 'rejected') ORDER BY row_number"), {"u": upload_id})
+    return [f"{sheet} row {number} ({group}): {reason}" for sheet, number, group, reason in rows]
+
+
+def load_reservations(db: Session, admin_id: int, path: str, filename: str) -> None:
+    """Stage and confirm the Reservation sheet with the Upload tab's code, so its rules (closed switch,
+    already imported, insert-only) apply unchanged."""
+    try:
+        results, _ignored = parse_reservation_workbook(path)
+    except ValueError:
+        print("Reservations: none")
+        return
+    if not results:
+        print("Reservations: none")
+        return
+    # the other sheets of this file are loaded by their own steps, so none are reported as left out
+    staged = ru.stage(db, admin_id, filename, results, [])
+    try:
+        out = ru.confirm(db, admin_id, staged["upload_id"], [])
+    except ru.ApplyError as error:
+        print(f"Reservations not loaded: {error.message}")
+        return
+    counts = out["counts"]
+    print(f"Reservations: {counts['reservations']} created, {len(out['skipped'])} skipped, "
+          f"{out['ignored_reservation_rows']} ignored (import closed), {staged['counts']}")
+    for warning in out["warnings"]:
+        print("  warning:", warning["message"])
+    for item in out["skipped"]:
+        print(f"  skipped: Reservation row {item['row_number']}: {item['reason']}")
+    for problem in reservation_problems(db, staged["upload_id"]):
+        print("  needs review:", problem)
+
+
 def load(db: Session, admin: str, path: str) -> int:
     admin_id = db.execute(text("SELECT id FROM users WHERE username = :u AND role = 'admin' AND active"), {"u": admin}).scalar()
     if admin_id is None:
@@ -142,6 +192,7 @@ def load(db: Session, admin: str, path: str) -> int:
     print(f"Survey counts: {done} set")
     for x in notes:
         print("  kept:", x)
+    load_reservations(db, admin_id, path, name)
     return 0
 
 
