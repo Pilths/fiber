@@ -13,6 +13,7 @@ import math
 import sys
 import xml.etree.ElementTree as ElementTree
 import zipfile
+from typing import BinaryIO
 
 import networkx
 from sqlalchemy import text
@@ -46,6 +47,16 @@ WHERE NOT EXISTS (
 )
 ORDER BY r.id LIMIT 1
 """
+OWN_SHAPE_SQL = """
+SELECT 1 FROM routes r
+JOIN route_segments rs ON rs.route_id = r.id AND rs.segment_id = :segment_id
+WHERE r.geom IS NOT NULL
+AND NOT EXISTS (
+    SELECT 1 FROM route_segments other WHERE other.route_id = r.id AND other.segment_id <> :segment_id
+)
+LIMIT 1
+"""
+SEGMENT_BY_ID_SQL = "SELECT id, site_a_id, site_b_id FROM segments WHERE id = :segment_id"
 UPDATE_ROUTE_SQL = """
 UPDATE routes SET geom = ST_SetSRID(ST_GeomFromGeoJSON(:geojson), 4326) WHERE id = :route_id
 """
@@ -89,11 +100,17 @@ def folder_name(folder: ElementTree.Element) -> str:
     return ""
 
 
-def read_kml_root(path: str) -> ElementTree.Element:
-    with zipfile.ZipFile(path) as archive:
-        kml_names = [name for name in archive.namelist() if name.lower().endswith(".kml")]
-        chosen = "doc.kml" if "doc.kml" in kml_names else kml_names[0]
-        return ElementTree.fromstring(archive.read(chosen))
+def read_kml_root(source: str | BinaryIO) -> ElementTree.Element:
+    """`source` is a path or an open binary file."""
+    try:
+        with zipfile.ZipFile(source) as archive:
+            kml_names = [name for name in archive.namelist() if name.lower().endswith(".kml")]
+            if not kml_names:
+                raise ValueError("no .kml inside the KMZ")
+            chosen = "doc.kml" if "doc.kml" in kml_names else kml_names[0]
+            return ElementTree.fromstring(archive.read(chosen))
+    except (zipfile.BadZipFile, ElementTree.ParseError) as error:
+        raise ValueError(f"not a valid KMZ ({error})") from error
 
 
 def parse_coordinates(coordinates_text: str) -> list[tuple[float, float]]:
@@ -122,7 +139,7 @@ def lines_in_folder(folder: ElementTree.Element) -> list[list[tuple[float, float
     return lines
 
 
-def parse_lines(path: str, folder: str) -> tuple[list[list[tuple[float, float]]], list[str]]:
+def parse_lines(source: str | BinaryIO, folder: str) -> tuple[list[list[tuple[float, float]]], list[str]]:
     """Lines of every folder named `folder`, and all folder names found (to help when none matches)."""
     wanted = folder.strip().lower()
     names: list[str] = []
@@ -140,7 +157,7 @@ def parse_lines(path: str, folder: str) -> tuple[list[list[tuple[float, float]]]
             else:
                 walk(child)
 
-    walk(read_kml_root(path))
+    walk(read_kml_root(source))
     return lines, names
 
 
@@ -273,16 +290,8 @@ def save_shape(db: Session, segment, coords: list[list[float]]) -> None:
     db.execute(text(INSERT_ROUTE_SEGMENT_SQL), {"route_id": route_id, "segment_id": segment["id"]})
 
 
-def run(db: Session, username: str, path: str, folder: str) -> int:
-    user_id = db.execute(text(USER_SQL), {"username": username}).scalar()
-    if user_id is None:
-        print(f"User '{username}' not found or not active.")
-        return 1
-    lines, folder_names = parse_lines(path, folder)
-    if not lines:
-        found = ", ".join(folder_names) or "none"
-        print(f"No lines found in folder '{folder}'. Folders in the file: {found}")
-        return 1
+def compute_shapes(db: Session, lines: list[list[tuple[float, float]]]) -> dict:
+    """Shapes for every segment whose two sites are near the lines. Saves nothing."""
     graph = build_graph(lines)
     snap_dangling_ends(graph, lines)
     attached: dict = {}
@@ -301,17 +310,46 @@ def run(db: Session, username: str, path: str, folder: str) -> int:
         if coords is None:
             skipped.append({"segment_id": segment["id"], "name": name, "reason": reason})
             continue
-        save_shape(db, segment, coords)
         excel_km = float(segment["distance_km"]) if segment["distance_km"] is not None else None
+        had_shape = db.execute(text(OWN_SHAPE_SQL), {"segment_id": segment["id"]}).first() is not None
         shaped.append(
-            {"segment_id": segment["id"], "name": name, "km": round(km, 2), "excel_km": excel_km}
+            {
+                "segment_id": segment["id"],
+                "name": name,
+                "km": round(km, 2),
+                "excel_km": excel_km,
+                "had_shape": had_shape,
+                "coords": coords,
+            }
         )
-    summary = {"shaped": shaped, "skipped": skipped}
+    sites_attached = [site_names[site_id] for site_id, node in attached.items() if node is not None]
+    return {"shaped": shaped, "skipped": skipped, "sites_attached": sites_attached}
+
+
+def run(db: Session, username: str, path: str, folder: str) -> int:
+    user_id = db.execute(text(USER_SQL), {"username": username}).scalar()
+    if user_id is None:
+        print(f"User '{username}' not found or not active.")
+        return 1
+    try:
+        lines, folder_names = parse_lines(path, folder)
+    except ValueError as error:
+        print(error)
+        return 1
+    if not lines:
+        found = ", ".join(folder_names) or "none"
+        print(f"No lines found in folder '{folder}'. Folders in the file: {found}")
+        return 1
+    result = compute_shapes(db, lines)
+    for item in result["shaped"]:
+        segment = db.execute(text(SEGMENT_BY_ID_SQL), {"segment_id": item["segment_id"]}).mappings().one()
+        save_shape(db, segment, item["coords"])
+    shaped = [{key: value for key, value in item.items() if key != "coords"} for item in result["shaped"]]
+    summary = {"shaped": shaped, "skipped": result["skipped"]}
     upload = {"user_id": user_id, "filename": path.rsplit("/", 1)[-1], "summary": json.dumps(summary)}
     db.execute(text(INSERT_UPLOAD_SQL), upload)
     db.commit()
-    attached_names = [site_names[site_id] for site_id, node in attached.items() if node is not None]
-    print_report(len(lines), shaped, skipped, attached_names)
+    print_report(len(lines), shaped, result["skipped"], result["sites_attached"])
     return 0
 
 
