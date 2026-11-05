@@ -102,7 +102,7 @@ test("clicking a chip selects the segment; Enter on a chip too; Esc clears", asy
   expect(page.url()).not.toContain("#segment=");
 });
 
-test("Layers: route types and trunk routes hide their lines; the selected segment always shows", async ({ page }) => {
+test("Layers: route types and trunk routes hide their lines; turning off the selected segment's layer unselects it", async ({ page }) => {
   await signIn(page);
   await expect(chips(page)).toHaveCount(19);
   const segs: { id: number; route_type: string | null; route: string | null }[] =
@@ -136,13 +136,15 @@ test("Layers: route types and trunk routes hide their lines; the selected segmen
   await expect(lines).toHaveCount(total - count((s) => s.route_type === "Metro"));
   await keyMetro.click();
   await expect(lines).toHaveCount(total);
-  // a selected Metro segment stays on the map with Metro unticked
+  // unticking the layer of the selected Metro segment unselects it and hides it
   const picked = drawn.find((s) => s.route_type === "Metro")!;
   const hash = `#segment=${encodeURIComponent(await segmentNameOf(page, picked.id))}`;
   await page.evaluate((value) => { location.hash = value; }, hash);
-  await expect(page.locator(`[data-testid=map-line][data-segment-id="${picked.id}"]`)).toHaveAttribute("data-selected", "true");
+  const pickedLine = page.locator(`[data-testid=map-line][data-segment-id="${picked.id}"]`);
+  await expect(pickedLine).toHaveAttribute("data-selected", "true");
   await page.getByRole("checkbox", { name: "Metro", exact: true }).uncheck();
-  await expect(page.locator(`[data-testid=map-line][data-segment-id="${picked.id}"]`)).toHaveCount(1);
+  await expect(pickedLine).toHaveCount(0);
+  await expect(page.locator("[data-testid=map-line][data-selected=true]")).toHaveCount(0);
 });
 
 async function segmentNameOf(page: Page, id: number): Promise<string> {
@@ -288,4 +290,19 @@ test("zoomed to 17 near DEV Kuala Lumpur DC the buildings layer draws", async ({
   await page.waitForTimeout(1000); // glyphs for street names
   await page.screenshot({ path: "e2e/screenshots/map-buildings.png" });
   expect(outside).toEqual([]);
+});
+
+test("Region filter that leaves out the selected segment unselects it", async ({ page }) => {
+  await signIn(page);
+  await expect(chips(page)).toHaveCount(19);
+  const segs: { id: number; region: string | null }[] = await (await page.request.get("/api/segments")).json();
+  const picked = segs.find((s) => s.region)!;
+  const other = segs.find((s) => s.region && s.region !== picked.region)!.region!;
+  const hash = `#segment=${encodeURIComponent(await segmentNameOf(page, picked.id))}`;
+  await page.evaluate((value) => { location.hash = value; }, hash);
+  const pickedLine = page.locator(`[data-testid=map-line][data-segment-id="${picked.id}"]`);
+  await expect(pickedLine).toHaveAttribute("data-selected", "true");
+  await map(page).getByLabel("Region").selectOption(other);
+  await expect(page.locator("[data-testid=map-line][data-selected=true]")).toHaveCount(0);
+  expect(page.url()).not.toContain("#segment=");
 });

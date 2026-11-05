@@ -182,4 +182,7 @@ test("route mode on the map: other options' segments switch option, the rest are
   const panel = page.getByRole("region", { name: "Site A to B" });
   await expect(panel.getByLabel("Site A")).toHaveValue("");
   await expect(panel.getByLabel("Site B")).toHaveValue("");
+  // and nothing stays selected
+  await expect(page.locator("[data-testid=map-line][data-selected=true]")).toHaveCount(0);
+  await expect(chain(page)).toHaveCount(0);
 });

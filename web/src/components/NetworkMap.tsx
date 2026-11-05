@@ -258,6 +258,24 @@ export function NetworkMap({ selectedIds, routeKey, visible, onSelectSegment: se
     if (b) go(fitView(b, size.w, size.h, ids ? 100 : 70));
   };
 
+  // Turning a layer off unselects a single segment it hides; a found route keeps its segments.
+  const layersSeen = useRef({ routeLayers, trunkOff });
+  useEffect(() => {
+    const seen = layersSeen.current;
+    if (seen.routeLayers === routeLayers && seen.trunkOff === trunkOff) {
+      return;
+    }
+    layersSeen.current = { routeLayers, trunkOff };
+    if (routeKey) {
+      return;
+    }
+    const hidesSelected = feats.some((feature) =>
+      sel.has(feature.properties.segment_id) && !routeLayerOn(routeLayers, trunkOff, feature.properties));
+    if (hidesSelected) {
+      onClear();
+    }
+  }, [routeLayers, trunkOff]); // eslint-disable-line react-hooks/exhaustive-deps -- runs on a layer change only
+
   // First data: fit to the selection if there is one, else to all segments. A new route: fit to its segments.
   const fitted = useRef(false);
   const selKey = selectedIds.join(",");
