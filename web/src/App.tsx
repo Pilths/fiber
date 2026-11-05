@@ -180,6 +180,22 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
     setSegmentId(null); setDetail(null); setDrawerCore(null); rp.clear();
     if (location.hash.startsWith("#segment=")) history.replaceState(null, "", location.pathname);
   };
+  // "Clear route" also unselects the segment the route had selected.
+  const planner = {
+    ...rp,
+    reset: () => {
+      rp.reset();
+      clearSelection();
+    },
+  };
+  // A Region filter that hides the selected segment unselects it; a found route ignores the filter.
+  const changeFilter = (next: SegmentFilter) => {
+    setFilter(next);
+    const selected = segments?.find((segment) => segment.id === segmentId);
+    if (!found && selected && !inFilter(selected, next)) {
+      clearSelection();
+    }
+  };
   const mapIds = found ? [...found.ids, ...(segmentId != null && !found.ids.includes(segmentId) ? [segmentId] : [])]
     : segmentId != null ? [segmentId] : [];
   const segmentLoss = loss?.segment_id === segmentId ? loss : null;
@@ -212,11 +228,11 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
             <NetworkMap version={version} onSelectSegment={pickOnMap} onSite={() => {}} onClear={clearSelection}
               selectedIds={mapIds} routeKey={found ? `found-${found.ids.join(",")}` : null}
               visible={(p) => (optionIds ? optionIds.has(p.segment_id) : inFilter(p, filter))}
-              tools={<MapFilters segments={segments} filter={filter} onFilter={setFilter} />} />
+              tools={<MapFilters segments={segments} filter={filter} onFilter={changeFilter} />} />
           </section>
           {/* The panel fills the map card's height (absolute, scrolls inside), so the map alone sets the row height. */}
           <div className="relative col-span-4 min-w-0">
-            <RouteSearch rp={rp} />
+            <RouteSearch rp={planner} />
           </div>
           {segmentId != null && !detail && <p className="card empty col-span-12 text-center text-body text-muted-foreground">Loading segment...</p>}
           {detail && (

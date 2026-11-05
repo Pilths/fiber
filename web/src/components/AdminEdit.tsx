@@ -45,11 +45,10 @@ function editError(e: unknown) {
   return errorText(e, "Could not save. Try again.");
 }
 
-function Reason({ value, onChange, missing, autoFocus }: { value: string; onChange: (v: string) => void; missing: boolean; autoFocus?: boolean }) {
+function Reason({ value, onChange, autoFocus }: { value: string; onChange: (v: string) => void; autoFocus?: boolean }) {
   return (
-    <label className="col-span-2 block"><span className={lbl}>Reason (required)</span>
-      <input className="field" autoFocus={autoFocus} value={value} onChange={(e) => onChange(e.target.value)} aria-invalid={missing} />
-      {missing && <span role="alert" className="mt-1 block text-body font-semibold text-red">Enter a reason: every edit is kept as history.</span>}
+    <label className="col-span-2 block"><span className={lbl}>Reason (optional)</span>
+      <input className="field" autoFocus={autoFocus} value={value} onChange={(e) => onChange(e.target.value)} />
     </label>
   );
 }
@@ -96,7 +95,6 @@ export function EditSegmentDialog({ segmentId, focus, onClose, onSaved }: { segm
   const [a, setA] = useState<Site | null>(null);
   const [b, setB] = useState<Site | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [tried, setTried] = useState(false);
   const [busy, setBusy] = useState(false);
   const survey = useRef<HTMLInputElement>(null);
 
@@ -117,8 +115,7 @@ export function EditSegmentDialog({ segmentId, focus, onClose, onSaved }: { segm
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setF((o) => ({ ...o, [k]: e.target.value }));
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setTried(true);
-    if (!s || !f.reason.trim() || !a || !b) return;
+    if (!s || !a || !b) return;
     // Only changed fields are sent.
     const body: components["schemas"]["SegmentBody"] = { reason: f.reason.trim() };
     if (f.distance !== "" && (s.distance_km == null || Number(f.distance) !== Number(s.distance_km))) body.distance_km = f.distance;
@@ -164,7 +161,7 @@ export function EditSegmentDialog({ segmentId, focus, onClose, onSaved }: { segm
               <input type="checkbox" className="mt-0.5 size-4" checked={f.cut} onChange={(e) => setF((o) => ({ ...o, cut: e.target.checked }))} />
               <span className="font-semibold">Fiber cut</span>
             </label>
-            <Reason value={f.reason} onChange={(v) => setF((o) => ({ ...o, reason: v }))} missing={tried && !f.reason.trim()} autoFocus={focus === "restore"} />
+            <Reason value={f.reason} onChange={(v) => setF((o) => ({ ...o, reason: v }))} autoFocus={focus === "restore"} />
           </div>
           <Buttons busy={busy} onClose={onClose} />
           <EditHistory rows={s.history} />
@@ -178,7 +175,6 @@ export function EditSiteDialog({ siteId, onClose, onSaved }: { siteId: number; o
   const [s, setS] = useState<SiteEdit | null>(null);
   const [f, setF] = useState({ name: "", lat: "", lon: "", region: "", active: true, reason: "" });
   const [error, setError] = useState<string | null>(null);
-  const [tried, setTried] = useState(false);
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     let stale = false;
@@ -193,8 +189,7 @@ export function EditSiteDialog({ siteId, onClose, onSaved }: { siteId: number; o
   const set = (k: "name" | "lat" | "lon" | "region") => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setF((o) => ({ ...o, [k]: e.target.value }));
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setTried(true);
-    if (!s || !f.reason.trim()) return;
+    if (!s) return;
     const body: components["schemas"]["SiteBody"] = { reason: f.reason.trim() };
     if (f.name.trim() !== s.name) body.name = f.name;
     if (f.lat !== "" && Number(f.lat) !== s.lat) body.lat = Number(f.lat);
@@ -235,7 +230,7 @@ export function EditSiteDialog({ siteId, onClose, onSaved }: { siteId: number; o
             <p className="col-span-2 -mt-1 text-body text-muted-foreground">
               {f.active ? "Kind: " + s.kind.replace("_", " ") + "." : <b className="font-semibold text-amber">Inactive sites are kept, never deleted. A site used by a segment cannot be deactivated.</b>}
             </p>
-            <Reason value={f.reason} onChange={(v) => setF((o) => ({ ...o, reason: v }))} missing={tried && !f.reason.trim()} />
+            <Reason value={f.reason} onChange={(v) => setF((o) => ({ ...o, reason: v }))} />
           </div>
           <Buttons busy={busy} onClose={onClose} />
           <EditHistory rows={s.history} />

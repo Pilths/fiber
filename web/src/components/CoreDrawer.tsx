@@ -52,7 +52,7 @@ export function CoreDrawer({ core, segment, ends, me, onClose, onChanged, loss, 
   };
 
   const st = STATUS[core.status];
-  const canKeep = res && (res.is_mine || admin) && res.state === "approved";
+  const canRequestRelease = res && (res.is_mine || admin) && res.state === "approved";
   const canRelease = admin && res?.state === "release_requested";
   // The holder has no list of requested cores; admins see every reservation, so read it at click time.
   const release = async (rid: number) => {
@@ -92,10 +92,9 @@ export function CoreDrawer({ core, segment, ends, me, onClose, onChanged, loss, 
 
       {error && <p role="alert" className="mt-4 rounded-md border border-red bg-red-bg px-3 py-2 text-body font-semibold text-red">{error}</p>}
 
-      {(canKeep || canRelease) && (
+      {(canRequestRelease || canRelease) && (
         <div className="mt-4 flex flex-wrap gap-2 border-t pt-4">
-          {canKeep && <button type="button" className="btn" disabled={busy} onClick={() => act(() => resAction(res.reservation_id, "keep"))}>Keep</button>}
-          {canKeep && <button type="button" className="btn" disabled={busy} onClick={() => act(() => resAction(res.reservation_id, "request-release", { cores: [core.id] }))}>Request release of core {core.number}</button>}
+          {canRequestRelease && <button type="button" className="btn" disabled={busy} onClick={() => act(() => resAction(res.reservation_id, "request-release", { cores: [core.id] }))}>Request release of core {core.number}</button>}
           {canRelease && <button type="button" className="btn btn-p" disabled={busy} onClick={() => act(() => release(res.reservation_id))}>Release requested cores</button>}
         </div>
       )}
@@ -136,19 +135,15 @@ export function CoreDrawer({ core, segment, ends, me, onClose, onChanged, loss, 
 function PortsDialog({ core, ends, onClose, onSaved }: { core: Core; ends: [string, string]; onClose: () => void; onSaved: () => void }) {
   const [a, setA] = useState(core.port_a ?? "");
   const [b, setB] = useState(core.port_b ?? "");
-  const [reason, setReason] = useState("");
-  const [tried, setTried] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const lbl = "lbl mb-1 block text-body! text-foreground!";
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setTried(true);
-    if (!reason.trim()) return;
     setBusy(true);
     setError(null);
     try {
-      await api.post("/api/admin/cores/{core_id}/ports", { path: { core_id: core.id }, body: { port_a: a.trim() || null, port_b: b.trim() || null, reason: reason.trim() } });
+      await api.post("/api/admin/cores/{core_id}/ports", { path: { core_id: core.id }, body: { port_a: a.trim() || null, port_b: b.trim() || null, reason: "" } });
       onSaved();
       onClose();
     } catch (err) {
@@ -163,10 +158,6 @@ function PortsDialog({ core, ends, onClose, onSaved }: { core: Core; ends: [stri
         <label className="block"><span className={lbl}>Port at {ends[0]}</span><input className="field" value={a} onChange={(e) => setA(e.target.value)} autoFocus /></label>
         <label className="block"><span className={lbl}>Port at {ends[1]}</span><input className="field" value={b} onChange={(e) => setB(e.target.value)} /></label>
         <p className="text-body text-muted-foreground">Leave a field empty to clear that end.</p>
-        <label className="block"><span className={lbl}>Reason (required)</span>
-          <input className="field" value={reason} onChange={(e) => setReason(e.target.value)} aria-invalid={tried && !reason.trim()} />
-          {tried && !reason.trim() && <span role="alert" className="mt-1 block text-body font-semibold text-red">Enter a reason: every edit is kept as history.</span>}
-        </label>
         <div className="mt-5 flex justify-end gap-2">
           <button type="button" className="btn" onClick={onClose}>Cancel</button>
           <button type="submit" className="btn btn-p" disabled={busy}>{busy ? "Saving…" : "Save"}</button>

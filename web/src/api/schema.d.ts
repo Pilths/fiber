@@ -1248,7 +1248,10 @@ export interface components {
             port_a?: string | null;
             /** Port B */
             port_b?: string | null;
-            /** Reason */
+            /**
+             * Reason
+             * @default
+             */
             reason: string;
         };
         /** CoreRef */
@@ -1262,7 +1265,10 @@ export interface components {
         };
         /** CorrectBody */
         CorrectBody: {
-            /** Reason */
+            /**
+             * Reason
+             * @default
+             */
             reason: string;
             /** Customer Id */
             customer_id?: number | null;
@@ -1698,7 +1704,10 @@ export interface components {
         };
         /** SegmentBody */
         SegmentBody: {
-            /** Reason */
+            /**
+             * Reason
+             * @default
+             */
             reason: string;
             /** Distance Km */
             distance_km?: number | string | null;
@@ -1948,7 +1957,10 @@ export interface components {
         };
         /** SiteBody */
         SiteBody: {
-            /** Reason */
+            /**
+             * Reason
+             * @default
+             */
             reason: string;
             /** Name */
             name?: string | null;
@@ -2206,7 +2218,10 @@ export interface components {
         };
         /** ReasonBody */
         app__reservations__schemas__ReasonBody: {
-            /** Reason */
+            /**
+             * Reason
+             * @default
+             */
             reason: string;
         };
     };
