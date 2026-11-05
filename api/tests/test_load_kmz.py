@@ -111,3 +111,16 @@ def test_unknown_folder_and_user_fail(db, tmp_path, capsys):
     one(db, "INSERT INTO users (username, display_name, role) VALUES ('admin1','a','admin') RETURNING id")
     assert run(session, "admin1", path, "no such folder") == 1
     assert "ex infra" in capsys.readouterr().out
+
+
+def test_file_without_folders_or_blank_folder_reads_every_line(tmp_path):
+    from app.load_kmz import parse_lines
+    kml = f'<kml xmlns="http://www.opengis.net/kml/2.2"><Document>{line_xml(HIGHWAY)}</Document></kml>'
+    path = tmp_path / "flat.kmz"
+    with zipfile.ZipFile(path, "w") as archive:
+        archive.writestr("doc.kml", kml)
+    lines, folders = parse_lines(str(path), "propose route")
+    assert len(lines) == 1 and folders == []
+    build_kmz(str(tmp_path / "foldered.kmz"))
+    lines, _folders = parse_lines(str(tmp_path / "foldered.kmz"), "")
+    assert len(lines) == 4  # every line, ex infra included, when the folder box is left empty
