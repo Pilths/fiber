@@ -140,8 +140,10 @@ def lines_in_folder(folder: ElementTree.Element) -> list[list[tuple[float, float
 
 
 def parse_lines(source: str | BinaryIO, folder: str) -> tuple[list[list[tuple[float, float]]], list[str]]:
-    """Lines of every folder named `folder`, and all folder names found (to help when none matches)."""
+    """Lines of every folder named `folder`, and all folder names found (to help when none matches).
+    A blank `folder`, or a file with no folders at all, reads every line in the file."""
     wanted = folder.strip().lower()
+    root = read_kml_root(source)
     names: list[str] = []
     lines: list[list[tuple[float, float]]] = []
 
@@ -157,7 +159,11 @@ def parse_lines(source: str | BinaryIO, folder: str) -> tuple[list[list[tuple[fl
             else:
                 walk(child)
 
-    walk(read_kml_root(source))
+    if not wanted:
+        return lines_in_folder(root), names
+    walk(root)
+    if not names:
+        return lines_in_folder(root), names
     return lines, names
 
 
