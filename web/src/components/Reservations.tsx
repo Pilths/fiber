@@ -3,6 +3,7 @@ import { api, errorText, resAction, type Action } from "@/api/client";
 import type { components } from "@/api/schema";
 import { Icon } from "@/components/Icon";
 import { EVENT_WORD, inputCls, when } from "@/lib/status";
+import { plural } from "@/lib/utils";
 
 type Res = components["schemas"]["ReservationOut"];
 type Item = components["schemas"]["NeedsReviewItem"];
@@ -30,7 +31,7 @@ export function ResHistory({ rid }: { rid: number }) {
                 <span className="font-semibold">{EVENT_WORD[ev.type] ?? ev.type}</span> by {ev.user}
                 <span className="text-muted-foreground">, {when(ev.at)}</span>
                 {ev.cores.length > 0 && <span>; cores {ev.cores.map((c) => c.number).join(", ")}</span>}
-                {ev.unassigned_change != null && <span>; {ev.unassigned_change > 0 ? `${ev.unassigned_change} cores by count` : `${-ev.unassigned_change} assigned`}</span>}
+                {ev.unassigned_change != null && <span>; {ev.unassigned_change > 0 ? `${plural(ev.unassigned_change, "core")} by count` : `${-ev.unassigned_change} assigned`}</span>}
                 {(ev.customer || ev.planned_date) && <span>; now {[ev.customer, ev.planned_date && `planned ${ev.planned_date}`].filter(Boolean).join(", ")}</span>}
                 {ev.reason && <span className="block text-muted-foreground">Reason: {ev.reason}</span>}
               </li>
@@ -101,7 +102,7 @@ function Card({ r, me, onChanged }: { r: Res; me: Me; onChanged: () => void }) {
       {r.stale && <p className="text-sm font-medium">Stale: no change for over 3 months.</p>}
       {r.last_reason && <p className="text-sm font-medium" role="note">{r.status === "rejected" ? "Rejection reason" : "Release declined"}: {r.last_reason}</p>}
       {r.unassigned_cores > 0 && (
-        <p className="text-sm">{r.unassigned_cores} cores reserved by count on {r.unassigned_segment}; <strong>{r.remaining_unassigned} not assigned yet</strong>.</p>
+        <p className="text-sm">{plural(r.unassigned_cores, "core")} reserved by count on {r.unassigned_segment}; <strong>{r.remaining_unassigned} not assigned yet</strong>.</p>
       )}
       {groupCores(r).map(([segment, cores]) => (
         <p key={segment} className="text-sm">{segment}: cores {cores.map((c) => c.held ? c.number : `${c.number} (released)`).join(", ")}</p>
@@ -275,7 +276,7 @@ function ApprovalRow({ r, onChanged }: { r: Res; onChanged: () => void }) {
         <td colSpan={8} className="h-auto! py-3! whitespace-normal!">
           <div className="space-y-1.5 text-body">
             <p className="text-muted-foreground">Request #{r.id}{r.imported && ", imported"}. Last event: {r.last_event ?? "none"}, {r.age_days} days ago.{r.stale && " Stale: no change for over 3 months."}</p>
-            {r.unassigned_cores > 0 && <p>{r.unassigned_cores} cores reserved by count on {r.unassigned_segment}; {r.remaining_unassigned} not assigned yet.</p>}
+            {r.unassigned_cores > 0 && <p>{plural(r.unassigned_cores, "core")} reserved by count on {r.unassigned_segment}; {r.remaining_unassigned} not assigned yet.</p>}
             {groupCores(r).map(([segment, cs]) => <p key={segment}>{segment}: cores {cs.map((c) => c.held ? c.number : `${c.number} (released)`).join(", ")}</p>)}
             {release && <p>Release requested for cores {r.cores.filter((c) => r.release_requested_cores.includes(c.core_id)).map((c) => c.number).join(", ") || "unassigned"}.</p>}
             {r.last_reason && <p role="note">{r.status === "rejected" ? "Rejection reason" : "Release declined"}: {r.last_reason}</p>}
