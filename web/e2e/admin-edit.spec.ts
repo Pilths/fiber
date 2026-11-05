@@ -16,7 +16,7 @@ const coreBtn = (page: Page, n: number) => page.getByRole("button", { name: `Cor
 const editSegment = (page: Page) => page.getByTestId("segment-actions").getByRole("button", { name: "Edit segment" });
 const coresTable = (page: Page) => page.getByRole("table", { name: /^Cores of / });
 
-test("core drawer: opens from a taken core with history, Keep for the owner, Esc returns focus", async ({ page }) => {
+test("core drawer: opens from a taken core with history, no Keep, Esc returns focus", async ({ page }) => {
   await signIn(page, "planner1");
   await pick(page, KLCJ);
   await openCore(page, 1);
@@ -31,8 +31,7 @@ test("core drawer: opens from a taken core with history, Keep for the owner, Esc
   await expect(hist.getByRole("listitem").last()).toContainText("Requested by");
   await expect(d.getByRole("button", { name: "Request release of core 1" })).toBeVisible();
   await expect(d.getByRole("button", { name: /^Mark / })).toHaveCount(0); // planners cannot edit status
-  await d.getByRole("button", { name: "Keep" }).click();
-  await expect(hist.getByRole("listitem").first()).toContainText("Kept by DEV planner1");
+  await expect(d.getByRole("button", { name: "Keep" })).toHaveCount(0);
   await page.screenshot({ path: "e2e/screenshots/core-drawer.png" });
   await page.keyboard.press("Escape");
   await expect(d).toBeHidden();
@@ -77,9 +76,7 @@ test("admin edits segment distance with a reason; the diagram follows; then reve
     await editSegment(page).click();
     const dlg = page.getByRole("dialog", { name: /^Edit segment/ });
     await dlg.getByLabel("Distance (km)").fill(value);
-    await dlg.getByRole("button", { name: "Save" }).click();
-    await expect(dlg.getByRole("alert")).toContainText("Enter a reason"); // reason empty: blocked before sending
-    await dlg.getByLabel("Reason (required)").fill(reason);
+    await dlg.getByLabel("Reason (optional)").fill(reason);
     return dlg;
   };
   let dlg = await edit("18.3", "E2E: re-measured route");
@@ -104,7 +101,7 @@ test("lowering the survey count below taken cores is refused in plain words", as
   await editSegment(page).click();
   const dlg = page.getByRole("dialog", { name: /^Edit segment/ });
   await dlg.getByLabel("Survey count").fill("1");
-  await dlg.getByLabel("Reason (required)").fill("E2E: should be refused");
+  await dlg.getByLabel("Reason (optional)").fill("E2E: should be refused");
   await dlg.getByRole("button", { name: "Save" }).click();
   await expect(dlg.getByRole("alert")).toContainText(/^Cores 2, .* are allocated or have history and cannot be removed/);
   await dlg.getByRole("button", { name: "Cancel" }).click();
@@ -122,9 +119,7 @@ test("admin opens a site from the segment diagram: fields, reason required, hist
   await expect(dlg.getByLabel("Latitude")).toHaveValue("2.9213");
   await dlg.getByLabel("Active").uncheck();
   await expect(dlg).toContainText("A site used by a segment cannot be deactivated");
-  await dlg.getByRole("button", { name: "Save" }).click();
-  await expect(dlg.getByRole("alert")).toContainText("Enter a reason");
-  await dlg.getByLabel("Reason (required)").fill("E2E: try to deactivate");
+  await dlg.getByLabel("Reason (optional)").fill("E2E: try to deactivate");
   await dlg.getByRole("button", { name: "Save" }).click();
   await expect(dlg.getByRole("alert").first()).toContainText("used by a segment");
   await dlg.getByText(/^History/).click();
@@ -157,9 +152,6 @@ test("admin edits a core's ports with a reason, then puts them back", async ({ p
   await a.fill("E2E-KL-21");
   await b.fill("");
   await dlg.getByRole("button", { name: "Save" }).click();
-  await expect(dlg.getByRole("alert")).toContainText("Enter a reason");
-  await dlg.getByLabel("Reason (required)").fill("E2E: ports from site survey");
-  await dlg.getByRole("button", { name: "Save" }).click();
   await expect(dlg).toBeHidden();
   await expect(d).toBeVisible(); // closing the nested dialog leaves the drawer open
   await expect(d).toContainText("E2E-KL-21 to Not recorded");
@@ -168,7 +160,6 @@ test("admin edits a core's ports with a reason, then puts them back", async ({ p
   await d.getByRole("button", { name: "Edit ports" }).click();
   await a.fill(oldA);
   await b.fill(oldB);
-  await dlg.getByLabel("Reason (required)").fill("E2E: undo");
   await dlg.getByRole("button", { name: "Save" }).click();
   await expect(dlg).toBeHidden();
   await expect(d).toContainText(oldA || oldB ? `${oldA || "Not recorded"} to ${oldB || "Not recorded"}` : "Add ports");

@@ -64,7 +64,6 @@ def test_segment_edit_each_field_own_row_and_noop(client, w, db):
     assert post(client, f"segments/{s}", reason="x").status_code == 400
     assert len(edits(db, "segment", s)) == n
     assert post(client, f"segments/{s}", reason="x", region="Atlantis").status_code == 422
-    assert post(client, f"segments/{s}", reason=" ", cable_size=1).status_code == 422
     assert post(client, f"segments/{s}", reason="x", distance_km="-1").status_code == 422
     assert post(client, "segments/999999", reason="x", cable_size=1).status_code == 404
 
@@ -332,11 +331,12 @@ def test_core_ports_label_at_another_site_is_409(client, w, db):
 
 def test_core_ports_validation_and_permissions(client, w, db):
     c = w["c1"][1]
-    for body in ({"port_a": "P1"}, {"port_a": "P1", "reason": " "}):
-        assert post(client, f"cores/{c}/ports", **body).status_code == 422
     assert post(client, f"cores/{c}/ports", port_a="P1", reason="x", user="planner1").status_code == 403
     assert post(client, "cores/999999/ports", port_a="P1", reason="x").status_code == 404
     assert one(db, "SELECT count(*) FROM ports") == 0 and not edits(db, "core", c)
+    # no reason needed: the history row says "no reason given"
+    assert post(client, f"cores/{c}/ports", port_a="P1").status_code == 200
+    assert [edit[3] for edit in edits(db, "core", c)] == ["no reason given"]
 
 
 # ---------- count-only holds listed on the segment ----------
@@ -363,8 +363,6 @@ def cut(client, sid, on=True, user="admin1", **kw):
 
 def test_fiber_cut_edit_history_and_roles(client, w, db):
     s1 = w["s1"]
-    assert cut(client, s1, reason="").status_code == 422
-    assert post(client, f"segments/{s1}", fiber_cut=True).status_code == 422
     assert cut(client, s1, user="planner1").status_code == 403
     assert client.get(f"/api/admin/segments/{s1}", headers=H("admin1")).json()["fiber_cut"] is False
     assert cut(client, s1).status_code == 200

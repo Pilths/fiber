@@ -98,7 +98,7 @@ function Card({ r, me, onChanged }: { r: Res; me: Me; onChanged: () => void }) {
         {r.imported && ", imported"}. Last event: {r.last_event ?? "none"}, {r.age_days} days ago.
       </p>
       {r.awaiting && <p className="text-sm font-medium">{r.awaiting === "approval" ? "Waiting for approval" : "Release requested, waiting for an admin"} for {r.age_days} days.</p>}
-      {r.stale && <p className="text-sm font-medium">Stale: no approval or keep for over 3 months.</p>}
+      {r.stale && <p className="text-sm font-medium">Stale: no change for over 3 months.</p>}
       {r.last_reason && <p className="text-sm font-medium" role="note">{r.status === "rejected" ? "Rejection reason" : "Release declined"}: {r.last_reason}</p>}
       {r.unassigned_cores > 0 && (
         <p className="text-sm">{r.unassigned_cores} cores reserved by count on {r.unassigned_segment}; <strong>{r.remaining_unassigned} not assigned yet</strong>.</p>
@@ -122,7 +122,7 @@ function Card({ r, me, onChanged }: { r: Res; me: Me; onChanged: () => void }) {
         </fieldset>
       )}
       {needsReason && (
-        <label className="block text-sm font-medium">Reason (required)
+        <label className="block text-sm font-medium">Reason (optional)
           <input className={`${inputCls} mt-1 block w-full`} value={reason} onChange={(e) => setReason(e.target.value)} />
         </label>
       )}
@@ -132,7 +132,7 @@ function Card({ r, me, onChanged }: { r: Res; me: Me; onChanged: () => void }) {
       <div className="flex flex-wrap gap-2">
         {mode ? (
           <>
-            <button type="button" className="btn btn-p btn-sm" disabled={busy || (needsReason && !reason.trim()) || (mode === "request-release" && held.length > 0 && pick.size === 0)}
+            <button type="button" className="btn btn-p btn-sm" disabled={busy || (mode === "request-release" && held.length > 0 && pick.size === 0)}
               onClick={() => run(mode, needsReason ? { reason: reason.trim() } : { cores: [...pick] })}>
               Confirm {mode === "reject" ? "rejection" : mode === "decline-release" ? "decline" : "release request"}
             </button>
@@ -140,16 +140,9 @@ function Card({ r, me, onChanged }: { r: Res; me: Me; onChanged: () => void }) {
           </>
         ) : (
           <>
-            {admin && r.awaiting === "approval" && <button type="button" className="btn btn-p btn-sm" disabled={busy} onClick={() => run("approve")}>Approve</button>}
-            {admin && r.awaiting === "approval" && <button type="button" className="btn btn-sm" onClick={() => setMode("reject")}>Reject</button>}
-            {admin && r.awaiting === "release" && (
-              <button type="button" className="btn btn-p btn-sm" disabled={busy} onClick={() => run("release", { cores: r.release_requested_cores })}>Release requested cores</button>
-            )}
-            {admin && r.awaiting === "release" && <button type="button" className="btn btn-sm" onClick={() => setMode("decline-release")}>Decline release</button>}
             {own && r.status === "pending" && <button type="button" className="btn btn-sm" disabled={busy} onClick={() => run("withdraw")}>Withdraw</button>}
             {(own || admin) && r.status === "approved" && r.awaiting !== "release" && (
               <>
-                <button type="button" className="btn btn-sm" disabled={busy} onClick={() => run("keep")}>Keep</button>
                 <button type="button" className="btn btn-sm" onClick={() => setMode("request-release")}>Request release</button>
               </>
             )}
@@ -281,17 +274,17 @@ function ApprovalRow({ r, onChanged }: { r: Res; onChanged: () => void }) {
         <td />
         <td colSpan={8} className="h-auto! py-3! whitespace-normal!">
           <div className="space-y-1.5 text-body">
-            <p className="text-muted-foreground">Request #{r.id}{r.imported && ", imported"}. Last event: {r.last_event ?? "none"}, {r.age_days} days ago.{r.stale && " Stale: no approval or keep for over 3 months."}</p>
+            <p className="text-muted-foreground">Request #{r.id}{r.imported && ", imported"}. Last event: {r.last_event ?? "none"}, {r.age_days} days ago.{r.stale && " Stale: no change for over 3 months."}</p>
             {r.unassigned_cores > 0 && <p>{r.unassigned_cores} cores reserved by count on {r.unassigned_segment}; {r.remaining_unassigned} not assigned yet.</p>}
             {groupCores(r).map(([segment, cs]) => <p key={segment}>{segment}: cores {cs.map((c) => c.held ? c.number : `${c.number} (released)`).join(", ")}</p>)}
             {release && <p>Release requested for cores {r.cores.filter((c) => r.release_requested_cores.includes(c.core_id)).map((c) => c.number).join(", ") || "unassigned"}.</p>}
             {r.last_reason && <p role="note">{r.status === "rejected" ? "Rejection reason" : "Release declined"}: {r.last_reason}</p>}
             {mode && (
-              <form className="flex items-end gap-2 pt-1" onSubmit={(e) => { e.preventDefault(); if (reason.trim()) run(mode, { reason: reason.trim() }); }}>
-                <label className="w-[420px] font-medium">Reason (required)
+              <form className="flex items-end gap-2 pt-1" onSubmit={(e) => { e.preventDefault(); run(mode, { reason: reason.trim() }); }}>
+                <label className="w-[420px] font-medium">Reason (optional)
                   <input className="field mt-1 bg-white" value={reason} onChange={(e) => setReason(e.target.value)} autoFocus />
                 </label>
-                <button type="submit" className="btn btn-p" disabled={busy || !reason.trim()}>Confirm {mode === "reject" ? "rejection" : "decline"}</button>
+                <button type="submit" className="btn btn-p" disabled={busy}>Confirm {mode === "reject" ? "rejection" : "decline"}</button>
                 <button type="button" className="btn" onClick={() => { setMode(null); setMsg(null); }}>Cancel</button>
               </form>
             )}

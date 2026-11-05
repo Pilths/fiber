@@ -20,7 +20,7 @@ from app.ingest.reservation_import import add_cores, port
 from app.inventory import service as inventory
 from app.inventory.schemas import CoreHolderDetail
 from app.link_type import ROUTE_TYPE_SQL
-from app.reservations.schemas import Reason
+from app.reservations.schemas import NO_REASON, Reason
 from app.reservations.service import conflict
 from app.routing.graph import invalidate as invalidate_routes
 
@@ -59,7 +59,7 @@ def _log(db: Session, user: CurrentUser, entity: str, eid: int, edits: list[tupl
         db.execute(text("INSERT INTO data_edits (entity, entity_id, field, old_value, new_value, reason, user_id) "
                         "VALUES (:e, :i, :f, :o, :n, :r, :u)"),
                    {"e": entity, "i": eid, "f": field, "o": None if old is None else str(old),
-                    "n": None if new is None else str(new), "r": reason, "u": user.id})
+                    "n": None if new is None else str(new), "r": reason or NO_REASON, "u": user.id})
     return [f for f, _, _ in edits]
 
 
@@ -73,7 +73,7 @@ def get_history(db: DB, entity: Entity, id: int) -> list[HistoryRow]:
 class CorePortsBody(BaseModel):
     port_a: str | None = None  # label at the segment's first site; null or empty clears it
     port_b: str | None = None  # label at the segment's second site
-    reason: Reason
+    reason: Reason = ""
 
 
 @router.post("/cores/{core_id}/ports")
@@ -112,7 +112,7 @@ def set_core_ports(db: DB, admin: Admin, core_id: int, body: CorePortsBody) -> C
 # ---------- segments ----------
 
 class SegmentBody(BaseModel):
-    reason: Reason
+    reason: Reason = ""
     distance_km: Decimal | None = Field(None, ge=0, max_digits=10, decimal_places=3)
     region: str | None = None
     site_a_id: int | None = None
@@ -223,7 +223,7 @@ def edit_segment(db: DB, admin: Admin, sid: int, body: SegmentBody) -> Edited:
 # ---------- sites ----------
 
 class SiteBody(BaseModel):
-    reason: Reason
+    reason: Reason = ""
     name: str | None = None
     lat: float | None = None
     lon: float | None = None

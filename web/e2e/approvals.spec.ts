@@ -18,7 +18,7 @@ async function request(req: APIRequestContext) {
   return (await r.json() as { id: number }).id;
 }
 
-test("approvals: one table row per request, details open, reject asks for a reason", async ({ browser }) => {
+test("approvals: one table row per request, details open, reject offers an optional reason", async ({ browser }) => {
   const planner = await (await browser.newContext()).newPage();
   await signIn(planner, "planner2");
   const rid = await request(planner.request);
@@ -39,8 +39,8 @@ test("approvals: one table row per request, details open, reject asks for a reas
     await expect(more).toHaveAttribute("aria-expanded", "true");
     await expect(row).toContainText(`${SEGMENT}: cores`);
     await row.getByRole("button", { name: "Reject" }).click();
-    await expect(row.getByLabel("Reason (required)")).toBeFocused();
-    await expect(row.getByRole("button", { name: "Confirm rejection" })).toBeDisabled();
+    await expect(row.getByLabel("Reason (optional)")).toBeFocused();
+    await expect(row.getByRole("button", { name: "Confirm rejection" })).toBeEnabled(); // reason is optional
     await row.getByRole("button", { name: "Cancel" }).click();
     await more.press("Enter");
     await expect(more).toHaveAttribute("aria-expanded", "false");

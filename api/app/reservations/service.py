@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.auth.deps import CurrentUser
 from app.inventory import service as inventory
-from app.reservations.schemas import NeedsReviewItem, ReservationOut
+from app.reservations.schemas import NO_REASON, NeedsReviewItem, ReservationOut
 
 TZ = "'Asia/Kuala_Lumpur'"
 
@@ -300,7 +300,7 @@ def approve(db: Session, user: CurrentUser, rid: int) -> ReservationOut:
 def reject(db: Session, user: CurrentUser, rid: int, reason: str) -> ReservationOut:
     row = _lock(db, rid)
     _require(row, "pending")
-    _event(db, rid, "rejected", user, reason)
+    _event(db, rid, "rejected", user, reason or None)
     db.execute(text("DELETE FROM core_holds WHERE reservation_id = :r"), {"r": rid})
     db.commit()
     return get(db, rid)
@@ -325,7 +325,7 @@ def decline_release(db: Session, user: CurrentUser, rid: int, reason: str) -> Re
     _require(row, "approved")
     if row["last_event"] != "release_requested":
         raise conflict("No release request is waiting.")
-    _event(db, rid, "release_declined", user, reason)
+    _event(db, rid, "release_declined", user, reason or None)
     db.commit()
     return get(db, rid)
 
@@ -342,7 +342,7 @@ def correct(db: Session, user: CurrentUser, rid: int, reason: str, customer_id: 
         raise conflict("The date of an undated imported reservation cannot be corrected.")
     if customer_id is not None and not db.execute(text("SELECT 1 FROM customers WHERE id = :c"), {"c": customer_id}).first():
         raise HTTPException(422, "Unknown customer")
-    _event(db, rid, "corrected", user, reason, customer_id, planned_date)
+    _event(db, rid, "corrected", user, reason or NO_REASON, customer_id, planned_date)
     db.commit()
     return get(db, rid)
 

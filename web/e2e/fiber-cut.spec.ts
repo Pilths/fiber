@@ -53,7 +53,7 @@ test("fiber cut: admin Restore opens the segment dialog unticked with focus on t
   await pick(page);
   await actions(page).getByRole("button", { name: "Restore" }).click();
   const dlg = page.getByRole("dialog", { name: /^Edit segment/ });
-  const reason = dlg.getByLabel("Reason (required)");
+  const reason = dlg.getByLabel("Reason (optional)");
   await expect(reason).toBeFocused();
   await expect(dlg.getByRole("checkbox", { name: /Fiber cut/ })).not.toBeChecked();
   await reason.fill("E2E: repaired");
@@ -77,10 +77,7 @@ test("Edit segment: ticking Fiber cut sends fiber_cut true with the reason", asy
   const box = dlg.getByRole("checkbox", { name: /Fiber cut/ });
   await expect(box).not.toBeChecked();
   await box.check();
-  await dlg.getByRole("button", { name: "Save" }).click();
-  await expect(dlg.getByRole("alert")).toContainText("Enter a reason");
-  expect(posted).toBeNull();
-  await dlg.getByLabel("Reason (required)").fill("E2E: cable cut at km 4");
+  await dlg.getByLabel("Reason (optional)").fill("E2E: cable cut at km 4");
   await dlg.getByRole("button", { name: "Save" }).click();
   await expect(dlg).toBeHidden();
   expect(posted).toEqual({ reason: "E2E: cable cut at km 4", fiber_cut: true });

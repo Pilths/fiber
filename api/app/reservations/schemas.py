@@ -3,7 +3,9 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field, StringConstraints
 
-Reason = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+# Reasons are optional (owner decision, 5 Nov 2026); a blank one is stored as NO_REASON where the database needs text.
+Reason = Annotated[str, StringConstraints(strip_whitespace=True)]
+NO_REASON = "no reason given"
 Status = Literal["pending", "rejected", "withdrawn", "approved", "ended"]
 
 
@@ -19,11 +21,11 @@ class CoreIds(BaseModel):
 
 
 class ReasonBody(BaseModel):
-    reason: Reason
+    reason: Reason = ""
 
 
 class CorrectBody(BaseModel):
-    reason: Reason
+    reason: Reason = ""
     customer_id: int | None = None
     planned_date: date | None = None
     cores: list[int] | None = None  # always refused: cores are released and requested again
