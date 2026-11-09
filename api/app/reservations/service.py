@@ -137,6 +137,7 @@ def needs_review(db: Session, user: CurrentUser) -> list[NeedsReviewItem]:
 def _lock(db: Session, rid: int) -> dict[str, Any]:
     row = db.execute(text(
         "SELECT r.id, r.planner_id, r.imported, r.planned_date, r.unassigned_segment_id, st.status, st.last_event, "
+        "st.is_stale, "
         "COALESCE(un.remaining, 0) AS remaining FROM reservations r "
         "JOIN reservation_state_v st ON st.reservation_id = r.id "
         "LEFT JOIN reservation_unassigned_v un ON un.reservation_id = r.id "
@@ -250,6 +251,8 @@ def keep(db: Session, user: CurrentUser, rid: int) -> ReservationOut:
     _require(row, "approved")
     if row["last_event"] == "release_requested":
         raise conflict("A release is already requested; an admin has to decide it first.")
+    if not row["is_stale"]:
+        raise conflict("Keep is only for a stale reservation (no approval or keep for over 3 months).")
     _event(db, rid, "kept", user)
     db.commit()
     return get(db, rid)

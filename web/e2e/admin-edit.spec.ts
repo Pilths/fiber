@@ -16,7 +16,7 @@ const coreBtn = (page: Page, n: number) => page.getByRole("button", { name: `Cor
 const editSegment = (page: Page) => page.getByTestId("segment-actions").getByRole("button", { name: "Edit segment" });
 const coresTable = (page: Page) => page.getByRole("table", { name: /^Cores of / });
 
-test("core drawer: opens from a taken core with history, no Keep, Esc returns focus", async ({ page }) => {
+test("core drawer: opens from a taken core with history, no Keep while not stale, Esc returns focus", async ({ page }) => {
   await signIn(page, "planner1");
   await pick(page, KLCJ);
   await openCore(page, 1);

@@ -99,7 +99,7 @@ function Card({ r, me, onChanged }: { r: Res; me: Me; onChanged: () => void }) {
         {r.imported && ", imported"}. Last event: {r.last_event ?? "none"}, {r.age_days} days ago.
       </p>
       {r.awaiting && <p className="text-sm font-medium">{r.awaiting === "approval" ? "Waiting for approval" : "Release requested, waiting for an admin"} for {r.age_days} days.</p>}
-      {r.stale && <p className="text-sm font-medium">Stale: no change for over 3 months.</p>}
+      {r.stale && <p className="text-sm font-medium">Stale: no approval or keep for over 3 months.</p>}
       {r.last_reason && <p className="text-sm font-medium" role="note">{r.status === "rejected" ? "Rejection reason" : "Release declined"}: {r.last_reason}</p>}
       {r.unassigned_cores > 0 && (
         <p className="text-sm">{plural(r.unassigned_cores, "core")} reserved by count on {r.unassigned_segment}; <strong>{r.remaining_unassigned} not assigned yet</strong>.</p>
@@ -144,6 +144,7 @@ function Card({ r, me, onChanged }: { r: Res; me: Me; onChanged: () => void }) {
             {own && r.status === "pending" && <button type="button" className="btn btn-sm" disabled={busy} onClick={() => run("withdraw")}>Withdraw</button>}
             {(own || admin) && r.status === "approved" && r.awaiting !== "release" && (
               <>
+                {r.stale && <button type="button" className="btn btn-sm" disabled={busy} onClick={() => run("keep")}>Keep</button>}
                 <button type="button" className="btn btn-sm" onClick={() => setMode("request-release")}>Request release</button>
               </>
             )}
@@ -275,7 +276,7 @@ function ApprovalRow({ r, onChanged }: { r: Res; onChanged: () => void }) {
         <td />
         <td colSpan={8} className="h-auto! py-3! whitespace-normal!">
           <div className="space-y-1.5 text-body">
-            <p className="text-muted-foreground">Request #{r.id}{r.imported && ", imported"}. Last event: {r.last_event ?? "none"}, {r.age_days} days ago.{r.stale && " Stale: no change for over 3 months."}</p>
+            <p className="text-muted-foreground">Request #{r.id}{r.imported && ", imported"}. Last event: {r.last_event ?? "none"}, {r.age_days} days ago.{r.stale && " Stale: no approval or keep for over 3 months."}</p>
             {r.unassigned_cores > 0 && <p>{plural(r.unassigned_cores, "core")} reserved by count on {r.unassigned_segment}; {r.remaining_unassigned} not assigned yet.</p>}
             {groupCores(r).map(([segment, cs]) => <p key={segment}>{segment}: cores {cs.map((c) => c.held ? c.number : `${c.number} (released)`).join(", ")}</p>)}
             {release && <p>Release requested for cores {r.cores.filter((c) => r.release_requested_cores.includes(c.core_id)).map((c) => c.number).join(", ") || "unassigned"}.</p>}

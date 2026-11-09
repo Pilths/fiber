@@ -53,6 +53,7 @@ export function CoreDrawer({ core, segment, ends, me, onClose, onChanged, loss, 
 
   const st = STATUS[core.status];
   const canRequestRelease = res && (res.is_mine || admin) && res.state === "approved";
+  const canKeep = canRequestRelease && res.stale;
   const canRelease = admin && res?.state === "release_requested";
   // The holder has no list of requested cores; admins see every reservation, so read it at click time.
   const release = async (rid: number) => {
@@ -94,6 +95,7 @@ export function CoreDrawer({ core, segment, ends, me, onClose, onChanged, loss, 
 
       {(canRequestRelease || canRelease) && (
         <div className="mt-4 flex flex-wrap gap-2 border-t pt-4">
+          {canKeep && <button type="button" className="btn" disabled={busy} onClick={() => act(() => resAction(res.reservation_id, "keep"))}>Keep</button>}
           {canRequestRelease && <button type="button" className="btn" disabled={busy} onClick={() => act(() => resAction(res.reservation_id, "request-release", { cores: [core.id] }))}>Request release of core {core.number}</button>}
           {canRelease && <button type="button" className="btn btn-p" disabled={busy} onClick={() => act(() => release(res.reservation_id))}>Release requested cores</button>}
         </div>

@@ -239,6 +239,7 @@ def test_005_stale_keep_and_undated_import(client, w, db):
     assert client.get("/api/bell", headers=H("planner1")).json() == {"approvals": 0, "needs_review": 1, "total": 1}
     assert review(client, "planner2") == []  # planners see only their own
     assert review(client, "admin1") == [("stale", stale)]
+    assert act(client, fresh, "keep", user="planner1").status_code == 409  # Keep only once stale
     assert act(client, stale, "keep", user="planner2").status_code == 403
     assert act(client, stale, "keep", user="planner1").status_code == 200
     assert review(client) == []
