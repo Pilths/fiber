@@ -1,14 +1,11 @@
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy.orm import Session
 
-from app.auth.deps import get_current_user
-from app.db import get_db
+from app.auth.deps import DB, get_current_user
 from app.routing import service
 
 router = APIRouter(prefix="/api/routes", dependencies=[Depends(get_current_user)])
-DB = Annotated[Session, Depends(get_db)]
 
 
 @router.get("/endpoints")

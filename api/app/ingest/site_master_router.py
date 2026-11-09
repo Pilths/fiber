@@ -5,16 +5,12 @@ from typing import Annotated, Any, Literal
 from fastapi import APIRouter, Depends, Form, HTTPException, Query, UploadFile
 from pydantic import BaseModel
 from sqlalchemy import text
-from sqlalchemy.orm import Session
 
-from app.auth.deps import CurrentUser, require_admin
-from app.db import get_db
+from app.auth.deps import DB, Admin, require_admin
 from app.ingest import site_master as sm
+from app.ingest.upload_file import read_upload
 
 router = APIRouter(prefix="/api/admin/site-master", dependencies=[Depends(require_admin)])
-DB = Annotated[Session, Depends(get_db)]
-Admin = Annotated[CurrentUser, Depends(require_admin)]
-MAX_BYTES = 20 * 1024 * 1024
 
 
 class Counts(BaseModel):
@@ -79,12 +75,7 @@ class ApplyOut(BaseModel):
 @router.post("/uploads", status_code=201)
 def upload(db: DB, admin: Admin, file: UploadFile, add_only: Annotated[bool, Form()] = False) -> UploadOut:
     """add_only: the file is part of the list; sites not in it are kept active and the row-count check is skipped."""
-    name = file.filename or ""
-    if not name.lower().endswith(".xlsx"):
-        raise HTTPException(422, "Only .xlsx files are accepted")
-    data = file.file.read(MAX_BYTES + 1)
-    if len(data) > MAX_BYTES:
-        raise HTTPException(413, "File is larger than 20 MB")
+    name, data = read_upload(file, ".xlsx")
     try:
         parsed = sm.parse_workbook(io.BytesIO(data))
     except Exception as e:

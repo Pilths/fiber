@@ -5,17 +5,13 @@ from typing import Annotated, Any, Literal
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile
 from pydantic import BaseModel
 from sqlalchemy import text
-from sqlalchemy.orm import Session
 
-from app.auth.deps import CurrentUser, require_admin
-from app.db import get_db
+from app.auth.deps import DB, Admin, require_admin
 from app.ingest import segment_list as sl
 from app.ingest.site_master import ApplyError
+from app.ingest.upload_file import read_upload
 
 router = APIRouter(prefix="/api/admin/segment-list", dependencies=[Depends(require_admin)])
-DB = Annotated[Session, Depends(get_db)]
-Admin = Annotated[CurrentUser, Depends(require_admin)]
-MAX_BYTES = 20 * 1024 * 1024
 Group = Literal["new", "changed", "unchanged", "problem"]
 
 
@@ -89,12 +85,7 @@ class ApplyOut(BaseModel):
 
 @router.post("/uploads", status_code=201)
 def upload(db: DB, admin: Admin, file: UploadFile) -> UploadOut:
-    name = file.filename or ""
-    if not name.lower().endswith(".xlsx"):
-        raise HTTPException(422, "Only .xlsx files are accepted")
-    data = file.file.read(MAX_BYTES + 1)
-    if len(data) > MAX_BYTES:
-        raise HTTPException(413, "File is larger than 20 MB")
+    name, data = read_upload(file, ".xlsx")
     try:
         parsed = sl.parse_workbook(io.BytesIO(data))
     except Exception as e:

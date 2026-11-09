@@ -7,15 +7,12 @@ from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app.auth.deps import CurrentUser, require_admin
-from app.db import get_db
+from app.auth.deps import DB, Admin, require_admin
 from app.ingest import reservation_upload as ru
 from app.ingest.excel import parse_reservation_workbook
+from app.ingest.upload_file import read_upload
 
 router = APIRouter(prefix="/api/admin", dependencies=[Depends(require_admin)])
-DB = Annotated[Session, Depends(get_db)]
-Admin = Annotated[CurrentUser, Depends(require_admin)]
-MAX_BYTES = 20 * 1024 * 1024
 Group = Literal["new", "changed", "unchanged", "missing", "reservations", "conflicts", "already_imported", "ignored",
                 "needs_review", "rejected"]
 
@@ -47,12 +44,7 @@ def _get(db: Session, upload_id: int) -> dict[str, Any]:
 
 @router.post("/uploads", status_code=201)
 def upload(db: DB, admin: Admin, file: UploadFile) -> dict[str, Any]:
-    name = file.filename or ""
-    if not name.lower().endswith(".xlsx"):
-        raise HTTPException(422, "Only .xlsx files are accepted")
-    data = file.file.read(MAX_BYTES + 1)
-    if len(data) > MAX_BYTES:
-        raise HTTPException(413, "File is larger than 20 MB")
+    name, data = read_upload(file, ".xlsx")
     try:
         results, ignored = parse_reservation_workbook(io.BytesIO(data))
     except Exception as e:

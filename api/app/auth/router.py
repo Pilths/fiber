@@ -8,13 +8,10 @@ from argon2.exceptions import InvalidHashError, VerificationError
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Response
 from pydantic import BaseModel
 from sqlalchemy import text
-from sqlalchemy.orm import Session
 
-from app.auth.deps import COOKIE, CurrentUser, get_session_user, hash_token
-from app.db import get_db
+from app.auth.deps import COOKIE, DB, CurrentUser, get_session_user, hash_token
 
 router = APIRouter(prefix="/api")
-DB = Annotated[Session, Depends(get_db)]
 ph = PasswordHasher()
 DUMMY_HASH = ph.hash("not-a-real-password")  # verified against for unknown users, so timing does not reveal them
 MIN_PASSWORD = 8  # temporary, while the dashboard is in trial use

@@ -59,3 +59,7 @@ def require_admin(user: Annotated[CurrentUser, Depends(get_current_user)]) -> Cu
     if user.role != "admin":
         raise HTTPException(403, "Admin only")
     return user
+
+
+DB = Annotated[Session, Depends(get_db)]
+Admin = Annotated[CurrentUser, Depends(require_admin)]
