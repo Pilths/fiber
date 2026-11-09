@@ -10,7 +10,9 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.db import engine
-from app.seed_dev import CORES, SEGMENTS as OLD_SEGMENTS, SITES as OLD_SITES
+from app.seed_dev import CORES
+from app.seed_dev import SEGMENTS as OLD_SEGMENTS
+from app.seed_dev import SITES as OLD_SITES
 
 SHAPES = Path(__file__).with_name("dev_road_shapes.json")
 # name, kind, (lon, lat)

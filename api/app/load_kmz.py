@@ -11,9 +11,9 @@ import argparse
 import json
 import math
 import sys
-import xml.etree.ElementTree as ElementTree
 import zipfile
 from typing import BinaryIO
+from xml.etree import ElementTree
 
 import networkx
 from sqlalchemy import text

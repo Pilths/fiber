@@ -1,7 +1,6 @@
 from decimal import Decimal as D
 
 import pytest
-
 from app.loss.service import calculated_loss_db, deviation_pct, warning_level
 
 
@@ -162,6 +161,7 @@ def test_measurement_core_column_and_index(db):
 
 def test_calculated_loss_formula():
     from decimal import Decimal
+
     from app.loss.service import calculated_loss_db
     assert calculated_loss_db(Decimal("32.5")) == Decimal("9.94")
     assert calculated_loss_db(Decimal(0)) == Decimal("1.00")  # connectors only

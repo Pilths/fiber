@@ -87,7 +87,7 @@ def survey_counts(db: Session, admin_id: int, path: str, filename: str) -> tuple
         return 0, []
     done, notes = 0, []
     for n, r in enumerate(rows, 2):
-        cell = lambda k: clean(r[col[k]]) if k in col and col[k] < len(r) else None  # noqa: E731
+        cell = lambda k: clean(r[col[k]]) if k in col and col[k] < len(r) else None
         link = cell("link")
         if blank(link):
             continue

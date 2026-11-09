@@ -3,12 +3,11 @@ from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier
 
 import pytest
+from app.db import get_db
+from app.main import app
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 from sqlalchemy.orm import Session
-
-from app.db import get_db
-from app.main import app
 
 
 def one(db, sql, **p):

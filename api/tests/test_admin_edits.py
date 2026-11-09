@@ -4,7 +4,8 @@ import test_reservation_upload as tru
 import test_site_master as tsm
 from sqlalchemy import text
 from test_auth import mkuser
-from test_reservations import H, act, book, build, count_only as tru_count_only, one
+from test_reservations import H, act, book, build, one
+from test_reservations import count_only as tru_count_only
 
 
 @pytest.fixture

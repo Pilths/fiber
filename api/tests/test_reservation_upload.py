@@ -4,10 +4,9 @@ from datetime import datetime
 
 import openpyxl
 import pytest
+from app.ingest import reservation_upload as ru
 from sqlalchemy import text
 from test_auth import mkuser
-
-from app.ingest import reservation_upload as ru
 
 HEAD = ["Region", "Nodes", "Distance(KM)", "Core Secured", "Expected CV Ready", "Port Info", "Contractor", "Remark",
         "Fiber core monitoring ", "Fiber montiored \nY/N/WIP", "Fiber core requestor", "Fiber core request date",

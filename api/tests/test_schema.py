@@ -3,7 +3,6 @@ from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError, IntegrityError
 
 
-
 def one(db, sql, **p):
     return db.execute(text(sql), p).scalar_one()
 

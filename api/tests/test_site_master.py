@@ -3,11 +3,9 @@ import io
 
 import openpyxl
 import pytest
-from sqlalchemy import text
-from sqlalchemy.exc import DBAPIError
-from test_auth import PW, login, mkuser
-
 from app.ingest import site_master as sm
+from sqlalchemy import text
+from test_auth import PW, login, mkuser
 
 SITE_HEAD = ["SITE_NAME", "LATITUDE_IN_DECIMAL", "LONGITUDE_IN_DECIMAL", "REGION", "SITE_TYPE"]
 DC_HEAD = ["No", "State", "DC NAME / LINK", "LRD", "lat", "long"]

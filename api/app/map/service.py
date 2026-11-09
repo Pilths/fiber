@@ -5,9 +5,9 @@ junction site keeps every vertex of the drawn shape and needs no extra SQL. pony
 point on the line; fine for a hand-drawn shape that passes through the site, revisit if KMZ shapes drift.
 """
 import json
-from xml.sax.saxutils import escape
 import math
 from typing import Any
+from xml.sax.saxutils import escape
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session

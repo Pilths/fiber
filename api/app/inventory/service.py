@@ -3,8 +3,6 @@ from typing import Any, get_args
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app.link_type import ROUTE_TYPE_SQL
-from app.reservations.service import TZ
 from app.inventory.schemas import (
     CoreDetail,
     CoreHolderDetail,
@@ -16,6 +14,8 @@ from app.inventory.schemas import (
     SegmentSummary,
     UnassignedHold,
 )
+from app.link_type import ROUTE_TYPE_SQL
+from app.reservations.service import TZ
 
 PER_TYPE = 20
 

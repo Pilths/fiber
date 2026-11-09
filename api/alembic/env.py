@@ -1,9 +1,8 @@
 import os
 
-from sqlalchemy import create_engine
-
 from alembic import context
 from app.models import Base
+from sqlalchemy import create_engine
 
 # URL precedence: `-x dburl=...`, then ALEMBIC_DATABASE_URL, then DATABASE_URL.
 url = (

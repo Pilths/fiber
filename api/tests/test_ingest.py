@@ -2,12 +2,11 @@ from datetime import date, datetime
 
 import openpyxl
 import pytest
-from sqlalchemy import text
-from sqlalchemy.exc import DBAPIError
-
 from app import seed
 from app.ingest import checks
 from app.ingest.excel import parse_workbook
+from sqlalchemy import text
+from sqlalchemy.exc import DBAPIError
 
 RES_HEAD = ["Region", "Nodes", "Distance(KM)", "Core Secured", "Expected CV Ready", "Port Info", "Contractor", "Remark",
             "Fiber core monitoring ", "Fiber montiored \nY/N/WIP", "Fiber core requestor", "Fiber core request date",

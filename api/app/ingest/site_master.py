@@ -15,8 +15,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.ingest import checks
-from app.ingest.checks import clean
-from app.ingest.checks import blank, norm
+from app.ingest.checks import blank, clean, norm
 from app.ingest.excel import _json
 from app.routing.graph import invalidate as invalidate_routes
 

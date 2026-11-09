@@ -25,7 +25,7 @@ def _bad(field: str, msg: str) -> HTTPException:
 
 
 _LETTER = {"n": 0, "c": 1, "e": 2, "s": 3}  # north, central, east coast, south
-_SECTION = re.compile(r"^\s*([A-Za-z])\w*\s*(?:-|to)\s*([A-Za-z])", re.I)
+_SECTION = re.compile(r"^\s*([A-Za-z])\w*\s*(?:-|to)\s*([A-Za-z])", re.IGNORECASE)
 
 
 def _section_rank(section: str | None) -> tuple[int, int]:

@@ -1,8 +1,7 @@
 import pytest
+from app.main import app
 from argon2 import PasswordHasher
 from sqlalchemy import text
-
-from app.main import app
 
 PW = "correct-horse-battery"
 DEV = {"X-Dev-User": "planner1"}

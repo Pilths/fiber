@@ -1,10 +1,9 @@
 """load_data command: one hand-typed workbook loads sites, segments and survey counts; a second run changes nothing."""
 import openpyxl
-from sqlalchemy.orm import Session
-from test_auth import mkuser
-
 from app import load_data as ld
 from app.ingest.reservation_upload import close_import
+from sqlalchemy.orm import Session
+from test_auth import mkuser
 
 
 def run(monkeypatch, db, tmp_path, sites, segments, reservations=None):
@@ -62,7 +61,7 @@ def test_unknown_admin_and_template(db, monkeypatch, tmp_path):
 
 def test_invisible_characters_from_copied_cells_are_ignored(db, monkeypatch, tmp_path):
     mkuser(db, "boss1", "admin")
-    zw, nb = "​", " "
+    zw, nb = "\u200b", " "
     sites = [["AAAA" + zw, f"3.1{zw}", f"{nb}101.6", None], ["BBBB", "3.2", f"101.7{zw}", None]]
     segs = [[f"AAAA-BBBB{zw}", f"32.5{zw}", None, None, f"24{zw}", None]]
     assert run(monkeypatch, db, tmp_path, sites, segs) == 0

@@ -1,8 +1,7 @@
 """create_admin command: makes an admin who can sign in, asks twice, refuses a taken name."""
+from app import create_admin as ca
 from sqlalchemy.orm import Session
 from test_auth import PW, login, mkuser
-
-from app import create_admin as ca
 
 
 def run(monkeypatch, db, *answers, args=("boss1", "Boss One")):

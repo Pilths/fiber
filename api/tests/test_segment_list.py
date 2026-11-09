@@ -6,7 +6,6 @@ import pytest
 from sqlalchemy import text
 from test_auth import login, mkuser
 
-
 URL = "/api/admin/segment-list"
 HEAD = ["Link", "Site A", "Route", "Section", "Type", "Distance", "lat"]
 

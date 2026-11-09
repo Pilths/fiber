@@ -1,11 +1,9 @@
 """KMZ upload: stage a preview, apply it. Uses the KMZ builder from test_load_kmz."""
 import pytest
-from sqlalchemy import text
+from app.map.service import map_segments
 from sqlalchemy.orm import Session
 from test_auth import login, mkuser
 from test_load_kmz import EJH1, OKID, RINI, build_kmz, make_segment, make_site, one
-
-from app.map.service import map_segments
 
 URL = "/api/admin/kmz"
 

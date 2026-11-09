@@ -1,13 +1,11 @@
 """KMZ line shapes: spurs end near the highway, an ex infra line must be ignored."""
-import io
 import json
 import zipfile
 
-from sqlalchemy import text
-from sqlalchemy.orm import Session
-
 from app.load_kmz import run
 from app.map.service import map_segments
+from sqlalchemy import text
+from sqlalchemy.orm import Session
 
 EJH1 = (101.5, 3.0)
 RINI = (101.52, 3.035)

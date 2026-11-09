@@ -1,8 +1,7 @@
 """Routing (TEST-012): options over the segment graph, route picking, graph invalidation."""
 import pytest
-from sqlalchemy import text
-
 from app.routing.graph import invalidate
+from sqlalchemy import text
 
 
 def H(u="planner1"):
