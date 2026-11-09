@@ -204,7 +204,7 @@ def parse_workbook(data: Any) -> dict[str, ParsedSheet]:
                 continue
             try:
                 it = _parse_row(kind, headers, values)
-            except Exception as e:  # a bad row never stops the import
+            except Exception as e:  # noqa: BLE001  a bad row never stops the import
                 it = Item(0, {h: _json(v) for h, v in zip(headers, values) if h and not blank(v)},
                           {"key": None, "details": {}, "reasons": [f"could not parse row: {type(e).__name__}: {e}"]})
             it.row_number = n

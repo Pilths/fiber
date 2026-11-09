@@ -118,7 +118,7 @@ def parse_workbook(data: Any) -> Parsed:
             continue
         try:
             it = _parse_row(headers, values)
-        except Exception as e:  # a bad row never stops the import
+        except Exception as e:  # noqa: BLE001  a bad row never stops the import
             it = Item(0, {h: _json(v) for h, v in zip(headers, values) if h and not blank(v)},
                       {"link": None, "a": None, "b": None, "distance": None, "route": None, "section": None,
                        "reasons": [f"could not parse row: {type(e).__name__}: {e}"]})

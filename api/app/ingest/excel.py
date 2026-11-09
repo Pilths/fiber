@@ -80,10 +80,10 @@ def _finish(r: RowResult, reasons: list[str], reject: bool = False) -> None:
     r.status = "rejected" if reject else "needs_review" if reasons else "ready"
 
 
-def _guard(r: RowResult, fn: Any) -> None:
+def _guard(r: RowResult, fn: Any, *args: Any) -> None:
     try:
-        fn()
-    except Exception as e:  # a bad row never stops the import
+        fn(*args)
+    except Exception as e:  # noqa: BLE001  a bad row never stops the import
         r.parsed, r.status, r.reason = {}, "needs_review", f"could not parse row: {type(e).__name__}: {e}"
 
 
@@ -99,7 +99,7 @@ def _reservations(ws: Any, known: set[str]) -> list[RowResult]:
         if len(filled) == 1 and isinstance(filled[0], str) and blank(f.get("nodes")):
             label = filled[0].strip()
             continue
-        _guard(r, lambda: _reservation(r, f, label, known))
+        _guard(r, _reservation, r, f, label, known)
         out.append(r)
     return out
 
@@ -167,6 +167,32 @@ def _reservation(r: RowResult, f: dict[str, Any], label: str | None, known: set[
     _finish(r, reasons, reject=bool(no_customer))
 
 
+def _parse_site(
+    r: RowResult,
+    f: dict[str, Any],
+    name: str,
+    headers: list[Any],
+    values: Any,
+    dc: bool,
+    columns: tuple[str, str, str],
+    own: set[str],
+    seen: set[str],
+) -> None:
+    _, lat_col, lon_col = columns
+    reasons = []
+    lat, lon = _float(f.get(lat_col)), _float(f.get(lon_col))
+    if why := checks.check_coords(lat, lon):
+        reasons.append(why)
+    if name in seen:
+        reasons.append("duplicate site name")
+    seen.add(name)
+    details = {h: _json(v) for h, v in zip(headers, values) if h and norm(h) not in own and not blank(v)}
+    r.parsed = {"name": name, "kind": "data_center" if dc else "site", "lat": lat, "lon": lon, "details": details}
+    if dc:
+        r.parsed["lrd"] = _text(f.get("lrd"))
+    _finish(r, reasons)
+
+
 def _sites(ws: Any, header_row: int, sheet: str, seen: set[str]) -> list[RowResult]:
     headers, rows = _read(ws, header_row)
     out: list[RowResult] = []
@@ -178,22 +204,7 @@ def _sites(ws: Any, header_row: int, sheet: str, seen: set[str]) -> list[RowResu
         if blank(f.get(name_col)):
             continue
         name = str(f[name_col]).strip()
-
-        def parse() -> None:
-            reasons = []
-            lat, lon = _float(f.get(lat_col)), _float(f.get(lon_col))
-            if why := checks.check_coords(lat, lon):
-                reasons.append(why)
-            if name in seen:
-                reasons.append("duplicate site name")
-            seen.add(name)
-            details = {h: _json(v) for h, v in zip(headers, values) if h and norm(h) not in own and not blank(v)}
-            r.parsed = {"name": name, "kind": "data_center" if dc else "site", "lat": lat, "lon": lon, "details": details}
-            if dc:
-                r.parsed["lrd"] = _text(f.get("lrd"))
-            _finish(r, reasons)
-
-        _guard(r, parse)
+        _guard(r, _parse_site, r, f, name, headers, values, dc, (name_col, lat_col, lon_col), own, seen)
         out.append(r)
     return out
 

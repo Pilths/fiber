@@ -74,6 +74,12 @@ def _count(v: Any) -> int | None | str:
     return n if n >= 0 else f"'{v}' is negative"
 
 
+def _cell(row: tuple[Any, ...], columns: dict[str, int], key: str) -> Any:
+    if key not in columns or columns[key] >= len(row):
+        return None
+    return clean(row[columns[key]])
+
+
 def survey_counts(db: Session, admin_id: int, path: str, filename: str) -> tuple[int, list[str]]:
     """Fill segments.survey_cores / cable_size from the Segments sheet where the dashboard has no value yet."""
     wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
@@ -87,8 +93,7 @@ def survey_counts(db: Session, admin_id: int, path: str, filename: str) -> tuple
         return 0, []
     done, notes = 0, []
     for n, r in enumerate(rows, 2):
-        cell = lambda k: clean(r[col[k]]) if k in col and col[k] < len(r) else None
-        link = cell("link")
+        link = _cell(r, col, "link")
         if blank(link):
             continue
         a, _, b = str(link).strip().partition("-")
@@ -98,7 +103,7 @@ def survey_counts(db: Session, admin_id: int, path: str, filename: str) -> tuple
         if seg is None:
             continue  # the segment list step already reported why
         for key, field in (("surveyedcores", "survey_cores"), ("totalcores", "cable_size")):
-            v = _count(cell(key))
+            v = _count(_cell(r, col, key))
             if isinstance(v, str) or (field == "cable_size" and v == 0):
                 notes.append(f"Segments row {n} {link}: {key} {v if isinstance(v, str) else 'must be above 0'}")
                 continue

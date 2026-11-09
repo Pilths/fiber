@@ -8,6 +8,7 @@ its shape from the shortest path over the drawn lines between its two sites, so 
 by where their ends are. Safe to run again: the shape of a segment is updated, not duplicated.
 """
 import argparse
+import itertools
 import json
 import math
 import sys
@@ -170,7 +171,7 @@ def parse_lines(source: str | BinaryIO, folder: str) -> tuple[list[list[tuple[fl
 def build_graph(lines: list[list[tuple[float, float]]]) -> networkx.Graph:
     graph = networkx.Graph()
     for line_index, vertices in enumerate(lines):
-        for first, second in zip(vertices, vertices[1:]):
+        for first, second in itertools.pairwise(vertices):
             graph.add_edge(first, second, weight=haversine_m(first, second), line=line_index)
     return graph
 
