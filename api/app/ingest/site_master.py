@@ -222,12 +222,19 @@ def load_snapshot(db: Session) -> dict[str, DbSite]:
     return {r["name"]: DbSite(**{**r, "details": r["details"] or {}}) for r in rows}
 
 
-def load_protected(db: Session) -> dict[int, set[str]]:
-    prot: dict[int, set[str]] = {}
-    for i, f in db.execute(text("SELECT entity_id, field FROM data_edits WHERE entity = 'site' AND reason NOT LIKE :r"),
-                           {"r": UPLOAD_REASON + "%"}):
-        prot.setdefault(i, set()).add(f)
-    return prot
+PROTECTED_SQL = (
+    "SELECT entity_id, field FROM data_edits "
+    "WHERE entity = :entity AND NOT (reason LIKE ANY (CAST(:prefixes AS text[])))"
+)
+
+
+def load_protected(db: Session, entity: str, upload_reasons: tuple[str, ...]) -> dict[int, set[str]]:
+    """Fields edited in the dashboard (any reason that is not one of the upload reasons) are protected from uploads."""
+    protected: dict[int, set[str]] = {}
+    prefixes = [reason + "%" for reason in upload_reasons]
+    for entity_id, field_name in db.execute(text(PROTECTED_SQL), {"entity": entity, "prefixes": prefixes}):
+        protected.setdefault(entity_id, set()).add(field_name)
+    return protected
 
 
 def is_protected(prot: dict[int, set[str]], site_id: int, fld: str) -> bool:
@@ -369,7 +376,7 @@ def used_site_ids(db: Session, ids: list[int]) -> set[int]:
 
 
 def evaluate(db: Session, parsed: dict[str, ParsedSheet], add_only: bool = False) -> dict[str, SheetResult]:
-    snap, prot = load_snapshot(db), load_protected(db)
+    snap, prot = load_snapshot(db), load_protected(db, "site", (UPLOAD_REASON,))
     coords = {n: (r.lat, r.lon) for n, r in snap.items() if r.cls == "sites" and r.lat is not None and r.lon is not None}
     known = {n for n, r in snap.items() if r.cls == "sites"}
     out = {"sites": _eval_sheet("sites", parsed["sites"], snap, prot, {}, set(), add_only)}
@@ -589,7 +596,7 @@ def apply_upload(db: Session, admin_id: int, upload_id: int, override: dict[str,
             f"{x['missing_dc_name']} -> {x['new_dc_name']} (missing_dc_id {x['missing_dc_id']}, new_row_id {x['new_row_id']})"
             for x in undecided))
     why = f"{UPLOAD_REASON} {up['filename']} #{upload_id}"
-    snap, prot = load_snapshot(db), load_protected(db)
+    snap, prot = load_snapshot(db), load_protected(db, "site", (UPLOAD_REASON,))
     warnings: list[str] = []
     summary: dict[str, Any] = {}
     with db.begin_nested():  # all or nothing

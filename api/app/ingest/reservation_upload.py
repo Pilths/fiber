@@ -24,6 +24,7 @@ from app.ingest.reservation_import import (
     find_segment,
     place_reservation,
 )
+from app.ingest.site_master import ApplyError, load_protected
 from app.inventory import service as inventory
 from app.routing.graph import invalidate as invalidate_routes
 
@@ -35,11 +36,6 @@ ROW_GROUP = {"new": "new", "changed": "changed", "missing": "missing", "unchange
              "conflicts": "conflict", "already_imported": "unchanged", "ignored": "unchanged",
              "needs_review": "needs_review", "rejected": "rejected"}
 SEGMENT_GROUPS = ("new", "changed", "unchanged", "missing")
-
-
-class ApplyError(Exception):
-    def __init__(self, status: int, message: str):
-        self.status, self.message = status, message
 
 
 # ---- the one-time switch --------------------------------------------------------------------------------------
@@ -122,11 +118,6 @@ def from_results(results: list[RowResult]) -> list[Row]:
     return [Row(r.row_number, r.sheet, r.raw, r.parsed, r.status, r.reason) for r in results]
 
 
-def _protected(db: Session) -> set[tuple[int, str]]:
-    return {(i, f) for i, f in db.execute(text("SELECT entity_id, field FROM data_edits WHERE entity = 'segment' AND reason NOT LIKE :r"),
-                                          {"r": REASON + "%"})}
-
-
 def _num_same(a: Any, b: Any) -> bool:
     return a == b or (a is not None and b is not None and not isinstance(a, str) and round(float(a), 3) == round(float(b), 3)) \
         or (a is not None and b is not None and str(a) == str(b))
@@ -153,7 +144,7 @@ def _segment_items(db: Session, rows: list[Row], sites: dict[str, int], wins: se
             m = {"loss_db": r.p["loss_db"], "tested_on": r.p.get("tested_on"), "row_number": r.n}
             if not any(_num_same(x["loss_db"], m["loss_db"]) and x["tested_on"] == m["tested_on"] for x in sp.measurements):
                 sp.measurements.append(m)
-    protected = _protected(db)
+    protected = load_protected(db, "segment", (REASON,))
     for sp in segments.values():
         sid = find_segment(db, sites[sp.a], sites[sp.b])
         sp.segment_id = sid[0] if sid else None
@@ -168,7 +159,7 @@ def _segment_items(db: Session, rows: list[Row], sites: dict[str, int], wins: se
             new = sp.vals.get(f)
             if new is None or _num_same(old[f], new):
                 continue
-            prot = (sid[0], f) in protected
+            prot = f in protected.get(sid[0], set())
             c: dict[str, Any] = {"field": f, "old": None if old[f] is None else (float(old[f]) if f == "distance_km" else old[f]),
                                  "new": new, "protected": prot}
             if prot:
