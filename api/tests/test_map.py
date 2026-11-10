@@ -20,8 +20,8 @@ def site(db, name, kind="site", xy=None, lrd=None, region=None):
 
 
 def segment(db, a, b, survey, used=0):
-    sid = one(db, "INSERT INTO segments (site_a_id, site_b_id, distance_km, survey_cores, route_type, region) "
-                  "VALUES (:a,:b,5,:n,'Metro','Central') RETURNING id", a=a, b=b, n=survey)
+    sid = one(db, "INSERT INTO segments (site_a_id, site_b_id, distance_km, survey_cores, region) "
+                  "VALUES (:a,:b,5,:n,'Central') RETURNING id", a=a, b=b, n=survey)
     for n in range(1, (survey or 0) + 1):
         db.execute(text("INSERT INTO cores (segment_id, number, in_use) VALUES (:s,:n,:u)"), {"s": sid, "n": n, "u": n <= used})
     return sid

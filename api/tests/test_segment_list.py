@@ -60,10 +60,10 @@ def segment(db, a, b):
                            "WHERE x.name = :a AND y.name = :b"), {"a": a, "b": b}).mappings().first()
 
 
-def seed_segment(db, a, b, dist="5.000", typ=None, route=None, section=None):
-    return db.execute(text("INSERT INTO segments (site_a_id, site_b_id, distance_km, route_type, route, section) "
-                           "SELECT x.id, y.id, :d, :t, :r, :s FROM sites x, sites y WHERE x.name = :a AND y.name = :b RETURNING id"),
-                      {"a": a, "b": b, "d": dist, "t": typ, "r": route, "s": section}).scalar_one()
+def seed_segment(db, a, b, dist="5.000", route=None, section=None):
+    return db.execute(text("INSERT INTO segments (site_a_id, site_b_id, distance_km, route, section) "
+                           "SELECT x.id, y.id, :d, :r, :s FROM sites x, sites y WHERE x.name = :a AND y.name = :b RETURNING id"),
+                      {"a": a, "b": b, "d": dist, "r": route, "s": section}).scalar_one()
 
 
 def problems(client, uid):
@@ -71,8 +71,8 @@ def problems(client, uid):
 
 
 def test_happy_path_new_changed_unchanged_and_apply(client, admin, sites, db):
-    seed_segment(db, "BBBB", "CCCC", "5.000", "Metro", "R9", "S9")
-    seed_segment(db, "CCCC", "DDDD", "7.000", "Trunk", "R1", "S1")
+    seed_segment(db, "BBBB", "CCCC", "5.000", "R9", "S9")
+    seed_segment(db, "CCCC", "DDDD", "7.000", "R1", "S1")
     r = post(client, workbook([row("AAAA-BBBB"), row("BBBB-CCCC", 6), row("CCCC-DDDD", 7), row("AAAA-ZZZZ")]))
     assert r.status_code == 201
     j = r.json()
@@ -95,7 +95,7 @@ def test_happy_path_new_changed_unchanged_and_apply(client, admin, sites, db):
 
 
 def test_history_rows_written(client, admin, sites, db):
-    sid = seed_segment(db, "AAAA", "BBBB", "5.000", "Metro")
+    sid = seed_segment(db, "AAAA", "BBBB", "5.000")
     uid = post(client, workbook([row("AAAA-BBBB", 6, typ="Trunk")]), "my.xlsx").json()["upload_id"]
     apply(client, uid)
     h = db.execute(text("SELECT field, old_value, new_value, reason, user_id FROM data_edits WHERE entity = 'segment' AND entity_id = :i "
@@ -144,7 +144,7 @@ def test_duplicate_pair_does_not_block_others(client, admin, sites, db):
 
 
 def test_blank_cells_never_clear(client, admin, sites, db):
-    seed_segment(db, "AAAA", "BBBB", "5.000", "Metro", "R9", "S9")
+    seed_segment(db, "AAAA", "BBBB", "5.000", "R9", "S9")
     data = workbook([["AAAA-BBBB", None, None, "", None, None, None]])
     j = post(client, data).json()
     assert j["counts"]["unchanged"] == 1
@@ -154,7 +154,7 @@ def test_blank_cells_never_clear(client, admin, sites, db):
 
 
 def test_protected_field_kept(client, admin, sites, db):
-    sid = seed_segment(db, "AAAA", "BBBB", "5.000", "Metro")
+    sid = seed_segment(db, "AAAA", "BBBB", "5.000")
     db.execute(text("INSERT INTO data_edits (entity, entity_id, field, old_value, new_value, reason, user_id) "
                     "VALUES ('segment', :i, 'distance_km', '4', '5', 'surveyed', :u)"), {"i": sid, "u": admin})
     uid = post(client, workbook([row("AAAA-BBBB", 9)])).json()["upload_id"]
@@ -215,4 +215,3 @@ def test_type_column_is_ignored(client, admin, sites, db):
     j = post(client, data).json()
     assert j["counts"]["new"] == 2 and j["counts"]["problem"] == 0
     assert apply(client, j["upload_id"]).json()["created"] == 2
-    assert segment(db, "AAAA", "BBBB")["route_type"] is None

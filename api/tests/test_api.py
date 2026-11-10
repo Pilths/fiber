@@ -15,8 +15,8 @@ def net(db):
     adm = one(db, "INSERT INTO users (username, display_name, role) VALUES ('admin1','A','admin') RETURNING id")
     a, b, c = (one(db, "INSERT INTO sites (name, kind) VALUES (:n,'site') RETURNING id", n=n)
                for n in ("Alpha Hub", "Bravo Hub", "Charlie Hub"))
-    s1 = one(db, "INSERT INTO segments (site_a_id, site_b_id, region, route_type, distance_km) "
-                 "VALUES (:a,:b,'North','Trunk',10) RETURNING id", a=a, b=b)
+    s1 = one(db, "INSERT INTO segments (site_a_id, site_b_id, region, distance_km) "
+                 "VALUES (:a,:b,'North',10) RETURNING id", a=a, b=b)
     db.execute(text("UPDATE segments SET survey_cores = 5 WHERE id = :s"), {"s": s1})
     s2 = one(db, "INSERT INTO segments (site_a_id, site_b_id, region) VALUES (:a,:b,'Central') RETURNING id", a=b, b=c)
     cores = {}
@@ -145,14 +145,13 @@ def test_route_type_is_derived_from_end_sites(client, net, db):
         ("toc", "site"): "Trunk", ("site", "site"): "Trunk"}
 
 
-def test_site_kind_change_changes_route_type_without_segment_write(client, net, db):
+def test_site_kind_change_changes_route_type(client, net, db):
     _, ids = derived_types(client, db, [("site", "site")])
     sid = ids[("site", "site")]
     site_a = one(db, "SELECT site_a_id FROM segments WHERE id = :s", s=sid)
     db.execute(text("UPDATE sites SET kind = 'data_center' WHERE id = :i"), {"i": site_a})
     got = {s["id"]: s["route_type"] for s in client.get("/api/segments", headers=H).json()}
     assert got[sid] == "Metro"
-    assert one(db, "SELECT route_type IS NULL FROM segments WHERE id = :s", s=sid)
 
 
 def test_route_type_filter_uses_derived_value(client, net, db):

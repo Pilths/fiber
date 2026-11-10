@@ -34,7 +34,7 @@ FROM sites a, sites b
 WHERE a.id = s.site_a_id AND b.id = s.site_b_id AND a.name LIKE 'DEV %' AND b.name LIKE 'DEV %'
   AND a.kind <> 'data_center' AND b.kind <> 'data_center' AND s.route IS NULL
 """
-# site A, site B, route_type, region, cable_size
+# site A, site B, route type (unused: derived from the site kinds), region, cable_size
 SEGMENTS = [
     (PEN, BW, "Metro", "North", 48), (BW, TP, "Trunk", "North", 144), (TP, IPH, "Trunk", "North", 144),
     (IPH, TI, "Trunk", "North", 144), (TI, KG, "Trunk", "Central", 144), (KG, KL, "Metro", "Central", 48),
@@ -71,12 +71,12 @@ def main() -> None:
                                  n=name, k=kind, x=lon, y=lat)
                 added_sites += 1
         seg: dict[tuple[str, str], int] = {}
-        for n, (a, b, route, region, cable) in enumerate(SEGMENTS):
+        for n, (a, b, _route_type, region, cable) in enumerate(SEGMENTS):
             sid = one("SELECT id FROM segments WHERE site_a_id IN (:a, :b) AND site_b_id IN (:a, :b)", a=site[a], b=site[b])
             if sid is None:
                 km = shapes[f"{a}|{b}"]["km"]
-                sid = one("INSERT INTO segments (site_a_id, site_b_id, route_type, region, distance_km, survey_cores, cable_size) "
-                          "VALUES (:a, :b, :r, :g, :d, :n, :c) RETURNING id", a=site[a], b=site[b], r=route, g=region, d=km, n=CORES, c=cable)
+                sid = one("INSERT INTO segments (site_a_id, site_b_id, region, distance_km, survey_cores, cable_size) "
+                          "VALUES (:a, :b, :g, :d, :n, :c) RETURNING id", a=site[a], b=site[b], g=region, d=km, n=CORES, c=cable)
                 for num in range(1, CORES + 1):
                     ports = [one("INSERT INTO ports (port_id, site_id) VALUES (:p, :s) RETURNING id",
                                  p=f"{name[4:8].upper()}-{sid}-{end}-{num:02d}", s=site[name])

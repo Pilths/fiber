@@ -434,7 +434,6 @@ CREATE TABLE public.segments (
     id bigint NOT NULL,
     site_a_id bigint NOT NULL,
     site_b_id bigint NOT NULL,
-    route_type text,
     region text,
     distance_km numeric(10,3),
     created_at timestamp with time zone DEFAULT now() NOT NULL,
@@ -446,7 +445,6 @@ CREATE TABLE public.segments (
     CONSTRAINT segments_cable_size_ck CHECK ((cable_size > 0)),
     CONSTRAINT segments_distance_ck CHECK ((distance_km >= (0)::numeric)),
     CONSTRAINT segments_region_ck CHECK ((region = ANY (ARRAY['North'::text, 'Central'::text, 'South'::text, 'East Coast'::text]))),
-    CONSTRAINT segments_route_type_ck CHECK ((route_type = ANY (ARRAY['Trunk'::text, 'Metro'::text]))),
     CONSTRAINT segments_sites_differ_ck CHECK ((site_a_id <> site_b_id))
 );
 
@@ -490,7 +488,7 @@ CREATE TABLE public.sites (
     details jsonb,
     lrd_site_id bigint,
     active boolean DEFAULT true NOT NULL,
-    CONSTRAINT sites_kind_ck CHECK ((kind = ANY (ARRAY['site'::text, 'building'::text, 'equipment'::text, 'data_center'::text, 'toc'::text])))
+    CONSTRAINT sites_kind_ck CHECK ((kind = ANY (ARRAY['site'::text, 'building'::text, 'data_center'::text, 'toc'::text])))
 );
 
 

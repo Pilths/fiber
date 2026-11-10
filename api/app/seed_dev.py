@@ -20,7 +20,7 @@ SITES = [
     ("PEN", "DEV Penang Tower", "building", (100.3327, 5.4164)),
     ("KTN", "DEV Kuantan Hut", "site", None),
 ]
-# site A, site B, route_type, region, distance_km, loss factor vs distance*0.3 (None = no measurements)
+# site A, site B, route type (unused: derived from the site kinds), region, distance_km, loss factor vs distance*0.3 (None = no measurements)
 SEGMENTS: list[tuple[str, str, str, str, float | None, float | None]] = [
     ("KL", "CJ", "Metro", "Central", 32.5, 1.0),
     ("CJ", "BJ", "Metro", "Central", 18.2, 1.05),
@@ -57,9 +57,9 @@ def run(db: Session) -> None:
     rng = random.Random(1)
     segment: list[int] = []
     cores: dict[int, dict[int, int]] = {}  # segment id -> core number -> core id
-    for n, (a, b, route, region, km, factor) in enumerate(SEGMENTS, start=1):
-        sid = one("INSERT INTO segments (site_a_id, site_b_id, route_type, region, distance_km, survey_cores) "
-                  "VALUES (:a, :b, :r, :g, :d, :n) RETURNING id", a=site[a], b=site[b], r=route, g=region, d=km, n=CORES)
+    for n, (a, b, _route_type, region, km, factor) in enumerate(SEGMENTS, start=1):
+        sid = one("INSERT INTO segments (site_a_id, site_b_id, region, distance_km, survey_cores) "
+                  "VALUES (:a, :b, :g, :d, :n) RETURNING id", a=site[a], b=site[b], g=region, d=km, n=CORES)
         segment.append(sid)
         cores[sid] = {}
         for num in range(1, CORES + 1):

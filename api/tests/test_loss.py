@@ -44,8 +44,8 @@ def one(db, sql, **p):
 def segments(db):
     one(db, "INSERT INTO users (username, display_name, role) VALUES ('planner1','p','planner') RETURNING id")
     s = [one(db, "INSERT INTO sites (name, kind) VALUES (:n,'site') RETURNING id", n=n) for n in "ABCD"]
-    ids = [one(db, "INSERT INTO segments (site_a_id, site_b_id, region, route_type, distance_km) "
-                   "VALUES (:a,:b,:r,'Metro',:d) RETURNING id", a=s[i], b=s[i + 1], r=r, d=d)
+    ids = [one(db, "INSERT INTO segments (site_a_id, site_b_id, region, distance_km) "
+                   "VALUES (:a,:b,:r,:d) RETURNING id", a=s[i], b=s[i + 1], r=r, d=d)
            for i, (r, d) in enumerate([("North", 10), ("North", 20), ("South", None)])]
     return ids
 
