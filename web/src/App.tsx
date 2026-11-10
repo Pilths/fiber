@@ -8,7 +8,7 @@ import { MapFilters } from "@/components/FindCard";
 import { Header } from "@/components/Header";
 import { CoresTable, SegmentDiagram } from "@/components/NetworkDetail";
 import { NetworkMap } from "@/components/NetworkMap";
-import { Approvals, MyReservations, NeedsReview } from "@/components/Reservations";
+import { Approvals, MyReservations } from "@/components/Reservations";
 import { ReserveBox } from "@/components/ReserveBox";
 import { RouteSearch } from "@/components/RoutePlanner";
 import { Upload } from "@/components/Upload";
@@ -127,10 +127,7 @@ function Dashboard({ me, onSignOut, onChangePassword }: DashboardProps) {
       {view !== "map" && view !== "upload" && (
         <main className="space-y-4 px-6 pt-6 pb-10">
           {view === "mine" && (
-            <>
-              <MyReservations me={me} onChanged={refreshBell} />
-              <NeedsReview me={me} onChanged={refreshBell} />
-            </>
+            <MyReservations me={me} onChanged={refreshBell} />
           )}
           {view === "approvals" && <Approvals me={me} onChanged={refreshBell} />}
           {view === "users" && <Users me={me} />}

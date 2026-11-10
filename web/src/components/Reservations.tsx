@@ -170,23 +170,64 @@ function useLoad<T>(load: () => Promise<T>, deps: unknown[] = []) {
   return { data, error, reload };
 }
 
-const FILTERS: [string, Res["status"] | undefined][] = [["All", undefined], ["Pending", "pending"], ["Approved", "approved"], ["Rejected", "rejected"]];
+type Chip = "All" | "Action needed" | "Pending" | "Stale";
 
+const CHIPS: Chip[] = ["All", "Action needed", "Pending", "Stale"];
+
+const EMPTY_TEXT: Record<Chip, string> = {
+  All: "No reservations.",
+  "Action needed": "Nothing needs action.",
+  Pending: "No pending reservations.",
+  Stale: "No stale reservations.",
+};
+
+// Which of the planner's reservations each chip shows. Action needed = the ones in GET /api/needs-review.
+function chipFilter(chip: Chip, needsAction: Set<number>): (reservation: Res) => boolean {
+  if (chip === "Action needed") {
+    return (reservation) => needsAction.has(reservation.id);
+  }
+  if (chip === "Pending") {
+    return (reservation) => reservation.status === "pending";
+  }
+  if (chip === "Stale") {
+    return (reservation) => reservation.stale;
+  }
+  return () => true;
+}
+
+// My reservations: loaded once, filtered on the client by chip. The needs-review list is loaded here too and
+// shared with the Action needed section below, so it is fetched once.
 export function MyReservations({ me, onChanged }: { me: Me; onChanged: () => void }) {
-  const [status, setStatus] = useState<Res["status"] | undefined>();
-  const { data, error, reload } = useLoad(() => api.get("/api/reservations", { query: { mine: true, status } }), [status]);
+  const [chip, setChip] = useState<Chip>("All");
+  const mine = useLoad(() => api.get("/api/reservations", { query: { mine: true } }));
+  const review = useLoad(() => api.get("/api/needs-review"));
+  const needsAction = new Set((review.data ?? []).map((item) => item.reservation.id));
+  const reloadAll = () => {
+    mine.reload();
+    review.reload();
+    onChanged();
+  };
+  const countOf = (name: Chip) => (mine.data ?? []).filter(chipFilter(name, needsAction)).length;
+  const shown = mine.data?.filter(chipFilter(chip, needsAction));
   return (
-    <section aria-labelledby="mine-h" className="card mx-auto w-full max-w-4xl space-y-3">
-      <h2 id="mine-h" className="text-base leading-6 font-semibold">My reservations</h2>
-      <div role="group" aria-label="Filter by status" className="flex gap-2">
-        {FILTERS.map(([label, v]) => (
-          <button key={label} type="button" className="chip" aria-pressed={status === v} onClick={() => setStatus(v)}>{label}</button>
-        ))}
-      </div>
-      {error && <p role="alert">Could not load reservations.</p>}
-      {data && data.length === 0 && <p>No reservations{status ? ` that are ${status}` : ""}.</p>}
-      <ul className="space-y-3">{data?.map((r) => <Card key={r.id} r={r} me={me} onChanged={() => { reload(); onChanged(); }} />)}</ul>
-    </section>
+    <>
+      <section aria-labelledby="mine-h" className="card mx-auto w-full max-w-4xl space-y-3">
+        <h2 id="mine-h" className="text-base leading-6 font-semibold">My reservations</h2>
+        <div role="group" aria-label="Filter reservations" className="flex gap-2">
+          {CHIPS.map((name) => (
+            <button key={name} type="button" className="chip" aria-pressed={chip === name} onClick={() => setChip(name)}>
+              {name} {mine.data ? countOf(name) : ""}
+            </button>
+          ))}
+        </div>
+        {mine.error && <p role="alert">Could not load reservations.</p>}
+        {shown && shown.length === 0 && <p>{EMPTY_TEXT[chip]}</p>}
+        <ul className="space-y-3">
+          {shown?.map((reservation) => <Card key={reservation.id} r={reservation} me={me} onChanged={reloadAll} />)}
+        </ul>
+      </section>
+      <NeedsReview me={me} data={review.data} error={review.error} onChanged={reloadAll} />
+    </>
   );
 }
 
@@ -300,8 +341,9 @@ function ApprovalRow({ r, onChanged }: { r: Res; onChanged: () => void }) {
   );
 }
 
-export function NeedsReview({ me, onChanged }: { me: Me; onChanged: () => void }) {
-  const { data, error, reload } = useLoad(() => api.get("/api/needs-review"));
+type NeedsReviewProps = { me: Me; data: Item[] | null; error: boolean; onChanged: () => void };
+
+function NeedsReview({ me, data, error, onChanged }: NeedsReviewProps) {
   return (
     <section aria-labelledby="nr-h" className="card mx-auto w-full max-w-4xl space-y-3">
       <h2 id="nr-h" className="text-base leading-6 font-semibold">Action needed{data ? ` (${data.length})` : ""}</h2>
@@ -311,7 +353,7 @@ export function NeedsReview({ me, onChanged }: { me: Me; onChanged: () => void }
         {data?.map((i: Item, n) => (
           <div key={`${i.kind}-${i.reservation.id}-${n}`} className="space-y-1">
             <p className="text-sm font-semibold">{i.detail}</p>
-            <ul><Card r={i.reservation} me={me} onChanged={() => { reload(); onChanged(); }} /></ul>
+            <ul><Card r={i.reservation} me={me} onChanged={onChanged} /></ul>
           </div>
         ))}
       </div>

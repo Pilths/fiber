@@ -95,8 +95,13 @@ test("count-only reservation shows on the segment and in My reservations", async
   await expect(page.getByTestId("unassigned-row").first()).toContainText("3 cores");
   await page.getByRole("button", { name: /My reservations/ }).click();
   await expect(page.getByTestId("reservation").filter({ hasText: "3 not assigned yet" })).toBeVisible();
-  await page.getByRole("button", { name: "Rejected" }).click();
-  await expect(page.getByText("No reservations that are rejected.")).toBeVisible();
+  const pendingChip = page.getByRole("button", { name: /^Pending \d+$/ });
+  await pendingChip.click();
+  await expect(pendingChip).toHaveAttribute("aria-pressed", "true");
+  const mine = page.getByRole("region", { name: "My reservations" });
+  for (const card of await mine.getByTestId("reservation").all()) {
+    await expect(card).toContainText("Pending approval");
+  }
 });
 
 test("planner request shows as Pending in My reservations; admin sees Approvals", async ({ browser }) => {

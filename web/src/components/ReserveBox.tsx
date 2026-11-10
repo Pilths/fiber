@@ -3,6 +3,7 @@ import { CustomerField, SimilarWarning } from "@/components/CustomerPicker";
 import { Blank } from "@/components/LossCard";
 import { Chain } from "@/components/NetworkDetail";
 import { Dialog } from "@/components/upload-parts";
+import { LossDeviation } from "@/lib/lossLevel";
 import { db } from "@/lib/status";
 import {
   availableCores,
@@ -203,20 +204,15 @@ function PortsCell({ core }: { core: Core }) {
   return <>{`${core.port_a ?? "-"} → ${core.port_b ?? "-"}`}</>;
 }
 
-type MeasuredCellProps = { measured: number | null | undefined; calculated: number | null };
+type MeasuredCellProps = { loss: LossDetail["cores"][number] | undefined };
 
-function MeasuredCell({ measured, calculated }: MeasuredCellProps) {
-  if (measured == null) {
+function MeasuredCell({ loss }: MeasuredCellProps) {
+  if (loss == null) {
     return <Blank>Not tested</Blank>;
-  }
-  const high = calculated != null && measured > calculated;
-  if (!high) {
-    return <>{db(measured)}</>;
   }
   return (
     <>
-      {db(measured)} <span aria-hidden className="text-amber">▲</span>
-      <span className="sr-only"> above calculated</span>
+      {db(loss.measured_db)} <LossDeviation loss={loss} compact />
     </>
   );
 }
@@ -259,7 +255,7 @@ function CoreList({ available, loss, ticked, full, toggle }: {
               <td className="truncate"><PortsCell core={core} /></td>
               <td className="num">{calculated == null ? <Blank>-</Blank> : db(calculated)}</td>
               <td className="num">
-                <MeasuredCell measured={lossOf(core)?.measured_db} calculated={calculated} />
+                <MeasuredCell loss={lossOf(core)} />
               </td>
             </tr>
           );

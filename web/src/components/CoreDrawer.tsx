@@ -4,6 +4,7 @@ import type { components } from "@/api/schema";
 import { Icon } from "@/components/Icon";
 import { Blank } from "@/components/LossCard";
 import { Dialog } from "@/components/upload-parts";
+import { LossDeviation } from "@/lib/lossLevel";
 import { db, EVENT_WORD, STATUS, statusLabel, when } from "@/lib/status";
 
 type Core = components["schemas"]["CoreDetail"];
@@ -69,9 +70,7 @@ export function CoreDrawer({ core, segment, ends, me, onClose, onChanged, loss, 
     ["Planned date", core.planned_date ?? na],
     ["Calculated loss", calc == null ? <Blank key="cl">No distance</Blank> : db(calc)],
     ["Measured loss", !loss ? <Blank key="ml">Not tested</Blank> : <span key="ml">
-      {loss.measured_db > (calc ?? Infinity)
-        ? <>{db(loss.measured_db)} <span aria-hidden className="text-amber">▲</span><span className="sr-only"> above calculated</span></>
-        : db(loss.measured_db)}
+      {db(loss.measured_db)} <LossDeviation loss={loss} />
       {[loss.test_method, loss.tested_on, loss.field_team].filter(Boolean).map((x) => `, ${x}`).join("")}
     </span>],
   ];
