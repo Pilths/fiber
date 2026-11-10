@@ -196,7 +196,8 @@ function chipFilter(chip: Chip, needsAction: Set<number>): (reservation: Res) =>
 }
 
 // My reservations: loaded once, filtered on the client by chip. The needs-review list is loaded here too and
-// shared with the Action needed section below, so it is fetched once.
+// shared with the Action needed section below, so it is fetched once. Only admins get that section: it lists
+// every planner's items, while for a planner it would repeat the Action needed chip.
 export function MyReservations({ me, onChanged }: { me: Me; onChanged: () => void }) {
   const [chip, setChip] = useState<Chip>("All");
   const mine = useLoad(() => api.get("/api/reservations", { query: { mine: true } }));
@@ -226,7 +227,9 @@ export function MyReservations({ me, onChanged }: { me: Me; onChanged: () => voi
           {shown?.map((reservation) => <Card key={reservation.id} r={reservation} me={me} onChanged={reloadAll} />)}
         </ul>
       </section>
-      <NeedsReview me={me} data={review.data} error={review.error} onChanged={reloadAll} />
+      {me.role === "admin" && (
+        <NeedsReview me={me} data={review.data} error={review.error} onChanged={reloadAll} />
+      )}
     </>
   );
 }
