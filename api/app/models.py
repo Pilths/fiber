@@ -133,8 +133,9 @@ class RouteSpan(Base):
 
 class Port(Base):
     __tablename__ = "ports"
+    __table_args__ = (UniqueConstraint("site_id", "port_id", name="ports_site_port_key"),)
     id: Mapped[int] = _id()
-    port_id: Mapped[str] = mapped_column(Text, unique=True)
+    port_id: Mapped[str] = mapped_column(Text)
     site_id: Mapped[int] = _fk("sites")
 
 

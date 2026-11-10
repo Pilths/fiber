@@ -11,6 +11,13 @@ class Skip(Exception):
     pass
 
 
+PORT_INSERT_SQL = (
+    "INSERT INTO ports (port_id, site_id) VALUES (:p, :s) "
+    "ON CONFLICT (site_id, port_id) DO NOTHING RETURNING id"
+)
+PORT_FIND_SQL = "SELECT id FROM ports WHERE port_id = :p AND site_id = :s"
+
+
 def one(db: Any, sql: str, **p: Any) -> Any:
     return db.execute(text(sql), p).scalar_one_or_none()
 
@@ -45,10 +52,9 @@ def ensure_segment(db: Any, counts: dict[str, int], a: int, b: int, p: dict[str,
 
 
 def port(db: Any, counts: dict[str, int], label: str, site_id: int) -> int:
-    n = one(db, "INSERT INTO ports (port_id, site_id) VALUES (:p, :s) ON CONFLICT (port_id) DO NOTHING RETURNING id",
-            p=label, s=site_id)
+    n = one(db, PORT_INSERT_SQL, p=label, s=site_id)
     if n is None:
-        return one(db, "SELECT id FROM ports WHERE port_id = :p", p=label)
+        return one(db, PORT_FIND_SQL, p=label, s=site_id)
     counts["ports"] = counts.get("ports", 0) + 1
     return n
 

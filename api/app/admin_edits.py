@@ -47,7 +47,6 @@ FROM cores c JOIN segments s ON s.id = c.segment_id WHERE c.id = :core_id
 """
 LOCK_SEGMENT_SQL = "SELECT id FROM segments WHERE id = :segment_id FOR UPDATE"
 PORT_LABEL_SQL = "SELECT port_id FROM ports WHERE id = :port_row_id"
-PORT_SITE_SQL = "SELECT site_id FROM ports WHERE port_id = :label"
 SET_CORE_PORT_SQL = {
     "port_a": "UPDATE cores SET port_a_id = :port_row_id WHERE id = :core_id",
     "port_b": "UPDATE cores SET port_b_id = :port_row_id WHERE id = :core_id",
@@ -183,10 +182,7 @@ def _port_label(db: Session, port_row_id: int | None) -> str | None:
 
 
 def _port_for_site(db: Session, label: str, site_id: int) -> int:
-    """The port row for a label at this site, made if new; a label already used at another site is refused."""
-    at_site = db.execute(text(PORT_SITE_SQL), {"label": label}).scalar_one_or_none()
-    if at_site is not None and at_site != site_id:
-        raise conflict(f"Port '{label}' already belongs to another site.")
+    """The port row for a label at this site, made if new; the same label may exist at other sites."""
     return port(db, {}, label, site_id)
 
 
