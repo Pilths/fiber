@@ -10,7 +10,8 @@ import { AssignDialog } from "@/components/AssignDialog";
 import { CoresTable, SegmentDiagram, type Found } from "@/components/NetworkDetail";
 import { NetworkMap } from "@/components/NetworkMap";
 import { ReserveBox } from "@/components/ReserveBox";
-import { RouteSearch, useRoutePlanner } from "@/components/RoutePlanner";
+import { RouteSearch } from "@/components/RoutePlanner";
+import { useRoutePlanner } from "@/lib/useRoutePlanner";
 import { Upload } from "@/components/Upload";
 import { Users } from "@/components/Users";
 import { Approvals, MyReservations, NeedsReview } from "@/components/Reservations";
@@ -155,10 +156,10 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
   const [pickAfter, setPickAfter] = useState<number | null>(null);
   if (seenRoute !== foundKey) { setSeenRoute(foundKey); setPickAfter(null); if (found) open(pickAfter != null && found.ids.includes(pickAfter) ? pickAfter : found.ids[0]); }
   // Route mode: only the options' segments can be clicked on the map; the rest stay faint.
-  const optionIds = found ? new Set(rp.res?.options.flatMap((o) => o.segments.map((x) => x.segment_id)) ?? found.ids) : null;
+  const optionIds = found ? new Set(rp.result?.options.flatMap((o) => o.segments.map((x) => x.segment_id)) ?? found.ids) : null;
   const pickOnMap = (id: number) => {
     if (!found || found.ids.includes(id)) return open(id);
-    const i = rp.res?.options.findIndex((o) => o.segments.some((x) => x.segment_id === id)) ?? -1;
+    const i = rp.result?.options.findIndex((o) => o.segments.some((x) => x.segment_id === id)) ?? -1;
     if (i >= 0) { setPickAfter(id); rp.select(i); }
   };
   // Selection -> hash; a found route keeps its #route= hash.
@@ -232,7 +233,7 @@ function Dashboard({ me, onSignOut, onChangePassword }: { me: Me; onSignOut: () 
           </section>
           {/* The panel fills the map card's height (absolute, scrolls inside), so the map alone sets the row height. */}
           <div className="relative col-span-4 min-w-0">
-            <RouteSearch rp={planner} />
+            <RouteSearch planner={planner} />
           </div>
           {segmentId != null && !detail && <p className="card empty col-span-12 text-center text-body text-muted-foreground">Loading segment...</p>}
           {detail && (
