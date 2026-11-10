@@ -3,6 +3,7 @@ import { api, errorText, resAction } from "@/api/client";
 import type { components } from "@/api/schema";
 import { Icon } from "@/components/Icon";
 import { Blank } from "@/components/LossCard";
+import { MeasurementDialog } from "@/components/MeasurementDialog";
 import { Dialog } from "@/components/upload-parts";
 import { LossDeviation } from "@/lib/lossLevel";
 import { db, EVENT_WORD, STATUS, statusLabel, when } from "@/lib/status";
@@ -30,6 +31,7 @@ export function CoreDrawer({ core, segment, ends, me, onClose, onChanged, loss, 
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [ports, setPorts] = useState(false);
+  const [addingTest, setAddingTest] = useState(false);
   const admin = me.role === "admin";
 
   const load = useCallback(() => {
@@ -87,8 +89,20 @@ export function CoreDrawer({ core, segment, ends, me, onClose, onChanged, loss, 
       <dl className="mt-4 grid grid-cols-[110px_1fr] gap-x-3 gap-y-1.5 border-t pt-4 text-body">
         {facts.map(([k, v]) => <div key={k} className="contents"><dt className="text-muted-foreground">{k}</dt><dd className="min-w-0 break-words">{v}</dd></div>)}
       </dl>
-      {admin && <button type="button" className="btn btn-sm mt-3" onClick={() => setPorts(true)}>{core.port_a || core.port_b ? "Edit ports" : "Add ports"}</button>}
+      {admin && (
+        <div className="mt-3 flex gap-2">
+          <button type="button" className="btn btn-sm" onClick={() => setPorts(true)}>{core.port_a || core.port_b ? "Edit ports" : "Add ports"}</button>
+          <button type="button" className="btn btn-sm" onClick={() => setAddingTest(true)}>Add test</button>
+        </div>
+      )}
       {ports && <PortsDialog core={core} ends={ends} onClose={() => setPorts(false)} onSaved={() => { onChanged(); load(); }} />}
+      {addingTest && (
+        <MeasurementDialog core={core} onClose={() => setAddingTest(false)}
+          onSaved={() => {
+            onChanged();
+            load();
+          }} />
+      )}
 
       {error && <p role="alert" className="mt-4 rounded-md border border-red bg-red-bg px-3 py-2 text-body font-semibold text-red">{error}</p>}
 

@@ -283,6 +283,7 @@ class Measurement(Base):
     test_method: Mapped[str | None] = mapped_column(Text)
     field_team: Mapped[str | None] = mapped_column(Text)
     core_id: Mapped[int | None] = _fk("cores", True)
+    created_by: Mapped[int | None] = _fk("users", True)
 
 
 class DataEdit(Base):

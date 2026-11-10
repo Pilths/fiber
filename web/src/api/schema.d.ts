@@ -812,6 +812,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/cores/{core_id}/measurements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add Core Measurement */
+        post: operations["add_core_measurement_api_admin_cores__core_id__measurements_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/segments/{sid}": {
         parameters: {
             query?: never;
@@ -1483,6 +1500,20 @@ export interface components {
             username: string;
             /** Password */
             password: string;
+        };
+        /** MeasurementBody */
+        MeasurementBody: {
+            /** Loss Db */
+            loss_db: number | string;
+            /**
+             * Tested On
+             * Format: date
+             */
+            tested_on: string;
+            /** Test Method */
+            test_method?: string | null;
+            /** Field Team */
+            field_team?: string | null;
         };
         /** MeasurementOut */
         MeasurementOut: {
@@ -4045,6 +4076,45 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CoreHolderDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_core_measurement_api_admin_cores__core_id__measurements_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-dev-user"?: string | null;
+            };
+            path: {
+                core_id: number;
+            };
+            cookie?: {
+                fiber_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MeasurementBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoreLoss"];
                 };
             };
             /** @description Validation Error */

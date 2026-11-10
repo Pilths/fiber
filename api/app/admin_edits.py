@@ -4,6 +4,7 @@ Every changed field is its own data_edits row (old, new, reason, user). Field na
 modules compare for protection: site name/location ("lat,lon")/region (stored in details.region)/active,
 segment distance_km/region/site_a_id/site_b_id/survey_cores/cable_size, core ports.
 """
+from datetime import date
 from decimal import Decimal
 from typing import Annotated, Any, Literal
 
@@ -19,6 +20,8 @@ from app.ingest.reservation_import import add_cores, port
 from app.inventory import service as inventory
 from app.inventory.schemas import CoreHolderDetail
 from app.link_type import ROUTE_TYPE_SQL
+from app.loss import service as loss_service
+from app.loss.schemas import CoreLoss
 from app.reservations.schemas import NO_REASON, Reason
 from app.reservations.service import conflict
 from app.routing.graph import invalidate as invalidate_routes
@@ -44,6 +47,16 @@ VALUES (:entity, :entity_id, :field, :old_value, :new_value, :reason, :user_id)
 CORE_PORTS_SQL = """
 SELECT c.segment_id, c.port_a_id, c.port_b_id, s.site_a_id, s.site_b_id
 FROM cores c JOIN segments s ON s.id = c.segment_id WHERE c.id = :core_id
+"""
+CORE_SURVEY_SQL = """
+SELECT c.segment_id, c.number, s.survey_cores, s.distance_km
+FROM cores c JOIN segments s ON s.id = c.segment_id
+WHERE c.id = :core_id
+"""
+TODAY_KL_SQL = "SELECT (now() AT TIME ZONE 'Asia/Kuala_Lumpur')::date"
+INSERT_MEASUREMENT_SQL = """
+INSERT INTO measurements (segment_id, core_id, loss_db, tested_on, test_method, field_team, created_by)
+VALUES (:segment_id, :core_id, :loss_db, :tested_on, :test_method, :field_team, :created_by)
 """
 LOCK_SEGMENT_SQL = "SELECT id FROM segments WHERE id = :segment_id FOR UPDATE"
 PORT_LABEL_SQL = "SELECT port_id FROM ports WHERE id = :port_row_id"
@@ -214,6 +227,50 @@ def set_core_ports(db: DB, admin: Admin, core_id: int, body: CorePortsBody) -> C
     core = inventory.get_core(db, core_id, admin.id)
     assert core is not None
     return core
+
+
+# ---------- measured loss, typed by hand (each test is its own history row) ----------
+
+def _trimmed_or_none(value: str | None) -> str | None:
+    if value is None:
+        return None
+    return value.strip() or None
+
+
+class MeasurementBody(BaseModel):
+    loss_db: Decimal = Field(gt=0, le=100)
+    tested_on: date
+    test_method: str | None = None
+    field_team: str | None = None
+
+
+@router.post("/cores/{core_id}/measurements")
+def add_core_measurement(db: DB, admin: Admin, core_id: int, body: MeasurementBody) -> CoreLoss:
+    found = db.execute(text(CORE_SURVEY_SQL), {"core_id": core_id}).first()
+    if found is None:
+        raise HTTPException(404, "Core not found")
+    segment_id, number, survey_cores, distance_km = found
+    # Same rule as inventory: cores above the surveyed count are hidden. A segment with no count yet
+    # still shows all its cores in inventory, so it is not refused here.
+    if survey_cores is not None and number > survey_cores:
+        raise conflict("This core is above the surveyed cores of the segment")
+    if body.tested_on > db.execute(text(TODAY_KL_SQL)).scalar_one():
+        raise HTTPException(422, "Test date cannot be in the future")
+    db.execute(text(INSERT_MEASUREMENT_SQL), {
+        "segment_id": segment_id,
+        "core_id": core_id,
+        "loss_db": body.loss_db,
+        "tested_on": body.tested_on,
+        "test_method": _trimmed_or_none(body.test_method),
+        "field_team": _trimmed_or_none(body.field_team),
+        "created_by": admin.id,
+    })
+    db.commit()
+    calculated = loss_service.calculated_loss_db(distance_km)
+    for entry in loss_service.core_losses(db, segment_id, calculated):
+        if entry["core_id"] == core_id:
+            return CoreLoss(**entry)
+    raise HTTPException(500, "Measurement was not saved")
 
 
 # ---------- segments ----------

@@ -34,6 +34,34 @@ test("a measured core: its Calculated loss and Measured loss in core details", a
   await d.screenshot({ path: "e2e/screenshots/core-details.png" });
 });
 
+test("admin adds a Measured loss test from core details", async ({ page }) => {
+  await signIn(page, "admin1");
+  await pick(page, SEGMENTS.measured);
+  const segments: { id: number; site_a: string; site_b: string }[] = await (await page.request.get("/api/segments")).json();
+  const segment = segments.find((each) => SEGMENTS.measured.test(`${each.site_a} - ${each.site_b}`))!;
+  const loss = await (await page.request.get(`/api/loss/segments/${segment.id}`)).json();
+  const core = loss.cores[0] as { core_number: number; history: unknown[] };
+  await openCore(page, core.core_number);
+  const drawer = page.getByRole("dialog", { name: new RegExp(`^Core ${core.core_number} on `) });
+  await drawer.getByRole("button", { name: "Add test" }).click();
+  const dialog = page.getByRole("dialog", { name: `Measured loss test for core ${core.core_number}` });
+  const value = (5 + Math.random() * 4).toFixed(2);
+  await dialog.getByLabel("Measured loss (dB)").fill("0");
+  await dialog.getByRole("button", { name: "Save" }).click();
+  await expect(dialog).toContainText("Enter a value above 0 and up to 100 dB.");
+  await dialog.getByLabel("Measured loss (dB)").fill(value);
+  await dialog.getByLabel("Test type").fill("OTDR");
+  await dialog.getByLabel("Field team").fill("E2E team");
+  await dialog.getByRole("button", { name: "Save" }).click();
+  await expect(dialog).toBeHidden();
+  const measured = drawer.locator("dt", { hasText: /^Measured loss$/ }).locator("xpath=following-sibling::dd[1]");
+  await expect(measured).toContainText(`${value} dB`);
+  await expect(measured).toContainText("E2E team");
+  const tests = drawer.getByRole("list", { name: "Measured loss tests, newest first" }).locator("li");
+  await expect(tests).toHaveCount(core.history.length + 1);
+  await expect(tests.first()).toContainText(`${value} dB`);
+});
+
 test("no distance segment: dashes, never 0 dB", async ({ page }) => {
   await signIn(page);
   await pick(page, SEGMENTS.noDistance);
