@@ -1,6 +1,6 @@
 # Fiber Dashboard PRD
 
-Last updated: 26 October 2026
+Last updated: 10 November 2026
 
 ## 1. Executive Summary
 
@@ -59,8 +59,8 @@ To confirm against the mock files arriving 22 October 2026: KMZ lines are named 
    - Global search matches customer, segment, circuit ID and core.
    - Segments are labelled by their two sites and show their free cores and status mix; planners can filter by region and route type.
    - Each core's status is visible at a glance, and status is never shown by colour alone (for example hatched for Reserved, outlined for Available).
-   - Only surveyed cores are shown. A cable is usually 144 cores, but the data knows only the cores found at the onsite survey (Excel "Core Secured", stored as `segments.survey_cores`). A segment gets one core row per surveyed core, numbered 1 to the survey count. Cores with known port ranges show their port labels; the others have blank ports until known. The total cores of the cable (`segments.cable_size`, default 144, admin-editable) is info only, shown as "Total cores", and never shown as core rows.
-   - A segment with no survey count is "not surveyed" and cannot be booked until an admin enters a count (a segment edit with a reason). When the admin raises the count, more cores appear; nothing is rebuilt.
+   - Only verified cores are shown. A cable is usually 144 cores, but the data knows only the cores found at core verification (Excel "Core Secured", stored as `segments.survey_cores`). A segment gets one core row per verified core, numbered 1 to the verified core count. Cores with known port ranges show their port labels; the others have blank ports until known. The total cores of the cable (`segments.cable_size`, default 144, admin-editable) is info only, shown as "Total cores", and never shown as core rows.
+   - A segment with no verified core count is "not verified" and cannot be booked until an admin enters a count (a segment edit, kept as history). When the admin raises the count, more cores appear; nothing is rebuilt.
    - The Cores table shows one row per core. Consecutive cores of one reservation, and runs of Available cores, are grouped into one expandable row. Filter chips All, Free, In use and Unassigned show counts. A count-only reservation shows as an "Unassigned" row. Columns: Cores, Status, Customer, Planner, SRF, Planned date, Age, Ports. Circuit ID and loss are in the core details.
    - The "Free" figure (in the Free chip and the segment list) is Available cores minus the remaining unassigned cores of active reservations on that segment.
 2. As a planner, I want to request cores for a customer with a planned date, so that capacity is held once an admin approves it.
@@ -69,7 +69,7 @@ To confirm against the mock files arriving 22 October 2026: KMZ lines are named 
    - Each reservation records the customer, planner, planned date, request date, and the admin who approved or rejected it.
    - Reservations are append-only: no editing in place. A change, approval or release is a new record, and earlier records stay as history.
    - On a segment, only Available cores can be ticked; in use and reserved cores are not in the list.
-   - On a route, the planner enters the cores needed per segment, and the reservation takes that many on every segment, assigned from the first free cores on each segment by default. Changing the cores per segment (a per-segment override) is Later / parked. If any segment has fewer free cores than needed, Reserve is disabled with a sentence naming the short segment.
+   - On a route, the planner enters the cores needed per segment, and the reservation takes that many on every segment, assigned from the first free cores on each segment by default. Changing the cores per segment (a per-segment override) is Later / parked. If any segment has fewer free cores than needed (or is not verified), the option is flagged without a sentence: its lowest-free pill turns red with a warning symbol, it sorts last, and Reserve on the route stays disabled.
    - Nobody, planner or admin, can book more cores on a segment than its Free figure; the API answers 409.
    - A count-only reservation holds a number of cores on a segment without naming them (`unassigned_cores = N`). It comes from the Excel import (a core count and no Core assignment). It marks no cell, but it lowers Free. An admin later assigns specific cores with the `assign` action (admin only), which adds cores and holds and saves an 'assigned' event. The remaining unassigned count is `unassigned_cores` minus the cores added by 'assigned' events, derived because reservations are insert-only. Assign only adds cores to an unassigned count, so cores are still never corrected or swapped. Releasing a count-only reservation releases its remaining unassigned count with it.
    - A new request holds its cores as Requested until an admin approves or rejects it; approval reserves them and rejection frees them.
@@ -110,7 +110,7 @@ To confirm against the mock files arriving 22 October 2026: KMZ lines are named 
    - From and To list all sites, so any site can route to any site, including starting or ending a route inside a route.
    - A route option's Calculated loss is the sum of its segments' Calculated loss (each segment counts its own 2 connectors).
    - Each option shows loss confidence, as measured segments out of segments on the path.
-   - An option with fewer free cores than needed is flagged.
+   - An option with too few free cores (or a segment not verified) is flagged without a sentence: its lowest-free pill turns red with a warning symbol, it sorts last, and Reserve on the route stays disabled.
    - Invalid input clears the results and shows an inline error on the field.
 6. As a planner, I want to see real routes on a map, so that I understand where segments run.
    - MapLibre GL JS draws each segment as a straight line between its two sites over the self-hosted basemap, with the drawing rules in Design decisions (data center square, other site diamond, line weight by route type, free-cores chip). Clicking a segment selects it and fills the segment diagram and the Cores table on the Inventory page. KMZ shapes are not in the MVP map: segments are straight lines. One mock route with a drawn shape (two segments between three sites, stored as a route line) is drawn in place of its straight lines to prove the line-shape path works end to end. Real KMZ import is Later / parked; routes stay labels.
@@ -149,7 +149,10 @@ To confirm against the mock files arriving 22 October 2026: KMZ lines are named 
    - After the first import, the dashboard database is the source of truth and the Excel is a feed. A field edited in the dashboard is protected: a later upload that differs shows as a conflict in the preview and keeps the dashboard value unless the admin ticks the Excel value.
    - The Admin area runs an upload in three steps: Upload, Preview and Confirm. The preview groups rows as New, Changed, Conflicts, Not in this file, Needs review and Rejected, each with its warnings and row status. Rows missing from a file are left untouched and listed as Not in this file. The site master upload below is the exception: it uses the replace-file model.
    - An upload never changes a reservation. If an uploaded row conflicts with a Requested or Reserved core, for example the segment is marked cut or the core no longer exists, the preview flags it and the reservation goes to the Action needed list.
-   - Admins can edit data in the app, because the Excel is a feed and not the source of truth. The MVP covers fiber cut on a segment (cut or restore; In use comes from the Excel and Reserved from the reservation flow), segment details (distance, region, sites A and B, survey count, total cores) and site details (name, coordinates). Everything else is v1.1. Each edit needs a reason and is saved as a new history record; a changed distance recalculates loss, and marking a segment cut sends the reservations on it to Needs review.
+   - Admins can edit data in the app, because the Excel is a feed and not the source of truth. The MVP covers fiber cut on a segment (cut or restore; In use comes from the Excel and Reserved from the reservation flow), segment details (distance, region, sites A and B, verified core count, total cores) and site details (name, coordinates). Everything else is v1.1. Each edit is saved as a new history record (reason optional, owner decision 5 Nov 2026); a changed distance recalculates loss, and marking a segment cut sends the reservations on it to Needs review.
+   - Paste ports (Edit segment): the admin pastes the port column from the build sheet for the site A end and/or the site B end, one label per line; line 1 is the core at "Start at core" (default 1). A blank line skips that core. A preview lists each core with old and new ports and a check: New, Replaces, Unchanged, Problem (duplicate label in the paste, label already on another core at that site, core above the verified core count). Apply saves all non-problem rows at once; each change is kept as history like the single-core ports edit. Labels are free text (FDF/EDF style such as FDF1-M2-T3), unique per site.
+   - Use total cores: a button beside the verified core count in Edit segment that copies Total cores into it, for a newly built cable that needs no verification.
+   - Admins can add a Measured loss test by hand from core details ("Add test": dB, test date, test type, field team). It is appended to the history and attributed to the admin. Allowed on segments without a verified core count too.
    - Each upload is logged with who, when and what changed.
 
 **Non-Goals**
@@ -245,7 +248,7 @@ Reservation sheet (header on row 1):
 - **Region:** some blocks are merged cells, others repeat per row. Merged cells are filled forward. Spelling variants (for example "Nothern") map to North, Central, South or East Coast; an unknown value is Needs review with a reason.
 - **Nodes:** `AABB-BBCC`, split on '-' and matched to a segment by the unordered site pair. The suffix "(additional core)" means another reservation on the same segment: it is stripped to match the segment, and the reservation gets an `additional` flag. An unknown site code is Needs review.
 - **Distance(KM):** the segment's distance comes from this sheet.
-- **Core Secured:** the number of cores found available at the onsite survey (core verification). Stored on the segment as `survey_cores`. It sets how many core cells the segment shows.
+- **Core Secured:** the number of cores found available at core verification. Stored on the segment as `survey_cores`. It sets how many core cells the segment shows.
 - **Expected CV Ready:** the core verification date (an Excel serial date). Stored on the reservation as `cv_ready_date`.
 - **Port Info:** physical labels from both sites, free text with checklists, quality comments, sometimes dB loss and distance. Stored raw only in the MVP. Parsing it is a nice-to-have for later.
 - **Contractor, Remark:** free text, stored raw.

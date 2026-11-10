@@ -39,9 +39,9 @@ Tabs: **Inventory | My reservations**. There is no Reserve tab; reserving opens 
 | Slot | Content |
 |---|---|
 | Top left, 8 of 12 columns | Map, full size. Never shrunk to make room for other content. The Region filter ("All regions") sits in the map toolbar beside Layers, zoom, Fit selection and Full screen; it dims the other segments. Layers is the one place for what the map shows: Routes (Trunk, Metro, DC-DC, DC-TOC tick boxes with their key swatch, and an on/off chip per trunk route such as R1, R3) and Sites (Data centres, TOC, Trunk sites). A hidden line or site is not drawn; the selected segment or route and its end sites always show; route search still uses hidden segments. Line colour shows the route type (Trunk dark grey, Metro purple, DC-DC teal double line, DC-TOC pink dashed; selected blue); free-core health shows on the chips. The map key is clickable: each route type and site entry toggles the same layer as the Layers panel (off entries are faded and struck through; Selected is not a toggle). Map key, Sites: Data centre (dark square), TOC (dark triangle), Trunk site (diamond). |
-| Top right, 4 columns, map height | "Site A to B" panel (prototype 9e), content scrolls inside: Site A and Site B with a swap button, Cores needed, a full-width blue "Find route", Shortest distance / Most free cores toggle, then the option rows (as many as the network gives, up to 5; near-copies dropped) (radio dot, Option N, segments and km, lowest free count in a coloured pill, Calculated loss; the selected one has a blue border and tint). Nothing below before a search. Segments are found with the header search or the map. |
+| Top right, 4 columns, map height | "Site A to B" panel (prototype 9e), content scrolls inside: Site A and Site B with a swap button, Cores needed, a full-width blue "Find route", Shortest distance / Most free cores toggle, then the option rows (as many as the network gives, up to 5; near-copies dropped) (radio dot, Option N, segments and km, lowest free count in a coloured pill, Calculated loss; the selected one has a blue border and tint). An option with too few free cores, or a segment not verified, has its pill red with a warning symbol and sorts last, with no sentence; Reserve on this route stays disabled. Nothing below before a search. Segments are found with the header search or the map. |
 | Under the map, full width | Segment diagram: keep the one the web app has now (`SegmentDiagram` in `web/src/components/NetworkDetail.tsx`), not the simplified line in the FigCraft mock. The selected segment's box reaches the site dots at both ends. |
-| Under the diagram, own row | "Reserve on this route" (when a route is found) and "Edit segment" (and "Restore" on a cut segment), right-aligned, all the same width. Not inside the diagram card. No row when it would be empty. |
+| Under the diagram, own row | "Reserve on this route" (when a route is found) and "Edit segment" (and "Restore" on a cut segment), right-aligned, all the same width. Not inside the diagram card. No row when it would be empty. Edit segment (admin) has "Use total cores" beside the verified core count (copies Total cores into it) and "Paste ports": paste the build sheet port column for the site A and/or site B end (one label per line, line 1 = core at "Start at core", default 1, blank line skips), a preview of each core with old and new ports and a check (New, Replaces, Unchanged, Problem), and Apply for all non-problem rows. |
 | Below, full width | Cores table (see below). Rows of holders come first, so every holder is above the fold. |
 
 Segment facts are only the two site names and the distance. No numbers row, no loss, no region or type on the segment
@@ -63,7 +63,7 @@ Segment facts are only the two site names and the distance. No numbers row, no l
 - One row per core everywhere (no ranges); the core number sits centred under "Cores". (Owner, 3 Nov 2026.)
 - Unassigned row: a reservation for a number of cores whose core numbers are not picked yet (Excel import).
   Shown as "4 cores" in the Unassigned group.
-- Row click opens core details (side panel): customer, planner, SRF, circuit, ports both ends, "Measured loss",
+- Row click opens core details (side panel; admin has "Add test" for a Measured loss test: dB, test date, test type, field team): customer, planner, SRF, circuit, ports both ends, "Measured loss",
   "Calculated loss", test date, history, Keep, Release.
 
 ### Reserve box (modal over Inventory)
@@ -95,7 +95,7 @@ Separate tab: all segments, only the planner's own reservations, with chips (All
 |---|---|
 | Free | cores that can be booked now (Available minus Unassigned holds) |
 | In use | Requested, Reserved, In service and Unassigned |
-| Verified | cores confirmed by the onsite survey (`segments.survey_cores`) |
+| Verified | cores confirmed by core verification (`segments.survey_cores`) |
 | Total cores | cores in the cable (`segments.cable_size`), never shown as cells |
 | Calculated loss | per core, from the owner's formula (km x 0.25 + 0.1 x km/4 + 0.5 x 2 connectors, 2 decimals); never drawn on the map or diagram |
 | Measured loss | per core, from a physical field test by the field team (test type, date, team kept with it) |
