@@ -32,7 +32,7 @@ const GROUP: Record<Group, { label: string; icon: IconName; cls: string; word: s
 };
 const OTHER: Group[] = ["new", "changed", "unchanged", "missing", "conflicts", "already_imported", "ignored", "needs_review", "rejected"];
 const SEGMENT_GROUPS: Group[] = ["new", "changed", "unchanged", "missing"];
-const FIELD: Record<string, string> = { region: "Region", distance_km: "Distance (km)", survey_cores: "Surveyed cores" };
+const FIELD: Record<string, string> = { region: "Region", distance_km: "Distance (km)", survey_cores: "Verified cores" };
 
 const TEXT: Record<string, string> = { "h-red": "font-semibold text-red", "h-amber": "font-semibold text-amber", "h-green": "text-green", "h-blue": "text-blue", "h-ns": "text-muted-foreground" };
 const Pill = ({ g }: { g: Group }) => <span className={`inline-flex items-center gap-1.5 ${TEXT[GROUP[g].cls]}`}><Icon name={GROUP[g].icon} />{GROUP[g].word}</span>;

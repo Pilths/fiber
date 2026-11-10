@@ -68,11 +68,13 @@ test("#route= link opens Inventory with that route found and drawn; #segment= st
   await expect(reserveRoute(page)).toHaveCount(0);
 });
 
-test("too many cores: the option names the short segment, Reserve on this route is off", async ({ page }) => {
+test("too many cores: the free pill turns red with a symbol, Reserve on this route is off", async ({ page }) => {
   await signIn(page);
   await page.goto(`/${await routeHash(page, 200)}`);
   const short = options(page).first().getByTestId("route-short");
-  await expect(short).toContainText(/Not enough free cores on DEV .+: \d+ free, 200 needed|DEV .+ is not surveyed/);
+  await expect(short).toContainText(/\d+ free/);
+  await expect(short).toHaveClass(/h-red/);
+  await expect(short.locator(".sr-only")).toHaveText(/^, (not enough for 200|DEV .+ not verified)$/);
   await expect(short.locator('svg[data-icon="fl"]')).toHaveCount(1); // symbol, not colour alone
   await expect(options(page).first()).not.toContainText("Best match");
   await expect(reserveRoute(page)).toBeDisabled();

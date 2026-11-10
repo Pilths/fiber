@@ -812,6 +812,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/segments/{segment_id}/ports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Paste Segment Ports */
+        post: operations["paste_segment_ports_api_admin_segments__segment_id__ports_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/cores/{core_id}/measurements": {
         parameters: {
             query?: never;
@@ -1580,6 +1597,74 @@ export interface components {
             route: string | null;
             /** Section */
             section: string | null;
+        };
+        /** PastePortCounts */
+        PastePortCounts: {
+            /**
+             * New
+             * @default 0
+             */
+            new: number;
+            /**
+             * Replaces
+             * @default 0
+             */
+            replaces: number;
+            /**
+             * Unchanged
+             * @default 0
+             */
+            unchanged: number;
+            /**
+             * Problem
+             * @default 0
+             */
+            problem: number;
+        };
+        /** PastePortRow */
+        PastePortRow: {
+            /** Core Number */
+            core_number: number;
+            /** Port A Old */
+            port_a_old: string | null;
+            /** Port A New */
+            port_a_new: string | null;
+            /** Port B Old */
+            port_b_old: string | null;
+            /** Port B New */
+            port_b_new: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "new" | "replaces" | "unchanged" | "problem";
+            /** Problem */
+            problem?: string | null;
+        };
+        /** PastePortsBody */
+        PastePortsBody: {
+            /**
+             * Start Core
+             * @default 1
+             */
+            start_core: number;
+            /** Port A */
+            port_a?: string[] | null;
+            /** Port B */
+            port_b?: string[] | null;
+            /**
+             * Apply
+             * @default false
+             */
+            apply: boolean;
+        };
+        /** PastePortsResult */
+        PastePortsResult: {
+            /** Rows */
+            rows: components["schemas"]["PastePortRow"][];
+            counts: components["schemas"]["PastePortCounts"];
+            /** Applied */
+            applied: boolean;
         };
         /** RenameIn */
         RenameIn: {
@@ -4076,6 +4161,45 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CoreHolderDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    paste_segment_ports_api_admin_segments__segment_id__ports_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-dev-user"?: string | null;
+            };
+            path: {
+                segment_id: number;
+            };
+            cookie?: {
+                fiber_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PastePortsBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PastePortsResult"];
                 };
             };
             /** @description Validation Error */

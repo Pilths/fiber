@@ -170,7 +170,7 @@ def test_pick_respects_count_only_holds_and_409_names_short_segment(client, g, d
     assert client.get(f"/api/routes/pick?segment_ids={g['AC']}&cores_needed=1", headers=H()).status_code == 200
     # not surveyed
     r = client.get(f"/api/routes/pick?segment_ids={g['AD']}&cores_needed=1", headers=H())
-    assert r.status_code == 409 and "not surveyed" in r.json()["detail"]["message"]
+    assert r.status_code == 409 and "no verified core count" in r.json()["detail"]["message"]
 
 
 def test_endpoints_ordered_by_section(client, g, db):

@@ -95,19 +95,61 @@ test("admin edits segment distance with a reason; the diagram follows; then reve
   await expect(page.getByTestId("edit-history").getByRole("listitem").first()).toContainText("Reason: E2E: revert");
 });
 
-test("lowering the survey count below taken cores is refused in plain words", async ({ page }) => {
+test("lowering the verified core count below taken cores is refused in plain words", async ({ page }) => {
   await signIn(page, "admin1");
   await pick(page, KLCJ);
   await editSegment(page).click();
   const dlg = page.getByRole("dialog", { name: /^Edit segment/ });
-  await dlg.getByLabel("Survey count").fill("1");
+  await dlg.getByLabel("Verified cores").fill("1");
   await dlg.getByLabel("Reason (optional)").fill("E2E: should be refused");
   await dlg.getByRole("button", { name: "Save" }).click();
   await expect(dlg.getByRole("alert")).toContainText(/^Cores 2, .* are allocated or have history and cannot be removed/);
   await dlg.getByRole("button", { name: "Cancel" }).click();
   const n = await coresTable(page).getByTestId("core-group").evaluateAll((gs) => gs.filter((g) => g.getAttribute("data-status") !== "Unassigned")
     .reduce((t, g) => t + Number(/(\d+)\s*$/.exec(g.querySelector("th[scope=rowgroup]")!.textContent!)![1]), 0));
-  expect(n).toBe(24); // survey count unchanged: the group counts add up to 24 cores
+  expect(n).toBe(24); // verified core count unchanged: the group counts add up to 24 cores
+});
+
+// Sets the port at the first end of core n in core details; returns the port it had.
+async function setFirstPort(page: Page, n: number, value: string): Promise<string> {
+  await openCore(page, n);
+  const d = drawer(page);
+  await d.getByRole("button", { name: /^(Edit|Add) ports$/ }).click();
+  const ports = page.getByRole("dialog", { name: `Ports of core ${n}` });
+  const first = ports.getByLabel(/^Port at /).first();
+  const old = await first.inputValue();
+  await first.fill(value);
+  await ports.getByRole("button", { name: "Save" }).click();
+  await expect(ports).toBeHidden();
+  await d.getByRole("button", { name: "Close core detail" }).click();
+  return old;
+}
+
+test("paste ports: preview shows New rows, apply writes the ports, then the old ports go back", async ({ page }) => {
+  await signIn(page, "admin1");
+  await pick(page, KLBJ);
+  // DEV cores all have ports; clear the first end of cores 20 and 21 so the paste is New.
+  const old20 = await setFirstPort(page, 20, "");
+  const old21 = await setFirstPort(page, 21, "");
+  await editSegment(page).click();
+  await page.getByRole("dialog", { name: /^Edit segment/ }).getByRole("button", { name: "Paste ports" }).click();
+  const paste = page.getByRole("dialog", { name: /^Paste ports/ });
+  await paste.getByLabel("Start at core").fill("20");
+  await paste.getByLabel("DEV Kuala Lumpur DC end").fill("E2E-PP-20\nE2E-PP-21");
+  await expect(paste.getByText("2 lines")).toBeVisible();
+  const rows = paste.getByRole("table", { name: "Paste ports preview" }).locator("tbody tr");
+  await expect(rows).toHaveCount(2);
+  await expect(rows.nth(0)).toContainText("✓ New");
+  await expect(rows.nth(1)).toContainText("✓ New");
+  await expect(paste.getByRole("status")).toHaveText("2 ready");
+  await paste.getByRole("button", { name: "Apply 2 cores" }).click();
+  await expect(paste).toBeHidden();
+  await expect(page.getByRole("dialog", { name: /^Edit segment/ })).toBeHidden();
+  await openCore(page, 20);
+  await expect(drawer(page)).toContainText("E2E-PP-20 to");
+  await drawer(page).getByRole("button", { name: "Close core detail" }).click();
+  expect(await setFirstPort(page, 20, old20)).toBe("E2E-PP-20");
+  expect(await setFirstPort(page, 21, old21)).toBe("E2E-PP-21");
 });
 
 test("admin opens a site from the segment diagram: fields, reason required, history", async ({ page }) => {

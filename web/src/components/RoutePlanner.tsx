@@ -30,11 +30,30 @@ function isShort(segment: RouteSegment, need: number): boolean {
   return !segment.surveyed || segment.free_to_reserve < need;
 }
 
-function shortText(segment: RouteSegment, need: number): string {
+// Screen-reader words after the lowest-free pill, so a short option is not shown by colour alone.
+function shortWords(segment: RouteSegment, need: number): string {
   if (!segment.surveyed) {
-    return `${segment.name} is not surveyed`;
+    return `, ${segment.name} not verified`;
   }
-  return `Not enough free cores on ${segment.name}: ${segment.free_to_reserve} free, ${need} needed`;
+  return `, not enough for ${need}`;
+}
+
+function FreePill({ option, short, need }: {
+  option: RouteOption;
+  short: RouteSegment | undefined;
+  need: number;
+}) {
+  if (!short) {
+    const freeClass = health({ survey_cores: 1, free_to_reserve: option.fewest_free }).cls;
+    return <span className={`pill ${freeClass}`}>{option.fewest_free} free</span>;
+  }
+  return (
+    <span className="pill h-red" data-testid="route-short">
+      <Icon name="fl" className="ic" />
+      {option.fewest_free} free
+      <span className="sr-only">{shortWords(short, need)}</span>
+    </span>
+  );
 }
 
 function siteProblem(from: Endpoint | null, to: Endpoint | null): string | null {
@@ -162,7 +181,6 @@ function OptionCard({ option, number, selected, need, onSelect }: {
 }) {
   const short = option.insufficient ? option.segments.find((segment) => isShort(segment, need)) : undefined;
   const segmentWord = option.total_segments === 1 ? "segment" : "segments";
-  const freeClass = health({ survey_cores: 1, free_to_reserve: option.fewest_free }).cls;
   const loss = option.estimated_db == null ? "-" : db(option.estimated_db);
   return (
     <button type="button" aria-pressed={selected} onClick={onSelect} data-testid="route-option"
@@ -177,14 +195,9 @@ function OptionCard({ option, number, selected, need, onSelect }: {
         </span>
         <span className="mt-1 flex items-center justify-between gap-2">
           <span>{option.total_segments} {segmentWord}, {totalKm(option)} km</span>
-          <span className={`pill ${freeClass}`}>{option.fewest_free} free</span>
+          <FreePill option={option} short={short} need={need} />
         </span>
         <span className="block">Calculated loss {loss}</span>
-        {short && (
-          <span className="mt-0.5 flex items-start gap-1.5 font-semibold text-red" data-testid="route-short">
-            <Icon name="fl" className="ic mt-[3px]" /><span>{shortText(short, need)}</span>
-          </span>
-        )}
       </span>
     </button>
   );

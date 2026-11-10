@@ -315,7 +315,7 @@ def test_my_reservations_list(client, w):
 
 def test_not_surveyed_segment_refuses_booking(client, w):
     r = book(client, w, [w["c3"]])
-    assert r.status_code == 409 and "not surveyed" in r.json()["detail"]["message"]
+    assert r.status_code == 409 and "no verified core count" in r.json()["detail"]["message"]
     s = segment(client, w["s3"])
     assert (s["survey_cores"], s["not_surveyed"], s["free_to_reserve"]) == (None, None, 0)
 

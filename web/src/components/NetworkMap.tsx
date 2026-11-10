@@ -215,7 +215,7 @@ function SegmentChip({ line, shown, onSelect }: SegmentChipProps) {
     free_to_reserve: segment.free_to_reserve,
     fiber_cut: segment.fiber_cut,
   });
-  let freeText = "not surveyed";
+  let freeText = "not verified";
   if (segment.surveyed) {
     freeText = `${segment.free_to_reserve} free to reserve, ${status.word}`;
   }

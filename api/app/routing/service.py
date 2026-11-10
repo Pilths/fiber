@@ -144,7 +144,7 @@ def pick(db: Session, segment_ids: list[int], cores_needed: int) -> dict[str, An
             raise HTTPException(422, f"Unknown segment {sid}")
         label = f"{s['site_a']} - {s['site_b']}"
         if s["survey_cores"] is None:
-            raise HTTPException(409, {"message": f"{label} is not surveyed yet; it cannot be booked.", "segment_id": sid})
+            raise HTTPException(409, {"message": f"{label} has no verified core count yet; it cannot be booked.", "segment_id": sid})
         if s["free_to_reserve"] < cores_needed:
             raise HTTPException(409, {"message": f"{label}: {cores_needed} needed but only {s['free_to_reserve']} free to reserve.",
                                       "segment_id": sid})

@@ -291,16 +291,12 @@ function Sent({ id, onClose }: { id: number; onClose: () => void }) {
 }
 
 function NotSurveyed({ detail, admin }: { detail: Detail; admin: AdminActions | null }) {
-  let message = "Not surveyed, cannot be booked.";
-  if (admin) {
-    message = "Not surveyed: enter a survey count to make it bookable.";
-  }
   return (
     <div role="status" data-testid="capacity" className="flex items-center gap-3 text-body">
-      <p>{message} No cores to show. Cable size {detail.cable_size}.</p>
+      <p>Not verified, cannot be booked. Total cores {detail.cable_size}.</p>
       {admin && (
         <button type="button" className="btn btn-sm" onClick={() => admin.onEditSegment("survey")}>
-          Enter survey count
+          Enter verified cores
         </button>
       )}
     </div>

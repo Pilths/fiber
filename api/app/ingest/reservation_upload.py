@@ -220,7 +220,7 @@ def _reservation_row(db: Session, r: Row, sp: SegmentItem, sites: dict[str, int]
     if ident in count_rows:
         return _set(r, "needs_review", f"identical to row {count_rows[ident]} in this file")
     if sp.survey is None:
-        return _set(r, "needs_review", "segment is not surveyed: a count-only reservation cannot be booked")
+        return _set(r, "needs_review", "segment has no verified core count: a count-only reservation cannot be booked")
     free = (sp.db_free if sp.segment_id else 0) + max(sp.survey - (sp.db_survey or 0), 0) - sp.used
     if n > free:
         return _set(r, "needs_review", f"{n} cores requested but only {max(free, 0)} free to reserve on this segment")

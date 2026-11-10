@@ -218,7 +218,7 @@ def test_count_only_and_capacity(client, db, admin):
     assert n(db, "SELECT unassigned_cores FROM reservations") == 3 and n(db, "SELECT count(*) FROM core_holds") == 0
     assert n(db, "SELECT survey_cores FROM segments") == 4 and n(db, "SELECT count(*) FROM cores") == 4
     j = up(client, workbook(row("BBCC-CCDD", cores=None, count=1, survey=None))).json()
-    assert j["counts"]["needs_review"] == 1 and "not surveyed" in rows_of(client, j["upload_id"], "needs_review")[0]["reason"]
+    assert j["counts"]["needs_review"] == 1 and "no verified core count" in rows_of(client, j["upload_id"], "needs_review")[0]["reason"]
     dup = up(client, workbook(row("BBCC-CCDD", cores=None, count=1, survey=5), row("BBCC-CCDD", cores=None, count=1, survey=5))).json()
     assert dup["counts"]["reservations"] == 1 and dup["counts"]["needs_review"] == 1
 

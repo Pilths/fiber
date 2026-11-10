@@ -297,7 +297,7 @@ def _check_segment(db: Session, segment_id: int, requested: int) -> None:
     if segment.fiber_cut:
         raise conflict(f"{label} has a fiber cut and cannot be booked until an admin restores it.")
     if segment.survey_cores is None:
-        raise conflict(f"{label} is not surveyed yet; it cannot be booked.")
+        raise conflict(f"{label} has no verified core count yet; it cannot be booked.")
     if requested > segment.free_to_reserve:
         raise conflict(f"{label}: {requested} requested but only {segment.free_to_reserve} free to reserve "
                        f"({segment.unassigned_reserved} reserved by count only).")
@@ -316,7 +316,7 @@ def _check_book(db: Session, core_ids: list[int]) -> list[dict[str, Any]]:
     cores = _core_rows(db, core_ids)  # statuses as of now, after the lock
     taken = _not_bookable(cores)
     if taken:
-        message = "Some cores are not Available (or are beyond the surveyed count)."
+        message = "Some cores are not Available (or are beyond the verified core count)."
         raise conflict(message, taken_core_ids=taken)
     for segment_id in sorted(segment_ids):
         requested = sum(core["segment_id"] == segment_id for core in cores)

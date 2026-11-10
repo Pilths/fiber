@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { api, ApiError, errorText } from "@/api/client";
 import type { components } from "@/api/schema";
+import { PastePortsDialog } from "@/components/PastePortsDialog";
 import { Dialog } from "@/components/upload-parts";
 import { when } from "@/lib/status";
 
@@ -12,7 +13,7 @@ type Site = { id: number; name: string };
 const REGIONS = ["Central", "East Coast", "North", "South"];
 const FIELD: Record<string, string> = {
   distance_km: "Distance (km)", route_type: "Route type", region: "Region", site_a_id: "Site A (id)", site_b_id: "Site B (id)",
-  survey_cores: "Survey count", cable_size: "Cable size", fiber_cut: "Fiber cut", name: "Name", location: "Location", active: "Active", status: "Status",
+  survey_cores: "Verified cores", cable_size: "Total cores", fiber_cut: "Fiber cut", name: "Name", location: "Location", active: "Active", status: "Status",
 };
 const lbl = "lbl mb-1 block text-body! text-foreground!";
 
@@ -40,7 +41,7 @@ export function EditHistory({ rows }: { rows: Row[] }) {
 function editError(e: unknown) {
   const d = e instanceof ApiError ? (e.detail as { detail?: { blocking_core_numbers?: number[] } } | null)?.detail : null;
   const ns = d && typeof d === "object" ? d.blocking_core_numbers : undefined;
-  if (ns?.length) return `Cores ${ns.join(", ")} are allocated or have history and cannot be removed. The survey count stays as it is.`;
+  if (ns?.length) return `Cores ${ns.join(", ")} are allocated or have history and cannot be removed. The verified core count stays as it is.`;
   if (e instanceof ApiError && e.status === 400) return "Nothing changed.";
   return errorText(e, "Could not save. Try again.");
 }
@@ -77,9 +78,10 @@ function SitePicker({ label, site, onPick }: { label: string; site: Site | null;
   );
 }
 
-function Buttons({ busy, onClose }: { busy: boolean; onClose: () => void }) {
+function Buttons({ busy, onClose, left }: { busy: boolean; onClose: () => void; left?: React.ReactNode }) {
   return (
     <div className="mt-5 flex justify-end gap-2">
+      {left}
       <button type="button" className="btn" onClick={onClose}>Cancel</button>
       <button type="submit" className="btn btn-p" disabled={busy}>{busy ? "Saving…" : "Save"}</button>
     </div>
@@ -96,6 +98,7 @@ export function EditSegmentDialog({ segmentId, focus, onClose, onSaved }: { segm
   const [b, setB] = useState<Site | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [pasting, setPasting] = useState(false);
   const survey = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -113,6 +116,17 @@ export function EditSegmentDialog({ segmentId, focus, onClose, onSaved }: { segm
   useEffect(() => { if (s && focus === "survey") survey.current?.focus(); }, [s, focus]);
 
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setF((o) => ({ ...o, [k]: e.target.value }));
+  const copyTotalCores = () => {
+    setF((old) => ({ ...old, survey: old.cable }));
+  };
+  const portsApplied = () => {
+    setPasting(false);
+    onSaved();
+    onClose();
+  };
+  const pasteButton = (
+    <button type="button" className="btn mr-auto" onClick={() => setPasting(true)}>Paste ports</button>
+  );
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!s || !a || !b) return;
@@ -153,19 +167,27 @@ export function EditSegmentDialog({ segmentId, focus, onClose, onSaved }: { segm
             </label>
             <SitePicker label="Site A" site={a} onPick={setA} />
             <SitePicker label="Site B" site={b} onPick={setB} />
-            <label><span className={lbl}>Survey count</span>
-              <input ref={survey} className="field" type="number" min="0" step="1" value={f.survey} onChange={set("survey")} placeholder="Not surveyed" />
+            <label><span className={lbl}>Verified cores</span>
+              <span className="flex gap-2">
+                <input ref={survey} className="field" type="number" min="0" step="1" value={f.survey}
+                  onChange={set("survey")} placeholder="Not verified" />
+                <button type="button" className="btn whitespace-nowrap" onClick={copyTotalCores}>Use total cores</button>
+              </span>
             </label>
-            <label><span className={lbl}>Cable size</span><input className="field" type="number" min="1" step="1" value={f.cable} onChange={set("cable")} /></label>
+            <label><span className={lbl}>Total cores</span><input className="field" type="number" min="1" step="1" value={f.cable} onChange={set("cable")} /></label>
             <label className="col-span-2 flex items-start gap-2 text-body">
               <input type="checkbox" className="mt-0.5 size-4" checked={f.cut} onChange={(e) => setF((o) => ({ ...o, cut: e.target.checked }))} />
               <span className="font-semibold">Fiber cut</span>
             </label>
             <Reason value={f.reason} onChange={(v) => setF((o) => ({ ...o, reason: v }))} autoFocus={focus === "restore"} />
           </div>
-          <Buttons busy={busy} onClose={onClose} />
+          <Buttons busy={busy} onClose={onClose} left={pasteButton} />
           <EditHistory rows={s.history} />
         </form>
+      )}
+      {s && pasting && (
+        <PastePortsDialog segmentId={segmentId} siteA={s.site_a} siteB={s.site_b} cores={s.survey_cores ?? 0}
+          onClose={() => setPasting(false)} onApplied={portsApplied} />
       )}
     </Dialog>
   );
