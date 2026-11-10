@@ -1,96 +1,151 @@
-import { Fragment, useEffect, useId, useRef, useState } from "react";
-import { api, errorText } from "@/api/client";
-import type { components } from "@/api/schema";
+import { Fragment, useEffect, useId, useRef } from "react";
+import { CustomerField, SimilarWarning } from "@/components/CustomerPicker";
 import { Blank } from "@/components/LossCard";
 import { Chain } from "@/components/NetworkDetail";
 import { Dialog } from "@/components/upload-parts";
 import { db } from "@/lib/status";
+import {
+  availableCores,
+  useReserveBox,
+  type Core,
+  type LossDetail,
+  type ReserveBoxState,
+  type RouteLeg,
+} from "@/lib/useReserveBox";
 
-type Customer = components["schemas"]["Customer"];
-type Picked = Customer & { isNew?: boolean };
-type Core = components["schemas"]["CoreDetail"];
-type LossDetail = components["schemas"]["SegmentLossDetail"];
+const DIALOG_CLASS =
+  "m-auto flex max-h-[640px] w-[1040px] max-w-[calc(100vw-32px)] flex-col overflow-visible " +
+  "rounded-lg border bg-white p-0 text-sm backdrop:bg-[#0a0a0a]/45";
+const TITLE_CLASS = "flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 text-base font-semibold";
+const ERROR_CLASS = "mb-3 rounded-md border border-red bg-red-bg px-3 py-2 text-body font-semibold text-red";
+const EMPTY_CLASS = "empty pb-4 text-body text-muted-foreground";
 
-// Customer lookup for the Reserve box: typeahead over /api/customers, "Add as new", and the similar-name
-// warning (confirm_new). Returns the field and the warning as elements.
-export function useCustomerPicker(onError: (text: string) => void) {
-  const id = useId();
-  const [q, setQ] = useState("");
-  const [matches, setMatches] = useState<Customer[]>([]);
-  const [listOpen, setListOpen] = useState(false);
-  const [customer, setCustomer] = useState<Picked | null>(null);
-  const [similar, setSimilar] = useState<Customer[] | null>(null);
+function coresText(count: number): string {
+  return `${count} ${count === 1 ? "core" : "cores"}`;
+}
 
+// The modal opens itself; focus returns to the opener (the "Reserve on this route" button).
+// The opener is kept from the first mount: StrictMode mounts twice.
+function useModal(dialog: React.RefObject<HTMLDialogElement | null>) {
+  const opener = useRef<Element | null>(null);
   useEffect(() => {
-    if (customer || !listOpen) return;
-    let stale = false;
-    const t = setTimeout(() => {
-      api.get("/api/customers", { query: { q: q.trim() || undefined } }).then((r) => !stale && setMatches(r)).catch(() => {});
-    }, 150);
-    return () => { stale = true; clearTimeout(t); };
-  }, [q, customer, listOpen]);
-
-  const choose = (c: Picked) => { setCustomer(c); setSimilar(null); setListOpen(false); };
-  const exact = matches.some((m) => m.name.toLowerCase() === q.trim().toLowerCase());
-  const addNew = async (confirmNew: boolean) => {
-    try {
-      const r = await api.post("/api/customers", { body: { name: q.trim(), confirm_new: confirmNew } });
-      if (r.customer) choose({ ...r.customer, isNew: r.created });
-      else { setSimilar(r.similar); setListOpen(false); } // similar names exist: warn, the planner confirms
-    } catch {
-      onError("Could not check the customer name. Try again.");
+    opener.current ??= document.activeElement;
+    const element = dialog.current!;
+    if (!element.open) {
+      element.showModal();
     }
-  };
+    return () => {
+      element.close();
+      (opener.current as HTMLElement | null)?.focus?.();
+    };
+  }, [dialog]);
+}
 
-  const field = (
-    <div className="relative grid min-w-[240px] flex-[1_1_320px] gap-1" onBlur={(e) => !e.currentTarget.contains(e.relatedTarget) && setListOpen(false)}>
-      <label htmlFor={`${id}-c`} className="lbl">Customer (required)</label>
-      {customer ? (
-        <p className="flex h-9 items-center justify-between gap-2 rounded-md border border-line bg-white pl-3 pr-1">
-          <span className="truncate font-semibold">{customer.name}{customer.isNew && " (new customer)"}</span>
-          <button type="button" id={`${id}-c`} className="btn h-7 px-2.5 text-body" onClick={() => { setCustomer(null); setListOpen(true); }}>Change</button>
-        </p>
-      ) : (
-        <input id={`${id}-c`} aria-label="Search customers" role="combobox" aria-expanded={listOpen} aria-controls={`${id}-l`} aria-autocomplete="list"
-          className="field" placeholder="Type a customer name" value={q} autoComplete="off"
-          onChange={(e) => { setQ(e.target.value); setSimilar(null); setListOpen(true); }}
-          onFocus={() => setListOpen(true)}
-          onKeyDown={(e) => { if (e.key === "Escape" && listOpen) { e.preventDefault(); e.stopPropagation(); setListOpen(false); } }} />
-      )}
-      {!customer && listOpen && (q.trim() || matches.length > 0) && (
-        <div id={`${id}-l`} className="absolute bottom-[42px] left-0 right-0 z-10 max-h-56 overflow-auto rounded-xl border border-line bg-white py-1.5">
-          <ul aria-label="Matching customers">
-            {matches.map((m) => (
-              <li key={m.id}><button type="button" className="block min-h-9 w-full px-3 text-left hover:bg-blue-bg focus-visible:-outline-offset-3" onClick={() => choose(m)}>{m.name}</button></li>
-            ))}
-          </ul>
-          {q.trim() && !exact && (
-            <button type="button" className="block min-h-9 w-full border-t px-3 text-left font-semibold text-blue hover:bg-blue-bg focus-visible:-outline-offset-3" onClick={() => addNew(false)}>
-              Add "{q.trim()}" as a new customer
-            </button>
+function RouteTitle({ id, sites }: { id: string; sites: string[] }) {
+  return (
+    <h2 id={id} className={TITLE_CLASS}>
+      <span className="sr-only">Reserve on </span>
+      {sites.map((site, i) => (
+        <Fragment key={i}>
+          {i > 0 && (
+            <span aria-hidden className="flex items-center gap-1 text-blue">
+              ●<span className="h-0.5 w-6 bg-blue" />
+            </span>
           )}
-        </div>
-      )}
-    </div>
+          {i > 0 && <span className="sr-only">to</span>}
+          <span className="truncate">{site}</span>
+        </Fragment>
+      ))}
+    </h2>
   );
-  const warning = similar && similar.length > 0 && (
-    <div role="alert" className="mt-3 note p-3 text-body">
-      <strong className="text-amber">Similar customers already exist:</strong> {similar.map((s) => s.name).join(", ")}
-      <div className="mt-2 flex flex-wrap gap-2">
-        {similar.map((s) => <button key={s.id} type="button" className="btn btn-sm" onClick={() => choose(s)}>Use {s.name}</button>)}
-        <button type="button" className="btn btn-sm" onClick={() => addNew(true)}>Create new anyway</button>
+}
+
+function LegBadge({ chosen, perSegment }: { chosen: number; perSegment: number }) {
+  const full = chosen === perSegment;
+  return (
+    <span className={`pill min-w-11 justify-center ${full ? "h-green" : "h-amber"}`} data-testid="leg-count">
+      {chosen} of {perSegment}
+    </span>
+  );
+}
+
+function CoresNeeded({ id, box }: { id: string; box: ReserveBoxState }) {
+  const labelId = `${id}-n`;
+  return (
+    <div className="mb-3 flex items-center gap-3">
+      <span id={labelId} className="font-semibold">Cores needed per segment</span>
+      <div role="group" aria-labelledby={labelId} className="flex items-center gap-1">
+        <button type="button" className="btn btn-sm w-8 px-0" aria-label="One fewer"
+          disabled={box.perSegment <= 1}
+          onClick={() => box.step(box.perSegment - 1)}>−</button>
+        <output aria-live="polite" className="w-10 text-center text-base font-semibold tabular-nums"
+          data-testid="reserve-n">{box.perSegment}</output>
+        <button type="button" className="btn btn-sm w-8 px-0" aria-label="One more"
+          disabled={box.perSegment >= box.max}
+          onClick={() => box.step(box.perSegment + 1)}>+</button>
       </div>
     </div>
   );
-  return { customer, field, warning };
 }
 
-export type RouteLeg = { segment_id: number; free: number; a: string; b: string; km: number | null }; // a, b in travel order
+function PickedSegmentCores({ box }: { box: ReserveBoxState }) {
+  if (box.picked == null) {
+    return <p className={EMPTY_CLASS}>Choose a segment</p>;
+  }
+  if (!box.shown) {
+    return <p className={EMPTY_CLASS}>Loading cores...</p>;
+  }
+  return (
+    <CoreList available={availableCores(box.shown.cores)} loss={box.shown.loss} ticked={box.ticked}
+      full={box.chosenOn(box.picked) >= box.perSegment} toggle={box.toggle} />
+  );
+}
 
-const cores = (n: number) => `${n} ${n === 1 ? "core" : "cores"}`;
+function BookingFields({ box }: { box: ReserveBoxState }) {
+  const customerMissing = box.tried && !box.customerPicker.customer;
+  return (
+    <div className="border-t px-5 py-4">
+      {box.error && <p role="alert" className={ERROR_CLASS}>{box.error}</p>}
+      <div className="flex flex-wrap items-end gap-3">
+        <CustomerField picker={box.customerPicker} />
+        <label className="grid w-[170px] gap-1">
+          <span className="lbl">Planned date</span>
+          <input type="date" className="field" value={box.date}
+            onChange={(event) => box.setDate(event.target.value)} />
+        </label>
+        <label className="grid w-[150px] gap-1">
+          <span className="lbl">SRF ID (optional)</span>
+          <input className="field" value={box.srf} onChange={(event) => box.setSrf(event.target.value)}
+            autoComplete="off" />
+        </label>
+        <button type="submit" className="btn btn-p ml-auto min-w-[150px]" disabled={box.busy || !box.ready}>
+          {`Reserve ${coresText(box.ticked.size)}`}
+        </button>
+      </div>
+      <SimilarWarning picker={box.customerPicker} />
+      {customerMissing && (
+        <p role="alert" className="mt-2.5 text-body font-bold text-red">
+          Choose a customer before submitting.
+        </p>
+      )}
+    </div>
+  );
+}
 
-// Reserve box: a modal over Inventory for a found route (one segment is a route between its two sites). Pick a segment
-// in the chain and tick N of its Available cores, for every segment; one POST /api/reservations with the chosen core ids.
+type DiscardDialogProps = { count: number; onKeep: () => void; onDiscard: () => void };
+
+function DiscardDialog({ count, onKeep, onDiscard }: DiscardDialogProps) {
+  return (
+    <Dialog title={`Discard ${count} chosen ${count === 1 ? "core" : "cores"}?`} onClose={onKeep}>
+      <div className="mt-5 flex justify-end gap-2">
+        <button type="button" className="btn" onClick={onKeep}>Keep editing</button>
+        <button type="button" className="btn btn-p" onClick={onDiscard}>Discard</button>
+      </div>
+    </Dialog>
+  );
+}
+
+// Reserve box: a modal over Inventory for a found route (one segment is a route between its two sites).
 export function ReserveBox({ sites, legs, need, onClose, onSent }: {
   sites: string[]; // the chain in travel order
   legs: RouteLeg[];
@@ -99,165 +154,113 @@ export function ReserveBox({ sites, legs, need, onClose, onSent }: {
   onSent: (reservationId: number) => void;
 }) {
   const id = useId();
-  const ref = useRef<HTMLDialogElement>(null);
-  const back = useRef<Element | null>(null);
-  const max = Math.min(...legs.map((l) => l.free));
-  const [ticked, setTicked] = useState<Set<number>>(new Set());
-  const [n, setN] = useState(Math.max(1, Math.min(need, max)));
-  // The selected segment and each segment's cores and loss, fetched on its first select.
-  const [picked, setPicked] = useState<number | null>(null);
-  const [legData, setLegData] = useState<Record<number, { cores: Core[]; loss: LossDetail | null }>>({});
-  const availOf = (cs: Core[]) => cs.filter((c) => c.status === "Available").sort((a, b) => a.number - b.number);
-  const countOf = (legId: number) => legData[legId]?.cores.filter((c) => ticked.has(c.id)).length ?? 0;
-  const ready = legs.every((l) => countOf(l.segment_id) === n);
-  const pick = (legId: number) => {
-    setPicked(legId);
-    if (legData[legId]) return;
-    Promise.all([
-      api.get("/api/segments/{segment_id}", { path: { segment_id: legId } }),
-      api.get("/api/loss/segments/{segment_id}", { path: { segment_id: legId } }).catch(() => null),
-    ]).then(([d, loss]) => setLegData((x) => ({ ...x, [legId]: { cores: d.cores, loss } })))
-      .catch((err) => setError(errorText(err, "Could not load the cores. Try again.")));
-  };
-  const [date, setDate] = useState("");
-  const [srf, setSrf] = useState("");
-  const [tried, setTried] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [asking, setAsking] = useState(false);
-  const { customer, field, warning } = useCustomerPicker(setError);
+  const dialog = useRef<HTMLDialogElement>(null);
+  useModal(dialog);
+  const box = useReserveBox(legs, need, onClose, onSent);
 
-  // Focus returns to the opener (the "Reserve on this route" button). Kept from the first mount: StrictMode mounts twice.
-  useEffect(() => {
-    back.current ??= document.activeElement;
-    const d = ref.current!;
-    if (!d.open) d.showModal();
-    return () => { d.close(); (back.current as HTMLElement | null)?.focus?.(); };
-  }, []);
-
-  const close = () => (ticked.size ? setAsking(true) : onClose());
-  const step = (to: number) => setN(Math.max(1, Math.min(max, to)));
-  const toggle = (cid: number) => setTicked((s) => { const x = new Set(s); if (!x.delete(cid)) x.add(cid); return x; });
-
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setTried(true);
-    if (!customer || !ready) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const r = await api.post("/api/reservations", { body: { customer_id: customer.id, planned_date: date || null, ...(srf.trim() && { srf_id: srf.trim() }), cores: [...ticked] } });
-      onSent(r.id);
-      onClose();
-    } catch (err) {
-      setError(errorText(err, "Submit failed. Try again."));
-      setBusy(false);
+  const onCancel = (event: React.SyntheticEvent) => {
+    event.preventDefault();
+    if (!box.asking) {
+      box.close();
     }
   };
-
-  const shown = picked == null ? null : legData[picked];
-
+  const chainLegs = legs.map((leg) => ({ id: leg.segment_id, a: leg.a, b: leg.b, km: leg.km }));
   return (
-    <dialog ref={ref} aria-labelledby={`${id}-h`} data-testid="reserve-box"
-      onCancel={(e) => { e.preventDefault(); if (!asking) close(); }}
-      className="m-auto flex max-h-[640px] w-[1040px] max-w-[calc(100vw-32px)] flex-col overflow-visible rounded-lg border bg-white p-0 text-sm backdrop:bg-[#0a0a0a]/45">
+    <dialog ref={dialog} aria-labelledby={`${id}-h`} data-testid="reserve-box" onCancel={onCancel}
+      className={DIALOG_CLASS}>
       <header className="flex items-center gap-4 border-b px-5 py-3">
-        <h2 id={`${id}-h`} className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 text-base font-semibold">
-          <span className="sr-only">Reserve on </span>
-          {sites.map((s, i) => (
-            <Fragment key={i}>
-              {i > 0 && <span aria-hidden className="flex items-center gap-1 text-blue">●<span className="h-0.5 w-6 bg-blue" /></span>}
-              {i > 0 && <span className="sr-only">to</span>}
-              <span className="truncate">{s}</span>
-            </Fragment>
-          ))}
-        </h2>
-        <button type="button" className="btn btn-sm px-2.5" aria-label="Close" onClick={close}>×</button>
+        <RouteTitle id={`${id}-h`} sites={sites} />
+        <button type="button" className="btn btn-sm px-2.5" aria-label="Close" onClick={box.close}>×</button>
       </header>
 
-      <form onSubmit={submit} noValidate aria-label="Reserve cores" className="flex min-h-0 flex-1 flex-col">
+      <form onSubmit={box.submit} noValidate aria-label="Reserve cores"
+        className="flex min-h-0 flex-1 flex-col">
         <div className="border-b px-5 pt-4 pb-2" data-testid="route-chain">
-            <Chain legs={legs.map((l) => ({ id: l.segment_id, a: l.a, b: l.b, km: l.km }))} selectedId={picked}
-              onPick={pick} onUnpick={() => setPicked(null)} describe={(legId) => `${countOf(legId)} of ${n} cores chosen`}
-              badge={(legId) => {
-                const x = countOf(legId), full = x === n;
-                return <span className={`pill min-w-11 justify-center ${full ? "h-green" : "h-amber"}`} data-testid="leg-count">{x} of {n}</span>;
-              }} />
-          </div>
+          <Chain legs={chainLegs} selectedId={box.picked} onPick={box.pick} onUnpick={box.unpick}
+            describe={(segmentId) => `${box.chosenOn(segmentId)} of ${box.perSegment} cores chosen`}
+            badge={(segmentId) => (
+              <LegBadge chosen={box.chosenOn(segmentId)} perSegment={box.perSegment} />
+            )} />
+        </div>
         <div className="min-h-0 flex-1 overflow-y-auto px-5 pt-4">
-          <div className="mb-3 flex items-center gap-3">
-            <span id={`${id}-n`} className="font-semibold">Cores needed per segment</span>
-            <div role="group" aria-labelledby={`${id}-n`} className="flex items-center gap-1">
-              <button type="button" className="btn btn-sm w-8 px-0" aria-label="One fewer" disabled={n <= 1} onClick={() => step(n - 1)}>−</button>
-              <output aria-live="polite" className="w-10 text-center text-base font-semibold tabular-nums" data-testid="reserve-n">{n}</output>
-              <button type="button" className="btn btn-sm w-8 px-0" aria-label="One more" disabled={n >= max} onClick={() => step(n + 1)}>+</button>
-            </div>
-          </div>
-          {picked == null ? <p className="empty pb-4 text-body text-muted-foreground">Choose a segment</p>
-            : !shown ? <p className="empty pb-4 text-body text-muted-foreground">Loading cores...</p>
-            : <CoreList avail={availOf(shown.cores)} loss={shown.loss} ticked={ticked} full={countOf(picked) >= n} toggle={toggle} />}
+          <CoresNeeded id={id} box={box} />
+          <PickedSegmentCores box={box} />
         </div>
-
-        <div className="border-t px-5 py-4">
-          {error && <p role="alert" className="mb-3 rounded-md border border-red bg-red-bg px-3 py-2 text-body font-semibold text-red">{error}</p>}
-          <div className="flex flex-wrap items-end gap-3">
-            {field}
-            <label className="grid w-[170px] gap-1"><span className="lbl">Planned date</span>
-              <input type="date" className="field" value={date} onChange={(e) => setDate(e.target.value)} />
-            </label>
-            <label className="grid w-[150px] gap-1"><span className="lbl">SRF ID (optional)</span>
-              <input className="field" value={srf} onChange={(e) => setSrf(e.target.value)} autoComplete="off" />
-            </label>
-            <button type="submit" className="btn btn-p ml-auto min-w-[150px]" disabled={busy || !ready}>{`Reserve ${cores(ticked.size)}`}</button>
-          </div>
-          {warning}
-          {tried && !customer && <p role="alert" className="mt-2.5 text-body font-bold text-red">Choose a customer before submitting.</p>}
-        </div>
+        <BookingFields box={box} />
       </form>
 
-      {asking && (
-        <Dialog title={`Discard ${ticked.size} chosen ${ticked.size === 1 ? "core" : "cores"}?`} onClose={() => setAsking(false)}>
-          <div className="mt-5 flex justify-end gap-2">
-            <button type="button" className="btn" onClick={() => setAsking(false)}>Keep editing</button>
-            <button type="button" className="btn btn-p" onClick={onClose}>Discard</button>
-          </div>
-        </Dialog>
+      {box.asking && (
+        <DiscardDialog count={box.ticked.size} onKeep={() => box.setAsking(false)} onDiscard={onClose} />
       )}
     </dialog>
   );
 }
 
-// Available cores of one segment: tick, core, ports, Calculated loss, Measured loss. Unticked rows lock once full.
-function CoreList({ avail, loss, ticked, full, toggle }: {
-  avail: Core[]; loss: LossDetail | null; ticked: Set<number>; full: boolean; toggle: (id: number) => void;
+function PortsCell({ core }: { core: Core }) {
+  if (!core.port_a && !core.port_b) {
+    return <Blank>-</Blank>;
+  }
+  return <>{`${core.port_a ?? "-"} → ${core.port_b ?? "-"}`}</>;
+}
+
+type MeasuredCellProps = { measured: number | null | undefined; calculated: number | null };
+
+function MeasuredCell({ measured, calculated }: MeasuredCellProps) {
+  if (measured == null) {
+    return <Blank>Not tested</Blank>;
+  }
+  const high = calculated != null && measured > calculated;
+  if (!high) {
+    return <>{db(measured)}</>;
+  }
+  return (
+    <>
+      {db(measured)} <span aria-hidden className="text-amber">▲</span>
+      <span className="sr-only"> above calculated</span>
+    </>
+  );
+}
+
+// Available cores of one segment: tick, core, ports, Calculated loss, Measured loss.
+// Unticked rows lock once full.
+function CoreList({ available, loss, ticked, full, toggle }: {
+  available: Core[];
+  loss: LossDetail | null;
+  ticked: Set<number>;
+  full: boolean;
+  toggle: (id: number) => void;
 }) {
-  // Per core: calculated from the core's loss row when it has one, else the segment's calculated loss (same formula per segment).
-  const lossOf = (c: Core) => loss?.cores.find((x) => x.core_id === c.id);
-  const calcOf = (c: Core) => lossOf(c)?.calculated_db ?? loss?.calculated_db ?? null;
+  const lossOf = (core: Core) => loss?.cores.find((row) => row.core_id === core.id);
+  // The core's own calculated loss when it has a loss row, else the segment's (same formula per segment).
+  const calculatedOf = (core: Core) => lossOf(core)?.calculated_db ?? loss?.calculated_db ?? null;
   return (
     <table className="tbl [&_td]:h-9 [&_th]:h-9">
       <caption className="sr-only">Available cores</caption>
-      <thead className="sticky top-0 bg-white"><tr>
-        <th scope="col" className="w-12"><span className="sr-only">Chosen</span></th>
-        <th scope="col" className="w-[14%]">Core</th>
-        <th scope="col">Ports</th>
-        <th scope="col" className="num w-[20%]">Calculated loss</th>
-        <th scope="col" className="num w-[20%]">Measured loss</th>
-      </tr></thead>
+      <thead className="sticky top-0 bg-white">
+        <tr>
+          <th scope="col" className="w-12"><span className="sr-only">Chosen</span></th>
+          <th scope="col" className="w-[14%]">Core</th>
+          <th scope="col">Ports</th>
+          <th scope="col" className="num w-[20%]">Calculated loss</th>
+          <th scope="col" className="num w-[20%]">Measured loss</th>
+        </tr>
+      </thead>
       <tbody>
-        {avail.map((c) => {
-          const on = ticked.has(c.id), m = lossOf(c)?.measured_db, calc = calcOf(c);
-          const high = m != null && calc != null && m > calc;
+        {available.map((core) => {
+          const chosen = ticked.has(core.id);
+          const calculated = calculatedOf(core);
           return (
-            <tr key={c.id} className={on ? "bg-blue-bg" : ""} data-core={c.number}>
-              <td><input type="checkbox" className="size-4 accent-blue" aria-label={`Core ${c.number}`} checked={on}
-                disabled={!on && full} onChange={() => toggle(c.id)} /></td>
-              <th scope="row" className="font-semibold">{c.number}</th>
-              <td className="truncate">{c.port_a || c.port_b ? `${c.port_a ?? "-"} → ${c.port_b ?? "-"}` : <Blank>-</Blank>}</td>
-              <td className="num">{calc == null ? <Blank>-</Blank> : db(calc)}</td>
-              <td className="num">{m == null ? <Blank>Not tested</Blank>
-                : high ? <>{db(m)} <span aria-hidden className="text-amber">▲</span><span className="sr-only"> above calculated</span></>
-                : db(m)}</td>
+            <tr key={core.id} className={chosen ? "bg-blue-bg" : ""} data-core={core.number}>
+              <td>
+                <input type="checkbox" className="size-4 accent-blue" aria-label={`Core ${core.number}`}
+                  checked={chosen} disabled={!chosen && full} onChange={() => toggle(core.id)} />
+              </td>
+              <th scope="row" className="font-semibold">{core.number}</th>
+              <td className="truncate"><PortsCell core={core} /></td>
+              <td className="num">{calculated == null ? <Blank>-</Blank> : db(calculated)}</td>
+              <td className="num">
+                <MeasuredCell measured={lossOf(core)?.measured_db} calculated={calculated} />
+              </td>
             </tr>
           );
         })}
