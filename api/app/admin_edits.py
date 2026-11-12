@@ -235,12 +235,22 @@ def _canonical_label(typed: str | None) -> str | None:
     return label
 
 
+def _refuse_label_on_other_core(db: Session, label: str, site_id: int, core_id: int) -> None:
+    """A port label is one physical port per site, so only one core may hold it."""
+    owners = _owners_by_label(db, site_id, [label]).get(label, [])
+    for owner in owners:
+        if owner["core_id"] != core_id:
+            raise HTTPException(409, f"{label} is on core {owner['number']} of {owner['segment']}")
+
+
 def _write_core_ports(
-    db: Session, user: CurrentUser, core_id: int, wanted: dict[str, str | None], reason: str
+    db: Session, user: CurrentUser, core_id: int, wanted: dict[str, str | None], reason: str,
+    check_owners: bool = True,
 ) -> bool:
     """Set the wanted labels on one core (field name -> label, empty or None clears) and log each change.
 
-    Does not commit; returns whether anything changed.
+    The paste preview has already checked the owners (a label may move between cores in one paste),
+    so it passes check_owners=False. Does not commit; returns whether anything changed.
     """
     segment_id, current_a, current_b, site_a, site_b = db.execute(
         text(CORE_PORTS_SQL), {"core_id": core_id}
@@ -257,6 +267,8 @@ def _write_core_ports(
         if label is None:
             new_port_ids[field_name] = None
         else:
+            if check_owners:
+                _refuse_label_on_other_core(db, label, site_id, core_id)
             new_port_ids[field_name] = _port_for_site(db, label, site_id)
         edits.append((field_name, old, label))
     for field_name, port_row_id in new_port_ids.items():
@@ -345,6 +357,7 @@ def _owners_by_label(db: Session, site_id: int, labels: list[str]) -> dict[str, 
 def _label_problem(
     label: str, core_id: int, segment_id: int,
     pasted: dict[int, str], repeats: Counter[str], owners: dict[str, list[Any]],
+    unapplied: set[int],
 ) -> str | None:
     if normalize_port_label(label) is None:
         return f"{label} is not a port label. {LABEL_HELP}"
@@ -354,7 +367,9 @@ def _label_problem(
         if owner["core_id"] == core_id:
             continue
         pasted_for_owner = pasted.get(owner["number"])
-        moving_away = owner["segment_id"] == segment_id and pasted_for_owner not in (None, label)
+        owner_gets_other_label = owner["segment_id"] == segment_id and pasted_for_owner not in (None, label)
+        # A problem row is never applied, so its owner keeps the label.
+        moving_away = owner_gets_other_label and owner["number"] not in unapplied
         if not moving_away:
             return f"{label} is on core {owner['number']} of {owner['segment']}"
     return None
@@ -373,17 +388,27 @@ def _paste_problems(
             problems[number] = f"Core {number} is above the verified cores ({segment['survey_cores']})"
         elif number not in cores:
             problems[number] = f"Core {number} does not exist"
-    for end in PORT_ENDS:
-        pasted = pasted_by_end[end]
-        repeats = Counter(pasted.values())
-        owners = _owners_by_label(db, segment[SITE_OF_END[end]], list(repeats))
-        for number, label in pasted.items():
-            if number in problems:
-                continue
-            core_id = cores[number]["id"]
-            found = _label_problem(label, core_id, segment_id, pasted, repeats, owners)
-            if found:
-                problems[number] = found
+    repeats_by_end = {end: Counter(pasted_by_end[end].values()) for end in PORT_ENDS}
+    owners_by_end = {
+        end: _owners_by_label(db, segment[SITE_OF_END[end]], list(repeats_by_end[end]))
+        for end in PORT_ENDS
+    }
+    # A new problem row can stop a label from moving off its owner, which can make another
+    # row a problem. Repeat until a pass finds nothing new.
+    found_new = True
+    while found_new:
+        found_new = False
+        for end in PORT_ENDS:
+            for number, label in pasted_by_end[end].items():
+                if number in problems:
+                    continue
+                found = _label_problem(
+                    label, cores[number]["id"], segment_id, pasted_by_end[end],
+                    repeats_by_end[end], owners_by_end[end], set(problems),
+                )
+                if found:
+                    problems[number] = found
+                    found_new = True
     return problems
 
 
@@ -441,7 +466,7 @@ def _apply_paste(db: Session, admin: Admin, result: PastePortsResult, core_ids: 
             wanted["port_a"] = row.port_a_new
         if row.port_b_new != row.port_b_old:
             wanted["port_b"] = row.port_b_new
-        _write_core_ports(db, admin, core_ids[row.core_number], wanted, "")
+        _write_core_ports(db, admin, core_ids[row.core_number], wanted, "", check_owners=False)
 
 
 @router.post("/segments/{segment_id}/ports")

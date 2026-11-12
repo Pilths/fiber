@@ -37,12 +37,14 @@ WHERE a.id = s.site_a_id AND b.id = s.site_b_id AND a.name LIKE 'DEV %' AND b.na
 # One DEV segment with gaps in its ports, as real build sheets have:
 # cores 5-8 lack the site A port, 9-12 lack the site B port, 13-16 have no ports at all.
 # Clears ports only; the port rows stay, unused, so a later paste can reuse the label.
+# A core with a data_edits row was edited by hand, so running the seed again leaves it alone.
 PORT_GAPS_SEGMENT = (KG, CJ)
 CLEAR_PORT_GAPS_SQL = """
 UPDATE cores SET
   port_a_id = CASE WHEN number BETWEEN 5 AND 8 OR number BETWEEN 13 AND 16 THEN NULL ELSE port_a_id END,
   port_b_id = CASE WHEN number BETWEEN 9 AND 16 THEN NULL ELSE port_b_id END
 WHERE segment_id = :segment_id AND number BETWEEN 5 AND 16
+  AND NOT EXISTS (SELECT 1 FROM data_edits e WHERE e.entity = 'core' AND e.entity_id = cores.id)
 """
 # Older DEV databases have ports named before the FDF/ODF label shapes; rename them in place.
 DEV_PORTED_CORES_SQL = """
@@ -52,6 +54,7 @@ JOIN segments s ON s.id = c.segment_id
 JOIN sites a ON a.id = s.site_a_id
 JOIN sites b ON b.id = s.site_b_id
 WHERE a.name LIKE 'DEV %' AND b.name LIKE 'DEV %' AND (c.port_a_id IS NOT NULL OR c.port_b_id IS NOT NULL)
+  AND NOT EXISTS (SELECT 1 FROM data_edits e WHERE e.entity = 'core' AND e.entity_id = c.id)
 """
 RENAME_PORT_SQL = "UPDATE ports SET port_id = :label WHERE id = :port_row_id AND port_id <> :label"
 

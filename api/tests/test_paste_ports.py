@@ -119,3 +119,21 @@ def test_parts_may_be_letters(client, w, db):
     assert statuses(response) == ["new", "new"]
     assert port_label(db, w["c1"][1], "port_a") == "FDFA-MODB-TC-P12"
     assert port_label(db, w["c1"][2], "port_a") == "ODFB-P7"
+
+
+def test_label_cannot_move_off_a_core_whose_row_is_a_problem(client, w, db):
+    paste(client, w["s1"], port_a=["ODF1-P1", "ODF1-P2"], apply=True)
+    # core 1 takes ODF1-P2 from core 2, but core 2 gets a bad label, so core 2 keeps ODF1-P2
+    response = paste(client, w["s1"], port_a=["ODF1-P2", "not a label"], apply=True)
+    assert statuses(response) == ["problem", "problem"]
+    assert "ODF1-P2 is on core 2" in response.json()["rows"][0]["problem"]
+    assert port_label(db, w["c1"][1], "port_a") == "ODF1-P1"
+    assert port_label(db, w["c1"][2], "port_a") == "ODF1-P2"
+
+
+def test_labels_can_swap_between_cores(client, w, db):
+    paste(client, w["s1"], port_a=["ODF1-P1", "ODF1-P2"], apply=True)
+    response = paste(client, w["s1"], port_a=["ODF1-P2", "ODF1-P1"], apply=True)
+    assert statuses(response) == ["replaces", "replaces"]
+    assert port_label(db, w["c1"][1], "port_a") == "ODF1-P2"
+    assert port_label(db, w["c1"][2], "port_a") == "ODF1-P1"

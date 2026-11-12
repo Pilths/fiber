@@ -325,10 +325,12 @@ def test_core_ports_set_change_clear_with_history(client, w, db):
     assert one(db, "SELECT port_a_id IS NULL AND port_b_id IS NULL FROM cores WHERE id = :c", c=c)
 
 
-def test_core_ports_same_label_per_site(client, w, db):
+def test_core_ports_label_is_one_core_per_site(client, w, db):
     assert post(client, f"cores/{w['c1'][1]}/ports", port_b="ODF1-P1", reason="r").status_code == 200  # ODF1-P1 at site B
-    assert post(client, f"cores/{w['c2'][1]}/ports", port_a="ODF1-P1", reason="r").status_code == 200  # also site B: reused
+    taken = post(client, f"cores/{w['c2'][1]}/ports", port_a="ODF1-P1", reason="r")  # also site B: refused
+    assert taken.status_code == 409 and "ODF1-P1 is on core 1" in taken.json()["detail"]
     assert one(db, "SELECT count(*) FROM ports WHERE port_id = 'ODF1-P1'") == 1
+    assert post(client, f"cores/{w['c1'][1]}/ports", port_b="ODF1-P1", reason="again").status_code == 200  # own label
     assert post(client, f"cores/{w['c1'][2]}/ports", port_a="ODF1-P1", reason="r").status_code == 200  # site A: new row
     assert one(db, "SELECT count(*) FROM ports WHERE port_id = 'ODF1-P1'") == 2
 

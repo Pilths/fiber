@@ -146,7 +146,8 @@ export function CoreDrawer({ core, segment, ends, me, onClose, onChanged, loss, 
   );
 }
 
-type PortEnd = { kind: PortKind | ""; values: string[] };
+// clear: the admin chose "No port" on an end that holds an old label (the picker starts on "Keep old label").
+type PortEnd = { kind: PortKind | ""; values: string[]; clear?: boolean };
 type PortsBody = components["schemas"]["CorePortsBody"];
 
 const PORT_ERROR_CLASS =
@@ -178,6 +179,9 @@ function endIsIncomplete(end: PortEnd): boolean {
 // The value to send for one end; undefined leaves that end untouched on the server.
 function endValue(end: PortEnd, oldLabel: string | null): string | null | undefined {
   if (end.kind === "") {
+    if (end.clear) {
+      return null;
+    }
     if (oldLabel == null || isUnparsedLabel(oldLabel)) {
       return undefined;
     }
@@ -259,10 +263,13 @@ function PortEndPicker({ name, site, oldLabel, end, onChange, incomplete, autoFo
   autoFocus?: boolean;
 }) {
   const fields = end.kind === "" ? [] : PORT_FIELDS[end.kind];
-  const showOldLabel = end.kind === "" && isUnparsedLabel(oldLabel);
+  const hasOldLabel = isUnparsedLabel(oldLabel);
+  const showOldLabel = end.kind === "" && !end.clear && hasOldLabel;
   const chooseKind = (kind: string) => {
     if (kind === "FDF" || kind === "ODF") {
       onChange({ kind, values: PORT_FIELDS[kind].map(() => "") });
+    } else if (kind === "CLEAR") {
+      onChange({ kind: "", values: [], clear: true });
     } else {
       onChange({ kind: "", values: [] });
     }
@@ -278,9 +285,10 @@ function PortEndPicker({ name, site, oldLabel, end, onChange, incomplete, autoFo
       <div className="flex flex-wrap items-end gap-2">
         <label className="block">
           <span className="block text-body">Type</span>
-          <select className="field w-28" aria-label={`${name} type`} value={end.kind} autoFocus={autoFocus}
+          <select className="field w-28" aria-label={`${name} type`} value={end.clear ? "CLEAR" : end.kind} autoFocus={autoFocus}
             onChange={(event) => chooseKind(event.target.value)}>
-            <option value="">No port</option>
+            <option value="">{hasOldLabel ? "Keep old label" : "No port"}</option>
+            {hasOldLabel && <option value="CLEAR">No port</option>}
             <option value="FDF">FDF</option>
             <option value="ODF">ODF</option>
           </select>
