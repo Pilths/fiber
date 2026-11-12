@@ -1,3 +1,6 @@
+import { chipText, routeLayerOn, type SegmentProps } from "@/lib/mapLayers";
+import type { NetworkMapState } from "@/lib/useNetworkMap";
+
 // Web Mercator at 512 px tiles, the same as MapLibre, so the overlay lines up with the basemap.
 
 export type Camera = { lng: number; lat: number; zoom: number };
@@ -99,4 +102,77 @@ export function makePlacer(reserved: number[][]) {
     return true;
   };
   return { fits, block };
+}
+
+// Drawing the network overlay: which lines to draw where, and which chips and names fit.
+
+const SITE_HALF = 11; // half the marker box, in px
+
+// Areas kept free of chips and names: the controls (top left) and the key (bottom left).
+function reservedAreas(height: number): number[][] {
+  return [[0, 0, 380, 50], [0, height - 200, 300, height]];
+}
+
+export type DrawnLine = {
+  segment: SegmentProps;
+  points: Point[];
+  selected: boolean;
+  show: boolean;
+  dim: boolean;
+  mid: Point;
+};
+
+// Lines to draw, in screen coordinates. Hidden layers drop out unless the line is selected.
+export function drawnLines(state: NetworkMapState, visible: (segment: SegmentProps) => boolean): DrawnLine[] {
+  const { camera, size, selected } = state;
+  if (!camera || !size.w) {
+    return [];
+  }
+  const layered = state.features.filter((feature) => {
+    const isSelected = selected.has(feature.properties.segment_id);
+    return isSelected || routeLayerOn(state.routeLayers, state.trunkOff, feature.properties);
+  });
+  return layered.map((feature) => {
+    const segment = feature.properties;
+    const points = feature.geometry.coordinates.map((coordinate) => project(camera, size, coordinate));
+    const isSelected = selected.has(segment.segment_id);
+    const show = isSelected || visible(segment);
+    const dim = show && !isSelected && selected.size > 0;
+    return { segment, points, selected: isSelected, show, dim, mid: midpoint(points) };
+  });
+}
+
+// Declutter, greedy: site markers, then chips (selected first), then site names. A chip or name that would
+// overlap something already placed is hidden (visibility: hidden) until the user zooms in.
+export function declutter(state: NetworkMapState, lines: DrawnLine[], sitePoints: Point[]) {
+  const placer = makePlacer(reservedAreas(state.size.h));
+  for (const [x, y] of sitePoints) {
+    placer.block([x - SITE_HALF, y - SITE_HALF, x + SITE_HALF, y + SITE_HALF]);
+  }
+  const chipShown = new Set<number>();
+  const shown = lines.filter((line) => line.show);
+  const byPriority = shown.sort((a, b) => Number(b.selected) - Number(a.selected));
+  for (const { segment, selected, mid } of byPriority) {
+    const chipWidth = 20 + 7.5 * chipText(segment).length;
+    let fits: boolean;
+    if (selected) {
+      const labelWidth = Math.max(chipWidth, 7.5 * segment.name.length + 16);
+      fits = placer.fits(mid[0], mid[1] - 11, labelWidth, 46);
+    } else {
+      fits = placer.fits(mid[0], mid[1], chipWidth + 4, 24);
+    }
+    if (fits) {
+      chipShown.add(segment.segment_id);
+    }
+  }
+  const sites = state.data.sites?.features ?? [];
+  const nameShown = sitePoints.map(([x, y], i) => {
+    const nameWidth = 7.2 * sites[i].properties.name.length + 12;
+    return placer.fits(x, y + 33, nameWidth, 18);
+  });
+  return { chipShown, nameShown };
+}
+
+export function linePath(points: Point[]): string {
+  return "M" + points.map((point) => `${point[0].toFixed(1)} ${point[1].toFixed(1)}`).join("L");
 }
