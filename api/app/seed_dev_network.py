@@ -34,6 +34,16 @@ FROM sites a, sites b
 WHERE a.id = s.site_a_id AND b.id = s.site_b_id AND a.name LIKE 'DEV %' AND b.name LIKE 'DEV %'
   AND a.kind <> 'data_center' AND b.kind <> 'data_center' AND s.route IS NULL
 """
+# One DEV segment with gaps in its ports, as real build sheets have:
+# cores 5-8 lack the site A port, 9-12 lack the site B port, 13-16 have no ports at all.
+# Clears ports only; the port rows stay, unused, so a later paste can reuse the label.
+PORT_GAPS_SEGMENT = (KG, CJ)
+CLEAR_PORT_GAPS_SQL = """
+UPDATE cores SET
+  port_a_id = CASE WHEN number BETWEEN 5 AND 8 OR number BETWEEN 13 AND 16 THEN NULL ELSE port_a_id END,
+  port_b_id = CASE WHEN number BETWEEN 9 AND 16 THEN NULL ELSE port_b_id END
+WHERE segment_id = :segment_id AND number BETWEEN 5 AND 16
+"""
 # site A, site B, route type (unused: derived from the site kinds), region, cable_size
 SEGMENTS = [
     (PEN, BW, "Metro", "North", 48), (BW, TP, "Trunk", "North", 144), (TP, IPH, "Trunk", "North", 144),
@@ -101,6 +111,7 @@ def main() -> None:
                       a=site[a], b=site[b], g=json.dumps({"type": "LineString", "coordinates": coords}))
             db.execute(text("INSERT INTO route_segments (route_id, segment_id, position) VALUES (:r, :s, 1)"), {"r": rid, "s": sid})
             shaped += 1
+        db.execute(text(CLEAR_PORT_GAPS_SQL), {"segment_id": seg[PORT_GAPS_SEGMENT]})
         # DEV trunk route labels: R1 up north and central, R3 down south. Only fills a blank route.
         db.execute(text(DEV_TRUNK_ROUTES_SQL))
         db.commit()
