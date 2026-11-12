@@ -23,9 +23,9 @@ def net(db):
     for n in range(1, 6):
         pa = one(db, "INSERT INTO ports (port_id, site_id) VALUES (:p,:s) RETURNING id", p=f"P-{n}-A", s=a)
         pb = one(db, "INSERT INTO ports (port_id, site_id) VALUES (:p,:s) RETURNING id", p=f"P-{n}-B", s=b)
-        cores[n] = one(db, "INSERT INTO cores (segment_id, number, port_a_id, port_b_id, circuit_id, in_use) "
-                           "VALUES (:s,:n,:pa,:pb,:ck,:u) RETURNING id",
-                       s=s1, n=n, pa=pa, pb=pb, ck="CKT-9001" if n == 4 else None, u=n == 4)
+        cores[n] = one(db, "INSERT INTO cores (segment_id, number, port_a_id, port_b_id, in_use) "
+                           "VALUES (:s,:n,:pa,:pb,:u) RETURNING id",
+                       s=s1, n=n, pa=pa, pb=pb, u=n == 4)
     cust = one(db, "INSERT INTO customers (name) VALUES ('Telekom Zeta') RETURNING id")
 
     def reserve(core: int, approved: bool) -> None:
@@ -67,11 +67,6 @@ def test_search_segment(client, net):
     assert {h["segment_id"] for h in hits} == {net["s1"], net["s2"]}
 
 
-def test_search_circuit(client, net):
-    hits = labels(client, "ckt-9001", "circuit")
-    assert hits == [{"type": "circuit", "label": "CKT-9001", "segment_id": net["s1"], "core_id": net["cores"][4]}]
-
-
 def test_search_core_number(client, net):
     hits = labels(client, "3", "core")
     assert hits[0]["core_id"] == net["cores"][3]
@@ -97,7 +92,6 @@ def test_segment_detail(client, net):
     assert [c["status"] for c in cores] == ["Available", "Requested", "Reserved", "In use", "Available"]
     assert cores[1]["customer"] == "Telekom Zeta" and cores[1]["planned_date"] == "2026-12-01"
     assert cores[0]["customer"] is None
-    assert cores[3]["circuit_id"] == "CKT-9001"
     assert (cores[0]["port_a"], cores[0]["port_b"]) == ("P-1-A", "P-1-B")
 
 

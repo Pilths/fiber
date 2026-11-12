@@ -5,9 +5,9 @@ import { NavIcon } from "@/components/Icon";
 
 type Result = components["schemas"]["SearchResult"];
 type Me = components["schemas"]["CurrentUser"];
-const GROUPS: Result["type"][] = ["customer", "segment", "circuit", "core"];
-const GROUP_LABEL = { customer: "Customers", segment: "Segments", circuit: "Circuits", core: "Cores" };
-const SEARCH_LABEL = "Find a segment, site, customer, circuit or core";
+const GROUPS: Result["type"][] = ["customer", "segment", "core"];
+const GROUP_LABEL = { customer: "Customers", segment: "Segments", core: "Cores" };
+const SEARCH_LABEL = "Find a segment, site, customer or core";
 const SEARCH_DELAY_MS = 200;
 
 const LIST_CLASS =

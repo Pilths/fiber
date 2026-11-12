@@ -54,7 +54,7 @@ FastAPI generates an OpenAPI spec for free, so the UI never needs a throwaway mo
 The order builds the last-to-be-cut items first.
 
 - Session 0: Docker Compose (PostGIS, FastAPI, Vite) and `CLAUDE.md`.
-- Session 1: Schema and Alembic. Reservations are insert-only events. Internal segment ID is the key. Circuit ID is an optional field on the core. Measurements per core. `user_id` on every write. Edit history with reasons. Seed from the mock Excel.
+- Session 1: Schema and Alembic. Reservations are insert-only events. Internal segment ID is the key. Measurements per core. `user_id` on every write. Edit history with reasons. Seed from the mock Excel.
 - Session 2: Search, segment and core endpoints. Generate the TypeScript client. A dev-only header stands in for the acting user.
 - Session 3: Segment list, Cores table and the reserve box. UI session, runs Step 7. Done; the page structure is reworked into the one-page map layout by TASK-073 to TASK-079 (Session 10).
 - Session 4: Approval flow: request, approve, reject, withdraw, release request. Action needed list and waiting counts. Also migration 0004 (total cores, count-only reservations, `assign` action) and the Free limit.
@@ -91,7 +91,7 @@ Do not create a separate agent per phase. Make an agent only when it needs a dif
 - Every write is attributable to a user, and every data edit needs a reason and is kept as history.
 - Nothing is deleted. Accounts are deactivated.
 - After the first import the dashboard database is the source of truth and the Excel is a feed. A field edited in the dashboard is protected from uploads.
-- Internal segment ID is the key. Circuit ID comes from another system and is an optional field on the core, because one segment carries many circuits.
+- Internal segment ID is the key. Cores have no circuit ID (dropped 11 Nov 2026: no data source).
 - Measurements are stored per core. Distance comes from the Excel.
 - Site is the general term for a site, building or equipment location.
 
@@ -102,8 +102,7 @@ Do not create a separate agent per phase. Make an agent only when it needs a dif
 - A release request shows in Approvals and the bell count. Cores stay Reserved until an admin releases them. A declined release needs a reason.
 - Accounts are deactivated, never deleted. Their pending requests stay in the admin queue and their digests go to all admins.
 - Login stays in the MVP and is built right after the approval flow.
-- Uploads match segments by the two sites (two sites have at most one segment), and ports by Port ID. A circuit ID in a row attaches to its core. Rows missing from a file are left untouched (except the site master, where a missing site is marked inactive, never deleted). Conflicts with a Requested or Reserved core go to Needs review.
-- One segment carries many circuits, so circuit ID lives on the core.
+- Uploads match segments by the two sites (two sites have at most one segment), and ports by Port ID. Rows missing from a file are left untouched (except the site master, where a missing site is marked inactive, never deleted). Conflicts with a Requested or Reserved core go to Needs review.
 - Loss coverage counts segments with a reading.
 - Layout is decided (26 October): one map page as the home, top bar navigation, no left sidebar, desktop only, light theme only. The PRD, Design decisions, holds the details.
 - Decided 26 October: loss shows per core (core details, reserve box); Users is in the account menu (admin only); KMZ shapes are not in the MVP map (straight lines plus one mock route with a drawn shape); no site master undo in the MVP (previous uploads kept); the site master is a separate workbook from the Reservation workbook.

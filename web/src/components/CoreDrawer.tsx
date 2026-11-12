@@ -68,7 +68,6 @@ export function CoreDrawer({ core, segment, ends, me, onClose, onChanged, loss, 
     ["Customer", core.customer ?? na],
     ["Reserved by", res ? `${res.owner.display_name}, reservation #${res.reservation_id}` : <Blank key="r">Not applicable</Blank>],
     ["Ports", core.port_a || core.port_b ? <span key="p">{core.port_a ?? <Blank />} to {core.port_b ?? <Blank />}</span> : <Blank key="p">No ports yet</Blank>],
-    ["Circuit", core.circuit_id ? <span key="c" className="font-mono">{core.circuit_id}</span> : <Blank key="c">{core.status === "Available" ? "Not applicable" : "Not recorded"}</Blank>],
     ["Planned date", core.planned_date ?? na],
     ["Calculated loss", calc == null ? <Blank key="cl">No distance</Blank> : db(calc)],
     ["Measured loss", !loss ? <Blank key="ml">Not tested</Blank> : <span key="ml">

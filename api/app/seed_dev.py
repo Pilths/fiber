@@ -66,12 +66,11 @@ def run(db: Session) -> None:
             ports = [one("INSERT INTO ports (port_id, site_id) VALUES (:p, :s) RETURNING id",
                          p=f"{code}-{sid}-{end}-{num:02d}", s=site[code])
                      for code, end in ((a, "A"), (b, "B"))]
-            # cores 10-13 in use with a circuit, 14 has a circuit but is not in use
-            circuit = f"CKT-{1000 + n * 10 + num - 9}" if 10 <= num <= 14 and n <= 5 else None
+            in_use = 10 <= num <= 13 and n <= 5
             cores[sid][num] = one(
-                "INSERT INTO cores (segment_id, number, port_a_id, port_b_id, circuit_id, in_use) "
-                "VALUES (:s, :n, :pa, :pb, :c, :u) RETURNING id",
-                s=sid, n=num, pa=ports[0], pb=ports[1], c=circuit, u=circuit is not None and num != 14)
+                "INSERT INTO cores (segment_id, number, port_a_id, port_b_id, in_use) "
+                "VALUES (:s, :n, :pa, :pb, :u) RETURNING id",
+                s=sid, n=num, pa=ports[0], pb=ports[1], u=in_use)
         if km is not None and factor is not None:
             for _ in range(3):
                 ins("INSERT INTO measurements (segment_id, core_id, loss_db, tested_on) "

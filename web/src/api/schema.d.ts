@@ -1169,8 +1169,6 @@ export interface components {
             status: "Available" | "Requested" | "Reserved" | "In use";
             /** Customer */
             customer: string | null;
-            /** Circuit Id */
-            circuit_id: string | null;
             /** Planned Date */
             planned_date: string | null;
             /** Port A */
@@ -1232,8 +1230,6 @@ export interface components {
              * @enum {string}
              */
             status: "Available" | "Requested" | "Reserved" | "In use";
-            /** Circuit Id */
-            circuit_id: string | null;
             /** Port A */
             port_a: string | null;
             /** Port B */
@@ -1810,7 +1806,7 @@ export interface components {
              * Type
              * @enum {string}
              */
-            type: "customer" | "segment" | "circuit" | "core";
+            type: "customer" | "segment" | "core";
             /** Label */
             label: string;
             /** Segment Id */

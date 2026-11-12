@@ -18,7 +18,7 @@ Status: 1 November 2026. Section 3 agreed with the owner.
 
 Source of truth: `web/src/index.css`. Summary:
 
-- Fonts: Geist (UI), Geist Mono (circuit IDs only), self-hosted. Tabular numerals for every number.
+- Fonts: Geist (UI), Geist Mono (port labels and codes), self-hosted. Tabular numerals for every number.
 - Ground #f2f4f7. White cards, 1px border #e2e5ea, radius 8px, no shadows, 16px gutters, 20px card padding.
 - Type: segment title 32px/700, metric numbers 40px/700, section titles 16px/600, labels 12px/500.
 - Colour only where it carries meaning: blue #1d5fbf (primary), green #1a7f4b (free 10 or more),
@@ -63,7 +63,7 @@ Segment facts are only the two site names and the distance. No numbers row, no l
 - One row per core everywhere (no ranges); the core number sits centred under "Cores". (Owner, 3 Nov 2026.)
 - Unassigned row: a reservation for a number of cores whose core numbers are not picked yet (Excel import).
   Shown as "4 cores" in the Unassigned group.
-- Row click opens core details (side panel; admin has "Add test" for a Measured loss test: dB, test date, test type, field team): customer, planner, SRF, circuit, ports both ends, "Measured loss",
+- Row click opens core details (side panel; admin has "Add test" for a Measured loss test: dB, test date, test type, field team): customer, planner, SRF, ports both ends, "Measured loss",
   "Calculated loss", test date, history, Keep, Release.
 
 ### Reserve box (modal over Inventory)
@@ -105,8 +105,7 @@ Never label a value just "Loss": always "Calculated loss" or "Measured loss".
 ### Later
 
 Sites and data centres: when `sites.details` has data, the segment list gets a Segments | Sites switch and a site
-gets its own detail view (Overview, Racks, 3D). Global search: results grouped as Customers, Segments, Cores,
-Circuits; a core result opens its segment and highlights the row.
+gets its own detail view (Overview, Racks, 3D). Global search: results grouped as Customers, Segments, Cores; a core result opens its segment and highlights the row.
 
 ## 4. Patterns (agreed)
 

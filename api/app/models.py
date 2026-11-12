@@ -147,7 +147,6 @@ class Core(Base):
     number: Mapped[int] = mapped_column(Integer)
     port_a_id: Mapped[int | None] = _fk("ports", True)
     port_b_id: Mapped[int | None] = _fk("ports", True)
-    circuit_id: Mapped[str | None] = mapped_column(Text)
     in_use: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
 
 

@@ -48,7 +48,7 @@ ORDER BY s.id
 # Customer and planned date: each field takes its latest 'corrected' value, else the reservation row.
 # (A correction may set only one of the two fields.)
 CORE_SQL = f"""
-SELECT c.id, c.number, v.status, c.circuit_id, pa.port_id AS port_a, pb.port_id AS port_b,
+SELECT c.id, c.number, v.status, pa.port_id AS port_a, pb.port_id AS port_b,
        COALESCE(cust.name, hc.name) AS customer,
        COALESCE(corr_date.planned_date, r.planned_date) AS planned_date,
        r.id AS reservation_id, COALESCE(st.is_stale, false) AS stale, st.stale_since,
@@ -159,11 +159,6 @@ JOIN sites a ON a.id = s.site_a_id JOIN sites b ON b.id = s.site_b_id
 WHERE a.name ILIKE :like ESCAPE '\\' OR b.name ILIKE :like ESCAPE '\\'
 ORDER BY s.id LIMIT :n
 """
-SEARCH_CIRCUIT_SQL = """
-SELECT c.circuit_id, c.segment_id, c.id FROM cores c JOIN segments s ON s.id = c.segment_id
-WHERE (s.survey_cores IS NULL OR c.number <= s.survey_cores) AND c.circuit_id ILIKE :like ESCAPE '\\'
-ORDER BY c.circuit_id, c.id LIMIT :n
-"""
 SEARCH_CORE_SQL = """
 SELECT 'Core ' || c.number || ' on ' || a.name || ' - ' || b.name, c.segment_id, c.id FROM cores c
 JOIN segments s ON s.id = c.segment_id AND (s.survey_cores IS NULL OR c.number <= s.survey_cores)
@@ -252,7 +247,6 @@ def get_core(db: Session, core_id: int, user_id: int) -> CoreHolderDetail | None
         segment_id=row["segment_id"],
         segment_name=row["segment_name"],
         status=row["status"],
-        circuit_id=row["circuit_id"],
         port_a=row["port_a"],
         port_b=row["port_b"],
         holder=holder,
@@ -304,7 +298,6 @@ def search(db: Session, query: str) -> list[SearchResult]:
     searches = [
         ("customer", SEARCH_CUSTOMER_SQL),
         ("segment", SEARCH_SEGMENT_SQL),
-        ("circuit", SEARCH_CIRCUIT_SQL),
     ]
     if number is not None:
         searches.append(("core", SEARCH_CORE_SQL))

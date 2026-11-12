@@ -8,7 +8,7 @@ CoreStatus = Literal["Available", "Requested", "Reserved", "In use"]
 
 
 class SearchResult(BaseModel):
-    type: Literal["customer", "segment", "circuit", "core"]
+    type: Literal["customer", "segment", "core"]
     label: str
     segment_id: int | None = None
     core_id: int | None = None
@@ -40,7 +40,6 @@ class CoreDetail(BaseModel):
     number: int
     status: CoreStatus
     customer: str | None
-    circuit_id: str | None
     planned_date: date | None
     port_a: str | None
     port_b: str | None
@@ -78,7 +77,6 @@ class CoreHolderDetail(BaseModel):
     segment_id: int
     segment_name: str
     status: CoreStatus
-    circuit_id: str | None
     port_a: str | None
     port_b: str | None
     hidden: Literal[False] = False

@@ -95,14 +95,14 @@ WHERE s.id = :segment_id
 """
 LOCK_SEGMENT_ROW_SQL = "SELECT * FROM segments WHERE id = :segment_id FOR UPDATE"
 HIGHEST_CORE_SQL = "SELECT coalesce(max(number), 0) FROM cores WHERE segment_id = :segment_id"
-# Cores above the new count that must stay: taken, ever reserved, edited, or carrying ports or a circuit
+# Cores above the new count that must stay: taken, ever reserved, edited, or carrying ports
 BLOCKING_CORES_SQL = """
 SELECT c.id, c.number FROM cores c JOIN core_status_v v ON v.core_id = c.id
 WHERE c.segment_id = :segment_id AND c.number > :new_count AND (
   v.status <> 'Available'
   OR EXISTS (SELECT 1 FROM reservation_cores rc WHERE rc.core_id = c.id)
   OR EXISTS (SELECT 1 FROM data_edits d WHERE d.entity = 'core' AND d.entity_id = c.id)
-  OR c.port_a_id IS NOT NULL OR c.port_b_id IS NOT NULL OR c.circuit_id IS NOT NULL
+  OR c.port_a_id IS NOT NULL OR c.port_b_id IS NOT NULL
 )
 ORDER BY c.number
 """
