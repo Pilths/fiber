@@ -1,10 +1,8 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
 
-from app.auth.deps import CurrentUser, get_current_user
-from app.db import get_db
+from app.auth.deps import DB, CurrentUser, get_current_user
 from app.inventory import service
 from app.inventory.schemas import (
     CoreHolderDetail,
@@ -17,7 +15,6 @@ from app.inventory.schemas import (
 )
 
 router = APIRouter(prefix="/api", dependencies=[Depends(get_current_user)])
-DB = Annotated[Session, Depends(get_db)]
 
 
 @router.get("/search")

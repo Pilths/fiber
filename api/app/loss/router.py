@@ -1,15 +1,12 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
 
-from app.auth.deps import get_current_user
-from app.db import get_db
+from app.auth.deps import DB, get_current_user
 from app.loss import service
 from app.loss.schemas import Coverage, RouteLoss, SegmentLoss, SegmentLossDetail
 
 router = APIRouter(prefix="/api/loss", dependencies=[Depends(get_current_user)])
-DB = Annotated[Session, Depends(get_db)]
 
 
 @router.get("/segments")

@@ -6,10 +6,9 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 from sqlalchemy import text
-from sqlalchemy.orm import Session
 
-from app.auth.deps import CurrentUser, require_admin
-from app.db import get_db
+from app.auth.deps import DB, Admin, require_admin
+from app.ingest.upload_file import read_upload
 from app.load_kmz import SEGMENT_BY_ID_SQL, compute_shapes, parse_lines, save_shape
 
 INSERT_UPLOAD_SQL = """
@@ -20,9 +19,6 @@ SELECT_UPLOAD_SQL = "SELECT status, summary FROM uploads WHERE id = :upload_id A
 CONFIRM_UPLOAD_SQL = "UPDATE uploads SET status = 'confirmed', confirmed_at = now() WHERE id = :upload_id"
 
 router = APIRouter(prefix="/api/admin/kmz", dependencies=[Depends(require_admin)])
-DB = Annotated[Session, Depends(get_db)]
-Admin = Annotated[CurrentUser, Depends(require_admin)]
-MAX_BYTES = 20 * 1024 * 1024
 DEFAULT_FOLDER = "propose route"
 
 
@@ -78,12 +74,7 @@ def upload(
     file: UploadFile,
     folder: Annotated[str, Form()] = DEFAULT_FOLDER,
 ) -> KmzUploadOut:
-    name = file.filename or ""
-    if not name.lower().endswith(".kmz"):
-        raise HTTPException(422, "Only .kmz files are accepted")
-    data = file.file.read(MAX_BYTES + 1)
-    if len(data) > MAX_BYTES:
-        raise HTTPException(413, "File is larger than 20 MB")
+    name, data = read_upload(file, ".kmz")
     try:
         lines, folders_found = parse_lines(io.BytesIO(data), folder)
     except ValueError as error:

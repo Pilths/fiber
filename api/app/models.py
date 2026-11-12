@@ -73,7 +73,7 @@ class User(Base):
 class Site(Base):
     __tablename__ = "sites"
     __table_args__ = (
-        _in("kind", ("site", "building", "equipment", "data_center", "toc"), "sites_kind_ck"),
+        _in("kind", ("site", "building", "data_center", "toc"), "sites_kind_ck"),
         Index("sites_geom_gix", "geom", postgresql_using="gist"),
         Index("sites_name_trgm_ix", "name", postgresql_using="gin", postgresql_ops={"name": "gin_trgm_ops"}),
     )
@@ -91,7 +91,6 @@ class Segment(Base):
     __tablename__ = "segments"
     __table_args__ = (
         CheckConstraint("site_a_id <> site_b_id", name="segments_sites_differ_ck"),
-        _in("route_type", ("Trunk", "Metro"), "segments_route_type_ck"),
         _in("region", ("North", "Central", "South", "East Coast"), "segments_region_ck"),
         CheckConstraint("distance_km >= 0", name="segments_distance_ck"),
         CheckConstraint("cable_size > 0", name="segments_cable_size_ck"),
@@ -101,7 +100,6 @@ class Segment(Base):
     site_a_id: Mapped[int] = _fk("sites")
     site_b_id: Mapped[int] = _fk("sites")
     # ponytail: unused since route type is derived from the end sites (app/link_type.py); drop in a later migration
-    route_type: Mapped[str | None] = mapped_column(Text)
     region: Mapped[str | None] = mapped_column(Text)
     route: Mapped[str | None] = mapped_column(Text)
     section: Mapped[str | None] = mapped_column(Text)
@@ -135,8 +133,9 @@ class RouteSpan(Base):
 
 class Port(Base):
     __tablename__ = "ports"
+    __table_args__ = (UniqueConstraint("site_id", "port_id", name="ports_site_port_key"),)
     id: Mapped[int] = _id()
-    port_id: Mapped[str] = mapped_column(Text, unique=True)
+    port_id: Mapped[str] = mapped_column(Text)
     site_id: Mapped[int] = _fk("sites")
 
 
@@ -148,7 +147,6 @@ class Core(Base):
     number: Mapped[int] = mapped_column(Integer)
     port_a_id: Mapped[int | None] = _fk("ports", True)
     port_b_id: Mapped[int | None] = _fk("ports", True)
-    circuit_id: Mapped[str | None] = mapped_column(Text)
     in_use: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
 
 
@@ -284,6 +282,7 @@ class Measurement(Base):
     test_method: Mapped[str | None] = mapped_column(Text)
     field_team: Mapped[str | None] = mapped_column(Text)
     core_id: Mapped[int | None] = _fk("cores", True)
+    created_by: Mapped[int | None] = _fk("users", True)
 
 
 class DataEdit(Base):

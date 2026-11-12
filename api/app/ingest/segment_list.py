@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 from app.ingest.checks import blank, clean, split_nodes
 from app.ingest.excel import _json
 from app.ingest.reservation_upload import REASON as RESERVATION_REASON
-from app.ingest.site_master import ApplyError, hkey
+from app.ingest.site_master import ApplyError, hkey, load_protected
 from app.routing.graph import invalidate as invalidate_routes
 
 UPLOAD_REASON = "segment list upload"
@@ -118,7 +118,7 @@ def parse_workbook(data: Any) -> Parsed:
             continue
         try:
             it = _parse_row(headers, values)
-        except Exception as e:  # a bad row never stops the import
+        except Exception as e:  # noqa: BLE001  a bad row never stops the import
             it = Item(0, {h: _json(v) for h, v in zip(headers, values) if h and not blank(v)},
                       {"link": None, "a": None, "b": None, "distance": None, "route": None, "section": None,
                        "reasons": [f"could not parse row: {type(e).__name__}: {e}"]})
@@ -128,14 +128,6 @@ def parse_workbook(data: Any) -> Parsed:
 
 
 # ---- diff -----------------------------------------------------------------------------------------------------
-
-def load_protected(db: Session) -> dict[int, set[str]]:
-    prot: dict[int, set[str]] = {}
-    for i, f in db.execute(text("SELECT entity_id, field FROM data_edits WHERE entity = 'segment' AND reason NOT LIKE :a AND reason NOT LIKE :b"),
-                           {"a": UPLOAD_REASON + "%", "b": RESERVATION_REASON + "%"}):
-        prot.setdefault(i, set()).add(f)
-    return prot
-
 
 def _old(row: Any) -> dict[str, str | None]:
     return {k: None if row[k] is None else str(row[k]) for k in FIELDS}
@@ -147,7 +139,7 @@ def evaluate(db: Session, parsed: Parsed) -> list[Item]:
     sites = {r.name: r for r in db.execute(text("SELECT id, name, active FROM sites WHERE name = ANY(:n)"), {"n": sorted(names)})}
     segments = {frozenset((r["site_a_id"], r["site_b_id"])): r for r in db.execute(text(
         "SELECT id, site_a_id, site_b_id, distance_km, route, section FROM segments")).mappings()}
-    prot = load_protected(db)
+    prot = load_protected(db, "segment", (UPLOAD_REASON, RESERVATION_REASON))
     pairs = Counter(frozenset((it.p["a"], it.p["b"])) for it in parsed.items if it.p["a"])
     for it in parsed.items:
         p, reasons = it.p, list(it.p["reasons"])

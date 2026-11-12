@@ -9,7 +9,7 @@ Put the file in api/data/ (git-ignored; real data is never committed). ADMIN is 
 
 Sheet "Sites": site_name (4-letter LRD), latitude_in_decimal, longitude_in_decimal, region (optional),
     Type (optional: Trunk, DC, TOC; blank means Trunk).
-Sheet "Segments": Link (AAAA-BBBB), Distance (km), Route, Section, Surveyed cores, Total cores.
+Sheet "Segments": Link (AAAA-BBBB), Distance (km), Route, Section, Verified cores (old files with "Surveyed cores" still load), Total cores.
 Sheet "Reservation" (its own file; load sites and segments first): Region (optional: North, Central, South or
     East Coast; an unknown region makes the row Needs review and it is not imported), Nodes (site pair AAAA-BBBB; both sites must exist, the segment is
     matched by the pair), No of core requested (whole number, 1 or more: a count-only reservation, no specific cores),
@@ -19,7 +19,7 @@ Sheet "Reservation" (its own file; load sites and segments first): Region (optio
     Loaded like the Upload tab's Reservation workbook: reservations are only added, never changed, a row already
     imported is skipped on a re-run, and nothing is added once "Close reservation import" is closed.
 Safe to run again: sites missing from the file are left alone, fields edited in the dashboard are kept,
-and a survey count is only filled in where the segment has none yet.
+and a verified core count is only filled in where the segment has none yet.
 """
 import sys
 from typing import Any
@@ -38,7 +38,7 @@ from app.ingest.reservation_import import add_cores
 from app.routing.graph import invalidate as invalidate_routes
 
 SITES = ["site_name", "latitude_in_decimal", "longitude_in_decimal", "region", "Type"]
-SEGMENTS = ["Link", "Distance", "Route", "Section", "Surveyed cores", "Total cores"]
+SEGMENTS = ["Link", "Distance", "Route", "Section", "Verified cores", "Total cores"]
 RESERVATIONS = ["Region", "Nodes", "No of core requested", "Fiber core requestor", "Fiber core request date",
                 "Expected CV Ready", "Contractor", "Remark", "SRF", "Port Info", "Fiber monitored Y/N/WIP"]
 REASON = "data file load"
@@ -74,6 +74,12 @@ def _count(v: Any) -> int | None | str:
     return n if n >= 0 else f"'{v}' is negative"
 
 
+def _cell(row: tuple[Any, ...], columns: dict[str, int], key: str) -> Any:
+    if key not in columns or columns[key] >= len(row):
+        return None
+    return clean(row[columns[key]])
+
+
 def survey_counts(db: Session, admin_id: int, path: str, filename: str) -> tuple[int, list[str]]:
     """Fill segments.survey_cores / cable_size from the Segments sheet where the dashboard has no value yet."""
     wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
@@ -82,13 +88,15 @@ def survey_counts(db: Session, admin_id: int, path: str, filename: str) -> tuple
         return 0, []
     rows = ws.iter_rows(values_only=True)
     head = [sm.hkey(h) if not blank(h) else "" for h in next(rows, ())]
-    col = {k: head.index(k) for k in ("link", "surveyedcores", "totalcores") if k in head}
+    col = {k: head.index(k) for k in ("link", "verifiedcores", "surveyedcores", "totalcores") if k in head}
     if "link" not in col:
         return 0, []
+    # the template says "Verified cores"; files made before that say "Surveyed cores"
+    if "verifiedcores" not in col and "surveyedcores" in col:
+        col["verifiedcores"] = col.pop("surveyedcores")
     done, notes = 0, []
     for n, r in enumerate(rows, 2):
-        cell = lambda k: clean(r[col[k]]) if k in col and col[k] < len(r) else None  # noqa: E731
-        link = cell("link")
+        link = _cell(r, col, "link")
         if blank(link):
             continue
         a, _, b = str(link).strip().partition("-")
@@ -97,15 +105,15 @@ def survey_counts(db: Session, admin_id: int, path: str, filename: str) -> tuple
                          {"a": a, "b": b}).mappings().first()
         if seg is None:
             continue  # the segment list step already reported why
-        for key, field in (("surveyedcores", "survey_cores"), ("totalcores", "cable_size")):
-            v = _count(cell(key))
+        for key, field in (("verifiedcores", "survey_cores"), ("totalcores", "cable_size")):
+            v = _count(_cell(r, col, key))
             if isinstance(v, str) or (field == "cable_size" and v == 0):
                 notes.append(f"Segments row {n} {link}: {key} {v if isinstance(v, str) else 'must be above 0'}")
                 continue
             if v is None or v == seg[field]:
                 continue
             if field == "survey_cores" and seg[field] is not None:
-                notes.append(f"Segments row {n} {link}: dashboard already has {seg[field]} surveyed cores, file says {v}; kept")
+                notes.append(f"Segments row {n} {link}: dashboard already has {seg[field]} verified cores, file says {v}; kept")
                 continue
             if field == "cable_size" and db.execute(text(
                     "SELECT 1 FROM data_edits WHERE entity = 'segment' AND entity_id = :i AND field = 'cable_size' AND reason NOT LIKE :r"),
@@ -198,7 +206,7 @@ def load(db: Session, admin: str, path: str) -> int:
             print("  needs review:", p)
     done, notes = survey_counts(db, admin_id, path, name)
     invalidate_routes()
-    print(f"Survey counts: {done} set")
+    print(f"Verified core counts: {done} set")
     for x in notes:
         print("  kept:", x)
     load_reservations(db, admin_id, path, name)

@@ -1,112 +1,245 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type PointerEvent as RPointerEvent, type ReactNode } from "react";
-import { api } from "@/api/client";
+import type { ReactNode } from "react";
 import { health } from "@/lib/status";
+import { makePlacer, midpoint, project, type Point } from "@/lib/mapGeometry";
+import {
+  chipText,
+  KEY_LABEL,
+  LINE_COLOR,
+  LINE_WIDTH,
+  lineKind,
+  ROUTE_LAYERS,
+  routeLayerOn,
+  SITE_LAYERS,
+  siteLayerOn,
+  siteLook,
+  trunkRoutesOf,
+  type SegmentProps,
+} from "@/lib/mapLayers";
+import { useNetworkMap, type Basemap, type NetworkMapState } from "@/lib/useNetworkMap";
 
-// Network map card body (TASK-054, TASK-055). One overlay draws segments (SVG lines), free-cores chips and site markers
-// (DOM buttons, app font, Tab reachable) in both modes:
+// Network map card body (TASK-054, TASK-055). One overlay draws segments (SVG lines), free-cores chips
+// and site markers (DOM buttons, app font, Tab reachable) in both modes:
 //   "gl":  MapLibre renders the self-hosted PMTiles basemap underneath and owns the camera.
 //   "svg": no basemap (WebGL unavailable, or tiles not installed): plain background, own camera, drag to pan.
-// The overlay projects with Web Mercator at 512 px tiles, the same as MapLibre, so it lines up with the basemap.
-// ponytail: the overlay re-renders on every camera move; fine for a few hundred segments, move lines into a MapLibre
-// GeoJSON layer if real data makes panning sluggish.
+// ponytail: the overlay re-renders on every camera move; fine for a few hundred segments, move lines into a
+// MapLibre GeoJSON layer if real data makes panning sluggish.
 
-export type SegmentProps = {
-  segment_id: number; name: string; site_a_id: number; site_b_id: number; route_type: string | null; region: string | null;
-  route: string | null; site_a_kind: string; site_b_kind: string;
-  distance_km: string | null; free_to_reserve: number; surveyed: boolean; chip: "ok" | "low" | "full" | "not_surveyed"; fiber_cut?: boolean;
-  route_id: number | null; shaped?: boolean;
+const NOTE: Partial<Record<Basemap, string>> = {
+  missing: "Basemap not installed on this machine: run ./scripts/get-tiles.sh",
+  failed: "Basemap tiles could not be read: run ./scripts/get-tiles.sh",
+  nogl: "This browser cannot draw the basemap (no WebGL): plain map shown",
 };
-type SiteProps = { site_id: number; name: string; kind: string; lrd_site_id: number | null; region: string | null; location_from_site?: string };
-type Geo<P> = { features: { properties: P; geometry: { coordinates: P extends SegmentProps ? [number, number][] : [number, number] } }[]; not_drawn: { name: string; reason: string }[] };
-type View = { lng: number; lat: number; zoom: number };
-type Bounds = [number, number, number, number]; // west, south, east, north
-
-const MALAYSIA: Bounds = [99.5, 0.8, 119.5, 7.5];
-const TILE = 512;
-const mx = (lng: number) => (lng + 180) / 360;
-const my = (lat: number) => { const s = Math.sin((lat * Math.PI) / 180); return 0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI); };
-const unY = (y: number) => (Math.atan(Math.sinh(Math.PI * (1 - 2 * y))) * 180) / Math.PI;
-
-function fitView([w, s, e, n]: Bounds, W: number, H: number, pad = 60): View {
-  const dx = Math.max(mx(e) - mx(w), 1e-4), dy = Math.max(my(s) - my(n), 1e-4);
-  const zoom = Math.min(12, Math.max(4, Math.log2(Math.min((W - 2 * pad) / (dx * TILE), (H - 2 * pad) / (dy * TILE)))));
-  return { lng: (w + e) / 2, lat: unY((my(s) + my(n)) / 2), zoom };
-}
-const boundsOf = (pts: [number, number][]): Bounds | null => pts.length ? [
-  Math.min(...pts.map((p) => p[0])), Math.min(...pts.map((p) => p[1])), Math.max(...pts.map((p) => p[0])), Math.max(...pts.map((p) => p[1])),
-] : null;
-
-// Point at half the drawn length, so a chip sits on its line even when the line is shaped.
-function midpoint(p: [number, number][]): [number, number] {
-  const seg = p.slice(1).map((q, i) => Math.hypot(q[0] - p[i][0], q[1] - p[i][1]));
-  let half = seg.reduce((a, b) => a + b, 0) / 2;
-  for (let i = 0; i < seg.length; i++) {
-    if (half <= seg[i] || i === seg.length - 1) {
-      const t = seg[i] ? Math.min(1, half / seg[i]) : 0;
-      return [p[i][0] + (p[i + 1][0] - p[i][0]) * t, p[i][1] + (p[i + 1][1] - p[i][1]) * t];
-    }
-    half -= seg[i];
-  }
-  return p[0];
+const LAYERS_PANEL_CLASS =
+  "absolute top-[38px] left-0 w-[270px] rounded-lg border border-line bg-white px-3.5 py-3";
+const NOTE_CLASS =
+  "absolute top-3 right-3 z-10 max-w-[340px] note px-3 py-1.5 text-xs font-medium text-amber";
+const FRAMED_CLASS = "min-h-[clamp(520px,calc(100vh-210px),860px)] rounded-md border border-border";
+const SITE_HALF = 11; // half the marker box, in px
+// Areas kept free of chips and names: the controls (top left) and the key (bottom left).
+function reservedAreas(height: number): number[][] {
+  return [[0, 0, 380, 50], [0, height - 200, 300, height]];
 }
 
-// Line width and colour per route type. Each type also has its own pattern (DC-DC double, DC-TOC dashed), so the
-// colour is never the only cue. Free-core health is on the chips, not the lines.
-const LINE_WIDTH: Record<string, number> = { trunk: 6, "dc-dc": 7, "dc-toc": 4, metro: 4 };
-const LINE_COLOR: Record<string, string> = {
-  trunk: "var(--line-trunk)", metro: "var(--line-metro)", "dc-dc": "var(--line-dcdc)", "dc-toc": "var(--line-dctoc)",
+type DrawnLine = {
+  segment: SegmentProps;
+  points: Point[];
+  selected: boolean;
+  show: boolean;
+  dim: boolean;
+  mid: Point;
 };
-// Layers: which route types, trunk routes and site kinds show on the map. A hidden line or site is not drawn at
-// all; the selected segment or route and its end sites always show. Route search still uses hidden segments.
-type SiteLayers = { data_center: boolean; toc: boolean; site: boolean };
-const ALL_SITES: SiteLayers = { data_center: true, toc: true, site: true };
-const SITE_LAYERS: [keyof SiteLayers, string, string][] = [
-  ["data_center", "Data centres", "rb-sh dc size-3!"],
-  ["toc", "TOC", "rb-sh toc"],
-  ["site", "Trunk sites", "rb-sh st size-2.5!"],
-];
-// Singular words for the map key ("Data centre"); the Layers panel uses the plural.
-const KEY_LABEL: Record<keyof SiteLayers, string> = { data_center: "Data centre", toc: "TOC", site: "Trunk site" };
-const ROUTE_LAYERS: [string, string][] = [["Trunk", "ll"], ["Metro", "ll m"], ["DC-DC", "ll dd"], ["DC-TOC", "ll dt"]];
-type RouteLayers = Record<string, boolean>;
-const ALL_ROUTES: RouteLayers = { Trunk: true, Metro: true, "DC-DC": true, "DC-TOC": true };
 
-function siteLayerOn(layers: SiteLayers, kind: string): boolean {
-  if (kind === "data_center" || kind === "toc") {
-    return layers[kind];
-  }
-  return layers.site;
+function plural(count: number, word: string): string {
+  return `${count} ${word}${count === 1 ? "" : "s"}`;
 }
 
-function routeLayerOn(layers: RouteLayers, trunkOff: Set<string>, segment: SegmentProps): boolean {
-  const type = segment.route_type ?? "";
-  if (layers[type] === false) {
-    return false;
+// Lines to draw, in screen coordinates. Hidden layers drop out unless the line is selected.
+function drawnLines(state: NetworkMapState, visible: (segment: SegmentProps) => boolean): DrawnLine[] {
+  const { camera, size, selected } = state;
+  if (!camera || !size.w) {
+    return [];
   }
-  if (type === "Trunk" && segment.route && trunkOff.has(segment.route)) {
-    return false;
-  }
-  return true;
-}
-
-// Trunk routes (R1, R3, ...) on the map, in name order: one on/off chip each on the Trunk row.
-function trunkRoutesOf(features: { properties: SegmentProps }[]): string[] {
-  const routes = new Set<string>();
-  for (const feature of features) {
+  const layered = state.features.filter((feature) => {
+    const isSelected = selected.has(feature.properties.segment_id);
+    return isSelected || routeLayerOn(state.routeLayers, state.trunkOff, feature.properties);
+  });
+  return layered.map((feature) => {
     const segment = feature.properties;
-    if (segment.route_type === "Trunk" && segment.route) {
-      routes.add(segment.route);
+    const points = feature.geometry.coordinates.map((coordinate) => project(camera, size, coordinate));
+    const isSelected = selected.has(segment.segment_id);
+    const show = isSelected || visible(segment);
+    const dim = show && !isSelected && selected.size > 0;
+    return { segment, points, selected: isSelected, show, dim, mid: midpoint(points) };
+  });
+}
+
+// Declutter, greedy: site markers, then chips (selected first), then site names. A chip or name that would
+// overlap something already placed is hidden (visibility: hidden) until the user zooms in.
+function declutter(state: NetworkMapState, lines: DrawnLine[], sitePoints: Point[]) {
+  const placer = makePlacer(reservedAreas(state.size.h));
+  for (const [x, y] of sitePoints) {
+    placer.block([x - SITE_HALF, y - SITE_HALF, x + SITE_HALF, y + SITE_HALF]);
+  }
+  const chipShown = new Set<number>();
+  const shown = lines.filter((line) => line.show);
+  const byPriority = shown.sort((a, b) => Number(b.selected) - Number(a.selected));
+  for (const { segment, selected, mid } of byPriority) {
+    const chipWidth = 20 + 7.5 * chipText(segment).length;
+    let fits: boolean;
+    if (selected) {
+      const labelWidth = Math.max(chipWidth, 7.5 * segment.name.length + 16);
+      fits = placer.fits(mid[0], mid[1] - 11, labelWidth, 46);
+    } else {
+      fits = placer.fits(mid[0], mid[1], chipWidth + 4, 24);
+    }
+    if (fits) {
+      chipShown.add(segment.segment_id);
     }
   }
-  return [...routes].sort();
+  const sites = state.data.sites?.features ?? [];
+  const nameShown = sitePoints.map(([x, y], i) => {
+    const nameWidth = 7.2 * sites[i].properties.name.length + 12;
+    return placer.fits(x, y + 33, nameWidth, 18);
+  });
+  return { chipShown, nameShown };
+}
+
+function linePath(points: Point[]): string {
+  return "M" + points.map((point) => `${point[0].toFixed(1)} ${point[1].toFixed(1)}`).join("L");
+}
+
+function lineState(line: DrawnLine): string {
+  if (!line.show) {
+    return "hidden";
+  }
+  return line.dim ? "dim" : "";
+}
+
+function lineOpacity(line: DrawnLine): number {
+  if (!line.show) {
+    return 0.12;
+  }
+  return line.dim ? 0.5 : 1;
+}
+
+function MapLine({ line, onSelect }: { line: DrawnLine; onSelect: (id: number) => void }) {
+  const { segment, selected } = line;
+  const path = linePath(line.points);
+  const kind = lineKind(segment.route_type);
+  const width = (LINE_WIDTH[kind] ?? 4) + (selected ? 3 : 0);
+  const dotted = segment.chip === "not_surveyed" && !selected;
+  let dash: string | undefined;
+  if (dotted) {
+    dash = "1 7";
+  } else if (kind === "dc-toc") {
+    dash = "9 5";
+  }
+  const colour = selected ? "var(--blue)" : LINE_COLOR[kind] ?? "var(--line-metro)";
+  return (
+    <g data-testid="map-line" data-segment-id={segment.segment_id} data-selected={selected}
+      data-state={lineState(line)} opacity={lineOpacity(line)}>
+      {/* white casing on every line: keeps the dash and double-line patterns readable over the basemap */}
+      <path d={path} fill="none" stroke="#fff" strokeWidth={width + (selected ? 4 : 3)}
+        strokeLinecap="round" strokeLinejoin="round" />
+      <path d={path} fill="none" stroke={colour} strokeWidth={dotted ? 4 : width}
+        strokeLinecap="round" strokeLinejoin="round" strokeDasharray={dash} />
+      {/* DC-DC: a double line, the colour with a thin white centre */}
+      {kind === "dc-dc" && !dotted && (
+        <path d={path} fill="none" stroke="#fff" strokeWidth={selected ? 3 : 2.5}
+          strokeLinecap="round" strokeLinejoin="round" />
+      )}
+      {line.show && (
+        <path d={path} data-hit fill="none" stroke="transparent" strokeWidth={18} className="cursor-pointer"
+          style={{ pointerEvents: "stroke" }} onClick={() => onSelect(segment.segment_id)} />
+      )}
+    </g>
+  );
+}
+
+function MapLines({ lines, onSelect }: { lines: DrawnLine[]; onSelect: (id: number) => void }) {
+  const selectedOnTop = [...lines].sort((a, b) => Number(a.selected) - Number(b.selected));
+  return (
+    <svg className="pointer-events-none absolute inset-0 size-full" aria-hidden="true"
+      data-testid="map-lines">
+      {selectedOnTop.map((line) => (
+        <MapLine key={line.segment.segment_id} line={line} onSelect={onSelect} />
+      ))}
+    </svg>
+  );
+}
+
+function SiteMarkers({ state, sitePoints, nameShown, onSite }: {
+  state: NetworkMapState;
+  sitePoints: Point[];
+  nameShown: boolean[];
+  onSite: (name: string) => void;
+}) {
+  const features = state.features;
+  const ends = new Set(
+    features
+      .filter((feature) => state.selected.has(feature.properties.segment_id))
+      .flatMap((feature) => [feature.properties.site_a_id, feature.properties.site_b_id]),
+  );
+  const touches = (feature: (typeof features)[number], siteId: number) =>
+    feature.properties.site_a_id === siteId || feature.properties.site_b_id === siteId;
+  const segmentCount = (siteId: number) => features.filter((feature) => touches(feature, siteId)).length;
+  return (state.data.sites?.features ?? []).map((feature, i) => {
+    const site = feature.properties;
+    const [x, y] = sitePoints[i];
+    const isEnd = ends.has(site.site_id);
+    if (!isEnd && !siteLayerOn(state.siteLayers, site.kind)) {
+      return null;
+    }
+    const look = siteLook(site.kind);
+    const endNote = isEnd ? ", end of the selection" : "";
+    const segmentsText = plural(segmentCount(site.site_id), "segment");
+    const label = `Site ${site.name}, ${look.word}, ${segmentsText}${endNote}`;
+    return (
+      <button key={site.site_id} type="button" data-testid="map-site" data-site-id={site.site_id}
+        data-end={isEnd}
+        aria-label={label} className={`msite ${isEnd ? "end" : ""}`} style={{ left: x, top: y }}
+        onClick={() => onSite(site.name)}>
+        <span className={`shape ${look.shape}`} />
+        {(nameShown[i] || isEnd) && <span className="code" aria-hidden="true">{site.name}</span>}
+      </button>
+    );
+  });
+}
+
+type SegmentChipProps = { line: DrawnLine; shown: boolean; onSelect: (id: number) => void };
+
+function SegmentChip({ line, shown, onSelect }: SegmentChipProps) {
+  const { segment, selected, mid } = line;
+  const status = health({
+    survey_cores: segment.surveyed ? 1 : null,
+    free_to_reserve: segment.free_to_reserve,
+    fiber_cut: segment.fiber_cut,
+  });
+  let freeText = "not verified";
+  if (segment.surveyed) {
+    freeText = `${segment.free_to_reserve} free to reserve, ${status.word}`;
+  }
+  const label = `Segment ${segment.name}, ${segment.route_type ?? "no route type"}, ${freeText}`;
+  const style = {
+    left: mid[0],
+    top: mid[1],
+    visibility: shown ? undefined : ("hidden" as const),
+    opacity: line.dim ? 0.6 : undefined,
+  };
+  return (
+    <button type="button" data-testid="map-chip" data-segment-id={segment.segment_id} data-selected={selected}
+      aria-pressed={selected} aria-label={label} className={`mchip ${status.cls} ${selected ? "on" : ""}`}
+      style={style} onClick={() => onSelect(segment.segment_id)}>
+      {chipText(segment)}
+      {selected && <span className="mname" aria-hidden="true">{segment.name}</span>}
+    </button>
+  );
 }
 
 // The Layers panel: Routes (type tick boxes with their key swatch, trunk route chips) and Sites.
-function LayersPanel({ open, routes, setRoutes, trunkRoutes, trunkOff, setTrunkOff, sites, setSites }: {
-  open: boolean; routes: RouteLayers; setRoutes: (layers: RouteLayers) => void;
-  trunkRoutes: string[]; trunkOff: Set<string>; setTrunkOff: (off: Set<string>) => void;
-  sites: SiteLayers; setSites: (layers: SiteLayers) => void;
-}) {
+function LayersPanel({ state }: { state: NetworkMapState }) {
+  const { routeLayers, trunkOff, siteLayers } = state;
+  const trunkRoutes = trunkRoutesOf(state.features);
   const toggleTrunk = (route: string) => {
     const next = new Set(trunkOff);
     if (next.has(route)) {
@@ -114,23 +247,27 @@ function LayersPanel({ open, routes, setRoutes, trunkRoutes, trunkOff, setTrunkO
     } else {
       next.add(route);
     }
-    setTrunkOff(next);
+    state.setTrunkOff(next);
   };
   return (
-    <div id="map-layers" hidden={!open} className="absolute top-[38px] left-0 w-[270px] rounded-lg border border-line bg-white px-3.5 py-3">
+    <div id="map-layers" hidden={!state.layersOpen} className={LAYERS_PANEL_CLASS}>
       <fieldset>
         <legend className="lbl mb-1.5">Routes</legend>
         {ROUTE_LAYERS.map(([type, swatch]) => (
           <div key={type} className="flex items-center gap-2">
             <label className="lrow flex-1">
-              <input type="checkbox" checked={routes[type]}
-                onChange={(event) => setRoutes({ ...routes, [type]: event.target.checked })} />
+              <input type="checkbox" checked={routeLayers[type]}
+                onChange={(event) => {
+                  state.setRouteLayers({ ...routeLayers, [type]: event.target.checked });
+                }} />
               <i className="slot" aria-hidden="true"><i className={swatch} /></i>
               {type}
             </label>
             {type === "Trunk" && trunkRoutes.map((route) => (
-              <button key={route} type="button" className="chip h-6! px-2! text-xs" aria-pressed={!trunkOff.has(route)}
-                aria-label={`Trunk ${route}`} disabled={!routes.Trunk} onClick={() => toggleTrunk(route)}>
+              <button key={route} type="button" className="chip h-6! px-2! text-xs"
+                aria-pressed={!trunkOff.has(route)} aria-label={`Trunk ${route}`}
+                disabled={!routeLayers.Trunk}
+                onClick={() => toggleTrunk(route)}>
                 {route}
               </button>
             ))}
@@ -141,8 +278,8 @@ function LayersPanel({ open, routes, setRoutes, trunkRoutes, trunkOff, setTrunkO
         <legend className="lbl mb-1.5">Sites</legend>
         {SITE_LAYERS.map(([kind, label, shape]) => (
           <label key={kind} className="lrow">
-            <input type="checkbox" checked={sites[kind]}
-              onChange={(event) => setSites({ ...sites, [kind]: event.target.checked })} />
+            <input type="checkbox" checked={siteLayers[kind]}
+              onChange={(event) => state.setSiteLayers({ ...siteLayers, [kind]: event.target.checked })} />
             <i className="slot" aria-hidden="true"><i className={shape} /></i>
             {label}
           </label>
@@ -152,316 +289,154 @@ function LayersPanel({ open, routes, setRoutes, trunkRoutes, trunkOff, setTrunkO
   );
 }
 
-const kindOf = (t: string | null) => (t ?? "").toLowerCase();
-// Chip text: the free-core number only; a cut segment reads 0, not surveyed a dash.
-// Map shape and spoken word per site kind: DC a dark square, TOC a dark triangle, a trunk site a diamond.
-function siteLook(kind: string): { shape: string; word: string } {
-  if (kind === "data_center") {
-    return { shape: "dc", word: "data centre" };
-  }
-  if (kind === "toc") {
-    return { shape: "toc", word: "TOC" };
-  }
-  return { shape: "st", word: "trunk site" };
+function MapControls({ state, tools }: { state: NetworkMapState; tools?: ReactNode }) {
+  const full = state.full;
+  const fullIcon = full ? "M6 2v4H2M10 2v4h4M6 14v-4H2M10 14v-4h4" : "M2 6V2h4M14 6V2h-4M2 10v4h4M14 10v4h-4";
+  return (
+    <div className="absolute top-3 left-3 z-10 flex items-start gap-2">
+      <div className="relative">
+        <button type="button" className="mbtn" aria-expanded={state.layersOpen} aria-controls="map-layers"
+          onClick={() => state.setLayersOpen((open) => !open)}>
+          <svg className="ni" viewBox="0 0 16 16" aria-hidden="true">
+            <path d="M8 2l6 3.2-6 3.2-6-3.2zM2 8.4l6 3.2 6-3.2M2 11.4l6 3.2 6-3.2" />
+          </svg>
+          Layers
+          <svg className="ni size-3!" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4" /></svg>
+        </button>
+        <LayersPanel state={state} />
+      </div>
+      <div className="flex" role="group" aria-label="Zoom">
+        <button type="button" className="mbtn w-[34px] justify-center rounded-r-none! px-0! text-base"
+          aria-label="Zoom in" onClick={() => state.zoomBy(1)}>+</button>
+        <button type="button" className="mbtn -ml-px w-[34px] justify-center rounded-l-none! px-0! text-base"
+          aria-label="Zoom out" onClick={() => state.zoomBy(-1)}>&minus;</button>
+      </div>
+      <button type="button" className="mbtn" onClick={state.fitSelection}>Fit selection</button>
+      {document.fullscreenEnabled && (
+        <button type="button" className="mbtn" aria-pressed={full} onClick={state.toggleFull}>
+          <svg className="ni" viewBox="0 0 16 16" aria-hidden="true"><path d={fullIcon} /></svg>
+          {full ? "Exit full screen" : "Full screen"}
+        </button>
+      )}
+      {tools}
+    </div>
+  );
 }
 
-const chipText = (p: SegmentProps) => (p.fiber_cut ? "0" : p.surveyed ? String(p.free_to_reserve) : "–");
+// The key doubles as Layers: click an entry to show or hide it (same state as the Layers panel).
+function MapKey({ state }: { state: NetworkMapState }) {
+  const { routeLayers, siteLayers } = state;
+  return (
+    <div role="group" aria-label="Map key" className="mleg">
+      <p className="mleg-h col-span-2">Route type</p>
+      {ROUTE_LAYERS.map(([type, swatch]) => (
+        <button key={type} type="button" aria-pressed={routeLayers[type]} aria-label={`Show ${type} lines`}
+          onClick={() => state.setRouteLayers({ ...routeLayers, [type]: !routeLayers[type] })}>
+          <i className="slot" aria-hidden="true"><i className={swatch} /></i>{type}
+        </button>
+      ))}
+      <span><i className="slot" aria-hidden="true"><i className="ll s" /></i>Selected</span>
+      <p className="mleg-h col-span-2">Sites</p>
+      {SITE_LAYERS.map(([kind, label, shape]) => (
+        <button key={kind} type="button" aria-pressed={siteLayers[kind]} aria-label={`Show ${label}`}
+          onClick={() => state.setSiteLayers({ ...siteLayers, [kind]: !siteLayers[kind] })}>
+          <i className="slot" aria-hidden="true"><i className={shape} /></i>{KEY_LABEL[kind]}
+        </button>
+      ))}
+    </div>
+  );
+}
 
-type Basemap = "loading" | "gl" | "missing" | "nogl" | "failed";
-const NOTE: Partial<Record<Basemap, string>> = {
-  missing: "Basemap not installed on this machine: run ./scripts/get-tiles.sh",
-  failed: "Basemap tiles could not be read: run ./scripts/get-tiles.sh",
-  nogl: "This browser cannot draw the basemap (no WebGL): plain map shown",
-};
-const webgl = () => { try { return !!document.createElement("canvas").getContext("webgl2"); } catch { return false; } };
+function NotDrawn({ items }: { items: { name: string; reason: string }[] }) {
+  if (items.length === 0) {
+    return null;
+  }
+  return (
+    <details className="mt-2 text-xs text-muted-foreground" data-testid="map-not-drawn">
+      <summary className="cursor-pointer">
+        {plural(items.length, "segment")} not on the map (no coordinates)
+      </summary>
+      <ul className="mt-1 list-disc pl-5">
+        {items.map((item) => (
+          <li key={item.name}><b className="font-semibold text-foreground">{item.name}</b>: {item.reason}</li>
+        ))}
+      </ul>
+    </details>
+  );
+}
 
-export function NetworkMap({ selectedIds, routeKey, visible, onSelectSegment: selectSegment, onSite, onClear, version, tools }: {
+function mapMode(base: Basemap): string {
+  if (base === "gl") {
+    return "gl";
+  }
+  return base === "loading" ? "loading" : "svg";
+}
+
+type NetworkMapProps = {
   tools?: ReactNode; // extra toolbar controls (the Region filter)
-  selectedIds: number[]; routeKey: string | null; visible: (p: SegmentProps) => boolean;
-  onSelectSegment: (id: number) => void; onSite: (name: string) => void; onClear: () => void; version: number;
-}) {
-  const box = useRef<HTMLDivElement>(null);
-  const glBox = useRef<HTMLDivElement>(null);
-  const map = useRef<import("maplibre-gl").Map | null>(null);
-  const [size, setSize] = useState({ w: 0, h: 0 });
-  const [view, setView] = useState<View | null>(null);
-  const [gl] = useState(webgl);
-  const [base, setBase] = useState<Basemap>(gl ? "loading" : "nogl");
-  const [segments, setSegments] = useState<Geo<SegmentProps> | null>(null);
-  const [sites, setSites] = useState<Geo<SiteProps> | null>(null);
-  const [err, setErr] = useState(false);
-  const [routeLayers, setRouteLayers] = useState<RouteLayers>(ALL_ROUTES);
-  const [trunkOff, setTrunkOff] = useState<Set<string>>(new Set());
-  const [siteLayers, setSiteLayers] = useState<SiteLayers>(ALL_SITES);
-  const [layersOpen, setLayersOpen] = useState(false);
-  const [full, setFull] = useState(false);
-  useEffect(() => {
-    const on = () => setFull(document.fullscreenElement === box.current);
-    document.addEventListener("fullscreenchange", on);
-    return () => document.removeEventListener("fullscreenchange", on);
-  }, []);
-  const toggleFull = () => (full ? document.exitFullscreen() : box.current!.requestFullscreen()).catch(() => {});
+  selectedIds: number[];
+  routeKey: string | null;
+  visible: (segment: SegmentProps) => boolean;
+  onSelectSegment: (id: number) => void;
+  onSite: (name: string) => void;
+  onClear: () => void;
+  version: number;
+};
 
-  useEffect(() => {
-    let live = true;
-    Promise.all([api.get("/api/map/segments"), api.get("/api/map/sites")])
-      .then(([a, b]) => { if (live) { setSegments(a as unknown as Geo<SegmentProps>); setSites(b as unknown as Geo<SiteProps>); } })
-      .catch(() => live && setErr(true));
-    return () => { live = false; };
-  }, [version]);
-
-  useLayoutEffect(() => {
-    const el = box.current!;
-    // Start on Malaysia; the data fit follows once segments arrive.
-    const ro = new ResizeObserver(() => {
-      setSize({ w: el.clientWidth, h: el.clientHeight });
-      setView((v) => v ?? (el.clientWidth ? fitView(MALAYSIA, el.clientWidth, el.clientHeight, 8) : null));
-    });
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-
-  const viewRef = useRef(view);
-  useEffect(() => { viewRef.current = view; }, [view]);
-  // Basemap: WebGL and the PMTiles file are both needed, otherwise stay on the SVG overlay.
-  const ready = view != null;
-  useEffect(() => {
-    if (!ready || !gl) return;
-    let live = true;
-    import("@/lib/basemap").then(async (bm) => {
-      const has = await bm.basemapInstalled();
-      if (!live) return;
-      if (!has.tiles) { setBase("missing"); return; }
-      const v = viewRef.current!;
-      const m = bm.createBasemap(glBox.current!, [v.lng, v.lat], v.zoom, has.glyphs);
-      map.current = m;
-      (window as { fiberMap?: unknown }).fiberMap = m; // read by the e2e tests (layer checks); harmless otherwise
-      m.on("move", () => { const c = m.getCenter(); setView({ lng: c.lng, lat: c.lat, zoom: m.getZoom() }); });
-      m.on("error", (e) => { if ((e as { sourceId?: string }).sourceId === "pm" || /pmtiles/i.test(String(e.error?.message))) setBase("failed"); });
-      setBase("gl");
-    }).catch(() => live && setBase("nogl"));
-    return () => { live = false; map.current?.remove(); map.current = null; };
-  }, [ready, gl]);
-  const go = useCallback((v: View) => {
-    if (map.current) map.current.easeTo({ center: [v.lng, v.lat], zoom: v.zoom, duration: 250 });
-    else setView(v);
-  }, []);
-  // A segment picked on the map is already in view and stays put; a segment picked anywhere else (the Find list, search) is followed.
-  const clicked = useRef<number | null>(null);
-  const onSelectSegment = (id: number) => { clicked.current = id; selectSegment(id); };
-  const sel = new Set(selectedIds);
-  const feats = segments?.features ?? [];
-  const fitTo = (ids: number[] | null) => {
-    if (!size.w) return;
-    const pts = feats.filter((f) => !ids || ids.includes(f.properties.segment_id)).flatMap((f) => f.geometry.coordinates);
-    const b = boundsOf(pts);
-    if (b) go(fitView(b, size.w, size.h, ids ? 100 : 70));
-  };
-
-  // Turning a layer off unselects a single segment it hides; a found route keeps its segments.
-  const layersSeen = useRef({ routeLayers, trunkOff });
-  useEffect(() => {
-    const seen = layersSeen.current;
-    if (seen.routeLayers === routeLayers && seen.trunkOff === trunkOff) {
-      return;
+export function NetworkMap(props: NetworkMapProps) {
+  const { selectedIds, routeKey, visible, onSelectSegment, onSite, onClear, version, tools } = props;
+  const state = useNetworkMap({ selectedIds, routeKey, version, onSelectSegment, onClear });
+  const { box, glBox, onPointerDown, onPointerMove, onPointerUp } = state;
+  const { camera, size } = state;
+  const showOverlay = camera != null && size.w > 0;
+  const lines = drawnLines(state, visible);
+  const sitePoints = (state.data.sites?.features ?? []).map((feature): Point => {
+    if (!showOverlay) {
+      return [0, 0];
     }
-    layersSeen.current = { routeLayers, trunkOff };
-    if (routeKey) {
-      return;
-    }
-    const hidesSelected = feats.some((feature) =>
-      sel.has(feature.properties.segment_id) && !routeLayerOn(routeLayers, trunkOff, feature.properties));
-    if (hidesSelected) {
+    return project(camera, size, feature.geometry.coordinates);
+  });
+  const { chipShown, nameShown } = declutter(state, lines, sitePoints);
+  let note = NOTE[state.base];
+  if (state.data.failed) {
+    note = "Could not load the map data. Search and lists still work.";
+  }
+  const onKeyDown = (event: React.KeyboardEvent) => {
+    if (event.key === "Escape") {
+      state.setLayersOpen(false);
       onClear();
     }
-  }, [routeLayers, trunkOff]); // eslint-disable-line react-hooks/exhaustive-deps -- runs on a layer change only
-
-  // First data: fit to the selection if there is one, else to all segments. A new route: fit to its segments.
-  const fitted = useRef(false);
-  const selKey = selectedIds.join(",");
-  useEffect(() => {
-    if (fitted.current || !segments || !size.w || base === "loading") return;
-    fitted.current = true;
-    fitTo(selectedIds.length ? selectedIds : null);
-  }, [segments, size, base]); // eslint-disable-line react-hooks/exhaustive-deps -- once, when everything is in
-  useEffect(() => {
-    if (fitted.current && routeKey && selectedIds.length) fitTo(selectedIds);
-  }, [routeKey, selKey]); // eslint-disable-line react-hooks/exhaustive-deps -- refit only when the route changes
-  useEffect(() => {
-    if (!fitted.current || routeKey || selectedIds.length !== 1) return;
-    if (clicked.current === selectedIds[0]) { clicked.current = null; return; }
-    fitTo(selectedIds);
-  }, [selKey]); // eslint-disable-line react-hooks/exhaustive-deps -- follow a segment selected outside the map
-
-  // SVG mode camera: drag to pan.
-  const drag = useRef<{ x: number; y: number; v: View } | null>(null);
-  const onDown = (e: RPointerEvent) => {
-    if (map.current || !view || (e.target as Element).closest("button,a,input,label,[data-hit],details")) return;
-    drag.current = { x: e.clientX, y: e.clientY, v: view };
-    (e.currentTarget as Element).setPointerCapture(e.pointerId);
-  };
-  const onMove = (e: RPointerEvent) => {
-    const d = drag.current;
-    if (!d) return;
-    const k = TILE * 2 ** d.v.zoom;
-    setView({ ...d.v, lng: d.v.lng - ((e.clientX - d.x) / k) * 360, lat: unY(my(d.v.lat) - (e.clientY - d.y) / k) });
   };
 
-  const P = (c: [number, number]): [number, number] => {
-    const v = view!, k = TILE * 2 ** v.zoom;
-    return [(mx(c[0]) - mx(v.lng)) * k + size.w / 2, (my(c[1]) - my(v.lat)) * k + size.h / 2];
-  };
-  const ends = new Set(feats.filter((f) => sel.has(f.properties.segment_id)).flatMap((f) => [f.properties.site_a_id, f.properties.site_b_id]));
-  const segmentCount = (id: number) => feats.filter((f) => f.properties.site_a_id === id || f.properties.site_b_id === id).length;
-  const layered = feats.filter((f) => {
-    const selected = sel.has(f.properties.segment_id);
-    return selected || routeLayerOn(routeLayers, trunkOff, f.properties);
-  });
-  const drawn = view && size.w ? layered.map((f) => {
-    const p = f.properties, pts = f.geometry.coordinates.map(P);
-    const on = sel.has(p.segment_id), show = on || visible(p);
-    return { p, pts, on, show, dim: show && !on && sel.size > 0, mid: midpoint(pts) };
-  }) : [];
-  const order = [...drawn].sort((a, b) => Number(a.on) - Number(b.on)); // selected on top
-
-  // Declutter, greedy: site markers, then chips (selected first), then site names. A chip or name that would overlap
-  // something already placed is hidden (visibility: hidden) until the user zooms in; the Find list still reaches it.
-  const placed: number[][] = [[0, 0, 380, 50], [0, size.h - 200, 300, size.h]]; // controls, key
-  const fits = (x: number, y: number, w: number, h: number) => {
-    const r = [x - w / 2, y - h / 2, x + w / 2, y + h / 2];
-    if (placed.some((q) => r[0] < q[2] && r[2] > q[0] && r[1] < q[3] && r[3] > q[1])) return false;
-    placed.push(r);
-    return true;
-  };
-  const siteXY = (sites?.features ?? []).map((f) => (view && size.w ? P(f.geometry.coordinates) : [0, 0]));
-  siteXY.forEach(([x, y]) => placed.push([x - 11, y - 11, x + 11, y + 11]));
-  const chipShown = new Set([...drawn].filter((d) => d.show).sort((a, b) => Number(b.on) - Number(a.on)).filter(({ p, on, mid }) => {
-    const w = 20 + 7.5 * chipText(p).length;
-    return on ? fits(mid[0], mid[1] - 11, Math.max(w, 7.5 * p.name.length + 16), 46) : fits(mid[0], mid[1], w + 4, 24);
-  }).map((d) => d.p.segment_id));
-  const nameShown = siteXY.map(([x, y], i) => fits(x, y + 33, 7.2 * sites!.features[i].properties.name.length + 12, 18));
-
-  // The stage is the growing child: it fills the card when the right column makes the row taller (no blank band
-  // under the map). MapLibre follows container size changes itself (ResizeObserver), the overlay via `box` above.
+  // The stage is the growing child: it fills the card when the right column makes the row taller
+  // (no blank band under the map). MapLibre follows container size changes itself (ResizeObserver),
+  // the overlay via `box`.
   return (
     <div className="flex flex-1 flex-col">
-      <p id="map-instr" className="sr-only">Chips show free to reserve. Tab to a chip or site and press Enter to select; Esc clears the selection.</p>
-      <div ref={box} data-testid="network-map" data-mode={base === "gl" ? "gl" : base === "loading" ? "loading" : "svg"}
-        className={`relative flex-1 overflow-hidden bg-map select-none ${full ? "" : "min-h-[clamp(520px,calc(100vh-210px),860px)] rounded-md border border-border"}`}
-        onKeyDown={(e) => { if (e.key === "Escape") { setLayersOpen(false); onClear(); } }}
-        onPointerDown={onDown} onPointerMove={onMove} onPointerUp={() => { drag.current = null; }}>
-        <div ref={glBox} style={{ position: "absolute", inset: 0 }} aria-hidden="true" />{/* inline: MapLibre's CSS sets position: relative */}
-        {view && size.w > 0 && (
+      <p id="map-instr" className="sr-only">
+        Chips show free to reserve. Tab to a chip or site and press Enter to select; Esc clears the selection.
+      </p>
+      <div ref={box} data-testid="network-map" data-mode={mapMode(state.base)}
+        className={`relative flex-1 overflow-hidden bg-map select-none ${state.full ? "" : FRAMED_CLASS}`}
+        onKeyDown={onKeyDown} onPointerDown={onPointerDown} onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}>
+        {/* inline style: MapLibre's CSS sets position: relative */}
+        <div ref={glBox} style={{ position: "absolute", inset: 0 }} aria-hidden="true" />
+        {showOverlay && (
           <>
-            <svg className="pointer-events-none absolute inset-0 size-full" aria-hidden="true" data-testid="map-lines">
-              {order.map(({ p, pts, on, show, dim }) => {
-                const d = "M" + pts.map((q) => `${q[0].toFixed(1)} ${q[1].toFixed(1)}`).join("L");
-                const t = kindOf(p.route_type), w = (LINE_WIDTH[t] ?? 4) + (on ? 3 : 0);
-                const dotted = p.chip === "not_surveyed" && !on;
-                const dash = dotted ? "1 7" : t === "dc-toc" ? "9 5" : undefined;
-                return (
-                  <g key={p.segment_id} data-testid="map-line" data-segment-id={p.segment_id} data-selected={on} data-state={!show ? "hidden" : dim ? "dim" : ""} opacity={!show ? 0.12 : dim ? 0.5 : 1}>
-                    {/* white casing on every line: keeps the dash and double-line patterns readable over the basemap */}
-                    <path d={d} fill="none" stroke="#fff" strokeWidth={w + (on ? 4 : 3)} strokeLinecap="round" strokeLinejoin="round" />
-                    <path d={d} fill="none" stroke={on ? "var(--blue)" : LINE_COLOR[t] ?? "var(--line-metro)"} strokeWidth={p.chip === "not_surveyed" && !on ? 4 : w}
-                      strokeLinecap="round" strokeLinejoin="round"
-                      strokeDasharray={dash} />
-                    {/* DC-DC: a double line, the colour with a thin white centre */}
-                    {t === "dc-dc" && !dotted && (
-                      <path d={d} fill="none" stroke="#fff" strokeWidth={on ? 3 : 2.5} strokeLinecap="round" strokeLinejoin="round" />
-                    )}
-                    {show && <path d={d} data-hit fill="none" stroke="transparent" strokeWidth={18} className="cursor-pointer" style={{ pointerEvents: "stroke" }} onClick={() => onSelectSegment(p.segment_id)} />}
-                  </g>
-                );
-              })}
-            </svg>
-            {(sites?.features ?? []).map((f, i) => {
-              const s = f.properties, [x, y] = siteXY[i], end = ends.has(s.site_id), n = segmentCount(s.site_id);
-              const look = siteLook(s.kind);
-              if (!end && !siteLayerOn(siteLayers, s.kind)) {
-                return null;
-              }
-              return (
-                <button key={s.site_id} type="button" data-testid="map-site" data-site-id={s.site_id} data-end={end}
-                  aria-label={`Site ${s.name}, ${look.word}, ${n} segment${n === 1 ? "" : "s"}${end ? ", end of the selection" : ""}`}
-                  className={`msite ${end ? "end" : ""}`} style={{ left: x, top: y }} onClick={() => onSite(s.name)}>
-                  <span className={`shape ${look.shape}`} />
-                  {(nameShown[i] || end) && <span className="code" aria-hidden="true">{s.name}</span>}
-                </button>
-              );
-            })}
-            {drawn.filter((d) => d.show).map(({ p, on, mid, dim }) => {
-              const h = health({ survey_cores: p.surveyed ? 1 : null, free_to_reserve: p.free_to_reserve, fiber_cut: p.fiber_cut });
-              return (
-                <button key={p.segment_id} type="button" data-testid="map-chip" data-segment-id={p.segment_id} data-selected={on} aria-pressed={on}
-                  aria-label={`Segment ${p.name}, ${p.route_type ?? "no route type"}, ${p.surveyed ? `${p.free_to_reserve} free to reserve, ${h.word}` : "not surveyed"}`}
-                  className={`mchip ${h.cls} ${on ? "on" : ""}`} style={{ left: mid[0], top: mid[1], visibility: chipShown.has(p.segment_id) ? undefined : "hidden", opacity: dim ? 0.6 : undefined }} onClick={() => onSelectSegment(p.segment_id)}>
-                  {chipText(p)}
-                  {on && <span className="mname" aria-hidden="true">{p.name}</span>}
-                </button>
-              );
-            })}
+            <MapLines lines={lines} onSelect={state.selectSegment} />
+            <SiteMarkers state={state} sitePoints={sitePoints} nameShown={nameShown} onSite={onSite} />
+            {lines.filter((line) => line.show).map((line) => (
+              <SegmentChip key={line.segment.segment_id} line={line}
+                shown={chipShown.has(line.segment.segment_id)} onSelect={state.selectSegment} />
+            ))}
           </>
         )}
-
-        <div className="absolute top-3 left-3 z-10 flex items-start gap-2">
-          <div className="relative">
-            <button type="button" className="mbtn" aria-expanded={layersOpen} aria-controls="map-layers" onClick={() => setLayersOpen((o) => !o)}>
-              <svg className="ni" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2l6 3.2-6 3.2-6-3.2zM2 8.4l6 3.2 6-3.2M2 11.4l6 3.2 6-3.2" /></svg>Layers
-              <svg className="ni size-3!" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4" /></svg>
-            </button>
-            <LayersPanel open={layersOpen} routes={routeLayers} setRoutes={setRouteLayers}
-              trunkRoutes={trunkRoutesOf(feats)} trunkOff={trunkOff} setTrunkOff={setTrunkOff}
-              sites={siteLayers} setSites={setSiteLayers} />
-          </div>
-          <div className="flex" role="group" aria-label="Zoom">
-            <button type="button" className="mbtn w-[34px] justify-center rounded-r-none! px-0! text-base" aria-label="Zoom in" onClick={() => view && go({ ...view, zoom: Math.min(18, view.zoom + 1) })}>+</button>
-            <button type="button" className="mbtn -ml-px w-[34px] justify-center rounded-l-none! px-0! text-base" aria-label="Zoom out" onClick={() => view && go({ ...view, zoom: Math.max(4, view.zoom - 1) })}>&minus;</button>
-          </div>
-          <button type="button" className="mbtn" onClick={() => fitTo(selectedIds.length ? selectedIds : null)}>Fit selection</button>
-          {document.fullscreenEnabled && (
-            <button type="button" className="mbtn" aria-pressed={full} onClick={toggleFull}>
-              <svg className="ni" viewBox="0 0 16 16" aria-hidden="true">
-                <path d={full ? "M6 2v4H2M10 2v4h4M6 14v-4H2M10 14v-4h4" : "M2 6V2h4M14 6V2h-4M2 10v4h4M14 10v4h-4"} />
-              </svg>
-              {full ? "Exit full screen" : "Full screen"}
-            </button>
-          )}
-          {tools}
-        </div>
-
-        {/* The key doubles as Layers: click an entry to show or hide it (same state as the Layers panel). */}
-        <div role="group" aria-label="Map key" className="mleg">
-          <p className="mleg-h col-span-2">Route type</p>
-          {ROUTE_LAYERS.map(([type, swatch]) => (
-            <button key={type} type="button" aria-pressed={routeLayers[type]} aria-label={`Show ${type} lines`}
-              onClick={() => setRouteLayers({ ...routeLayers, [type]: !routeLayers[type] })}>
-              <i className="slot" aria-hidden="true"><i className={swatch} /></i>{type}
-            </button>
-          ))}
-          <span><i className="slot" aria-hidden="true"><i className="ll s" /></i>Selected</span>
-          <p className="mleg-h col-span-2">Sites</p>
-          {SITE_LAYERS.map(([kind, label, shape]) => (
-            <button key={kind} type="button" aria-pressed={siteLayers[kind]} aria-label={`Show ${label}`}
-              onClick={() => setSiteLayers({ ...siteLayers, [kind]: !siteLayers[kind] })}>
-              <i className="slot" aria-hidden="true"><i className={shape} /></i>{KEY_LABEL[kind]}
-            </button>
-          ))}
-        </div>
-        {(NOTE[base] || err) && (
-          <p role="status" data-testid="map-note" className="absolute top-3 right-3 z-10 max-w-[340px] note px-3 py-1.5 text-xs font-medium text-amber">
-            {err ? "Could not load the map data. Search and lists still work." : NOTE[base]}
-          </p>
-        )}
+        <MapControls state={state} tools={tools} />
+        <MapKey state={state} />
+        {note && <p role="status" data-testid="map-note" className={NOTE_CLASS}>{note}</p>}
       </div>
-      {segments && segments.not_drawn.length > 0 && (
-        <details className="mt-2 text-xs text-muted-foreground" data-testid="map-not-drawn">
-          <summary className="cursor-pointer">{segments.not_drawn.length} segment{segments.not_drawn.length === 1 ? "" : "s"} not on the map (no coordinates)</summary>
-          <ul className="mt-1 list-disc pl-5">
-            {segments.not_drawn.map((s) => <li key={s.name}><b className="font-semibold text-foreground">{s.name}</b>: {s.reason}</li>)}
-          </ul>
-        </details>
-      )}
+      {state.data.segments && <NotDrawn items={state.data.segments.not_drawn} />}
     </div>
   );
 }

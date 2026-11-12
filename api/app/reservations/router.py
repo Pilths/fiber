@@ -1,10 +1,8 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
 
-from app.auth.deps import CurrentUser, get_current_user, require_admin
-from app.db import get_db
+from app.auth.deps import DB, Admin, CurrentUser, get_current_user
 from app.reservations import service
 from app.reservations.schemas import (
     Bell,
@@ -18,9 +16,7 @@ from app.reservations.schemas import (
 )
 
 router = APIRouter(prefix="/api", dependencies=[Depends(get_current_user)])
-DB = Annotated[Session, Depends(get_db)]
 User = Annotated[CurrentUser, Depends(get_current_user)]
-Admin = Annotated[CurrentUser, Depends(require_admin)]
 
 
 @router.post("/reservations")

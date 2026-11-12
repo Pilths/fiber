@@ -812,6 +812,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/segments/{segment_id}/ports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Paste Segment Ports */
+        post: operations["paste_segment_ports_api_admin_segments__segment_id__ports_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/cores/{core_id}/measurements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add Core Measurement */
+        post: operations["add_core_measurement_api_admin_cores__core_id__measurements_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/segments/{sid}": {
         parameters: {
             query?: never;
@@ -1135,8 +1169,6 @@ export interface components {
             status: "Available" | "Requested" | "Reserved" | "In use";
             /** Customer */
             customer: string | null;
-            /** Circuit Id */
-            circuit_id: string | null;
             /** Planned Date */
             planned_date: string | null;
             /** Port A */
@@ -1198,8 +1230,6 @@ export interface components {
              * @enum {string}
              */
             status: "Available" | "Requested" | "Reserved" | "In use";
-            /** Circuit Id */
-            circuit_id: string | null;
             /** Port A */
             port_a: string | null;
             /** Port B */
@@ -1484,6 +1514,20 @@ export interface components {
             /** Password */
             password: string;
         };
+        /** MeasurementBody */
+        MeasurementBody: {
+            /** Loss Db */
+            loss_db: number | string;
+            /**
+             * Tested On
+             * Format: date
+             */
+            tested_on: string;
+            /** Test Method */
+            test_method?: string | null;
+            /** Field Team */
+            field_team?: string | null;
+        };
         /** MeasurementOut */
         MeasurementOut: {
             /** Loss Db */
@@ -1549,6 +1593,74 @@ export interface components {
             route: string | null;
             /** Section */
             section: string | null;
+        };
+        /** PastePortCounts */
+        PastePortCounts: {
+            /**
+             * New
+             * @default 0
+             */
+            new: number;
+            /**
+             * Replaces
+             * @default 0
+             */
+            replaces: number;
+            /**
+             * Unchanged
+             * @default 0
+             */
+            unchanged: number;
+            /**
+             * Problem
+             * @default 0
+             */
+            problem: number;
+        };
+        /** PastePortRow */
+        PastePortRow: {
+            /** Core Number */
+            core_number: number;
+            /** Port A Old */
+            port_a_old: string | null;
+            /** Port A New */
+            port_a_new: string | null;
+            /** Port B Old */
+            port_b_old: string | null;
+            /** Port B New */
+            port_b_new: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "new" | "replaces" | "unchanged" | "problem";
+            /** Problem */
+            problem?: string | null;
+        };
+        /** PastePortsBody */
+        PastePortsBody: {
+            /**
+             * Start Core
+             * @default 1
+             */
+            start_core: number;
+            /** Port A */
+            port_a?: string[] | null;
+            /** Port B */
+            port_b?: string[] | null;
+            /**
+             * Apply
+             * @default false
+             */
+            apply: boolean;
+        };
+        /** PastePortsResult */
+        PastePortsResult: {
+            /** Rows */
+            rows: components["schemas"]["PastePortRow"][];
+            counts: components["schemas"]["PastePortCounts"];
+            /** Applied */
+            applied: boolean;
         };
         /** RenameIn */
         RenameIn: {
@@ -1694,7 +1806,7 @@ export interface components {
              * Type
              * @enum {string}
              */
-            type: "customer" | "segment" | "circuit" | "core";
+            type: "customer" | "segment" | "core";
             /** Label */
             label: string;
             /** Segment Id */
@@ -4045,6 +4157,84 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CoreHolderDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    paste_segment_ports_api_admin_segments__segment_id__ports_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-dev-user"?: string | null;
+            };
+            path: {
+                segment_id: number;
+            };
+            cookie?: {
+                fiber_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PastePortsBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PastePortsResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_core_measurement_api_admin_cores__core_id__measurements_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-dev-user"?: string | null;
+            };
+            path: {
+                core_id: number;
+            };
+            cookie?: {
+                fiber_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MeasurementBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoreLoss"];
                 };
             };
             /** @description Validation Error */

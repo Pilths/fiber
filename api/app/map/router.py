@@ -1,18 +1,15 @@
 import io
 import zipfile
-from typing import Annotated, Any
+from typing import Any
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response
-from sqlalchemy.orm import Session
 
-from app.auth.deps import get_current_user
-from app.db import get_db
+from app.auth.deps import DB, get_current_user
 from app.map import service
 
 router = APIRouter(prefix="/api/map", dependencies=[Depends(get_current_user)])
-DB = Annotated[Session, Depends(get_db)]
 KMZ_TYPE = "application/vnd.google-earth.kmz"
 
 

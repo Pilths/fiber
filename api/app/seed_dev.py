@@ -20,7 +20,7 @@ SITES = [
     ("PEN", "DEV Penang Tower", "building", (100.3327, 5.4164)),
     ("KTN", "DEV Kuantan Hut", "site", None),
 ]
-# site A, site B, route_type, region, distance_km, loss factor vs distance*0.3 (None = no measurements)
+# site A, site B, route type (unused: derived from the site kinds), region, distance_km, loss factor vs distance*0.3 (None = no measurements)
 SEGMENTS: list[tuple[str, str, str, str, float | None, float | None]] = [
     ("KL", "CJ", "Metro", "Central", 32.5, 1.0),
     ("CJ", "BJ", "Metro", "Central", 18.2, 1.05),
@@ -31,6 +31,16 @@ SEGMENTS: list[tuple[str, str, str, str, float | None, float | None]] = [
     ("BJ", "KTN", "Metro", "East Coast", None, None),
 ]
 CORES = 24
+
+
+def dev_port_label(site_name: str, segment_id: int, core_number: int) -> str:
+    """Huts and towers hang on an ODF wall; data centers and exchanges use an FDF (frame, module, tray, port)."""
+    if site_name.endswith(("Hut", "Tower")):
+        return f"ODF{segment_id}-P{core_number}"
+    module = (core_number - 1) // 12 + 1
+    tray = (core_number - 1) % 12 // 4 + 1
+    port = (core_number - 1) % 4 + 1
+    return f"FDF{segment_id}-MOD{module}-T{tray}-P{port}"
 
 
 def run(db: Session) -> None:
@@ -54,24 +64,24 @@ def run(db: Session) -> None:
         site[code] = one(f"INSERT INTO sites (name, kind, geom) VALUES (:n, :k, {geom}) RETURNING id",
                          n=name, k=kind, lon=lon, lat=lat)
 
+    site_name = {code: name for code, name, _, _ in SITES}
     rng = random.Random(1)
     segment: list[int] = []
     cores: dict[int, dict[int, int]] = {}  # segment id -> core number -> core id
-    for n, (a, b, route, region, km, factor) in enumerate(SEGMENTS, start=1):
-        sid = one("INSERT INTO segments (site_a_id, site_b_id, route_type, region, distance_km, survey_cores) "
-                  "VALUES (:a, :b, :r, :g, :d, :n) RETURNING id", a=site[a], b=site[b], r=route, g=region, d=km, n=CORES)
+    for n, (a, b, _route_type, region, km, factor) in enumerate(SEGMENTS, start=1):
+        sid = one("INSERT INTO segments (site_a_id, site_b_id, region, distance_km, survey_cores) "
+                  "VALUES (:a, :b, :g, :d, :n) RETURNING id", a=site[a], b=site[b], g=region, d=km, n=CORES)
         segment.append(sid)
         cores[sid] = {}
         for num in range(1, CORES + 1):
             ports = [one("INSERT INTO ports (port_id, site_id) VALUES (:p, :s) RETURNING id",
-                         p=f"{code}-{sid}-{end}-{num:02d}", s=site[code])
+                         p=dev_port_label(site_name[code], sid, num), s=site[code])
                      for code, end in ((a, "A"), (b, "B"))]
-            # cores 10-13 in use with a circuit, 14 has a circuit but is not in use
-            circuit = f"CKT-{1000 + n * 10 + num - 9}" if 10 <= num <= 14 and n <= 5 else None
+            in_use = 10 <= num <= 13 and n <= 5
             cores[sid][num] = one(
-                "INSERT INTO cores (segment_id, number, port_a_id, port_b_id, circuit_id, in_use) "
-                "VALUES (:s, :n, :pa, :pb, :c, :u) RETURNING id",
-                s=sid, n=num, pa=ports[0], pb=ports[1], c=circuit, u=circuit is not None and num != 14)
+                "INSERT INTO cores (segment_id, number, port_a_id, port_b_id, in_use) "
+                "VALUES (:s, :n, :pa, :pb, :u) RETURNING id",
+                s=sid, n=num, pa=ports[0], pb=ports[1], u=in_use)
         if km is not None and factor is not None:
             for _ in range(3):
                 ins("INSERT INTO measurements (segment_id, core_id, loss_db, tested_on) "
