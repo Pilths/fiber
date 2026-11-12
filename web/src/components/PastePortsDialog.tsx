@@ -1,5 +1,6 @@
 import { Dialog } from "@/components/upload-parts";
-import { lineCount, usePastePorts, type PastePortRow, type PastePortsResult } from "@/lib/usePastePorts";
+import { coreCount } from "@/lib/portLabel";
+import { usePastePorts, type PastePortRow, type PastePortsResult } from "@/lib/usePastePorts";
 
 const LABEL_CLASS = "lbl mb-1 block text-body! text-foreground!";
 const TEXTAREA_CLASS = "field h-36 resize-y py-2 font-mono";
@@ -10,8 +11,8 @@ function PortBox({ label, value, onChange }: {
   value: string;
   onChange: (value: string) => void;
 }) {
-  const lines = lineCount(value);
-  const lineWord = lines === 1 ? "line" : "lines";
+  const cores = coreCount(value);
+  const coreWord = cores === 1 ? "core" : "cores";
   return (
     <div>
       <label className="block">
@@ -19,7 +20,7 @@ function PortBox({ label, value, onChange }: {
         <textarea className={TEXTAREA_CLASS} value={value} onChange={(event) => onChange(event.target.value)}
           spellCheck={false} />
       </label>
-      <span className="mt-1 block text-body text-muted-foreground">{lines} {lineWord}</span>
+      <span className="mt-1 block text-body text-muted-foreground">{cores} {coreWord}</span>
     </div>
   );
 }

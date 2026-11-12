@@ -1,4 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
+import { buildPortLabel, parsePortLabel, portLines, type PortKind } from "../src/lib/portLabel";
 import { openCore, pickSegment, signIn } from "./helpers";
 
 // Session 8: core detail drawer, admin edits (TEST-011) and reservation history (TEST-021).
@@ -110,20 +111,85 @@ test("lowering the verified core count below taken cores is refused in plain wor
   expect(n).toBe(24); // verified core count unchanged: the group counts add up to 24 cores
 });
 
-// Sets the port at the first end of core n in core details; returns the port it had.
+const PORT_FIELDS = { FDF: ["Frame", "Mod", "Tray", "Port"], ODF: ["Number", "Port"] };
+
+// The label an end of the ports dialog holds now ("" for No port).
+async function readEnd(dialog: Locator, end: string): Promise<string> {
+  const kind = await dialog.getByLabel(`${end} type`).inputValue();
+  if (kind === "") {
+    return "";
+  }
+  const values: string[] = [];
+  for (const field of PORT_FIELDS[kind as PortKind]) {
+    values.push(await dialog.getByLabel(`${end} ${field}`).inputValue());
+  }
+  return buildPortLabel({ kind: kind as PortKind, values }) ?? "";
+}
+
+// Picks the type and types the parts of a canonical label; "" chooses No port.
+async function fillEnd(dialog: Locator, end: string, label: string) {
+  const parts = parsePortLabel(label);
+  if (parts == null) {
+    await dialog.getByLabel(`${end} type`).selectOption("");
+    return;
+  }
+  await dialog.getByLabel(`${end} type`).selectOption(parts.kind);
+  const fields = PORT_FIELDS[parts.kind];
+  for (let i = 0; i < fields.length; i++) {
+    await dialog.getByLabel(`${end} ${fields[i]}`).fill(parts.values[i]);
+  }
+}
+
+// Sets the port at the site A end of core n in core details; returns the port it had.
 async function setFirstPort(page: Page, n: number, value: string): Promise<string> {
   await openCore(page, n);
   const d = drawer(page);
   await d.getByRole("button", { name: /^(Edit|Add) ports$/ }).click();
   const ports = page.getByRole("dialog", { name: `Ports of core ${n}` });
-  const first = ports.getByLabel(/^Port at /).first();
-  const old = await first.inputValue();
-  await first.fill(value);
+  const old = await readEnd(ports, "Site A end");
+  await fillEnd(ports, "Site A end", value);
   await ports.getByRole("button", { name: "Save" }).click();
   await expect(ports).toBeHidden();
   await d.getByRole("button", { name: "Close core detail" }).click();
   return old;
 }
+
+const PASTE_BOX = "DEV Kuala Lumpur DC end";
+
+async function openPastePorts(page: Page): Promise<Locator> {
+  await editSegment(page).click();
+  const edit = page.getByRole("dialog", { name: /^Edit segment/ });
+  await edit.getByRole("button", { name: "Paste ports" }).click();
+  return page.getByRole("dialog", { name: /^Paste ports/ });
+}
+
+test("port labels: build, parse and pasted Excel cells", () => {
+  expect(buildPortLabel({ kind: "FDF", values: ["1", "02", "3", "5"] })).toBe("FDF1-MOD2-T3-P5");
+  expect(buildPortLabel({ kind: "ODF", values: ["20", "5"] })).toBe("ODF20-P5");
+  expect(buildPortLabel({ kind: "FDF", values: ["a", "b", "c", "012"] })).toBe("FDFA-MODB-TC-P12");
+  expect(buildPortLabel({ kind: "ODF", values: [" b ", "7"] })).toBe("ODFB-P7");
+  expect(buildPortLabel({ kind: "FDF", values: ["A01", "B", "3", "5"] })).toBe("FDFA01-MODB-T3-P5");
+  expect(buildPortLabel({ kind: "FDF", values: ["1", "", "3", "5"] })).toBeNull();
+  expect(buildPortLabel({ kind: "ODF", values: ["0", "5"] })).toBeNull();
+  expect(buildPortLabel({ kind: "ODF", values: ["000", "5"] })).toBeNull();
+  expect(buildPortLabel({ kind: "ODF", values: ["10000", "5"] })).toBeNull();
+  expect(buildPortLabel({ kind: "ODF", values: ["ABCDE", "5"] })).toBeNull();
+  expect(buildPortLabel({ kind: "ODF", values: ["A-1", "5"] })).toBeNull();
+  expect(parsePortLabel("FDF1-MOD2-T3-P5")).toEqual({ kind: "FDF", values: ["1", "2", "3", "5"] });
+  expect(parsePortLabel("ODF20-P5")).toEqual({ kind: "ODF", values: ["20", "5"] });
+  expect(parsePortLabel("FDFA-MODB-TC-P12")).toEqual({ kind: "FDF", values: ["A", "B", "C", "12"] });
+  expect(parsePortLabel("ODFB-P7")).toEqual({ kind: "ODF", values: ["B", "7"] });
+  expect(parsePortLabel("ODF01-P7")).toBeNull();
+  expect(parsePortLabel("ODF0-P7")).toBeNull();
+  expect(parsePortLabel("ODFABCDE-P7")).toBeNull();
+  expect(parsePortLabel("FDF1-M2-T3-P5")).toBeNull();
+  expect(parsePortLabel("E2E-KL-21")).toBeNull();
+  expect(portLines("")).toBeNull();
+  expect(portLines("ODF1-P1\n\nODF1-P3\n")).toEqual(["ODF1-P1", "", "ODF1-P3"]);
+  const excel = '"FDF1\r\nMOD2\r\nT3\r\nP5"\r\n\r\n"FDF1\nMOD2\nT3\nP6"\n';
+  expect(portLines(excel)).toEqual(["FDF1 MOD2 T3 P5", "", "FDF1 MOD2 T3 P6"]);
+  expect(portLines('"say ""hi""\nthere"')).toEqual(['say "hi" there']);
+});
 
 test("paste ports: preview shows New rows, apply writes the ports, then the old ports go back", async ({ page }) => {
   await signIn(page, "admin1");
@@ -131,12 +197,10 @@ test("paste ports: preview shows New rows, apply writes the ports, then the old 
   // DEV cores all have ports; clear the first end of cores 20 and 21 so the paste is New.
   const old20 = await setFirstPort(page, 20, "");
   const old21 = await setFirstPort(page, 21, "");
-  await editSegment(page).click();
-  await page.getByRole("dialog", { name: /^Edit segment/ }).getByRole("button", { name: "Paste ports" }).click();
-  const paste = page.getByRole("dialog", { name: /^Paste ports/ });
+  const paste = await openPastePorts(page);
   await paste.getByLabel("Start at core").fill("20");
-  await paste.getByLabel("DEV Kuala Lumpur DC end").fill("E2E-PP-20\nE2E-PP-21");
-  await expect(paste.getByText("2 lines")).toBeVisible();
+  await paste.getByLabel(PASTE_BOX).fill("ODF901-P20\nODF901-P21");
+  await expect(paste.getByText("2 cores", { exact: true })).toBeVisible();
   const rows = paste.getByRole("table", { name: "Paste ports preview" }).locator("tbody tr");
   await expect(rows).toHaveCount(2);
   await expect(rows.nth(0)).toContainText("✓ New");
@@ -146,10 +210,26 @@ test("paste ports: preview shows New rows, apply writes the ports, then the old 
   await expect(paste).toBeHidden();
   await expect(page.getByRole("dialog", { name: /^Edit segment/ })).toBeHidden();
   await openCore(page, 20);
-  await expect(drawer(page)).toContainText("E2E-PP-20 to");
+  await expect(drawer(page)).toContainText("ODF901-P20 to");
   await drawer(page).getByRole("button", { name: "Close core detail" }).click();
-  expect(await setFirstPort(page, 20, old20)).toBe("E2E-PP-20");
-  expect(await setFirstPort(page, 21, old21)).toBe("E2E-PP-21");
+  expect(await setFirstPort(page, 20, old20)).toBe("ODF901-P20");
+  expect(await setFirstPort(page, 21, old21)).toBe("ODF901-P21");
+});
+
+test("paste ports: a quoted multi-line Excel cell is one core with the canonical label", async ({ page }) => {
+  await signIn(page, "admin1");
+  await pick(page, KLBJ);
+  const paste = await openPastePorts(page);
+  await paste.getByLabel("Start at core").fill("20");
+  await paste.getByLabel(PASTE_BOX).fill('"FDF901\nMOD2\nT3\nP20"\n"FDF901\nMOD2\nT3\nP21"\n');
+  await expect(paste.getByText("2 cores", { exact: true })).toBeVisible();
+  const rows = paste.getByRole("table", { name: "Paste ports preview" }).locator("tbody tr");
+  await expect(rows).toHaveCount(2);
+  await expect(rows.nth(0)).toContainText("FDF901-MOD2-T3-P20");
+  await expect(rows.nth(1)).toContainText("FDF901-MOD2-T3-P21");
+  await page.screenshot({ path: "e2e/screenshots/paste-ports-quoted.png" });
+  await paste.getByRole("button", { name: "Cancel" }).click(); // preview only: nothing is written
+  await expect(paste).toBeHidden();
 });
 
 test("admin opens a site from the segment diagram: fields, reason required, history", async ({ page }) => {
@@ -181,30 +261,49 @@ test("reservation History disclosure lists events in order", async ({ page }) =>
   await expect(items.nth(1)).toContainText("Approved by DEV admin1");
 });
 
-test("admin edits a core's ports with a reason, then puts them back", async ({ page }) => {
+test("admin picks an FDF port in the ports dialog, then puts the old ports back", async ({ page }) => {
   await signIn(page, "admin1");
   await pick(page, KLBJ);
   await openCore(page, 21);
   const d = drawer(page);
   const dlg = page.getByRole("dialog", { name: "Ports of core 21" });
-  const a = dlg.getByLabel("Port at DEV Kuala Lumpur DC");
-  const b = dlg.getByLabel(/^Port at DEV Bukit Jalil/);
   await d.getByRole("button", { name: /^(Add|Edit) ports$/ }).click();
-  const [oldA, oldB] = [await a.inputValue(), await b.inputValue()]; // prefilled with the current labels
-  await a.fill("E2E-KL-21");
-  await b.fill("");
+  const oldA = await readEnd(dlg, "Site A end"); // prefilled from the current labels
+  const oldB = await readEnd(dlg, "Site B end");
+  await dlg.getByLabel("Site A end type").selectOption("FDF");
+  await dlg.getByLabel("Site A end Frame").fill("902");
+  await dlg.getByLabel("Site A end Mod").fill("8");
+  await dlg.getByLabel("Site A end Tray").fill("9");
+  await dlg.getByRole("button", { name: "Save" }).click();
+  await expect(dlg.getByText("Fill every part: 1 to 4 letters or numbers.")).toBeVisible(); // Port empty
+  await dlg.getByLabel("Site A end Port").fill("21");
+  await dlg.getByLabel("Site B end type").selectOption("");
+  await page.screenshot({ path: "e2e/screenshots/core-ports-picker.png" });
   await dlg.getByRole("button", { name: "Save" }).click();
   await expect(dlg).toBeHidden();
   await expect(d).toBeVisible(); // closing the nested dialog leaves the drawer open
-  await expect(d).toContainText("E2E-KL-21 to Not recorded");
-  await expect(d.getByRole("list", { name: "Core history, newest first" })).toContainText("port_a changed to E2E-KL-21");
+  await expect(d).toContainText("FDF902-MOD8-T9-P21 to Not recorded");
+  const history = d.getByRole("list", { name: "Core history, newest first" });
+  await expect(history).toContainText("port_a changed to FDF902-MOD8-T9-P21");
 
-  await d.getByRole("button", { name: "Edit ports" }).click();
-  await a.fill(oldA);
-  await b.fill(oldB);
+  await d.getByRole("button", { name: "Edit ports" }).click(); // letters are parts too
+  await dlg.getByLabel("Site A end Frame").fill("a");
+  await expect(dlg.getByLabel("Site A end Frame")).toHaveValue("A"); // upper-cased as typed
+  await dlg.getByLabel("Site A end Mod").fill("B");
+  await dlg.getByLabel("Site A end Tray").fill("3");
+  await dlg.getByLabel("Site A end Port").fill("012");
   await dlg.getByRole("button", { name: "Save" }).click();
   await expect(dlg).toBeHidden();
-  await expect(d).toContainText(oldA || oldB ? `${oldA || "Not recorded"} to ${oldB || "Not recorded"}` : "Add ports");
+  await expect(d).toContainText("FDFA-MODB-T3-P12 to Not recorded");
+
+  await d.getByRole("button", { name: "Edit ports" }).click();
+  await expect(dlg.getByLabel("Site A end Frame")).toHaveValue("A"); // the letter label parses back
+  await fillEnd(dlg, "Site A end", oldA);
+  await fillEnd(dlg, "Site B end", oldB);
+  await dlg.getByRole("button", { name: "Save" }).click();
+  await expect(dlg).toBeHidden();
+  const restored = `${oldA || "Not recorded"} to ${oldB || "Not recorded"}`;
+  await expect(d).toContainText(oldA || oldB ? restored : "Add ports");
 });
 
 test("one Unassigned row per reservation; admin assign dialog limits the choice", async ({ page }) => {

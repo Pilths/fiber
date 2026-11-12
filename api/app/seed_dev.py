@@ -33,6 +33,16 @@ SEGMENTS: list[tuple[str, str, str, str, float | None, float | None]] = [
 CORES = 24
 
 
+def dev_port_label(site_name: str, segment_id: int, core_number: int) -> str:
+    """Huts and towers hang on an ODF wall; data centers and exchanges use an FDF (frame, module, tray, port)."""
+    if site_name.endswith(("Hut", "Tower")):
+        return f"ODF{segment_id}-P{core_number}"
+    module = (core_number - 1) // 12 + 1
+    tray = (core_number - 1) % 12 // 4 + 1
+    port = (core_number - 1) % 4 + 1
+    return f"FDF{segment_id}-MOD{module}-T{tray}-P{port}"
+
+
 def run(db: Session) -> None:
     def one(sql: str, **p: Any) -> int:
         return db.execute(text(sql), p).scalar_one()
@@ -54,6 +64,7 @@ def run(db: Session) -> None:
         site[code] = one(f"INSERT INTO sites (name, kind, geom) VALUES (:n, :k, {geom}) RETURNING id",
                          n=name, k=kind, lon=lon, lat=lat)
 
+    site_name = {code: name for code, name, _, _ in SITES}
     rng = random.Random(1)
     segment: list[int] = []
     cores: dict[int, dict[int, int]] = {}  # segment id -> core number -> core id
@@ -64,7 +75,7 @@ def run(db: Session) -> None:
         cores[sid] = {}
         for num in range(1, CORES + 1):
             ports = [one("INSERT INTO ports (port_id, site_id) VALUES (:p, :s) RETURNING id",
-                         p=f"{code}-{sid}-{end}-{num:02d}", s=site[code])
+                         p=dev_port_label(site_name[code], sid, num), s=site[code])
                      for code, end in ((a, "A"), (b, "B"))]
             in_use = 10 <= num <= 13 and n <= 5
             cores[sid][num] = one(

@@ -1,28 +1,13 @@
 import { useEffect, useState } from "react";
 import { api, errorText } from "@/api/client";
 import type { components } from "@/api/schema";
+import { portLines } from "@/lib/portLabel";
 
 export type PastePortsResult = components["schemas"]["PastePortsResult"];
 export type PastePortRow = components["schemas"]["PastePortRow"];
 type PastePortsBody = components["schemas"]["PastePortsBody"];
 
 const PREVIEW_DELAY_MS = 400;
-
-// One label per line; a blank line stays so it skips its core. An empty box leaves that end untouched.
-export function portLines(text: string): string[] | null {
-  if (text === "") {
-    return null;
-  }
-  return text.split(/\r?\n/);
-}
-
-export function lineCount(text: string): number {
-  const lines = portLines(text);
-  if (lines == null) {
-    return 0;
-  }
-  return lines.length;
-}
 
 function readyCount(result: PastePortsResult | null): number {
   if (result == null) {

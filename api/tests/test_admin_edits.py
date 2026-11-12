@@ -302,41 +302,48 @@ def test_lowered_cores_are_hidden_everywhere_and_raise_reuses_rows(client, w, db
 def test_core_ports_set_change_clear_with_history(client, w, db):
     c = w["c1"][1]
     path = f"cores/{c}/ports"
-    r = post(client, path, port_a=" A Tray 1 P1 ", port_b="B Tray 1 P1", reason="from the patch panel")
-    assert r.status_code == 200 and (r.json()["port_a"], r.json()["port_b"], r.json()["core_id"]) == ("A Tray 1 P1", "B Tray 1 P1", c)
-    assert one(db, "SELECT site_id FROM ports WHERE port_id = 'A Tray 1 P1'") == one(db, "SELECT site_a_id FROM segments WHERE id = :s", s=w["s1"])
-    assert one(db, "SELECT site_id FROM ports WHERE port_id = 'B Tray 1 P1'") == one(db, "SELECT site_b_id FROM segments WHERE id = :s", s=w["s1"])
-    assert edits(db, "core", c) == [("port_a", None, "A Tray 1 P1", "from the patch panel"), ("port_b", None, "B Tray 1 P1", "from the patch panel")]
+    r = post(client, path, port_a=" fdf1 mod1 t1 p1 ", port_b="FDF2-MOD1-T1-P1", reason="from the patch panel")
+    assert r.status_code == 200 and (r.json()["port_a"], r.json()["port_b"], r.json()["core_id"]) == ("FDF1-MOD1-T1-P1", "FDF2-MOD1-T1-P1", c)
+    assert one(db, "SELECT site_id FROM ports WHERE port_id = 'FDF1-MOD1-T1-P1'") == one(db, "SELECT site_a_id FROM segments WHERE id = :s", s=w["s1"])
+    assert one(db, "SELECT site_id FROM ports WHERE port_id = 'FDF2-MOD1-T1-P1'") == one(db, "SELECT site_b_id FROM segments WHERE id = :s", s=w["s1"])
+    assert edits(db, "core", c) == [("port_a", None, "FDF1-MOD1-T1-P1", "from the patch panel"), ("port_b", None, "FDF2-MOD1-T1-P1", "from the patch panel")]
     assert one(db, "SELECT user_id FROM data_edits WHERE entity = 'core' AND field = 'port_a'") == w["admin1"]
     # nothing changed: 200 and no history
-    assert post(client, path, port_a="A Tray 1 P1", port_b="B Tray 1 P1", reason="same").status_code == 200
+    assert post(client, path, port_a="FDF1-MOD1-T1-P1", port_b="FDF2-MOD1-T1-P1", reason="same").status_code == 200
     assert len(edits(db, "core", c)) == 2
     # change one end only
-    assert post(client, path, port_a="A Tray 1 P2", port_b="B Tray 1 P1", reason="moved").json()["port_a"] == "A Tray 1 P2"
-    assert edits(db, "core", c)[2:] == [("port_a", "A Tray 1 P1", "A Tray 1 P2", "moved")]
+    assert post(client, path, port_a="FDF1-MOD1-T1-P2", port_b="FDF2-MOD1-T1-P1", reason="moved").json()["port_a"] == "FDF1-MOD1-T1-P2"
+    assert edits(db, "core", c)[2:] == [("port_a", "FDF1-MOD1-T1-P1", "FDF1-MOD1-T1-P2", "moved")]
+    # an end that is not sent stays as it is
+    r = post(client, path, port_b="FDF2-MOD1-T1-P1", reason="only b")
+    assert (r.json()["port_a"], r.json()["port_b"]) == ("FDF1-MOD1-T1-P2", "FDF2-MOD1-T1-P1")
     # clear: null and empty string; the ports rows stay
     r = post(client, path, port_a=None, port_b="  ", reason="wrong core")
     assert (r.json()["port_a"], r.json()["port_b"]) == (None, None)
-    assert edits(db, "core", c)[3:] == [("port_a", "A Tray 1 P2", None, "wrong core"), ("port_b", "B Tray 1 P1", None, "wrong core")]
+    assert edits(db, "core", c)[3:] == [("port_a", "FDF1-MOD1-T1-P2", None, "wrong core"), ("port_b", "FDF2-MOD1-T1-P1", None, "wrong core")]
     assert one(db, "SELECT count(*) FROM ports") == 3
     assert one(db, "SELECT port_a_id IS NULL AND port_b_id IS NULL FROM cores WHERE id = :c", c=c)
 
 
 def test_core_ports_same_label_per_site(client, w, db):
-    assert post(client, f"cores/{w['c1'][1]}/ports", port_b="X1", reason="r").status_code == 200  # X1 at site B
-    assert post(client, f"cores/{w['c2'][1]}/ports", port_a="X1", reason="r").status_code == 200  # also site B: reused
-    assert one(db, "SELECT count(*) FROM ports WHERE port_id = 'X1'") == 1
-    assert post(client, f"cores/{w['c1'][2]}/ports", port_a="X1", reason="r").status_code == 200  # site A: new row
-    assert one(db, "SELECT count(*) FROM ports WHERE port_id = 'X1'") == 2
+    assert post(client, f"cores/{w['c1'][1]}/ports", port_b="ODF1-P1", reason="r").status_code == 200  # ODF1-P1 at site B
+    assert post(client, f"cores/{w['c2'][1]}/ports", port_a="ODF1-P1", reason="r").status_code == 200  # also site B: reused
+    assert one(db, "SELECT count(*) FROM ports WHERE port_id = 'ODF1-P1'") == 1
+    assert post(client, f"cores/{w['c1'][2]}/ports", port_a="ODF1-P1", reason="r").status_code == 200  # site A: new row
+    assert one(db, "SELECT count(*) FROM ports WHERE port_id = 'ODF1-P1'") == 2
 
 
 def test_core_ports_validation_and_permissions(client, w, db):
     c = w["c1"][1]
-    assert post(client, f"cores/{c}/ports", port_a="P1", reason="x", user="planner1").status_code == 403
-    assert post(client, "cores/999999/ports", port_a="P1", reason="x").status_code == 404
+    assert post(client, f"cores/{c}/ports", port_a="ODF1-P1", reason="x", user="planner1").status_code == 403
+    assert post(client, "cores/999999/ports", port_a="ODF1-P1", reason="x").status_code == 404
+    assert one(db, "SELECT count(*) FROM ports") == 0 and not edits(db, "core", c)
+    for bad in ("A Tray 1 P1", "FDF1-M2-T3", "ODF1"):
+        refused = post(client, f"cores/{c}/ports", port_a=bad, reason="x")
+        assert refused.status_code == 422 and "Use FDF1-MOD2-T3-P5 or ODF1-P5" in refused.json()["detail"]
     assert one(db, "SELECT count(*) FROM ports") == 0 and not edits(db, "core", c)
     # no reason needed: the history row says "no reason given"
-    assert post(client, f"cores/{c}/ports", port_a="P1").status_code == 200
+    assert post(client, f"cores/{c}/ports", port_a="ODF1-P1").status_code == 200
     assert [edit[3] for edit in edits(db, "core", c)] == ["no reason given"]
 
 

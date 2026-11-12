@@ -21,6 +21,7 @@ from app.ingest.reservation_import import add_cores, port
 from app.inventory import service as inventory
 from app.inventory.schemas import CoreHolderDetail
 from app.link_type import ROUTE_TYPE_SQL
+from app.port_label import LABEL_HELP, normalize_port_label
 from app.loss import service as loss_service
 from app.loss.schemas import CoreLoss
 from app.reservations.schemas import NO_REASON, Reason
@@ -204,8 +205,10 @@ def get_history(db: DB, entity: Entity, id: int) -> list[HistoryRow]:
 
 # ---------- core ports (typed by hand; the reservation upload does not import ports) ----------
 
+PORT_ENDS = ("port_a", "port_b")
+
 class CorePortsBody(BaseModel):
-    port_a: str | None = None  # label at the segment's first site; null or empty clears it
+    port_a: str | None = None  # label at the segment's first site; null or empty clears it; not sent = untouched
     port_b: str | None = None  # label at the segment's second site
     reason: Reason = ""
 
@@ -219,6 +222,17 @@ def _port_label(db: Session, port_row_id: int | None) -> str | None:
 def _port_for_site(db: Session, label: str, site_id: int) -> int:
     """The port row for a label at this site, made if new; the same label may exist at other sites."""
     return port(db, {}, label, site_id)
+
+
+def _canonical_label(typed: str | None) -> str | None:
+    """Empty means clear; anything else must be an FDF or ODF port, saved in canonical form."""
+    text_value = (typed or "").strip()
+    if not text_value:
+        return None
+    label = normalize_port_label(text_value)
+    if label is None:
+        raise HTTPException(422, f"{text_value} is not a port label. {LABEL_HELP}")
+    return label
 
 
 def _write_core_ports(
@@ -236,7 +250,7 @@ def _write_core_ports(
     new_port_ids: dict[str, int | None] = {}
     for field_name, typed in wanted.items():
         current_row_id, site_id = current[field_name]
-        label = (typed or "").strip() or None
+        label = _canonical_label(typed)
         old = _port_label(db, current_row_id)
         if label == old:
             continue
@@ -258,7 +272,7 @@ def set_core_ports(db: DB, admin: Admin, core_id: int, body: CorePortsBody) -> C
     if found is None:
         raise HTTPException(404, "Core not found")
     db.execute(text(LOCK_SEGMENT_SQL), {"segment_id": found[0]})
-    wanted = {"port_a": body.port_a, "port_b": body.port_b}
+    wanted = {end: getattr(body, end) for end in PORT_ENDS if end in body.model_fields_set}
     if _write_core_ports(db, admin, core_id, wanted, body.reason):
         db.commit()
     core = inventory.get_core(db, core_id, admin.id)
@@ -269,7 +283,6 @@ def set_core_ports(db: DB, admin: Admin, core_id: int, body: CorePortsBody) -> C
 # ---------- paste ports for a whole segment (preview first, then apply) ----------
 
 MAX_PASTED_LINES = 2000
-PORT_ENDS = ("port_a", "port_b")
 SITE_OF_END = {"port_a": "site_a_id", "port_b": "site_b_id"}
 
 
@@ -315,7 +328,7 @@ def _pasted_labels(lines: list[str] | None, start_core: int) -> dict[int, str]:
     for index, line in enumerate(lines or []):
         label = line.strip()
         if label:
-            labels[start_core + index] = label
+            labels[start_core + index] = normalize_port_label(label) or label
     return labels
 
 
@@ -333,6 +346,8 @@ def _label_problem(
     label: str, core_id: int, segment_id: int,
     pasted: dict[int, str], repeats: Counter[str], owners: dict[str, list[Any]],
 ) -> str | None:
+    if normalize_port_label(label) is None:
+        return f"{label} is not a port label. {LABEL_HELP}"
     if repeats[label] > 1:
         return f"{label} is pasted more than once for this end"
     for owner in owners.get(label, []):

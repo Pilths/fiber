@@ -10,7 +10,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.db import engine
-from app.seed_dev import CORES
+from app.seed_dev import CORES, dev_port_label
 from app.seed_dev import SEGMENTS as OLD_SEGMENTS
 from app.seed_dev import SITES as OLD_SITES
 
@@ -44,6 +44,27 @@ UPDATE cores SET
   port_b_id = CASE WHEN number BETWEEN 9 AND 16 THEN NULL ELSE port_b_id END
 WHERE segment_id = :segment_id AND number BETWEEN 5 AND 16
 """
+# Older DEV databases have ports named before the FDF/ODF label shapes; rename them in place.
+DEV_PORTED_CORES_SQL = """
+SELECT c.segment_id, c.number, c.port_a_id, c.port_b_id, a.name AS name_a, b.name AS name_b
+FROM cores c
+JOIN segments s ON s.id = c.segment_id
+JOIN sites a ON a.id = s.site_a_id
+JOIN sites b ON b.id = s.site_b_id
+WHERE a.name LIKE 'DEV %' AND b.name LIKE 'DEV %' AND (c.port_a_id IS NOT NULL OR c.port_b_id IS NOT NULL)
+"""
+RENAME_PORT_SQL = "UPDATE ports SET port_id = :label WHERE id = :port_row_id AND port_id <> :label"
+
+
+def relabel_dev_ports(db: Session) -> None:
+    for core in db.execute(text(DEV_PORTED_CORES_SQL)).mappings().all():
+        for port_column, name_column in (("port_a_id", "name_a"), ("port_b_id", "name_b")):
+            if core[port_column] is None:
+                continue
+            label = dev_port_label(core[name_column], core["segment_id"], core["number"])
+            db.execute(text(RENAME_PORT_SQL), {"label": label, "port_row_id": core[port_column]})
+
+
 # site A, site B, route type (unused: derived from the site kinds), region, cable_size
 SEGMENTS = [
     (PEN, BW, "Metro", "North", 48), (BW, TP, "Trunk", "North", 144), (TP, IPH, "Trunk", "North", 144),
@@ -89,7 +110,7 @@ def main() -> None:
                           "VALUES (:a, :b, :g, :d, :n, :c) RETURNING id", a=site[a], b=site[b], g=region, d=km, n=CORES, c=cable)
                 for num in range(1, CORES + 1):
                     ports = [one("INSERT INTO ports (port_id, site_id) VALUES (:p, :s) RETURNING id",
-                                 p=f"{name[4:8].upper()}-{sid}-{end}-{num:02d}", s=site[name])
+                                 p=dev_port_label(name, sid, num), s=site[name])
                              for name, end in ((a, "A"), (b, "B"))]
                     db.execute(text("INSERT INTO cores (segment_id, number, port_a_id, port_b_id) VALUES (:s, :n, :pa, :pb)"),
                                {"s": sid, "n": num, "pa": ports[0], "pb": ports[1]})
@@ -111,6 +132,7 @@ def main() -> None:
                       a=site[a], b=site[b], g=json.dumps({"type": "LineString", "coordinates": coords}))
             db.execute(text("INSERT INTO route_segments (route_id, segment_id, position) VALUES (:r, :s, 1)"), {"r": rid, "s": sid})
             shaped += 1
+        relabel_dev_ports(db)
         db.execute(text(CLEAR_PORT_GAPS_SQL), {"segment_id": seg[PORT_GAPS_SEGMENT]})
         # DEV trunk route labels: R1 up north and central, R3 down south. Only fills a blank route.
         db.execute(text(DEV_TRUNK_ROUTES_SQL))
