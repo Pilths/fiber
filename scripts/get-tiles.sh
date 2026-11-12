@@ -27,7 +27,7 @@ if [ ! -s web/public/map/malaysia.pmtiles ] || [ "${FORCE:-}" = 1 ]; then
   docker run --rm --user "$(id -u):$(id -g)" -v "$PWD/web/public/map:/out" $CA_ENV \
     protomaps/go-pmtiles:v1.31.2 \
     extract "https://build.protomaps.com/$BUILD.pmtiles" /out/malaysia.pmtiles \
-    --bbox=99.5,0.8,119.5,7.5 --maxzoom=14
+    --bbox=99.25,0.8,119.7,7.75 --maxzoom=14
 fi
 
 if [ ! -s "web/public/map/fonts/$FONT/0-255.pbf" ] || [ "${FORCE:-}" = 1 ]; then
