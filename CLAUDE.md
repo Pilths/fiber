@@ -59,7 +59,7 @@ Read before working: `docs/PRD.md` (requirements), `docs/architecture.md` (desig
 
 Applies to all new and changed code. Existing code is tidied in the cleanup session, not during feature work.
 
-- One step per line. Lines at most 110 characters.
+- One step per line. Aim for 110 characters per line; a few characters over is fine, split once a line passes about 120.
 - Full, plain names: `planner`, `option`, `segment`, `site`, not `rp`, `op`, `s`, `g`, `x`. Short names only for loop counters (`i`) and tiny arrow functions over one item.
 - If/else is never on one line. Put the condition on its own line and the body indented below, also for a single statement:
   ```python

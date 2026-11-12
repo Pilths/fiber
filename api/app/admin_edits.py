@@ -208,8 +208,10 @@ def get_history(db: DB, entity: Entity, id: int) -> list[HistoryRow]:
 PORT_ENDS = ("port_a", "port_b")
 
 class CorePortsBody(BaseModel):
-    port_a: str | None = None  # label at the segment's first site; null or empty clears it; not sent = untouched
-    port_b: str | None = None  # label at the segment's second site
+    # Label at the segment's first site; null or empty clears it; not sent = untouched.
+    port_a: str | None = None
+    # Label at the segment's second site.
+    port_b: str | None = None
     reason: Reason = ""
 
 
