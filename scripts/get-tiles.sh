@@ -23,11 +23,13 @@ if [ -f certs/corporate-ca.crt ]; then
 fi
 
 if [ ! -s web/public/map/malaysia.pmtiles ] || [ "${FORCE:-}" = 1 ]; then
-  echo "Downloading Malaysia basemap from build $BUILD (about 220 MB, takes a few minutes)..."
+  echo "Downloading Malaysia basemap from build $BUILD (about 600 MB, takes a few minutes)..."
+  # Whole pan area (same as maxBounds in web/src/lib/basemap.ts), so no neighbouring country is cut in half.
+  # The map fades everything outside the Malaysia-Singapore-Brunei outline (web/src/lib/malaysiaOutline.json).
   docker run --rm --user "$(id -u):$(id -g)" -v "$PWD/web/public/map:/out" $CA_ENV \
     protomaps/go-pmtiles:v1.31.2 \
     extract "https://build.protomaps.com/$BUILD.pmtiles" /out/malaysia.pmtiles \
-    --bbox=99.5,0.8,119.5,7.5 --maxzoom=14
+    --bbox=95,-4,124,12 --maxzoom=14
 fi
 
 if [ ! -s "web/public/map/fonts/$FONT/0-255.pbf" ] || [ "${FORCE:-}" = 1 ]; then
