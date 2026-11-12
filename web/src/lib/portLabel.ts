@@ -4,8 +4,8 @@
 export type PortKind = "FDF" | "ODF";
 
 export const PORT_FIELDS: Record<PortKind, string[]> = {
-  FDF: ["Frame", "Mod", "Tray", "Port"],
-  ODF: ["Number", "Port"],
+  FDF: ["FDF ID", "Mod", "Tray", "Port"],
+  ODF: ["ODF ID", "Port"],
 };
 
 export type PortParts = { kind: PortKind; values: string[] };

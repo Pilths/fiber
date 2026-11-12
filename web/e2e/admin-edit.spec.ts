@@ -111,7 +111,7 @@ test("lowering the verified core count below taken cores is refused in plain wor
   expect(n).toBe(24); // verified core count unchanged: the group counts add up to 24 cores
 });
 
-const PORT_FIELDS = { FDF: ["Frame", "Mod", "Tray", "Port"], ODF: ["Number", "Port"] };
+const PORT_FIELDS = { FDF: ["FDF ID", "Mod", "Tray", "Port"], ODF: ["ODF ID", "Port"] };
 
 // The label an end of the ports dialog holds now ("" for No port).
 async function readEnd(dialog: Locator, end: string): Promise<string> {
@@ -271,7 +271,7 @@ test("admin picks an FDF port in the ports dialog, then puts the old ports back"
   const oldA = await readEnd(dlg, "Site A end"); // prefilled from the current labels
   const oldB = await readEnd(dlg, "Site B end");
   await dlg.getByLabel("Site A end type").selectOption("FDF");
-  await dlg.getByLabel("Site A end Frame").fill("902");
+  await dlg.getByLabel("Site A end FDF ID").fill("902");
   await dlg.getByLabel("Site A end Mod").fill("8");
   await dlg.getByLabel("Site A end Tray").fill("9");
   await dlg.getByRole("button", { name: "Save" }).click();
@@ -287,8 +287,8 @@ test("admin picks an FDF port in the ports dialog, then puts the old ports back"
   await expect(history).toContainText("port_a changed to FDF902-MOD8-T9-P21");
 
   await d.getByRole("button", { name: "Edit ports" }).click(); // letters are parts too
-  await dlg.getByLabel("Site A end Frame").fill("a");
-  await expect(dlg.getByLabel("Site A end Frame")).toHaveValue("A"); // upper-cased as typed
+  await dlg.getByLabel("Site A end FDF ID").fill("a");
+  await expect(dlg.getByLabel("Site A end FDF ID")).toHaveValue("A"); // upper-cased as typed
   await dlg.getByLabel("Site A end Mod").fill("B");
   await dlg.getByLabel("Site A end Tray").fill("3");
   await dlg.getByLabel("Site A end Port").fill("012");
@@ -297,7 +297,7 @@ test("admin picks an FDF port in the ports dialog, then puts the old ports back"
   await expect(d).toContainText("FDFA-MODB-T3-P12 to Not recorded");
 
   await d.getByRole("button", { name: "Edit ports" }).click();
-  await expect(dlg.getByLabel("Site A end Frame")).toHaveValue("A"); // the letter label parses back
+  await expect(dlg.getByLabel("Site A end FDF ID")).toHaveValue("A"); // the letter label parses back
   await fillEnd(dlg, "Site A end", oldA);
   await fillEnd(dlg, "Site B end", oldB);
   await dlg.getByRole("button", { name: "Save" }).click();

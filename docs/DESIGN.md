@@ -63,7 +63,7 @@ Segment facts are only the two site names and the distance. No numbers row, no l
 - One row per core everywhere (no ranges); the core number sits centred under "Cores". (Owner, 3 Nov 2026.)
 - Unassigned row: a reservation for a number of cores whose core numbers are not picked yet (Excel import).
   Shown as "4 cores" in the Unassigned group.
-- Row click opens core details (side panel; admin has "Add test" for a Measured loss test: dB, test date, test type, field team): customer, planner, SRF, ports both ends (an admin picks FDF with Frame, Mod, Tray, Port, or ODF with Number, Port, each a number or letters; no free text), "Measured loss",
+- Row click opens core details (side panel; admin has "Add test" for a Measured loss test: dB, test date, test type, field team): customer, planner, SRF, ports both ends (an admin picks FDF with FDF ID, Mod, Tray, Port, or ODF with ODF ID, Port, each a number or letters; no free text), "Measured loss",
   "Calculated loss", test date, history, Keep, Release.
 
 ### Reserve box (modal over Inventory)
