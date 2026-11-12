@@ -1,9 +1,14 @@
-// MapLibre basemap from the self-hosted PMTiles extract (scripts/get-tiles.sh). Loaded with a dynamic import so the
-// SVG fallback (no WebGL, no tiles) never downloads MapLibre. Nothing here points outside the app origin.
-import { addProtocol, Map as MlMap, setWorkerUrl, type ExpressionSpecification, type StyleSpecification } from "maplibre-gl";
+// MapLibre basemap from the self-hosted PMTiles extract (scripts/get-tiles.sh). The extract covers the whole pan
+// area; a grey mask fades everything outside the Malaysia-Singapore-Brunei outline (malaysiaOutline.json).
+// Loaded with a dynamic import so the SVG fallback (no WebGL, no tiles) never downloads MapLibre.
+// Nothing here points outside the app origin.
+import {
+  addProtocol, Map as MlMap, setWorkerUrl, type ExpressionSpecification, type GeoJSONSourceSpecification,
+  type StyleSpecification } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?url";
 import { Protocol } from "pmtiles";
+import malaysiaOutline from "./malaysiaOutline.json";
 
 export const PMTILES = "/map/malaysia.pmtiles";
 export const GLYPH_PROBE = "/map/fonts/Noto Sans Regular/0-255.pbf";
@@ -19,12 +24,27 @@ const PATHS = ["path"]; // footway, pedestrian, steps, sidewalk, crossing, cycle
 const LANDMARKS = ["station", "hospital", "mall", "university", "college", "stadium", "police", "fire_station"];
 const zw = (z0: number, w0: number, z1: number, w1: number): ExpressionSpecification => ["interpolate", ["exponential", 1.6], ["zoom"], z0, w0, z1, w1];
 
+// The whole world with the Malaysia-Singapore-Brunei outline cut out as a hole. Filled grey over the neighbours so
+// the three countries stand out while the tiles still draw everything in the pan area.
+function outsideOutlineMask(): GeoJSONSourceSpecification["data"] {
+  const world = [[-180, -85], [180, -85], [180, 85], [-180, 85], [-180, -85]];
+  const outlineRing = malaysiaOutline.geometry.coordinates[0];
+  return {
+    type: "Feature",
+    properties: {},
+    geometry: { type: "Polygon", coordinates: [world, outlineRing] },
+  };
+}
+
 function style(glyphs: boolean): StyleSpecification {
   const src = "pm";
   const kind = (k: string[]): ExpressionSpecification => ["in", ["get", "kind"], ["literal", k]];
   const s: StyleSpecification = {
     version: 8,
-    sources: { [src]: { type: "vector", url: `pmtiles://${location.origin}${PMTILES}`, attribution: "© OpenStreetMap" } },
+    sources: {
+      [src]: { type: "vector", url: `pmtiles://${location.origin}${PMTILES}`, attribution: "© OpenStreetMap" },
+      mask: { type: "geojson", data: outsideOutlineMask() },
+    },
     layers: [
       { id: "water-bg", type: "background", paint: { "background-color": "#dbe3ec" } },
       { id: "earth", type: "fill", source: src, "source-layer": "earth", paint: { "fill-color": "#f2f4f7" } },
@@ -45,6 +65,8 @@ function style(glyphs: boolean): StyleSpecification {
         paint: { "line-color": "#d3d8de", "line-width": zw(5, 0.4, 18, 16) } },
       { id: "boundaries", type: "line", source: src, "source-layer": "boundaries", filter: ["<=", ["get", "kind_detail"], 4],
         paint: { "line-color": "#a3a9b2", "line-width": 1, "line-dasharray": [3, 2] } },
+      { id: "outside-outline", type: "fill", source: "mask",
+        paint: { "fill-color": "#cfd3d9", "fill-opacity": 0.55 } },
     ],
   };
   if (glyphs) {
