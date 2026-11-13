@@ -335,7 +335,7 @@ def test_apply_is_all_or_nothing(client, admin, db, monkeypatch):
             raise RuntimeError("boom")
         return out
 
-    monkeypatch.setattr(sm, "apply_sheet", boom)
+    monkeypatch.setattr(sm.apply, "apply_sheet", boom)
     r = post(client, workbook([site("AAAA")], [dc("DC One", "AAAA", 3.3, 101.8)]))
     uid = r.json()["upload_id"]
     with pytest.raises(RuntimeError):
