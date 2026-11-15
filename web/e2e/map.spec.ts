@@ -1,7 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
 import { signIn } from "./helpers";
 
-// Map card (TASK-054, TASK-055). Dev seed + seed_dev_network: 19 segments with coordinates, all road-shaped, 2 not drawn (Kuantan Hut).
+// Map card (TASK-054, TASK-055). Dev seed + seed_dev_network: 22 segments with coordinates (3 inside the DEV campuses),
+// all road-shaped, 2 not drawn (Kuantan Hut).
+const DRAWN = 22;
 const SEGMENT = "DEV Kuala Lumpur DC - DEV Cyberjaya DC"; // in the dense KL cluster
 const FAR = "DEV Ipoh Exchange - DEV Teluk Intan Hut"; // long and N-S: its chip is never decluttered
 const map = (page: Page) => page.getByTestId("network-map");
@@ -32,16 +34,31 @@ const settle = async (page: Page) => { if ((await mode(page)) === "gl") await pa
 
 test.use({ viewport: { width: 1440, height: 900 } });
 
+// Site markers plus the sites inside count badges and under campus labels (their count badge).
+async function drawnSiteCount(page: Page): Promise<number> {
+  const markers = await map(page).getByTestId("map-site").count();
+  const badgeTexts = await map(page).getByTestId("map-badge").allTextContents();
+  const badged = badgeTexts.reduce((total, text) => total + Number(text), 0);
+  const campusTexts = await map(page).locator("[data-testid=map-sector-label] .msector-n").allTextContents();
+  const underLabels = campusTexts.reduce((total, text) => total + Number(text), 0);
+  return markers + badged + underLabels;
+}
+
+type MapSites = { features: { properties: { site_id: number; name: string; cluster?: string | null } }[] };
+const mapSites = async (page: Page): Promise<MapSites> => (await page.request.get("/api/map/sites")).json();
+
 test("map loads with no request leaving the app origin; chips, sites, layers and key", async ({ page }) => {
   const outside = await offline(page);
   await signIn(page);
   const m = await mode(page);
   test.info().annotations.push({ type: "map path", description: m ?? "" });
-  await expect(chips(page)).toHaveCount(19); // in the DOM; chips that would overlap are hidden until zoomed in
+  await expect(chips(page)).toHaveCount(DRAWN); // in the DOM; chips that would overlap are hidden until zoomed in
   await expect.poll(() => chips(page).filter({ visible: true }).count()).toBeGreaterThanOrEqual(2); // after the first fit eases in
-  await expect(map(page).getByTestId("map-site")).toHaveCount(13);
-  await expect(map(page).getByRole("button", { name: /^Site DEV Kuala Lumpur DC, data centre, 6 segments$/ })).toBeVisible();
-  await expect(map(page).getByRole("button", { name: /^Site DEV Penang Tower, trunk site/ })).toBeVisible();
+  // Sites closer than 16px share a count badge and campus sites sit under their label: together they cover every site.
+  const siteTotal = (await mapSites(page)).features.length;
+  await expect.poll(() => drawnSiteCount(page)).toBe(siteTotal);
+  await expect(map(page).getByRole("button", { name: /DEV Kuala Lumpur DC/ }).first()).toBeVisible();
+  await expect(map(page).getByRole("button", { name: /DEV Penang Tower/ }).first()).toBeVisible();
   await expect(chip(page, FAR)).toHaveText(/^(\d+|–)$/); // the free-core number only, no icon
   await expect(chips(page).locator("svg")).toHaveCount(0);
   await expect(page.getByTestId("map-not-drawn")).toContainText("2 segments not on the map (no coordinates)");
@@ -57,7 +74,7 @@ test("map loads with no request leaving the app origin; chips, sites, layers and
     await expect(page.getByRole("checkbox", { name: type, exact: true })).toBeChecked();
   }
   // Site layers: hiding TOC removes the TOC marker, showing it brings it back
-  const toc = page.getByRole("button", { name: /^Site DEV Bukit Jalil TOC, TOC,/ });
+  const toc = map(page).getByRole("button", { name: /DEV Bukit Jalil TOC/ }); // its marker, or the badge it shares
   await expect(toc).toBeVisible();
   await page.getByRole("checkbox", { name: "TOC", exact: true }).uncheck();
   await expect(toc).toHaveCount(0);
@@ -74,7 +91,7 @@ test("map loads with no request leaving the app origin; chips, sites, layers and
     await page.getByRole("checkbox", { name: type, exact: true }).check();
   }
   await page.getByRole("button", { name: "Layers" }).click();
-  await expect(chips(page)).toHaveCount(19);
+  await expect(chips(page)).toHaveCount(DRAWN);
   await page.screenshot({ path: "e2e/screenshots/map-overview.png" });
   expect(outside).toEqual([]);
 });
@@ -104,7 +121,7 @@ test("clicking a chip selects the segment; Enter on a chip too; Esc clears", asy
 
 test("Layers: route types and trunk routes hide their lines; turning off the selected segment's layer unselects it", async ({ page }) => {
   await signIn(page);
-  await expect(chips(page)).toHaveCount(19);
+  await expect(chips(page)).toHaveCount(DRAWN);
   const segs: { id: number; route_type: string | null; route: string | null }[] =
     await (await page.request.get("/api/segments")).json();
   const lines = page.locator("[data-testid=map-line]");
@@ -182,7 +199,7 @@ test("missing basemap file: note shown, segments still drawn, search still works
   await expect(map(page)).toHaveAttribute("data-mode", "svg");
   const note = page.getByTestId("map-note");
   await expect(note).toContainText(/Basemap not installed on this machine: run \.\/scripts\/get-tiles\.sh|no WebGL/);
-  await expect(chips(page)).toHaveCount(19);
+  await expect(chips(page)).toHaveCount(DRAWN);
   const search = page.getByRole("region", { name: "Site A to B" });
   await search.getByLabel("Site A").fill("DEV Ipoh Exchange");
   await search.getByLabel("Site B").fill("DEV Penang Tower");
@@ -196,7 +213,7 @@ test("no WebGL: the SVG fallback draws segments and selects by click", async ({ 
   await signIn(page);
   await expect(map(page)).toHaveAttribute("data-mode", "svg");
   await expect(page.getByTestId("map-note")).toContainText("no WebGL");
-  await expect(chips(page)).toHaveCount(19);
+  await expect(chips(page)).toHaveCount(DRAWN);
   await chip(page, FAR).click();
   await expect(page.locator("#segment-h", { hasText: FAR })).toBeVisible();
   await page.getByRole("button", { name: "Zoom in" }).click();
@@ -207,7 +224,7 @@ test("no WebGL: the SVG fallback draws segments and selects by click", async ({ 
 
 test("map page has no horizontal scroll at 1200, 1280, 1440 and 1920", async ({ page }) => {
   await signIn(page);
-  await expect(chips(page)).toHaveCount(19);
+  await expect(chips(page)).toHaveCount(DRAWN);
   for (const w of [1200, 1280, 1440, 1920]) {
     await page.setViewportSize({ width: w, height: 900 });
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
@@ -217,7 +234,7 @@ test("map page has no horizontal scroll at 1200, 1280, 1440 and 1920", async ({ 
 // The map stage is the growing child of its card: no blank band under the map, in each state (TASK-054 follow-up).
 test("the stage fills the map card: nothing, segment and route selected", async ({ page }) => {
   await signIn(page);
-  await expect(chips(page)).toHaveCount(19);
+  await expect(chips(page)).toHaveCount(DRAWN);
   const gaps = () => page.evaluate(() => {
     const card = document.querySelector('section[aria-label="Network map"]')!;
     const body = card.lastElementChild!; // NetworkMap root: stage, then the note line and "not on the map"
@@ -294,7 +311,7 @@ test("zoomed to 17 near DEV Kuala Lumpur DC the buildings layer draws", async ({
 
 test("Region filter that leaves out the selected segment unselects it", async ({ page }) => {
   await signIn(page);
-  await expect(chips(page)).toHaveCount(19);
+  await expect(chips(page)).toHaveCount(DRAWN);
   const segs: { id: number; region: string | null }[] = await (await page.request.get("/api/segments")).json();
   const picked = segs.find((s) => s.region)!;
   const other = segs.find((s) => s.region && s.region !== picked.region)!.region!;
@@ -305,4 +322,107 @@ test("Region filter that leaves out the selected segment unselects it", async ({
   await map(page).getByLabel("Region").selectOption(other);
   await expect(page.locator("[data-testid=map-line][data-selected=true]")).toHaveCount(0);
   expect(page.url()).not.toContain("#segment=");
+});
+
+// Campuses from the DEV seed (seed_dev_network): read only, nothing is written.
+const CAMPUS = "DEV KL Campus";
+
+test("campuses: label with site count zoomed out, outline and sites zoomed in, Layers chip turns one off", async ({ page }) => {
+  await signIn(page);
+  await mode(page);
+  const sectors: { features: { properties: Record<string, unknown> & { cluster: string; site_count: number } }[] } =
+    await (await page.request.get("/api/map/sectors")).json();
+  test.skip(!sectors.features.some((sector) => sector.properties.cluster === CAMPUS), "DEV campuses not seeded");
+  // Only a campus of 2 or more sites has a sector, and it carries no free-core number.
+  for (const sector of sectors.features) {
+    expect(sector.properties.site_count).toBeGreaterThanOrEqual(2);
+    expect(sector.properties).not.toHaveProperty("free_cores");
+  }
+  const members = (await mapSites(page)).features
+    .filter((site) => site.properties.cluster === CAMPUS)
+    .map((site) => site.properties.name);
+  const label = map(page).getByRole("button", { name: new RegExp(`^Cluster ${CAMPUS}, ${members.length} sites:`) });
+  const klMarkerOrBadge = map(page).getByRole("button", { name: /^(Site |\d+ sites: .*)DEV Kuala Lumpur DC/ });
+  // Zoomed out: one label per campus, a count badge with its name; the campus's sites are under it, other sites are drawn.
+  await expect(map(page).getByTestId("map-sector-label")).toHaveCount(sectors.features.length);
+  await expect(label).toBeVisible();
+  await expect(label.locator(".msector-n")).toHaveText(String(members.length));
+  await expect(label.locator(".msector-name")).toHaveText(CAMPUS);
+  // Small: a count badge with the name as text beside it, not a box over the site names.
+  const labelBox = (await label.boundingBox())!;
+  expect(labelBox.width).toBeLessThanOrEqual(24);
+  expect(labelBox.height).toBeLessThanOrEqual(24);
+  await expect(klMarkerOrBadge).toHaveCount(0);
+  await expect(map(page).getByRole("button", { name: /^Site DEV Ipoh Exchange,/ })).toBeVisible();
+  await settle(page);
+  await page.screenshot({ path: "e2e/screenshots/map-campus-out.png" });
+  // The label zooms to the campus: the label goes, the outline and each member site show.
+  await label.click();
+  await expect(label).toHaveCount(0);
+  for (const name of members) {
+    await expect(map(page).getByRole("button", { name: new RegExp(`^Site ${name},`) })).toBeVisible();
+  }
+  await expect(map(page).locator(`[data-testid=map-sector][data-cluster="${CAMPUS}"]`)).toHaveCount(1);
+  await expect(map(page).getByTestId("map-site").locator(".shape.dc").first()).toHaveCSS("width", "10px");
+  await settle(page);
+  await page.screenshot({ path: "e2e/screenshots/map-campus-in.png" });
+  // Layers: the campus chip off draws no label or outline and shows its sites at every zoom.
+  await page.getByRole("button", { name: "Fit selection" }).click();
+  await expect(label).toBeVisible();
+  await page.getByRole("button", { name: "Layers" }).click();
+  const campusChip = page.getByRole("button", { name: `Cluster ${CAMPUS}`, exact: true });
+  await expect(campusChip).toHaveAttribute("aria-pressed", "true");
+  await campusChip.click();
+  await expect(campusChip).toHaveAttribute("aria-pressed", "false");
+  await expect(map(page).locator(`[data-testid=map-sector][data-cluster="${CAMPUS}"]`)).toHaveCount(0);
+  await expect(label).toHaveCount(0);
+  await expect(klMarkerOrBadge.first()).toBeVisible();
+});
+
+// Crowding: DEV Bukit Jalil TOC is moved to about 2 m from DEV Tanjung Malim Hut (no campus), close enough to still
+// overlap at max zoom, for the test, then put back.
+type SiteEdit = { lat: number; lon: number };
+
+async function moveSite(page: Page, siteId: number, place: SiteEdit) {
+  const response = await page.request.post(`/api/admin/sites/${siteId}`, { data: { ...place, reason: "e2e crowd" } });
+  expect([200, 400]).toContain(response.status());
+}
+
+test("crowded sites: a badge zooms in; at max zoom the crowd spreads into a named list reached by Tab", async ({ page }) => {
+  await signIn(page, "admin1");
+  const sites = await mapSites(page);
+  const idOf = (name: string) => sites.features.find((site) => site.properties.name === name)!.properties.site_id;
+  const tocId = idOf("DEV Bukit Jalil TOC");
+  const original: SiteEdit = await (await page.request.get(`/api/admin/sites/${tocId}`)).json();
+  const anchor: SiteEdit = await (await page.request.get(`/api/admin/sites/${idOf("DEV Tanjung Malim Hut")}`)).json();
+  await moveSite(page, tocId, { lat: anchor.lat + 0.00002, lon: anchor.lon + 0.00001 });
+  try {
+    await page.reload();
+    await mode(page);
+    const badge = map(page).getByRole("button", { name: /^2 sites: .*DEV Bukit Jalil TOC/ });
+    await expect(badge).toBeVisible();
+    await expect(badge).toHaveText("2");
+    // Each click zooms in 3 levels; only at max zoom is the crowd a stacked list instead of a badge.
+    for (let click = 0; click < 6; click++) {
+      if ((await badge.count()) === 0) {
+        break;
+      }
+      await badge.click();
+      await page.waitForTimeout(400); // the camera eases
+    }
+    await expect(badge).toHaveCount(0);
+    const spread = map(page).locator("[data-testid=map-site].spread");
+    await expect(spread).toHaveCount(2);
+    const names = await spread.locator(".code").allTextContents();
+    expect(names.sort()).toEqual(["DEV Bukit Jalil TOC", "DEV Tanjung Malim Hut"]);
+    const first = spread.first();
+    await first.focus();
+    await page.keyboard.press("Tab");
+    await expect(spread.nth(1)).toBeFocused();
+    const box = (await first.boundingBox())!;
+    const clip = { x: box.x - 80, y: box.y - 50, width: 360, height: 140 };
+    await page.screenshot({ path: "e2e/screenshots/map-crowd-spread.png", clip });
+  } finally {
+    await moveSite(page, tocId, { lat: original.lat, lon: original.lon });
+  }
 });

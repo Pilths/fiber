@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { clusterColour, clustersOf } from "@/lib/mapClusters";
 import { KEY_LABEL, plural, ROUTE_LAYERS, SITE_LAYERS, trunkRoutesOf } from "@/lib/mapLayers";
 import type { NetworkMapState } from "@/lib/useNetworkMap";
 
@@ -7,23 +8,51 @@ import type { NetworkMapState } from "@/lib/useNetworkMap";
 const LAYERS_PANEL_CLASS =
   "absolute top-[38px] left-0 w-[270px] rounded-lg border border-line bg-white px-3.5 py-3";
 
-// The Layers panel: Routes (type tick boxes with their key swatch, trunk route chips) and Sites.
+// The set with `name` added, or removed when it was in already.
+function toggled(names: Set<string>, name: string): Set<string> {
+  const next = new Set(names);
+  if (next.has(name)) {
+    next.delete(name);
+  } else {
+    next.add(name);
+  }
+  return next;
+}
+
+// One on/off chip per cluster with a sector; off draws no sector and shows its sites at every zoom.
+function ClusterChips({ state }: { state: NetworkMapState }) {
+  const clusters = clustersOf(state.data.sectors?.features ?? []);
+  if (clusters.length === 0) {
+    return null;
+  }
+  return (
+    <fieldset className="mt-2.5">
+      <legend className="lbl mb-1">Clusters</legend>
+      <div className="flex flex-wrap gap-1.5">
+        {clusters.map((cluster) => (
+          <button key={cluster} type="button" className="chip h-6! px-2! text-xs"
+            aria-pressed={!state.clusterOff.has(cluster)} aria-label={`Cluster ${cluster}`}
+            onClick={() => state.setClusterOff(toggled(state.clusterOff, cluster))}>
+            <span className="cluster-swatch" style={{ background: clusterColour(clusters, cluster) }} />
+            {cluster}
+          </button>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
+
+// The Layers panel: Routes (type tick boxes with their key swatch, trunk route chips), Sites and Clusters.
 function LayersPanel({ state }: { state: NetworkMapState }) {
   const { routeLayers, trunkOff, siteLayers } = state;
   const trunkRoutes = trunkRoutesOf(state.features);
   const toggleTrunk = (route: string) => {
-    const next = new Set(trunkOff);
-    if (next.has(route)) {
-      next.delete(route);
-    } else {
-      next.add(route);
-    }
-    state.setTrunkOff(next);
+    state.setTrunkOff(toggled(trunkOff, route));
   };
   return (
     <div id="map-layers" hidden={!state.layersOpen} className={LAYERS_PANEL_CLASS}>
       <fieldset>
-        <legend className="lbl mb-1.5">Routes</legend>
+        <legend className="lbl mb-1">Routes</legend>
         {ROUTE_LAYERS.map(([type, swatch]) => (
           <div key={type} className="flex items-center gap-2">
             <label className="lrow flex-1">
@@ -46,7 +75,7 @@ function LayersPanel({ state }: { state: NetworkMapState }) {
         ))}
       </fieldset>
       <fieldset className="mt-2.5">
-        <legend className="lbl mb-1.5">Sites</legend>
+        <legend className="lbl mb-1">Sites</legend>
         {SITE_LAYERS.map(([kind, label, shape]) => (
           <label key={kind} className="lrow">
             <input type="checkbox" checked={siteLayers[kind]}
@@ -56,6 +85,7 @@ function LayersPanel({ state }: { state: NetworkMapState }) {
           </label>
         ))}
       </fieldset>
+      <ClusterChips state={state} />
     </div>
   );
 }
@@ -63,8 +93,11 @@ function LayersPanel({ state }: { state: NetworkMapState }) {
 export function MapControls({ state, tools }: { state: NetworkMapState; tools?: ReactNode }) {
   const full = state.full;
   const fullIcon = full ? "M6 2v4H2M10 2v4h4M6 14v-4H2M10 14v-4h4" : "M2 6V2h4M14 6V2h-4M2 10v4h4M14 10v4h-4";
+  // The toolbar spans the map's width so the controls wrap onto a second row instead of running past the right
+  // edge; the gaps between them let clicks through to the map.
   return (
-    <div className="absolute top-3 left-3 z-10 flex items-start gap-2">
+    <div className="pointer-events-none absolute top-3 right-3 left-3 z-10 flex flex-wrap items-start gap-2
+      *:pointer-events-auto">
       <div className="relative">
         <button type="button" className="mbtn" aria-expanded={state.layersOpen} aria-controls="map-layers"
           onClick={() => state.setLayersOpen((open) => !open)}>

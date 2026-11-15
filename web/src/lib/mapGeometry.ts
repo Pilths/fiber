@@ -1,5 +1,6 @@
 import { chipText, routeLayerOn, type SegmentProps } from "@/lib/mapLayers";
 import type { NetworkMapState } from "@/lib/useNetworkMap";
+import type { SectorLabel, SiteLayout } from "@/lib/clusterLayout";
 
 // Web Mercator at 512 px tiles, the same as MapLibre, so the overlay lines up with the basemap.
 
@@ -10,7 +11,8 @@ export type Size = { w: number; h: number };
 
 export const MALAYSIA: Bounds = [99.5, 0.8, 119.5, 7.5];
 export const TILE = 512;
-const MIN_ZOOM = 4;
+export const MIN_ZOOM = 4;
+export const MAX_ZOOM = 18;
 const MAX_FIT_ZOOM = 12;
 
 export function mercatorX(lng: number): number {
@@ -30,12 +32,18 @@ function pixelsPerWorld(zoom: number): number {
   return TILE * 2 ** zoom;
 }
 
-export function fitView([west, south, east, north]: Bounds, width: number, height: number, pad = 60): Camera {
+export function fitView(
+  [west, south, east, north]: Bounds,
+  width: number,
+  height: number,
+  pad = 60,
+  maxZoom = MAX_FIT_ZOOM,
+): Camera {
   const spanX = Math.max(mercatorX(east) - mercatorX(west), 1e-4);
   const spanY = Math.max(mercatorY(south) - mercatorY(north), 1e-4);
   const scaleX = (width - 2 * pad) / (spanX * TILE);
   const scaleY = (height - 2 * pad) / (spanY * TILE);
-  const zoom = Math.min(MAX_FIT_ZOOM, Math.max(MIN_ZOOM, Math.log2(Math.min(scaleX, scaleY))));
+  const zoom = Math.min(maxZoom, Math.max(MIN_ZOOM, Math.log2(Math.min(scaleX, scaleY))));
   const lat = latitudeOf((mercatorY(south) + mercatorY(north)) / 2);
   return { lng: (west + east) / 2, lat, zoom };
 }
@@ -106,7 +114,8 @@ export function makePlacer(reserved: number[][]) {
 
 // Drawing the network overlay: which lines to draw where, and which chips and names fit.
 
-const SITE_HALF = 11; // half the marker box, in px
+const SITE_HALF = 12; // half the marker box, in px
+const NAME_BELOW = 17; // centre of a site name under its marker, in px
 
 // Areas kept free of chips and names: the controls (top left) and the key (bottom left).
 function reservedAreas(height: number): number[][] {
@@ -142,34 +151,66 @@ export function drawnLines(state: NetworkMapState, visible: (segment: SegmentPro
   });
 }
 
-// Declutter, greedy: site markers, then chips (selected first), then site names. A chip or name that would
-// overlap something already placed is hidden (visibility: hidden) until the user zooms in.
-export function declutter(state: NetworkMapState, lines: DrawnLine[], sitePoints: Point[]) {
+function chipBox(line: DrawnLine, named: boolean): [number, number, number, number] {
+  const { segment, selected, mid } = line;
+  const chipWidth = 20 + 7.5 * chipText(segment).length;
+  if (selected && named) {
+    const labelWidth = Math.max(chipWidth, 7.5 * segment.name.length + 16);
+    return [mid[0], mid[1] - 11, labelWidth, 46];
+  }
+  return [mid[0], mid[1], chipWidth + 4, 24];
+}
+
+function nameWidth(name: string): number {
+  return 7.2 * name.length + 12;
+}
+
+// Declutter, greedy: site markers, badges and spread lists, then the selected chips, then sector labels, then the
+// other chips, then site names. A chip or name that would overlap something already placed is hidden
+// (visibility: hidden) until the user zooms in. `pinned` (customer mode): chips that always show, over a marker if
+// need be, with no name above them.
+export function declutter(
+  state: NetworkMapState,
+  lines: DrawnLine[],
+  layout: SiteLayout,
+  labels: SectorLabel[],
+  pinned: ReadonlySet<number> = new Set(),
+) {
   const placer = makePlacer(reservedAreas(state.size.h));
-  for (const [x, y] of sitePoints) {
+  const sites = state.data.sites?.features ?? [];
+  const markerPoints = [...layout.sites.map((site) => site.point), ...layout.badges.map((badge) => badge.crowd.center)];
+  for (const [x, y] of markerPoints) {
     placer.block([x - SITE_HALF, y - SITE_HALF, x + SITE_HALF, y + SITE_HALF]);
   }
+  for (const site of layout.sites.filter((placed) => placed.spread)) {
+    const [x, y] = site.point;
+    placer.block([x, y - 9, x + SITE_HALF + nameWidth(sites[site.index].properties.name), y + 9]);
+  }
   const chipShown = new Set<number>();
-  const shown = lines.filter((line) => line.show);
-  const byPriority = shown.sort((a, b) => Number(b.selected) - Number(a.selected));
-  for (const { segment, selected, mid } of byPriority) {
-    const chipWidth = 20 + 7.5 * chipText(segment).length;
-    let fits: boolean;
-    if (selected) {
-      const labelWidth = Math.max(chipWidth, 7.5 * segment.name.length + 16);
-      fits = placer.fits(mid[0], mid[1] - 11, labelWidth, 46);
-    } else {
-      fits = placer.fits(mid[0], mid[1], chipWidth + 4, 24);
+  const placeChip = (line: DrawnLine) => {
+    const isPinned = pinned.has(line.segment.segment_id);
+    const [x, y, width, height] = chipBox(line, !isPinned);
+    if (isPinned) {
+      placer.block([x - width / 2, y - height / 2, x + width / 2, y + height / 2]);
+      chipShown.add(line.segment.segment_id);
+    } else if (placer.fits(x, y, width, height)) {
+      chipShown.add(line.segment.segment_id);
     }
-    if (fits) {
-      chipShown.add(segment.segment_id);
+  };
+  const shown = lines.filter((line) => line.show);
+  shown.filter((line) => line.selected).forEach(placeChip);
+  for (const label of labels) {
+    placer.block(label.box);
+  }
+  shown.filter((line) => !line.selected).forEach(placeChip);
+  const nameShown = new Set<number>();
+  for (const site of layout.sites.filter((placed) => !placed.spread)) {
+    const [x, y] = site.point;
+    const fits = placer.fits(x, y + NAME_BELOW, nameWidth(sites[site.index].properties.name), 18);
+    if (fits || site.end) {
+      nameShown.add(site.index);
     }
   }
-  const sites = state.data.sites?.features ?? [];
-  const nameShown = sitePoints.map(([x, y], i) => {
-    const nameWidth = 7.2 * sites[i].properties.name.length + 12;
-    return placer.fits(x, y + 33, nameWidth, 18);
-  });
   return { chipShown, nameShown };
 }
 

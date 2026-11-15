@@ -230,6 +230,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/customers/{customer_id}/usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Customer Usage */
+        get: operations["customer_usage_api_customers__customer_id__usage_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/reservations": {
         parameters: {
             query?: never;
@@ -1024,6 +1041,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/map/sectors": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Sectors */
+        get: operations["sectors_api_map_sectors_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/map/segments/{segment_id}/kmz": {
         parameters: {
             query?: never;
@@ -1370,6 +1404,17 @@ export interface components {
             customer: components["schemas"]["Customer"] | null;
             /** Similar */
             similar: components["schemas"]["Customer"][];
+        };
+        /** CustomerUsage */
+        CustomerUsage: {
+            /** Customer Id */
+            customer_id: number;
+            /** Name */
+            name: string;
+            /** Segments */
+            segments: components["schemas"]["SegmentUsage"][];
+            /** Reservations */
+            reservations: components["schemas"]["ReservationUsage"][];
         };
         /** Edited */
         Edited: {
@@ -1746,6 +1791,19 @@ export interface components {
             /** Release Requested Cores */
             release_requested_cores: number[];
         };
+        /** ReservationUsage */
+        ReservationUsage: {
+            /** Reservation Id */
+            reservation_id: number;
+            /** Srf Id */
+            srf_id: string | null;
+            /** Planned Date */
+            planned_date: string | null;
+            /** Used Cores */
+            used_cores: number;
+            /** Segments */
+            segments: components["schemas"]["SegmentUsage"][];
+        };
         /** RouteCount */
         RouteCount: {
             /** Measured */
@@ -1813,6 +1871,8 @@ export interface components {
             segment_id?: number | null;
             /** Core Id */
             core_id?: number | null;
+            /** Customer Id */
+            customer_id?: number | null;
         };
         /** SegmentBody */
         SegmentBody: {
@@ -2048,6 +2108,13 @@ export interface components {
             /** Fiber Cut */
             fiber_cut: boolean;
         };
+        /** SegmentUsage */
+        SegmentUsage: {
+            /** Segment Id */
+            segment_id: number;
+            /** Used Cores */
+            used_cores: number;
+        };
         /** SheetOut */
         SheetOut: {
             /**
@@ -2082,6 +2149,8 @@ export interface components {
             lon?: number | null;
             /** Region */
             region?: string | null;
+            /** Cluster */
+            cluster?: string | null;
             /** Active */
             active?: boolean | null;
         };
@@ -2099,6 +2168,8 @@ export interface components {
             lon: number | null;
             /** Region */
             region: string | null;
+            /** Cluster */
+            cluster: string | null;
             /** Active */
             active: boolean;
             /** History */
@@ -2864,6 +2935,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CustomerResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    customer_usage_api_customers__customer_id__usage_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-dev-user"?: string | null;
+            };
+            path: {
+                customer_id: number;
+            };
+            cookie?: {
+                fiber_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerUsage"];
                 };
             };
             /** @description Validation Error */
@@ -4652,6 +4758,41 @@ export interface operations {
         };
     };
     sites_api_map_sites_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-dev-user"?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                fiber_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sectors_api_map_sectors_get: {
         parameters: {
             query?: never;
             header?: {

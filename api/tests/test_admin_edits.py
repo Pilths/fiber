@@ -421,3 +421,12 @@ def test_fiber_cut_needs_review_and_existing_actions_not_blocked(client, w, db):
     assert [i["reservation"]["id"] for i in client.get("/api/needs-review", headers=H("planner1")).json()] == [counted]
 
 
+
+
+def test_site_cluster_trimmed_set_and_cleared(client, w, db):
+    a = one(db, "SELECT id FROM sites WHERE name = 'A'")
+    assert post(client, f"sites/{a}", cluster="  North  Klang ", reason="x").json()["changed"] == ["cluster"]
+    assert one(db, f"SELECT details->>'cluster' FROM sites WHERE id = {a}") == "North Klang"
+    assert post(client, f"sites/{a}", cluster="North Klang", reason="x").status_code == 400  # unchanged
+    assert post(client, f"sites/{a}", cluster=" ", reason="x").json()["changed"] == ["cluster"]
+    assert one(db, f"SELECT details->>'cluster' FROM sites WHERE id = {a}") is None

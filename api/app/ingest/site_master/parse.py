@@ -67,6 +67,14 @@ def _site_kind(site_type: Any) -> str | None:
     return SITE_KINDS.get(str(site_type).strip().casefold())
 
 
+def _normalise_cluster(details: dict[str, Any]) -> None:
+    """Cluster is optional: key always "cluster", spaces trimmed and collapsed, blank not stored."""
+    for header in [header for header in details if hkey(header) == "cluster"]:
+        value = " ".join(str(details.pop(header)).split())
+        if value:
+            details["cluster"] = value
+
+
 def _parse_row(kind: str, headers: list[str], values: tuple[Any, ...]) -> Item:
     own = SHEETS[kind][3]
     raw = {header: _json(value) for header, value in zip(headers, values) if header and not blank(value)}
@@ -95,6 +103,7 @@ def _parse_row(kind: str, headers: list[str], values: tuple[Any, ...]) -> Item:
         for header, value in zip(headers, values)
         if header and hkey(header) not in own and not isblank(value)
     }
+    _normalise_cluster(details)
     parsed: dict[str, Any] = {"key": key, "lat": lat, "lon": lon, "details": details}
     if not key:
         name_header = "site_name" if kind == "sites" else "DC Name / Link"

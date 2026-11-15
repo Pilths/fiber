@@ -5,8 +5,10 @@ import { EditSiteDialog, EditSegmentDialog, type SegmentFocus } from "@/componen
 import { AssignDialog } from "@/components/AssignDialog";
 import { CoreDrawer } from "@/components/CoreDrawer";
 import { MapFilters } from "@/components/FindCard";
+import type { SearchResult } from "@/components/GlobalSearch";
 import { Header } from "@/components/Header";
 import { CoresTable, SegmentDiagram } from "@/components/NetworkDetail";
+import { CustomerChip } from "@/components/MapOverlay";
 import { NetworkMap } from "@/components/NetworkMap";
 import { Approvals, MyReservations } from "@/components/Reservations";
 import { ReserveBox } from "@/components/ReserveBox";
@@ -15,6 +17,7 @@ import { Upload } from "@/components/Upload";
 import { Users } from "@/components/Users";
 import { inFilter, segmentName } from "@/lib/status";
 import { useAuthGate, type Me } from "@/lib/useAuthGate";
+import { useCustomerHighlight, type CustomerHighlight } from "@/lib/useCustomerHighlight";
 import { useDashboardView } from "@/lib/useDashboardView";
 import { useInventory, type Detail, type Inventory } from "@/lib/useInventory";
 import type { RouteLeg } from "@/lib/useReserveBox";
@@ -100,6 +103,7 @@ function Dashboard({ me, onSignOut, onChangePassword }: DashboardProps) {
   const inventory = useInventory(dashboard.view, version);
   const dialogs = useEditDialogs();
   const admin = adminActions(me, inventory, dialogs);
+  const customerMode = useCustomerHighlight(inventory.found != null, inventory.setError);
   const isAdmin = me.role === "admin";
   const { view, refreshBell } = dashboard;
   const { detail, segmentId } = inventory;
@@ -108,11 +112,17 @@ function Dashboard({ me, onSignOut, onChangePassword }: DashboardProps) {
     setVersion((current) => current + 1);
     refreshBell();
   };
-  const onPick = (result: { segment_id?: number | null; core_id?: number | null }) => {
+  const onPick = (result: SearchResult) => {
     if (result.segment_id == null) {
       return;
     }
     dashboard.setView("map");
+    if (result.type === "customer" && result.customer_id != null) {
+      inventory.clearSelection();
+      customerMode.show(result.customer_id);
+      return;
+    }
+    customerMode.clear();
     inventory.openFromSearch(result.segment_id, result.core_id ?? null);
   };
   const drawn = detail?.cores.find((core) => core.id === inventory.drawerCore);
@@ -138,7 +148,8 @@ function Dashboard({ me, onSignOut, onChangePassword }: DashboardProps) {
       )}
       {view === "map" && (
         <InventoryView me={me} inventory={inventory} admin={admin} version={version}
-          onAssign={dialogs.setAssign} />
+          onAssign={dialogs.setAssign} customer={customerMode.customer} onClearCustomer={customerMode.clear}
+          onPickRequest={customerMode.pickRequest} />
       )}
       {detail && drawn && (
         <CoreDrawerForSegment inventory={inventory} detail={detail} coreId={drawn.id} me={me}
@@ -187,17 +198,41 @@ function CoreDrawerForSegment({ inventory, detail, coreId, me, onChanged }: {
   );
 }
 
-function InventoryView({ me, inventory, admin, version, onAssign }: {
+// Customer mode selects all the customer's segments (plus a segment opened from the map) and fits to them.
+function mapSelection(inventory: Inventory, customer: CustomerHighlight | null) {
+  const found = inventory.found;
+  if (found) {
+    return { selectedIds: inventory.mapIds, routeKey: `found-${found.ids.join(",")}` };
+  }
+  if (!customer) {
+    return { selectedIds: inventory.mapIds, routeKey: null };
+  }
+  const selectedIds = [...new Set([...customer.used.keys(), ...inventory.mapIds])];
+  return { selectedIds, routeKey: `customer-${customer.id}` };
+}
+
+function InventoryView(props: {
   me: Me;
   inventory: Inventory;
   admin: AdminActions | null;
   version: number;
   onAssign: (hold: Assignable) => void;
+  customer: CustomerHighlight | null;
+  onClearCustomer: () => void;
+  onPickRequest: (requestId: number | null) => void;
 }) {
-  const { found, optionIds, detail, segmentId } = inventory;
-  const routeKey = found ? `found-${found.ids.join(",")}` : null;
-  const filters = (
-    <MapFilters segments={inventory.segments} filter={inventory.filter} onFilter={inventory.changeFilter} />
+  const { me, inventory, admin, version, onAssign, customer, onClearCustomer, onPickRequest } = props;
+  const { optionIds, detail, segmentId } = inventory;
+  const { selectedIds, routeKey } = mapSelection(inventory, customer);
+  const clearMap = () => {
+    inventory.clearSelection();
+    onClearCustomer();
+  };
+  const tools = (
+    <>
+      <MapFilters segments={inventory.segments} filter={inventory.filter} onFilter={inventory.changeFilter} />
+      {customer && <CustomerChip customer={customer} onPickRequest={onPickRequest} onClear={onClearCustomer} />}
+    </>
   );
   return (
     <main className="grid grid-cols-12 gap-4 px-6 pt-6 pb-10">
@@ -205,14 +240,15 @@ function InventoryView({ me, inventory, admin, version, onAssign }: {
         aria-describedby="map-instr">
         {/* ponytail: site clicks do nothing on the view-only map; wire them to Site A/B if planners ask */}
         <NetworkMap version={version} onSelectSegment={inventory.pickOnMap} onSite={() => {}}
-          onClear={inventory.clearSelection} selectedIds={inventory.mapIds} routeKey={routeKey}
+          onClear={clearMap} selectedIds={selectedIds} routeKey={routeKey}
+          customer={customer} onEmptyClick={customer ? clearMap : undefined}
           visible={(properties) => {
             if (optionIds) {
               return optionIds.has(properties.segment_id);
             }
             return inFilter(properties, inventory.filter);
           }}
-          tools={filters} />
+          tools={tools} />
       </section>
       {/* The panel fills the map card's height (absolute, scrolls inside),
           so the map alone sets the row height. */}

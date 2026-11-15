@@ -12,6 +12,7 @@ class SearchResult(BaseModel):
     label: str
     segment_id: int | None = None
     core_id: int | None = None
+    customer_id: int | None = None  # set for customer results
 
 
 class SegmentSummary(BaseModel):
@@ -113,3 +114,23 @@ class CustomerResult(BaseModel):
     created: bool
     customer: Customer | None
     similar: list[Customer]
+
+
+class SegmentUsage(BaseModel):
+    segment_id: int
+    used_cores: int
+
+
+class ReservationUsage(BaseModel):
+    reservation_id: int
+    srf_id: str | None
+    planned_date: date | None
+    used_cores: int
+    segments: list[SegmentUsage]
+
+
+class CustomerUsage(BaseModel):
+    customer_id: int
+    name: str
+    segments: list[SegmentUsage]
+    reservations: list[ReservationUsage]

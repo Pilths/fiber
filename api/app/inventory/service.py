@@ -7,11 +7,14 @@ from app.inventory.schemas import (
     CoreDetail,
     CoreHolderDetail,
     Customer,
+    CustomerUsage,
     Holder,
     Owner,
     SearchResult,
     SegmentDetail,
     SegmentSummary,
+    ReservationUsage,
+    SegmentUsage,
     UnassignedHold,
 )
 from app.link_type import ROUTE_TYPE_SQL
@@ -143,24 +146,97 @@ INSERT INTO customers (name, created_by) VALUES (:name, :user_id)
 ON CONFLICT (lower(name)) DO NOTHING RETURNING id, name
 """
 
-# Search: one query per key; each returns (label, segment_id, core_id).
+# Search: one query per key; each returns (label, segment_id, core_id, customer_id).
 # Customers are linked to segments through their reservations' cores (one hit per customer, first segment).
 SEARCH_CUSTOMER_SQL = """
-SELECT cu.name, min(c.segment_id), NULL::bigint FROM customers cu
+SELECT cu.name, COALESCE(min(c.segment_id), min(un.segment_id)), NULL::bigint, cu.id FROM customers cu
 LEFT JOIN reservations r ON r.customer_id = cu.id
 LEFT JOIN reservation_cores rc ON rc.reservation_id = r.id
 LEFT JOIN cores c ON c.id = rc.core_id
+LEFT JOIN reservation_unassigned_v un ON un.reservation_id = r.id AND un.remaining > 0
 WHERE cu.name ILIKE :like ESCAPE '\\' OR similarity(cu.name, :q) >= 0.3
 GROUP BY cu.id, cu.name ORDER BY max(similarity(cu.name, :q)) DESC, cu.name LIMIT :n
 """
+
+# Segments where one customer has cores: Reserved or In use cores count as used (Requested does not), plus the
+# remaining cores of approved count-only reservations (reservation_unassigned_v). The customer is the holder's
+# reservation customer with the latest 'corrected' one applied, as in CORE_SQL.
+CUSTOMER_USAGE_SQL = """
+SELECT segment_id, sum(used)::int AS used_cores FROM (
+  SELECT c.segment_id,
+         CASE WHEN v.status IN ('Reserved', 'In use') THEN 1 ELSE 0 END AS used
+  FROM core_holds h
+  JOIN cores c ON c.id = h.core_id
+  JOIN core_status_v v ON v.core_id = c.id
+  JOIN segments sp ON sp.id = c.segment_id
+  JOIN reservations r ON r.id = h.reservation_id
+  LEFT JOIN LATERAL (
+    SELECT e.customer_id FROM reservation_events e
+    WHERE e.reservation_id = r.id AND e.type = 'corrected' AND e.customer_id IS NOT NULL
+    ORDER BY e.created_at DESC, e.id DESC LIMIT 1
+  ) corr_cust ON true
+  WHERE COALESCE(corr_cust.customer_id, r.customer_id) = :customer_id
+    AND v.status IN ('Requested', 'Reserved', 'In use')
+    AND (sp.survey_cores IS NULL OR c.number <= sp.survey_cores)
+  UNION ALL
+  SELECT u.segment_id, u.remaining::int
+  FROM reservation_unassigned_v u
+  JOIN reservations r ON r.id = u.reservation_id
+  JOIN reservation_state_v st ON st.reservation_id = r.id AND st.status = 'approved'
+  LEFT JOIN LATERAL (
+    SELECT e.customer_id FROM reservation_events e
+    WHERE e.reservation_id = r.id AND e.type = 'corrected' AND e.customer_id IS NOT NULL
+    ORDER BY e.created_at DESC, e.id DESC LIMIT 1
+  ) corr_cust ON true
+  WHERE u.remaining > 0 AND COALESCE(corr_cust.customer_id, r.customer_id) = :customer_id
+) usage
+GROUP BY segment_id ORDER BY segment_id
+"""
+# The same counting as CUSTOMER_USAGE_SQL, kept per reservation and segment (one row each). srf_id and planned_date
+# take the latest 'corrected' planned date like CORE_SQL.
+CUSTOMER_RESERVATIONS_SQL = """
+SELECT usage.reservation_id, r.srf_id, COALESCE(corr_date.planned_date, r.planned_date) AS planned_date,
+       usage.segment_id, sum(usage.used)::int AS used_cores
+FROM (
+  SELECT h.reservation_id, c.segment_id,
+         CASE WHEN v.status IN ('Reserved', 'In use') THEN 1 ELSE 0 END AS used
+  FROM core_holds h
+  JOIN cores c ON c.id = h.core_id
+  JOIN core_status_v v ON v.core_id = c.id
+  JOIN segments sp ON sp.id = c.segment_id
+  WHERE v.status IN ('Requested', 'Reserved', 'In use')
+    AND (sp.survey_cores IS NULL OR c.number <= sp.survey_cores)
+  UNION ALL
+  SELECT u.reservation_id, u.segment_id, u.remaining::int
+  FROM reservation_unassigned_v u
+  JOIN reservation_state_v st ON st.reservation_id = u.reservation_id AND st.status = 'approved'
+  WHERE u.remaining > 0
+) usage
+JOIN reservations r ON r.id = usage.reservation_id
+LEFT JOIN LATERAL (
+  SELECT e.customer_id FROM reservation_events e
+  WHERE e.reservation_id = r.id AND e.type = 'corrected' AND e.customer_id IS NOT NULL
+  ORDER BY e.created_at DESC, e.id DESC LIMIT 1
+) corr_cust ON true
+LEFT JOIN LATERAL (
+  SELECT e.planned_date FROM reservation_events e
+  WHERE e.reservation_id = r.id AND e.type = 'corrected' AND e.planned_date IS NOT NULL
+  ORDER BY e.created_at DESC, e.id DESC LIMIT 1
+) corr_date ON true
+WHERE COALESCE(corr_cust.customer_id, r.customer_id) = :customer_id
+GROUP BY usage.reservation_id, r.srf_id, corr_date.planned_date, r.planned_date, usage.segment_id
+ORDER BY usage.reservation_id, usage.segment_id
+"""
+GET_CUSTOMER_SQL = "SELECT id, name FROM customers WHERE id = :customer_id"
+
 SEARCH_SEGMENT_SQL = """
-SELECT a.name || ' - ' || b.name, s.id, NULL::bigint FROM segments s
+SELECT a.name || ' - ' || b.name, s.id, NULL::bigint, NULL::bigint FROM segments s
 JOIN sites a ON a.id = s.site_a_id JOIN sites b ON b.id = s.site_b_id
 WHERE a.name ILIKE :like ESCAPE '\\' OR b.name ILIKE :like ESCAPE '\\'
 ORDER BY s.id LIMIT :n
 """
 SEARCH_CORE_SQL = """
-SELECT 'Core ' || c.number || ' on ' || a.name || ' - ' || b.name, c.segment_id, c.id FROM cores c
+SELECT 'Core ' || c.number || ' on ' || a.name || ' - ' || b.name, c.segment_id, c.id, NULL::bigint FROM cores c
 JOIN segments s ON s.id = c.segment_id AND (s.survey_cores IS NULL OR c.number <= s.survey_cores)
 JOIN sites a ON a.id = s.site_a_id JOIN sites b ON b.id = s.site_b_id
 WHERE c.number = :num ORDER BY c.segment_id LIMIT :n
@@ -305,12 +381,46 @@ def search(db: Session, query: str) -> list[SearchResult]:
     out: list[SearchResult] = []
     for result_type, sql in searches:
         assert result_type in result_types
-        for label, segment_id, core_id in db.execute(text(sql), params):
+        for label, segment_id, core_id, customer_id in db.execute(text(sql), params):
             result = SearchResult(
                 type=result_type,  # type: ignore[arg-type]
                 label=label,
                 segment_id=segment_id,
                 core_id=core_id,
+                customer_id=customer_id,
             )
             out.append(result)
     return out
+
+
+def customer_usage(db: Session, customer_id: int) -> CustomerUsage | None:
+    customer = db.execute(text(GET_CUSTOMER_SQL), {"customer_id": customer_id}).first()
+    if customer is None:
+        return None
+    rows = db.execute(text(CUSTOMER_USAGE_SQL), {"customer_id": customer_id})
+    segments = [SegmentUsage(segment_id=row.segment_id, used_cores=row.used_cores) for row in rows]
+    return CustomerUsage(
+        customer_id=customer.id,
+        name=customer.name,
+        segments=segments,
+        reservations=_customer_reservations(db, customer_id),
+    )
+
+
+def _customer_reservations(db: Session, customer_id: int) -> list[ReservationUsage]:
+    rows = db.execute(text(CUSTOMER_RESERVATIONS_SQL), {"customer_id": customer_id})
+    by_reservation: dict[int, ReservationUsage] = {}
+    for row in rows:
+        reservation = by_reservation.get(row.reservation_id)
+        if reservation is None:
+            reservation = ReservationUsage(
+                reservation_id=row.reservation_id,
+                srf_id=row.srf_id,
+                planned_date=row.planned_date,
+                used_cores=0,
+                segments=[],
+            )
+            by_reservation[row.reservation_id] = reservation
+        reservation.used_cores += row.used_cores
+        reservation.segments.append(SegmentUsage(segment_id=row.segment_id, used_cores=row.used_cores))
+    return list(by_reservation.values())

@@ -474,3 +474,14 @@ def test_sheet_without_type_column_leaves_kinds_alone(client, admin, db):
     uid = post(client, workbook([site("AAAA"), site("BBBB"), site("NEWW")], None)).json()["upload_id"]
     apply(client, uid)
     assert [kind_of(db, n) for n in ("AAAA", "BBBB", "NEWW")] == ["toc", "building", "site"]
+
+
+def test_cluster_header_is_optional_and_trimmed():
+    from app.ingest.site_master.parse import _normalise_cluster
+
+    details = {"CLUSTER ": "  Klang   Valley ", "Other": "x"}
+    _normalise_cluster(details)
+    assert details == {"Other": "x", "cluster": "Klang Valley"}
+    empty = {"Cluster": "   "}
+    _normalise_cluster(empty)
+    assert empty == {}

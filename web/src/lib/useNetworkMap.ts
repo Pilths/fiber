@@ -1,6 +1,16 @@
 import { useCallback, useEffect, useRef, useState, type PointerEvent } from "react";
-import { boundsOf, fitView, panned, type Camera } from "@/lib/mapGeometry";
-import { useFullscreen, useMapData, useMapSize } from "@/lib/mapHooks";
+import { CAMPUS_MAX_ZOOM, FADE_TO } from "@/lib/mapClusters";
+import {
+  boundsOf,
+  fitView,
+  MAX_ZOOM,
+  MIN_ZOOM,
+  panned,
+  type Bounds,
+  type Camera,
+  type Point,
+} from "@/lib/mapGeometry";
+import { useClusterLayer, useFullscreen, useMapData, useMapSize } from "@/lib/mapHooks";
 import {
   ALL_ROUTES,
   ALL_SITES,
@@ -11,8 +21,7 @@ import {
 } from "@/lib/mapLayers";
 
 export type Basemap = "loading" | "gl" | "missing" | "nogl" | "failed";
-const MAX_ZOOM = 18;
-const MIN_ZOOM = 4;
+const BADGE_ZOOM_STEP = 3;
 const CAMERA_MOVE_MS = 250;
 // a press on one of these never starts a drag
 const NOT_DRAGGABLE = "button,a,input,label,[data-hit],details";
@@ -55,6 +64,7 @@ export function useNetworkMap(options: NetworkMapOptions) {
   const fullscreen = useFullscreen(box);
   const data = useMapData(version);
   const size = useMapSize(box, setCamera);
+  const clusters = useClusterLayer(camera);
 
   const cameraRef = useRef(camera);
   useEffect(() => {
@@ -121,6 +131,25 @@ export function useNetworkMap(options: NetworkMapOptions) {
     }
     const zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, camera.zoom + step));
     go({ ...camera, zoom });
+  };
+
+  // A count badge: centre on it and zoom in a few levels.
+  const zoomAt = (point: Point) => {
+    if (!camera) {
+      return;
+    }
+    const centred = panned(camera, size.w / 2 - point[0], size.h / 2 - point[1]);
+    const zoom = Math.min(MAX_ZOOM, camera.zoom + BADGE_ZOOM_STEP);
+    go({ ...centred, zoom });
+  };
+
+  // A campus label: fit the campus, at least far enough in that its sites show and stand apart.
+  const zoomToBounds = (bounds: Bounds) => {
+    if (!size.w) {
+      return;
+    }
+    const fitted = fitView(bounds, size.w, size.h, 60, CAMPUS_MAX_ZOOM);
+    go({ ...fitted, zoom: Math.max(fitted.zoom, FADE_TO) });
   };
 
   const features = data.segments?.features ?? [];
@@ -234,7 +263,10 @@ export function useNetworkMap(options: NetworkMapOptions) {
     layersOpen,
     setLayersOpen,
     ...fullscreen,
+    ...clusters,
     zoomBy,
+    zoomAt,
+    zoomToBounds,
     fitSelection,
     selectSegment,
     onPointerDown,

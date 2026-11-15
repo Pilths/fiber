@@ -25,13 +25,15 @@ export type SiteProps = {
   lrd_site_id: number | null;
   region: string | null;
   location_from_site?: string;
+  cluster?: string | null;
 };
 export type SegmentFeature = { properties: SegmentProps; geometry: { coordinates: Point[] } };
 export type SiteFeature = { properties: SiteProps; geometry: { coordinates: Point } };
 export type MapData<Feature> = { features: Feature[]; not_drawn: { name: string; reason: string }[] };
 
-// Line width and colour per route type. Each type also has its own pattern (DC-DC double, DC-TOC dashed),
-// so the colour is never the only cue. Free-core health is on the chips, not the lines.
+// Line width and colour per route type. Each type also has its own pattern (Trunk solid, Metro long dash and
+// dot, DC-DC double, DC-TOC dashed; not verified dotted), so the colour is never the only cue. The Layers and key
+// swatches (.ll in index.css) draw the same patterns. Free-core health is on the chips, not the lines.
 export const LINE_WIDTH: Record<string, number> = { trunk: 6, "dc-dc": 7, "dc-toc": 4, metro: 4 };
 export const LINE_COLOR: Record<string, string> = {
   trunk: "var(--line-trunk)",
@@ -46,9 +48,9 @@ export const LINE_COLOR: Record<string, string> = {
 export type SiteLayers = { data_center: boolean; toc: boolean; site: boolean };
 export const ALL_SITES: SiteLayers = { data_center: true, toc: true, site: true };
 export const SITE_LAYERS: [keyof SiteLayers, string, string][] = [
-  ["data_center", "Data centres", "rb-sh dc size-3!"],
+  ["data_center", "Data centres", "rb-sh dc"],
   ["toc", "TOC", "rb-sh toc"],
-  ["site", "Trunk sites", "rb-sh st size-2.5!"],
+  ["site", "Trunk sites", "rb-sh st"],
 ];
 // Singular words for the map key ("Data centre"); the Layers panel uses the plural.
 export const KEY_LABEL: Record<keyof SiteLayers, string> = {

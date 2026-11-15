@@ -37,7 +37,7 @@ from app.ingest.excel import parse_reservation_workbook
 from app.ingest.reservation_import import add_cores
 from app.routing.graph import invalidate as invalidate_routes
 
-SITES = ["site_name", "latitude_in_decimal", "longitude_in_decimal", "region", "Type"]
+SITES = ["site_name", "latitude_in_decimal", "longitude_in_decimal", "region", "Type", "cluster"]
 SEGMENTS = ["Link", "Distance", "Route", "Section", "Verified cores", "Total cores"]
 RESERVATIONS = ["Region", "Nodes", "No of core requested", "Fiber core requestor", "Fiber core request date",
                 "Expected CV Ready", "Contractor", "Remark", "SRF", "Port Info", "Fiber monitored Y/N/WIP"]
