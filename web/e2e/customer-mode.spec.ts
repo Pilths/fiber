@@ -114,16 +114,28 @@ test("customer search highlights its segments with used cores; the toolbar chip 
 });
 
 // Request picker: a customer with 2 or more requests that use cores can narrow the highlight to one request; a
-// request with 0 used cores (Requested only) is not listed. Read only: the DEV seed gives DEV Telco Alpha
-// SRF-DEV-001 and SRF-DEV-STALE (2 cores each) plus requests with 0 used cores, and DEV Bank Gamma one request.
+// request with 0 used cores (Requested only) is not listed. The DEV seed gives DEV Telco Alpha only one request,
+// so its usage response is mocked with three (two using cores, one Requested only); DEV Bank Gamma stays real.
 test("request picker narrows customer mode to one request and All requests restores it", async ({ page }) => {
   await signIn(page);
   const single = await usageOf(page, "DEV Bank Gamma");
   expect(single.reservations.length, "DEV Bank Gamma has one request").toBe(1);
-  const usage = await usageOf(page, CUSTOMER);
+  const real = await usageOf(page, CUSTOMER);
+  const usage: Usage = {
+    ...real,
+    segments: [{ segment_id: 1, used_cores: 2 }, { segment_id: 5, used_cores: 2 }],
+    reservations: [
+      { reservation_id: 1, srf_id: "SRF-DEV-001", planned_date: "2026-12-01", used_cores: 2,
+        segments: [{ segment_id: 1, used_cores: 2 }] },
+      { reservation_id: 23, srf_id: null, planned_date: null, used_cores: 0,
+        segments: [{ segment_id: 1, used_cores: 0 }] },
+      { reservation_id: 145, srf_id: "SRF-DEV-STALE", planned_date: "2026-07-25", used_cores: 2,
+        segments: [{ segment_id: 5, used_cores: 2 }] },
+    ],
+  };
+  await page.route(`**/api/customers/${real.customer_id}/usage`, (route) => route.fulfill({ json: usage }));
   const listed = usage.reservations.filter((request) => request.used_cores > 0);
   expect(listed.map((request) => request.srf_id).sort()).toEqual(["SRF-DEV-001", "SRF-DEV-STALE"]);
-  expect(usage.reservations.length, `${CUSTOMER} also has requests with 0 used cores`).toBeGreaterThan(listed.length);
   const allIds = usage.segments.map((segment) => segment.segment_id).sort().join(",");
   const narrower = listed.find((request) =>
     request.srf_id && request.segments.map((segment) => segment.segment_id).sort().join(",") !== allIds);
