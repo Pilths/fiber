@@ -23,7 +23,7 @@ class Counts(BaseModel):
 
 
 class SheetOut(BaseModel):
-    kind: Literal["sites", "dcs"]
+    kind: Literal["sites"]
     sheet_name: str | None
     found: bool
     blocked: bool
@@ -36,7 +36,6 @@ class UploadOut(BaseModel):
     upload_id: int
     filename: str
     sheets: list[SheetOut]
-    possible_renames: list[dict[str, Any]]
     add_only: bool = False
 
 
@@ -47,22 +46,14 @@ class RowsOut(BaseModel):
     items: list[dict[str, Any]]
 
 
-class RenameIn(BaseModel):
-    missing_dc_id: int
-    new_row_id: int
-    decision: Literal["rename", "separate"]
-
-
 class OverrideIn(BaseModel):
     sites: bool = False
-    dcs: bool = False
 
 
 class ApplyIn(BaseModel):
-    sheets: list[Literal["sites", "dcs"]] | None = None  # apply only these sheets; None applies every sheet that can be applied
+    sheets: list[Literal["sites"]] | None = None  # apply only these sheets; None applies every sheet that can be applied
     override_drop: OverrideIn = OverrideIn()
     reason: str | None = None
-    renames: list[RenameIn] = []
 
 
 class ApplyOut(BaseModel):
@@ -84,7 +75,7 @@ def upload(db: DB, admin: Admin, file: UploadFile, add_only: Annotated[bool, For
 
 
 @router.get("/uploads/{upload_id}/rows")
-def rows(db: DB, upload_id: int, sheet: Literal["sites", "dcs"], group: Literal["added", "changed", "missing", "problem", "unchanged"],
+def rows(db: DB, upload_id: int, sheet: Literal["sites"], group: Literal["added", "changed", "missing", "problem", "unchanged"],
          page: Annotated[int, Query(ge=1)] = 1, page_size: Annotated[int, Query(ge=1, le=500)] = 100) -> RowsOut:
     if not db.execute(text("SELECT 1 FROM uploads WHERE id = :i AND kind = 'site_master'"), {"i": upload_id}).first():
         raise HTTPException(404, "Upload not found")
@@ -98,8 +89,7 @@ def rows(db: DB, upload_id: int, sheet: Literal["sites", "dcs"], group: Literal[
               "group": group, "status": r["status"], "reason": r["reason"], "raw": r["raw"],
               "parsed": r["payload"].get("parsed"), "changes": r["payload"].get("changes", []),
               "edited_in_dashboard": r["payload"].get("edited_in_dashboard", False),
-              "location_note": r["payload"].get("location_note"), "db_id": r["payload"].get("db_id"),
-              "in_use": r["payload"].get("in_use"), "possible_rename": r["payload"].get("possible_rename")} for r in q]
+              "db_id": r["payload"].get("db_id"), "in_use": r["payload"].get("in_use")} for r in q]
     return RowsOut(total=total, page=page, page_size=page_size, items=items)
 
 
@@ -107,7 +97,7 @@ def rows(db: DB, upload_id: int, sheet: Literal["sites", "dcs"], group: Literal[
 def apply(db: DB, admin: Admin, upload_id: int, body: ApplyIn) -> ApplyOut:
     try:
         return ApplyOut(**sm.apply_upload(db, admin.id, upload_id, body.override_drop.model_dump(), body.reason,
-                                          [r.model_dump() for r in body.renames], body.sheets))
+                                          body.sheets))
     except sm.ApplyError as e:
         raise HTTPException(e.status, e.message) from e
 

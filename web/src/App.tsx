@@ -9,6 +9,7 @@ import type { SearchResult } from "@/components/GlobalSearch";
 import { Header } from "@/components/Header";
 import { CoresTable, SegmentDiagram } from "@/components/NetworkDetail";
 import { CustomerChip } from "@/components/MapOverlay";
+import { MapFilterPanel } from "@/components/MapPanels";
 import { NetworkMap } from "@/components/NetworkMap";
 import { Approvals, MyReservations } from "@/components/Reservations";
 import { ReserveBox } from "@/components/ReserveBox";
@@ -20,8 +21,12 @@ import { useAuthGate, type Me } from "@/lib/useAuthGate";
 import { useCustomerHighlight, type CustomerHighlight } from "@/lib/useCustomerHighlight";
 import { useDashboardView } from "@/lib/useDashboardView";
 import { useInventory, type Detail, type Inventory } from "@/lib/useInventory";
+import { useNetworkMap } from "@/lib/useNetworkMap";
 import type { RouteLeg } from "@/lib/useReserveBox";
 
+// The map row ends one gutter above the window: 100vh minus the 60px header, main's 24px top padding and a
+// 16px gutter. The floor keeps the Site A to B panel usable on short windows, the ceiling stops tall ones stretching.
+const MAP_CARD_CLASS = "card col-span-8 flex min-h-[clamp(600px,calc(100vh-100px),1000px)] flex-col p-3";
 const ERROR_CLASS = "rounded-md border border-red bg-red-bg px-4 py-2 font-semibold text-red";
 const SENT_CLASS =
   "mb-3 flex items-center gap-3 rounded-md border border-green-bd bg-green-bg px-3 py-2 " +
@@ -107,12 +112,18 @@ function Dashboard({ me, onSignOut, onChangePassword }: DashboardProps) {
   const isAdmin = me.role === "admin";
   const { view, refreshBell } = dashboard;
   const { detail, segmentId } = inventory;
+  const [clusterFocus, setClusterFocus] = useState<{ name: string } | null>(null);
 
   const changed = () => {
     setVersion((current) => current + 1);
     refreshBell();
   };
   const onPick = (result: SearchResult) => {
+    if (result.type === "cluster") {
+      dashboard.setView("map");
+      setClusterFocus({ name: result.label });
+      return;
+    }
     if (result.segment_id == null) {
       return;
     }
@@ -149,7 +160,8 @@ function Dashboard({ me, onSignOut, onChangePassword }: DashboardProps) {
       {view === "map" && (
         <InventoryView me={me} inventory={inventory} admin={admin} version={version}
           onAssign={dialogs.setAssign} customer={customerMode.customer} onClearCustomer={customerMode.clear}
-          onPickRequest={customerMode.pickRequest} />
+          onPickRequest={customerMode.pickRequest} clusterFocus={clusterFocus}
+          onClusterFocused={() => setClusterFocus(null)} />
       )}
       {detail && drawn && (
         <CoreDrawerForSegment inventory={inventory} detail={detail} coreId={drawn.id} me={me}
@@ -220,6 +232,8 @@ function InventoryView(props: {
   customer: CustomerHighlight | null;
   onClearCustomer: () => void;
   onPickRequest: (requestId: number | null) => void;
+  clusterFocus: { name: string } | null;
+  onClusterFocused: () => void;
 }) {
   const { me, inventory, admin, version, onAssign, customer, onClearCustomer, onPickRequest } = props;
   const { optionIds, detail, segmentId } = inventory;
@@ -228,19 +242,27 @@ function InventoryView(props: {
     inventory.clearSelection();
     onClearCustomer();
   };
-  const tools = (
-    <>
-      <MapFilters segments={inventory.segments} filter={inventory.filter} onFilter={inventory.changeFilter} />
-      {customer && <CustomerChip customer={customer} onPickRequest={onPickRequest} onClear={onClearCustomer} />}
-    </>
+  // The map state lives here so the map filters can sit in the Site A to B panel.
+  const map = useNetworkMap({
+    selectedIds,
+    routeKey,
+    version,
+    onSelectSegment: inventory.pickOnMap,
+    onClear: clearMap,
+    focusCluster: props.clusterFocus,
+    onFocused: props.onClusterFocused,
+  });
+  const tools = customer && (
+    <CustomerChip customer={customer} onPickRequest={onPickRequest} onClear={onClearCustomer} />
+  );
+  const region = (
+    <MapFilters segments={inventory.segments} filter={inventory.filter} onFilter={inventory.changeFilter} />
   );
   return (
-    <main className="grid grid-cols-12 gap-4 px-6 pt-6 pb-10">
-      <section className="card col-span-8 flex flex-col p-3" aria-label="Network map"
-        aria-describedby="map-instr">
+    <main className="grid grid-cols-12 gap-4 px-6 pt-6 pb-4">
+      <section className={MAP_CARD_CLASS} aria-label="Network map" aria-describedby="map-instr">
         {/* ponytail: site clicks do nothing on the view-only map; wire them to Site A/B if planners ask */}
-        <NetworkMap version={version} onSelectSegment={inventory.pickOnMap} onSite={() => {}}
-          onClear={clearMap} selectedIds={selectedIds} routeKey={routeKey}
+        <NetworkMap state={map} onSite={() => {}} onClear={clearMap}
           customer={customer} onEmptyClick={customer ? clearMap : undefined}
           visible={(properties) => {
             if (optionIds) {
@@ -253,7 +275,7 @@ function InventoryView(props: {
       {/* The panel fills the map card's height (absolute, scrolls inside),
           so the map alone sets the row height. */}
       <div className="relative col-span-4 min-w-0">
-        <RouteSearch planner={inventory.planner} />
+        <RouteSearch planner={inventory.planner} filters={<MapFilterPanel state={map} region={region} />} />
       </div>
       {segmentId != null && !detail && (
         <p className="card empty col-span-12 text-center text-body text-muted-foreground">

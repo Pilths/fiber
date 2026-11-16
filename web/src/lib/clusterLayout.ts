@@ -43,16 +43,10 @@ export function endSiteIds(state: NetworkMapState): Set<number> {
   return ends;
 }
 
-// Clusters drawn as a sector: the cluster has one and its Layers chip is on.
+// Clusters drawn as a sector: every cluster that has one.
 export function sectorClusters(state: NetworkMapState): Set<string> {
-  const names = new Set<string>();
-  for (const sector of state.data.sectors?.features ?? []) {
-    const name = sector.properties.cluster;
-    if (!state.clusterOff.has(name)) {
-      names.add(name);
-    }
-  }
-  return names;
+  const sectors = state.data.sectors?.features ?? [];
+  return new Set(sectors.map((sector) => sector.properties.cluster));
 }
 
 type SiteLook = { opacity: number; active: boolean; crowds: boolean };

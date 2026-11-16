@@ -17,12 +17,6 @@ SHEETS = {  # kind: (required header keys, expected-headers text, entity, own he
         "site",
         {"sitename", "latitudeindecimal", "longitudeindecimal", "region", "type"},
     ),
-    "dcs": (
-        ("dcnamelink", "lrd"),
-        "DC Name / Link, LRD",
-        "dc",
-        {"dcnamelink", "lrd", "lat", "long", "latitude", "longitude", "lon"},
-    ),
 }
 # Type column of the Sites sheet; blank or Trunk means a trunk site ('site')
 SITE_KINDS = {"trunk": "site", "dc": "data_center", "toc": "toc"}
@@ -33,7 +27,7 @@ GROUP_COL = {
     "problem": "needs_review",
     "unchanged": "unchanged",
 }
-APPLY_COUNTERS = ["added", "changed", "protected_kept", "renamed", "deactivated", "kept_active", "skipped"]
+APPLY_COUNTERS = ["added", "changed", "protected_kept", "deactivated", "kept_active", "skipped"]
 
 
 def isblank(value: Any) -> bool:
@@ -79,9 +73,6 @@ class Item:
     group: str = "unchanged"
     changes: list[dict[str, Any]] = field(default_factory=list)
     db_id: int | None = None
-    note: str | None = None
-    effective: tuple[float, float] | None = None
-    rename: dict[str, Any] | None = None
 
 
 @dataclass
@@ -93,14 +84,13 @@ class DbSite:
     lat: float | None
     lon: float | None
     details: dict[str, Any]
-    lrd: str | None
-    lrd_id: int | None
+    lrd_id: int | None  # old DC List rows have one; kept as stored, never written by an upload
 
     @property
     def cls(self) -> str:
-        # a DC from the Site Location sheet always has an LRD site; a DC from the Sites sheet has none
+        # old DC List rows (a DC with an LRD site) are not part of the Sites sheet and are left alone
         if self.kind == "data_center" and self.lrd_id is not None:
-            return "dcs"
+            return "dc_list"
         return "sites"
 
 
@@ -120,7 +110,6 @@ class SheetResult:
     items: list[Item] = field(default_factory=list)
     missing: list[DbSite] = field(default_factory=list)
     in_use: set[int] = field(default_factory=set)
-    renames: list[dict[str, Any]] = field(default_factory=list)
     block_reasons: list[str] = field(default_factory=list)
     hard: bool = False  # a block the admin cannot override
 

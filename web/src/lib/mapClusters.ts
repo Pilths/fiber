@@ -45,7 +45,7 @@ export function clusterName(value: string | null | undefined): string | null {
   return name || null;
 }
 
-// Clusters that have a sector, in name order: one Layers chip each.
+// Clusters that have a sector, in name order.
 export function clustersOf(sectors: SectorFeature[]): string[] {
   const names = sectors.map((sector) => sector.properties.cluster);
   return [...new Set(names)].sort();
@@ -54,8 +54,7 @@ export function clustersOf(sectors: SectorFeature[]): string[] {
 // The palette is --cluster-1 .. --cluster-6 in index.css.
 const CLUSTER_COLOURS = 6;
 
-// A cluster's tint follows its place in the name-sorted list of all clusters with a sector,
-// so it stays the same when other clusters are switched off.
+// A cluster's tint follows its place in the name-sorted list of all clusters with a sector.
 export function clusterColour(clusters: string[], cluster: string): string {
   const index = Math.max(0, clusters.indexOf(cluster));
   return `var(--cluster-${(index % CLUSTER_COLOURS) + 1})`;

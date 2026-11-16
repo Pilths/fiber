@@ -17,6 +17,12 @@ test("Site A to B panel is as tall as the map card, the map takes 8 of 12 column
   await same("nothing");
   const [m, p] = await Promise.all([map.boundingBox(), panel.boundingBox()]);
   expect(m!.width / (m!.width + p!.width + 16)).toBeCloseTo(8 / 12, 1); // 16px grid gap
+  // The row ends one 16px gutter above the window bottom, the page itself does not scroll,
+  // and the map filters sit at the panel's foot (inside its 20px padding and 1px border).
+  expect(900 - (m!.y + m!.height)).toBeCloseTo(16, 0);
+  expect(await page.evaluate(() => document.documentElement.scrollHeight - innerHeight)).toBe(0);
+  const filters = await panel.getByRole("group", { name: "Map filters" }).boundingBox();
+  expect(p!.y + p!.height - (filters!.y + filters!.height)).toBeCloseTo(21, 0);
   await expect(page.getByRole("region", { name: "Segment list" })).toHaveCount(0);
   await expect(page.getByRole("region", { name: "Route options" })).toHaveCount(0); // nothing below before a search
 

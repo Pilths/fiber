@@ -52,12 +52,6 @@ export const SITE_LAYERS: [keyof SiteLayers, string, string][] = [
   ["toc", "TOC", "rb-sh toc"],
   ["site", "Trunk sites", "rb-sh st"],
 ];
-// Singular words for the map key ("Data centre"); the Layers panel uses the plural.
-export const KEY_LABEL: Record<keyof SiteLayers, string> = {
-  data_center: "Data centre",
-  toc: "TOC",
-  site: "Trunk site",
-};
 export const ROUTE_LAYERS: [string, string][] = [
   ["Trunk", "ll"],
   ["Metro", "ll m"],

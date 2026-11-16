@@ -53,10 +53,8 @@ export function useMapData(version: number) {
   return { segments, sites, sectors, failed };
 }
 
-// Clusters layer: which clusters are switched off in Layers, and whether the map is zoomed in past the sectors
-// (with a dead band, see nextZoomedIn).
+// Clusters layer: whether the map is zoomed in past the sectors (with a dead band, see nextZoomedIn).
 export function useClusterLayer(camera: Camera | null) {
-  const [clusterOff, setClusterOff] = useState<Set<string>>(new Set());
   const [zoomedIn, setZoomedIn] = useState(false);
   if (camera) {
     const next = nextZoomedIn(zoomedIn, camera.zoom);
@@ -64,7 +62,7 @@ export function useClusterLayer(camera: Camera | null) {
       setZoomedIn(next);
     }
   }
-  return { clusterOff, setClusterOff, zoomedIn };
+  return { zoomedIn };
 }
 
 // Map size from the card; the camera starts on Malaysia (the data fit follows once segments arrive).

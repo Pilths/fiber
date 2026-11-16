@@ -85,12 +85,10 @@ def row_of(client, uid, sheet, group, key):
 
 
 def test_sheets_found_by_headers_not_name_or_row(client, admin):
-    data = workbook([["AAAA", 3.1, 101.6, "Central", "x"]], [[1, "DC One", "AAAA", 3.2, 101.7]], site_tab="zz1", dc_tab="zz2",
-                    site_offset=3, site_head=["Site Name", " latitude in  decimal", "LONGITUDE_in_decimal", "Region", "x"],
-                    dc_head=["No", "dc name/link", "lrd", "Lat", "Long"])
+    data = workbook([["AAAA", 3.1, 101.6, "Central", "x"]], site_tab="zz1", site_offset=3,
+                    site_head=["Site Name", " latitude in  decimal", "LONGITUDE_in_decimal", "Region", "x"])
     s = sheets(post(client, data))
     assert s["sites"]["found"] and s["sites"]["sheet_name"] == "zz1" and s["sites"]["counts"]["added"] == 1
-    assert s["dcs"]["found"] and s["dcs"]["sheet_name"] == "zz2" and s["dcs"]["counts"]["added"] == 1
 
 
 def test_header_row_found_below_row_ten_and_away_from_column_a(client, admin):
@@ -101,24 +99,20 @@ def test_header_row_found_below_row_ten_and_away_from_column_a(client, admin):
 
 
 def test_no_matching_sheet_blocks_that_part_with_expected_headers(client, admin):
-    s = sheets(post(client, workbook([site("AAAA")], None)))
-    assert not s["dcs"]["found"] and s["dcs"]["blocked"] and not s["dcs"]["needs_override"]
-    assert "DC Name / Link, LRD" in s["dcs"]["block_reasons"][0]
     s = sheets(post(client, workbook(None, [dc("DC One", "AAAA")])))
     assert "site_name, latitude_in_decimal, longitude_in_decimal" in s["sites"]["block_reasons"][0]
-    assert s["sites"]["blocked"] and s["dcs"]["found"]
+    assert s["sites"]["blocked"] and not s["sites"]["found"]
 
 
 def test_placeholders_are_blank_not_invalid_text(client, admin):
     data = workbook([["AAAA", "TBA", "N/A", "North", "-"], ["BBBB", 3.1, 101.6, "na", "TBC"], ["CCCC", 3.1, 101.6, "North", "tba"]],
-                    [dc("DC One", "CCCC", "TBC", "-")])
+                    )
     r = post(client, data)
     p = {i["key"]: i for i in rows(client, r.json()["upload_id"], "sites", "problem")["items"]}
     assert p["AAAA"]["reason"] == "missing coordinates"
     assert "BBBB" not in p  # Site Location has no region, so a blank or odd region is not a problem
     ok = row_of(client, r.json()["upload_id"], "sites", "added", "CCCC")
     assert "SITE_TYPE" not in ok["parsed"]["details"]
-    assert sheets(r)["dcs"]["counts"]["added"] == 1  # blank DC coordinates fall back to the site
 
 
 def test_preview_groups_and_nothing_written_before_apply(client, admin, db):
@@ -188,37 +182,27 @@ def test_missing_headers_block_not_overridable(client, admin):
     assert apply(client, r.json()["upload_id"], override_drop={"sites": True}, reason="x").status_code == 409
 
 
-def test_failing_dc_sheet_does_not_block_good_sites_sheet(client, admin, db):
-    r = post(client, workbook([site("AAAA"), site("BBBB")], []))  # a DC sheet with no rows is blocked for good
-    s = sheets(r)
-    assert not s["sites"]["blocked"] and s["dcs"]["blocked"]
-    ok = apply(client, r.json()["upload_id"])
-    assert ok.status_code == 200
-    assert ok.json()["sheets"]["sites"]["added"] == 2 and ok.json()["sheets"]["dcs"]["applied"] is False
-    assert count(db) == 2
-
-
-def test_dc_location_falls_back_to_site_and_creates_no_site(client, admin, db):
-    seed_sites(db, ["GOOD", "BADS"])
-    db.execute(text("UPDATE sites SET geom = NULL WHERE name = 'BADS'"))
-    sites_before = count(db, "SELECT count(*) FROM sites WHERE kind = 'site'")
-    data = workbook([site("GOOD"), site("BADS", 0, 0)],
-                    [dc("DC own", "GOOD", 3.3, 101.8), dc("DC fall", "GOOD", "TBA", None), dc("DC swapped", "GOOD", 101.8, 3.3),
-                     dc("DC none", "BADS", None, None), dc("DC ghost", "ZZZZ", 3.3, 101.8)])
-    r = post(client, data)
+def test_dc_list_sheet_is_ignored(client, admin, db):
+    r = post(client, workbook([site("AAAA"), site("BBBB")], [dc("DC One", "AAAA", 3.3, 101.8)]))
+    assert list(sheets(r)) == ["sites"] and "possible_renames" not in r.json()
     uid = r.json()["upload_id"]
-    assert row_of(client, uid, "dcs", "added", "DC own")["location_note"] is None
-    assert row_of(client, uid, "dcs", "added", "DC fall")["location_note"] == "location from site GOOD"
-    assert row_of(client, uid, "dcs", "added", "DC swapped")["location_note"] == "location from site GOOD"
-    none = row_of(client, uid, "dcs", "problem", "DC none")
-    assert none["status"] == "needs_review" and "no valid coordinates" in none["reason"]
-    assert "unknown site code ZZZZ" in row_of(client, uid, "dcs", "problem", "DC ghost")["reason"]
-    assert apply(client, uid).status_code == 200
-    assert count(db, "SELECT count(*) FROM sites WHERE kind = 'site'") == sites_before  # DC rows add no LRD site
-    assert count(db, "SELECT count(*) FROM sites WHERE kind = 'data_center'") == 3
-    assert count(db, "SELECT lrd_site_id = (SELECT id FROM sites WHERE name = 'GOOD') FROM sites WHERE name = 'DC fall'")
-    assert count(db, "SELECT geom IS NULL FROM sites WHERE name = 'DC fall'")  # drawn from the linked site
-    assert count(db, "SELECT ST_Y(geom) FROM sites WHERE name = 'DC own'") == pytest.approx(3.3)
+    assert count(db, f"SELECT count(*) FROM upload_rows WHERE upload_id = {uid} AND entity <> 'site'") == 0
+    ok = apply(client, uid)
+    assert ok.status_code == 200 and list(ok.json()["sheets"]) == ["sites"]
+    assert count(db) == 2  # the DC row created nothing
+
+
+def test_old_dc_list_dc_is_left_alone(client, admin, db):
+    seed_sites(db, ["AAAA", "KEEP"])
+    seed_sites(db, ["Old DC"], "data_center")
+    db.execute(text("UPDATE sites SET lrd_site_id = (SELECT id FROM sites WHERE name = 'AAAA') WHERE name = 'Old DC'"))
+    r = post_add_only(client, workbook([site("AAAA"), site("KEEP")]))
+    assert sheets(r)["sites"]["counts"]["missing"] == 0
+    r = post(client, workbook([site("AAAA"), site("KEEP")]))
+    assert sheets(r)["sites"]["counts"]["missing"] == 0  # not in the Sites sheet's own set
+    assert apply(client, r.json()["upload_id"]).status_code == 200
+    assert count(db, "SELECT active FROM sites WHERE name = 'Old DC'") is True
+    assert count(db, "SELECT lrd_site_id IS NOT NULL FROM sites WHERE name = 'Old DC'") is True
 
 
 def test_site_with_bad_coordinates_is_needs_review_and_not_applied(client, admin, db):
@@ -235,7 +219,7 @@ def test_apply_updates_with_history_and_deactivates_missing(client, admin, db):
     uid = r.json()["upload_id"]
     res = apply(client, uid)
     assert res.status_code == 200
-    assert res.json()["sheets"]["sites"] | {"applied": True} == {"added": 1, "changed": 2, "protected_kept": 0, "renamed": 0,
+    assert res.json()["sheets"]["sites"] | {"applied": True} == {"added": 1, "changed": 2, "protected_kept": 0,
                                                                   "deactivated": 1, "kept_active": 0, "skipped": 0, "applied": True}
     assert count(db, "SELECT active FROM sites WHERE name = 'GONE'") is False  # never deleted
     assert count(db, "SELECT active FROM sites WHERE name = 'BACK'") is True
@@ -279,71 +263,22 @@ def test_dashboard_edited_field_is_protected(client, admin, db):
     assert count(db, "SELECT ST_Y(geom) FROM sites WHERE name = 'AAAA'") == pytest.approx(3.1)  # dashboard value kept
 
 
-def rename_setup(client, db):
-    seed_sites(db, ["AAAA"])
-    seed_sites(db, ["Old DC"], "data_center")
-    db.execute(text("UPDATE sites SET lrd_site_id = (SELECT id FROM sites WHERE name = 'AAAA'), "
-                    "geom = ST_SetSRID(ST_MakePoint(101.8, 3.3), 4326) WHERE name = 'Old DC'"))
-    r = post(client, workbook([site("AAAA")], [dc("New DC", "AAAA", 3.3, 101.8, "Johor")]))
-    return r.json()
-
-
-def test_undecided_possible_rename_is_refused(client, admin, db):
-    up = rename_setup(client, db)
-    res = apply(client, up["upload_id"], override_drop={"dcs": True}, reason="x")
-    assert res.status_code == 422 and "Old DC" in res.json()["detail"] and "New DC" in res.json()["detail"]
-    assert count(db, "SELECT count(*) FROM sites WHERE name = 'New DC'") == 0
-
-
-def test_possible_rename_flagged_and_separate_decision(client, admin, db):
-    up = rename_setup(client, db)
-    pr = up["possible_renames"]
-    assert len(pr) == 1 and pr[0]["missing_dc_name"] == "Old DC" and pr[0]["new_dc_name"] == "New DC" and pr[0]["lrd"] == "AAAA"
-    assert row_of(client, up["upload_id"], "dcs", "added", "New DC")["possible_rename"]["missing_dc_id"] == pr[0]["missing_dc_id"]
-    res = apply(client, up["upload_id"], renames=[{"missing_dc_id": pr[0]["missing_dc_id"], "new_row_id": pr[0]["new_row_id"],
-                                                    "decision": "separate"}], override_drop={"dcs": True}, reason="x")
-    assert res.status_code == 200, res.text
-    assert count(db, "SELECT active FROM sites WHERE name = 'Old DC'") is False
-    assert count(db, "SELECT count(*) FROM sites WHERE name = 'New DC'") == 1
-
-
-def test_possible_rename_rename_decision_keeps_history(client, admin, db):
-    up = rename_setup(client, db)
-    pr = up["possible_renames"][0]
-    old_id = pr["missing_dc_id"]
-    res = apply(client, up["upload_id"], override_drop={"dcs": True}, reason="x",
-                renames=[{"missing_dc_id": old_id, "new_row_id": pr["new_row_id"], "decision": "rename"}])
-    assert res.status_code == 200, res.text
-    assert res.json()["sheets"]["dcs"]["renamed"] == 1
-    assert count(db, "SELECT name FROM sites WHERE id = :i".replace(":i", str(old_id))) == "New DC"
-    assert count(db, "SELECT active FROM sites WHERE id = :i".replace(":i", str(old_id))) is True
-    assert count(db, "SELECT count(*) FROM sites WHERE kind = 'data_center'") == 1
-    assert count(db, f"SELECT old_value || '>' || new_value FROM data_edits WHERE entity_id = {old_id} AND field = 'name'") == "Old DC>New DC"
-    bad = apply(client, up["upload_id"])
-    assert bad.status_code == 409  # already applied
-    other = post(client, workbook([site("AAAA")], [dc("New DC", "AAAA", 3.3, 101.8)])).json()
-    assert apply(client, other["upload_id"], renames=[{"missing_dc_id": 999999, "new_row_id": 1, "decision": "rename"}],
-                 override_drop={"dcs": True}, reason="x").status_code == 422
-
-
 def test_apply_is_all_or_nothing(client, admin, db, monkeypatch):
     real = sm.apply_sheet
 
-    def boom(db_, admin_id, kind, *a, **k):
-        out = real(db_, admin_id, kind, *a, **k)
-        if kind == "dcs":
-            raise RuntimeError("boom")
-        return out
+    def boom(*a, **k):
+        real(*a, **k)
+        raise RuntimeError("boom")
 
     monkeypatch.setattr(sm.apply, "apply_sheet", boom)
-    r = post(client, workbook([site("AAAA")], [dc("DC One", "AAAA", 3.3, 101.8)]))
+    r = post(client, workbook([site("AAAA")]))
     uid = r.json()["upload_id"]
     with pytest.raises(RuntimeError):
         apply(client, uid)
     assert count(db) == 0
     assert count(db, f"SELECT status FROM uploads WHERE id = {uid}") == "staged"
     monkeypatch.undo()
-    assert apply(client, uid).status_code == 200 and count(db) == 2
+    assert apply(client, uid).status_code == 200 and count(db) == 1
 
 
 def test_planner_gets_403_and_bad_files_are_refused(client, db, admin):
@@ -363,8 +298,7 @@ def test_planner_gets_403_and_bad_files_are_refused(client, db, admin):
 def test_timing_36k_sites(client, admin, db):
     import time
     sites = [site(f"S{i:05d}", 1.5 + (i % 200) * 0.03, 100.0 + (i // 200) * 0.01) for i in range(36000)]
-    dcs = [dc(f"DC {i:03d}", f"S{i:05d}", None, None) for i in range(100)]
-    data = workbook(sites, dcs)
+    data = workbook(sites)
     t = time.time()
     r = post(client, data)
     t1 = time.time() - t
@@ -376,25 +310,7 @@ def test_timing_36k_sites(client, admin, db):
     res = apply(client, uid)
     t3 = time.time() - t
     print(f"TIMING upload={t1:.1f}s rows_page={t2:.2f}s apply={t3:.1f}s")
-    assert res.status_code == 200 and page["total"] == 36000 and count(db) == 36100
-
-
-def test_sheets_apply_one_at_a_time(client, admin, db):
-    seed_sites(db, ["AAAA"])
-    uid = post(client, workbook([site("AAAA"), site("NEWW")], [dc("DC One", "AAAA")])).json()["upload_id"]
-    first = apply(client, uid, sheets=["sites"])
-    assert first.status_code == 200 and first.json()["complete"] is False
-    assert first.json()["sheets"]["sites"]["applied"] is True and first.json()["sheets"]["dcs"]["applied"] is False
-    assert count(db, "SELECT count(*) FROM sites WHERE name = 'NEWW'") == 1
-    assert count(db, "SELECT count(*) FROM sites WHERE kind = 'data_center'") == 0
-    assert client.get(f"{URL}/current").json()["current"] is None  # still staged: a sheet is left
-    assert apply(client, uid, sheets=["sites"]).status_code == 409  # that sheet is done
-    second = apply(client, uid, sheets=["dcs"])
-    assert second.status_code == 200 and second.json()["complete"] is True
-    assert second.json()["sheets"]["sites"]["applied"] is True and second.json()["sheets"]["dcs"]["applied"] is True
-    assert count(db, "SELECT count(*) FROM sites WHERE kind = 'data_center'") == 1
-    assert client.get(f"{URL}/current").json()["current"]["upload_id"] == uid
-    assert apply(client, uid).status_code == 409
+    assert res.status_code == 200 and page["total"] == 36000 and count(db) == 36000
 
 
 def test_add_only_keeps_sites_missing_from_the_file_and_skips_the_row_count_check(client, admin, db):

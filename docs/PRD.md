@@ -131,7 +131,7 @@ To confirm against the mock files arriving 22 October 2026: KMZ lines are named 
      - The admin uploads the new file. It goes to staging (nothing is written yet) and is compared with the database per sheet: Added (insert), Changed (update, kept as data edit history with the upload as the reason), Missing from the file (marked inactive, never deleted; if a segment or reservation uses it, it stays active and shows a warning) and Problem (Needs review). Sites key on site_name (the 4-letter LRD code); DCs key on "DC Name / Link".
      - The preview shows summary counts first, then filters Added, Changed, Missing and Problem (about 36,000 site rows). The admin applies it. The applied file becomes the "current file", shown with name, upload date, uploader and row counts. Previous uploads are kept for comparison.
      - Whole-file checks block that sheet: empty, required headers missing, duplicate keys, or the new sheet has 10% or more fewer rows than the database (the admin can override with a confirmation). A failing DC sheet does not block a good sites sheet.
-     - A DC missing from the new file while a new DC appears with the same LRD and coordinates is flagged "possible rename" for the admin to decide.
+     - The DC List sheet and "possible rename" were removed on 16 Nov 2026; a DC List sheet in the workbook is ignored.
      - The values empty, "TBA", "N/A", "NA", "-" and "TBC" count as blank, not as invalid text.
      - A DC row links to its site through the LRD column and adds the DC details; it does not create a new place. If its own lat/long is blank or invalid, the DC uses the linked site's coordinates, labelled "location from site <LRD>". If the linked site has no valid coordinates either, the row is Needs review and the DC is not drawn on the map. A site with invalid coordinates is Needs review and not drawn on the map, but segments and routing still work for it.
      - The per-row checks above still apply (coordinate box, region spelling map, unknown region is Needs review). A parser failure never blocks the import and nothing is guessed. A field edited in the dashboard is protected from uploads; the preview shows "edited in dashboard, file differs".
@@ -143,7 +143,7 @@ To confirm against the mock files arriving 22 October 2026: KMZ lines are named 
    - Parsing is layered: the raw text is always kept and parsed fields are added on top. A parser failure never blocks the import; the row goes to Needs review.
    - A region spelling variant (for example "Nothern") is mapped to North, Central, South or East Coast. A region value that cannot be mapped goes to Needs review with a reason, never a silent guess.
    - A site or DC with latitude and longitude outside a Southeast Asia box (roughly latitude -11 to 21, longitude 92 to 141; Malaysia is latitude 0.8 to 7.4, longitude 99.6 to 119.3) goes to Needs review, because swapped values, 0,0 and typos would plot in the wrong place and break distances.
-   - A standalone checker, `python -m app.ingest.excel_check <file>`, reads a workbook and prints a report of bad coordinates, unknown sites, malformed or unpairable port ranges, blank requestors, unknown region spellings and duplicate site names. The upload preview uses the same check functions.
+   - The standalone checker `excel_check` and the old sample-workbook seed were removed on 16 Nov 2026; data loads via `python -m app.load_data`. The upload preview uses the shared check functions.
    - Segments are grouped into routes as the Excel states; where it does not, by chaining site pairs from the route's site A to its site B, and any chain with more than one possible path is flagged in the report.
    - Many rows with the same two sites are normal, because one cable has many cores. The validation report warns when the same Port ID appears twice or when a cable looks listed twice between the same two sites, and the admin decides what to keep before anything is saved.
    - After the first import, the dashboard database is the source of truth and the Excel is a feed. A field edited in the dashboard is protected: a later upload that differs shows as a conflict in the preview and keeps the dashboard value unless the admin ticks the Excel value.
@@ -241,7 +241,7 @@ Walked through with the data owner on 22 to 24 October 2026 (`Sample/Sample Exce
 | Reservation | Imported (the only operational sheet) | About 102 |
 | Monitoring | Not imported; the planner says the data is not accurate. v1.1 or later | |
 | Site Location (sites sheet) | Imported as sites (site master upload) | About 36,000 |
-| DC List (DC sheet) | Imported as DCs, linked to their LRD site (site master upload) | About 100 |
+| DC List (DC sheet) | Not imported (removed 16 Nov 2026; ignored if present) | About 100 |
 
 Reservation sheet (header on row 1):
 
@@ -260,13 +260,13 @@ Reservation sheet (header on row 1):
 - **No of core requested and Core assignment:** the real reservation. Core assignment holds port ranges per site, for example `AABB Tray 1 P1-P2` and `BBCC MOD B P23-24`. The two sites' ranges are paired in order (P1 with P23, P2 with P24). A length mismatch or a malformed range (for example `P23-282`) makes the row Needs review. Never guessed.
   - Core assignment blank and a count present: a count-only reservation. The row is Ready and imports as a reservation with `unassigned_cores = N` and no specific cores.
   - Core assignment blank and the count blank: Needs review.
-  - Open question: whether real rows have blank or short Core assignment. To be checked by running `excel_check` on the real file on the work laptop. If every real row lists its cores, a blank Core assignment could become Needs review instead of a count-only reservation.
+  - Open question: whether real rows have blank or short Core assignment. To be checked by running `app.load_data` on the real file on the work laptop (`excel_check` was removed 16 Nov 2026). If every real row lists its cores, a blank Core assignment could become Needs review instead of a count-only reservation.
 - **Core balance:** computed; ignored on import. It is Core Secured minus assigned, which matches the dashboard's Free logic.
 - **Title rows** (for example "DWDM Trunk Route 1", "DWDM Route 2", "Company A project") are group labels. They apply to the rows below until the next title and are stored as `group_label` on each reservation.
 
 Site Location sheet (the sites sheet; found by its headers, not its name or position): in the sample the header is on row 4 (rows 1 to 3 are a title and blank). Every row is a site. Columns: SITE_NAME, LATITUDE_IN_DECIMAL, LONGITUDE_IN_DECIMAL, then 2G, 3G, 4G, REMOTE VSAT, CPE, PDH Microwave, SITE_TYPE, STRUCTURE_TYPE, PMSHIP, SHARING_TYPE, STRUCTURE_HEIGHT, DESCRIPTION, CREATED_BY, CREATED_WHEN, MODIFIEDBY, MODIFIEDWHEN, STRUCTURE_OWNER. Name, kind, location and region are real columns on the site. Every other column goes into one `details` JSON field, shown in the site panel, so a new Excel column needs no schema change. All sites are expected to have latitude and longitude; the coordinate check above applies.
 
-DC List sheet (the DC sheet; found by its headers): columns No, State, City, Cluster, DC NAME / LINK, LRD, E2E Status, Fiber Leg, lat, long. A DC is a site of kind 'data_center', linked to its LRD site row, not a separate place. A DC may have its own latitude and longitude, which can differ from its LRD site; when its own are blank or invalid it uses the linked site's, labelled "location from site <LRD>". E2E Status, Fiber Leg (the number of cables entering the DC), State, City and Cluster go in `details`.
+DC List sheet: no longer imported (removed 16 Nov 2026; the site master upload ignores it). Old description, kept for existing data: columns No, State, City, Cluster, DC NAME / LINK, LRD, E2E Status, Fiber Leg, lat, long. A DC is a site of kind 'data_center', linked to its LRD site row, not a separate place. A DC may have its own latitude and longitude, which can differ from its LRD site; when its own are blank or invalid it uses the linked site's, labelled "location from site <LRD>". E2E Status, Fiber Leg (the number of cables entering the DC), State, City and Cluster go in `details`.
 
 **Non-Functional Requirements**
 

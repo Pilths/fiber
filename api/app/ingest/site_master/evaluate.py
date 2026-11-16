@@ -1,4 +1,4 @@
-"""Compare parsed sheets with the database: protection rules, diff, renames, blocks."""
+"""Compare the parsed Sites sheet with the database: protection rules, diff, blocks."""
 from collections import Counter
 from typing import Any
 
@@ -20,8 +20,8 @@ from app.ingest.site_master.model import (
 
 SNAPSHOT_SQL = """
 SELECT s.id, s.name, s.kind, s.active, ST_Y(s.geom) AS lat, ST_X(s.geom) AS lon, s.details,
-       l.name AS lrd, s.lrd_site_id AS lrd_id
-FROM sites s LEFT JOIN sites l ON l.id = s.lrd_site_id
+       s.lrd_site_id AS lrd_id
+FROM sites s
 """
 PROTECTED_SQL = (
     "SELECT entity_id, field FROM data_edits "
@@ -76,10 +76,8 @@ def _same(a: Any, b: Any) -> bool:
     return a is not None and b is not None and str(a) == str(b)
 
 
-def _new_fields(kind: str, parsed: dict[str, Any]) -> dict[str, Any]:
+def _new_fields(parsed: dict[str, Any]) -> dict[str, Any]:
     fields: dict[str, Any] = {"location": _fmt(parsed["lat"], parsed["lon"])}
-    if kind == "dcs":  # Site Location has no region: it is neither checked nor compared nor written
-        fields["lrd"] = parsed["lrd"]
     if parsed.get("kind"):
         fields["kind"] = parsed["kind"]
     for key, value in parsed["details"].items():
@@ -95,23 +93,20 @@ def _drop_region(details: dict[str, Any]) -> None:
             return
 
 
-def _old_fields(kind: str, row: DbSite) -> dict[str, Any]:
+def _old_fields(row: DbSite) -> dict[str, Any]:
     details = dict(row.details)
     fields: dict[str, Any] = {"location": _fmt(row.lat, row.lon)}
-    if kind == "sites":
-        fields["kind"] = row.kind
-        _drop_region(details)
-    else:
-        fields["lrd"] = row.lrd
+    fields["kind"] = row.kind
+    _drop_region(details)
     for key, value in details.items():
         fields["details." + key] = value
     return fields
 
 
-def diff_fields(kind: str, parsed: dict[str, Any], row: DbSite,
+def diff_fields(parsed: dict[str, Any], row: DbSite,
                 protected: dict[int, set[str]]) -> list[dict[str, Any]]:
-    new = _new_fields(kind, parsed)
-    old = _old_fields(kind, row)
+    new = _new_fields(parsed)
+    old = _old_fields(row)
     if "kind" not in new:
         old.pop("kind", None)  # the file has no Type column
     old_by_norm = {norm(key): key for key in old}
@@ -133,33 +128,12 @@ def diff_fields(kind: str, parsed: dict[str, Any], row: DbSite,
     return changes
 
 
-def _duplicate_reason(kind: str, items: list[Item], key: str) -> str:
-    label = "site_name" if kind == "sites" else "DC Name / Link"
+def _duplicate_reason(items: list[Item], key: str) -> str:
     rows = ", ".join(str(item.row_number) for item in items if item.parsed["key"] == key)
-    return f"duplicate {label} '{key}' in file (rows {rows})"
+    return f"duplicate site_name '{key}' in file (rows {rows})"
 
 
-def _check_dc(
-    item: Item, known: set[str], site_coords: dict[str, tuple[float, float]], reasons: list[str]
-) -> None:
-    """A DC needs a known LRD site; without its own coordinates it takes the site's."""
-    parsed = item.parsed
-    lrd = parsed["lrd"]
-    if not lrd:
-        reasons.append("LRD is blank")
-    elif lrd not in known:
-        reasons.append(f"unknown site code {lrd}")
-    if parsed["lat"] is not None:
-        item.effective = (parsed["lat"], parsed["lon"])
-    elif lrd in known:
-        if lrd in site_coords:
-            item.effective = site_coords[lrd]
-            item.note = f"location from site {lrd}"
-        else:
-            reasons.append(f"no valid coordinates for the DC or its site {lrd}")
-
-
-def _set_group(kind: str, item: Item, row: DbSite | None, reasons: list[str],
+def _set_group(item: Item, row: DbSite | None, reasons: list[str],
                protected: dict[int, set[str]]) -> None:
     item.reason = "; ".join(reasons) or None
     if reasons:
@@ -171,7 +145,7 @@ def _set_group(kind: str, item: Item, row: DbSite | None, reasons: list[str],
         item.group = "added"
         return
     item.db_id = row.id
-    item.changes = diff_fields(kind, item.parsed, row, protected)
+    item.changes = diff_fields(item.parsed, row, protected)
     if item.changes:
         item.group = "changed"
     else:
@@ -193,8 +167,6 @@ def _eval_sheet(
     parsed_sheet: ParsedSheet,
     snapshot: dict[str, DbSite],
     protected: dict[int, set[str]],
-    site_coords: dict[str, tuple[float, float]],
-    known: set[str],
     add_only: bool = False,
 ) -> SheetResult:
     result = SheetResult(kind, parsed_sheet.sheet_name, parsed_sheet.found, parsed_sheet.items)
@@ -208,13 +180,11 @@ def _eval_sheet(
         reasons = list(item.parsed["reasons"])
         key = item.parsed["key"]
         if key and key_counts[key] > 1:
-            reasons.append(_duplicate_reason(kind, parsed_sheet.items, key))
-        if kind == "dcs":
-            _check_dc(item, known, site_coords, reasons)
+            reasons.append(_duplicate_reason(parsed_sheet.items, key))
         row = snapshot.get(key) if key else None
         if row and row.cls != kind:
             reasons.append(f"name already used by a {row.kind} in the database")
-        _set_group(kind, item, row, reasons, protected)
+        _set_group(item, row, reasons, protected)
 
     active_rows = [site for site in snapshot.values() if site.cls == kind and site.active]
     # add-only: the file is a part of the list, so nothing is "missing" and the row-count check does not apply
@@ -229,42 +199,7 @@ def _eval_sheet(
     file_rows = len(key_counts)
     if parsed_sheet.items and not add_only and _too_few_rows(file_rows, len(active_rows)):
         result.block_reasons.append(_row_count_block(file_rows, len(active_rows)))
-    if kind == "dcs":
-        _possible_renames(result, site_coords)
     return result
-
-
-def _same_place(item: Item, missing: DbSite, location: tuple[float, float]) -> bool:
-    if item.effective is None:
-        return False
-    return item.parsed["lrd"] == missing.lrd and _fmt(*item.effective) == _fmt(*location)
-
-
-def _possible_renames(result: SheetResult, site_coords: dict[str, tuple[float, float]]) -> None:
-    """A missing DC and a new DC on the same LRD site at the same place may be one DC renamed."""
-    added = [item for item in result.items if item.group == "added" and item.effective]
-    taken: set[int] = set()
-    for missing in result.missing:
-        if missing.lat is not None:
-            location = (missing.lat, missing.lon)
-        else:
-            location = site_coords.get(missing.lrd or "")
-        if not location:
-            continue
-        for item in added:
-            if id(item) in taken or not _same_place(item, missing, location):  # type: ignore[arg-type]
-                continue
-            taken.add(id(item))
-            item.rename = {"missing_dc_id": missing.id, "missing_dc_name": missing.name}
-            result.renames.append({
-                "missing_dc_id": missing.id,
-                "missing_dc_name": missing.name,
-                "new_dc_name": item.parsed["key"],
-                "new_row_number": item.row_number,
-                "new_row_id": item.id,
-                "lrd": missing.lrd,
-            })
-            break
 
 
 def used_site_ids(db: Session, ids: list[int]) -> set[int]:
@@ -273,30 +208,10 @@ def used_site_ids(db: Session, ids: list[int]) -> set[int]:
     return {row[0] for row in db.execute(text(USED_SITE_IDS_SQL), {"ids": ids})}
 
 
-def _site_coords(snapshot: dict[str, DbSite]) -> dict[str, tuple[float, float]]:
-    coords = {}
-    for name, site in snapshot.items():
-        if site.cls == "sites" and site.lat is not None and site.lon is not None:
-            coords[name] = (site.lat, site.lon)
-    return coords
-
-
 def evaluate(db: Session, parsed: dict[str, ParsedSheet], add_only: bool = False) -> dict[str, SheetResult]:
     snapshot = load_snapshot(db)
     protected = load_protected(db, "site", (UPLOAD_REASON,))
-    coords = _site_coords(snapshot)
-    known = {name for name, site in snapshot.items() if site.cls == "sites"}
-    sites = _eval_sheet("sites", parsed["sites"], snapshot, protected, {}, set(), add_only)
-    out = {"sites": sites}
-    # file sites count for the DCs unless the sites sheet is blocked for good
-    if not sites.blocked or not sites.hard:
-        for item in sites.items:
-            if item.status != "ready":
-                continue
-            known.add(item.parsed["key"])
-            if item.parsed["lat"] is not None:
-                coords[item.parsed["key"]] = (item.parsed["lat"], item.parsed["lon"])
-    out["dcs"] = _eval_sheet("dcs", parsed["dcs"], snapshot, protected, coords, known, add_only)
+    out = {"sites": _eval_sheet("sites", parsed["sites"], snapshot, protected, add_only)}
     for result in out.values():
         result.in_use = used_site_ids(db, [missing.id for missing in result.missing])
     return out

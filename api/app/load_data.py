@@ -185,7 +185,7 @@ def load(db: Session, admin: str, path: str) -> int:
     if parsed["sites"].found:
         up = sm.stage(db, admin_id, name, parsed, add_only=True)
         try:
-            out = sm.apply_upload(db, admin_id, up["upload_id"], {}, None, [], ["sites"])
+            out = sm.apply_upload(db, admin_id, up["upload_id"], {}, None, ["sites"])
             s = out["sheets"]["sites"]
             print(f"Sites: {s}")
         except sm.ApplyError as e:

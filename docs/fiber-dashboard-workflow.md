@@ -113,7 +113,7 @@ Do not create a separate agent per phase. Make an agent only when it needs a dif
 - Whether two sites can have more than one segment of the same route type (to confirm with the data owners).
 - KMZ route name format, until real files are seen (real KMZ import is Later).
 - SMTP relay access.
-- Whether the UI rework (TASK-073 to TASK-075) moves earlier than Phase 11 (RISK-010); whether real rows have blank core assignments (run `excel_check` on the real file); how an upload may "modify" a reservation. Full list: `docs/plan.md`, section 9.
+- Whether the UI rework (TASK-073 to TASK-075) moves earlier than Phase 11 (RISK-010); whether real rows have blank core assignments (run `app.load_data` on the real file; `excel_check` was removed 16 Nov 2026); how an upload may "modify" a reservation. Full list: `docs/plan.md`, section 9.
 
 ## Install notes
 

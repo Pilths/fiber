@@ -14,10 +14,10 @@ export function FreeBadge({ s }: { s: Parameters<typeof health>[0] }) {
 
 const regions = (all: Segment[]) => [...new Set(all.map((s) => s.region).filter((v): v is string => !!v))].sort();
 
-// Region in the map toolbar: it dims the other segments on the map. Route types and site kinds are in Layers.
+// Region, at the top of the map filters in the Site A to B panel: it dims the other segments on the map.
 export function MapFilters({ segments, filter, onFilter }: { segments: Segment[] | null; filter: SegmentFilter; onFilter: (f: SegmentFilter) => void }) {
   const all = segments ?? [];
-  const cls = "field h-8 w-auto text-[13px] font-semibold";
+  const cls = "field h-8 w-full text-[13px] font-semibold";
   return (
     <select className={cls} aria-label="Region" value={filter.region} onChange={(e) => onFilter({ ...filter, region: e.target.value })}>
       <option value="">All regions</option>

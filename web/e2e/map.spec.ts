@@ -62,14 +62,16 @@ test("map loads with no request leaving the app origin; chips, sites, layers and
   await expect(chip(page, FAR)).toHaveText(/^(\d+|–)$/); // the free-core number only, no icon
   await expect(chips(page).locator("svg")).toHaveCount(0);
   await expect(page.getByTestId("map-not-drawn")).toContainText("2 segments not on the map (no coordinates)");
-  await expect(map(page).getByRole("group", { name: "Map key" })).toContainText("Route type");
+  // Region, Layers and the key live at the foot of the Site A to B panel, not on the map.
+  await expect(map(page).getByRole("button", { name: "Layers" })).toHaveCount(0);
+  await expect(map(page).getByLabel("Region")).toHaveCount(0);
+  await expect(page.getByRole("group", { name: "Map filters" })).toContainText("Selected");
   if (m === "gl") {
     await expect(page.getByTestId("map-note")).toHaveCount(0);
     await page.waitForFunction(() => document.querySelector(".maplibregl-canvas"));
     await page.waitForTimeout(1500); // let tiles and glyphs load
   }
 
-  await page.getByRole("button", { name: "Layers" }).click();
   for (const type of ["Trunk", "Metro", "DC-DC", "DC-TOC"]) {
     await expect(page.getByRole("checkbox", { name: type, exact: true })).toBeChecked();
   }
@@ -90,7 +92,6 @@ test("map loads with no request leaving the app origin; chips, sites, layers and
   for (const type of ["Trunk", "Metro", "DC-DC", "DC-TOC"]) {
     await page.getByRole("checkbox", { name: type, exact: true }).check();
   }
-  await page.getByRole("button", { name: "Layers" }).click();
   await expect(chips(page)).toHaveCount(DRAWN);
   await page.screenshot({ path: "e2e/screenshots/map-overview.png" });
   expect(outside).toEqual([]);
@@ -130,7 +131,6 @@ test("Layers: route types and trunk routes hide their lines; turning off the sel
   const drawn = segs.filter((s) => drawnIds.includes(s.id)); // segments without coordinates are not drawn
   const count = (test: (s: { route_type: string | null; route: string | null }) => boolean) => drawn.filter(test).length;
   await expect(map(page).getByLabel("Type")).toHaveCount(0); // route types are in Layers, not a filter
-  await page.getByRole("button", { name: "Layers" }).click();
   const metro = page.getByRole("checkbox", { name: "Metro", exact: true });
   await metro.uncheck();
   await expect(lines).toHaveCount(total - count((s) => s.route_type === "Metro"));
@@ -144,14 +144,6 @@ test("Layers: route types and trunk routes hide their lines; turning off the sel
   await expect(chip).toHaveAttribute("aria-pressed", "false");
   await expect(lines).toHaveCount(total - count((s) => s.route_type === "Trunk" && s.route === route));
   await chip.click();
-  await expect(lines).toHaveCount(total);
-  // the map key toggles the same layers: click Metro in the key, the Layers tick box follows
-  const keyMetro = page.getByRole("group", { name: "Map key" }).getByRole("button", { name: "Show Metro lines" });
-  await keyMetro.click();
-  await expect(keyMetro).toHaveAttribute("aria-pressed", "false");
-  await expect(page.getByRole("checkbox", { name: "Metro", exact: true })).not.toBeChecked();
-  await expect(lines).toHaveCount(total - count((s) => s.route_type === "Metro"));
-  await keyMetro.click();
   await expect(lines).toHaveCount(total);
   // unticking the layer of the selected Metro segment unselects it and hides it
   const picked = drawn.find((s) => s.route_type === "Metro")!;
@@ -319,7 +311,7 @@ test("Region filter that leaves out the selected segment unselects it", async ({
   await page.evaluate((value) => { location.hash = value; }, hash);
   const pickedLine = page.locator(`[data-testid=map-line][data-segment-id="${picked.id}"]`);
   await expect(pickedLine).toHaveAttribute("data-selected", "true");
-  await map(page).getByLabel("Region").selectOption(other);
+  await page.getByRole("group", { name: "Map filters" }).getByLabel("Region").selectOption(other);
   await expect(page.locator("[data-testid=map-line][data-selected=true]")).toHaveCount(0);
   expect(page.url()).not.toContain("#segment=");
 });
@@ -327,7 +319,10 @@ test("Region filter that leaves out the selected segment unselects it", async ({
 // Campuses from the DEV seed (seed_dev_network): read only, nothing is written.
 const CAMPUS = "DEV KL Campus";
 
-test("campuses: label with site count zoomed out, outline and sites zoomed in, Layers chip turns one off", async ({ page }) => {
+test("campuses: label with site count zoomed out, outline and sites zoomed in, always drawn", async ({ page }) => {
+  // A campus name is dropped where it would overlap a site. At 1440x900 the first fit of the DEV network puts
+  // both campus names on sites; 60px shorter (the map's height before 16 Nov 2026) the KL name has room.
+  await page.setViewportSize({ width: 1440, height: 840 });
   await signIn(page);
   await mode(page);
   const sectors: { features: { properties: Record<string, unknown> & { cluster: string; site_count: number } }[] } =
@@ -366,17 +361,32 @@ test("campuses: label with site count zoomed out, outline and sites zoomed in, L
   await expect(map(page).getByTestId("map-site").locator(".shape.dc").first()).toHaveCSS("width", "10px");
   await settle(page);
   await page.screenshot({ path: "e2e/screenshots/map-campus-in.png" });
-  // Layers: the campus chip off draws no label or outline and shows its sites at every zoom.
-  await page.getByRole("button", { name: "Fit selection" }).click();
+  // Campuses are always drawn: the filters have no per-campus chip.
+  await expect(page.getByRole("button", { name: `Cluster ${CAMPUS}`, exact: true })).toHaveCount(0);
+});
+
+// The header search lists campuses under Clusters; picking one fits the map to the campus.
+test("picking a campus in the top bar search zooms the map to it", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 840 });
+  await signIn(page);
+  await mode(page);
+  const members = (await mapSites(page)).features
+    .filter((site) => site.properties.cluster === CAMPUS)
+    .map((site) => site.properties.name);
+  test.skip(members.length < 2, "DEV campuses not seeded");
+  const label = map(page).getByRole("button", { name: new RegExp(`^Cluster ${CAMPUS}, `) });
   await expect(label).toBeVisible();
-  await page.getByRole("button", { name: "Layers" }).click();
-  const campusChip = page.getByRole("button", { name: `Cluster ${CAMPUS}`, exact: true });
-  await expect(campusChip).toHaveAttribute("aria-pressed", "true");
-  await campusChip.click();
-  await expect(campusChip).toHaveAttribute("aria-pressed", "false");
-  await expect(map(page).locator(`[data-testid=map-sector][data-cluster="${CAMPUS}"]`)).toHaveCount(0);
+  await page.getByRole("combobox", { name: /^Find a segment/ }).fill("KL Camp");
+  const clusters = page.getByRole("group", { name: "Clusters" });
+  await expect(clusters).toBeVisible();
+  await clusters.getByRole("option", { name: CAMPUS }).click();
+  await expect(page.getByRole("listbox", { name: "Search results" })).toHaveCount(0);
+  // Zoomed in on the campus: the label gives way to the outline and each member site.
   await expect(label).toHaveCount(0);
-  await expect(klMarkerOrBadge.first()).toBeVisible();
+  await expect(map(page).locator(`[data-testid=map-sector][data-cluster="${CAMPUS}"]`)).toHaveCount(1);
+  for (const name of members) {
+    await expect(map(page).getByRole("button", { name: new RegExp(`^Site ${name},`) })).toBeVisible();
+  }
 });
 
 // Crowding: DEV Bukit Jalil TOC is moved to about 2 m from DEV Tanjung Malim Hut (no campus), close enough to still

@@ -1099,21 +1099,15 @@ export interface components {
         /** ApplyIn */
         ApplyIn: {
             /** Sheets */
-            sheets?: ("sites" | "dcs")[] | null;
+            sheets?: "sites"[] | null;
             /**
              * @default {
-             *       "sites": false,
-             *       "dcs": false
+             *       "sites": false
              *     }
              */
             override_drop: components["schemas"]["OverrideIn"];
             /** Reason */
             reason?: string | null;
-            /**
-             * Renames
-             * @default []
-             */
-            renames: components["schemas"]["RenameIn"][];
         };
         /** Bell */
         Bell: {
@@ -1609,11 +1603,6 @@ export interface components {
              * @default false
              */
             sites: boolean;
-            /**
-             * Dcs
-             * @default false
-             */
-            dcs: boolean;
         };
         /** Owner */
         Owner: {
@@ -1706,18 +1695,6 @@ export interface components {
             counts: components["schemas"]["PastePortCounts"];
             /** Applied */
             applied: boolean;
-        };
-        /** RenameIn */
-        RenameIn: {
-            /** Missing Dc Id */
-            missing_dc_id: number;
-            /** New Row Id */
-            new_row_id: number;
-            /**
-             * Decision
-             * @enum {string}
-             */
-            decision: "rename" | "separate";
         };
         /** ResCore */
         ResCore: {
@@ -1864,7 +1841,7 @@ export interface components {
              * Type
              * @enum {string}
              */
-            type: "customer" | "segment" | "core";
+            type: "customer" | "segment" | "cluster" | "core";
             /** Label */
             label: string;
             /** Segment Id */
@@ -2119,9 +2096,9 @@ export interface components {
         SheetOut: {
             /**
              * Kind
-             * @enum {string}
+             * @constant
              */
-            kind: "sites" | "dcs";
+            kind: "sites";
             /** Sheet Name */
             sheet_name: string | null;
             /** Found */
@@ -2389,10 +2366,6 @@ export interface components {
             filename: string;
             /** Sheets */
             sheets: components["schemas"]["SheetOut"][];
-            /** Possible Renames */
-            possible_renames: {
-                [key: string]: unknown;
-            }[];
             /**
              * Add Only
              * @default false
@@ -3675,7 +3648,7 @@ export interface operations {
     rows_api_admin_site_master_uploads__upload_id__rows_get: {
         parameters: {
             query: {
-                sheet: "sites" | "dcs";
+                sheet: "sites";
                 group: "added" | "changed" | "missing" | "problem" | "unchanged";
                 page?: number;
                 page_size?: number;

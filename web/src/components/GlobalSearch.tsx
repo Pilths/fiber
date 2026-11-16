@@ -6,8 +6,8 @@ import { useCloseOnOutsideClick } from "@/lib/useCloseOnOutsideClick";
 export type SearchResult = components["schemas"]["SearchResult"];
 type Result = SearchResult;
 
-const GROUPS: Result["type"][] = ["customer", "segment", "core"];
-const GROUP_LABEL = { customer: "Customers", segment: "Segments", core: "Cores" };
+const GROUPS: Result["type"][] = ["customer", "segment", "cluster", "core"];
+const GROUP_LABEL = { customer: "Customers", segment: "Segments", cluster: "Clusters", core: "Cores" };
 const SEARCH_LABEL = "Find a segment, site, customer or core";
 const SEARCH_DELAY_MS = 200;
 
@@ -16,6 +16,11 @@ const LIST_CLASS =
   "rounded-xl border border-line bg-white py-2";
 const OPTION_CLASS = "flex min-h-10 cursor-pointer items-center px-4 py-1.5 aria-disabled:cursor-not-allowed";
 const MUTED_LINE_CLASS = "px-4 py-2 text-body text-muted-foreground";
+
+// A cluster opens on the map; any other result needs a segment to open.
+function pickable(result: Result): boolean {
+  return result.type === "cluster" || result.segment_id != null;
+}
 
 // Results come from GET /api/search, grouped in GROUPS order. Typing waits SEARCH_DELAY_MS before asking.
 function useGlobalSearch(onPick: (result: Result) => void) {
@@ -62,7 +67,7 @@ function useGlobalSearch(onPick: (result: Result) => void) {
 
   const pick = (result: Result) => {
     // nothing to open (e.g. a customer without reservations)
-    if (result.segment_id == null) {
+    if (!pickable(result)) {
       return;
     }
     setOpen(false);
@@ -122,13 +127,13 @@ function SearchGroup({ id, group, results, active, onHover, onPick }: {
           id={`${id}-${index}`}
           role="option"
           aria-selected={index === active}
-          aria-disabled={result.segment_id == null}
+          aria-disabled={!pickable(result)}
           onMouseEnter={() => onHover(index)}
           onClick={() => onPick(result)}
           className={`${OPTION_CLASS} ${index === active ? "bg-blue-bg" : ""}`}
         >
           <span className="font-semibold">{result.label}</span>
-          {result.segment_id == null && (
+          {!pickable(result) && (
             <span className="ml-2 text-body text-muted-foreground">(no segment yet)</span>
           )}
         </div>

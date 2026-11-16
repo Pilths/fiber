@@ -225,20 +225,10 @@
 .msector:hover .msector-n { background: color-mix(in srgb, var(--ink) 80%, #fff); }
 /* The name is the tint darkened to keep 4.5:1 on white (even amber), with a white halo instead of a box. */
 .msector-name { position: absolute; left: calc(100% + 2px); top: 50%; transform: translateY(-50%); color: color-mix(in srgb, var(--tint) 65%, #000); font-size: 11px; line-height: 14px; font-weight: 700; white-space: nowrap; paint-order: stroke fill; -webkit-text-stroke: 3px #fff; }
-.cluster-swatch { width: 10px; height: 10px; border-radius: 2px; flex: none; }
-/* Map key: fixed-width card, bottom left. Two columns (free to reserve | route type), then sites; every row the same height. */
-.mleg { position: absolute; z-index: 10; left: 12px; bottom: 12px; width: 268px; display: grid; grid-template-columns: 1fr 1fr; grid-auto-rows: 20px; gap: 2px 16px; padding: 8px 12px 10px; background: #fff; border: 1px solid var(--border); border-radius: 6px; font-size: 12px; line-height: 20px; color: var(--ink); }
-.mleg > span { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
-.mleg > button { display: flex; align-items: center; gap: 8px; white-space: nowrap; margin: 0 -4px; padding: 0 4px; border-radius: 4px; cursor: pointer; text-align: left; }
-.mleg > button:hover { background: var(--raised); }
-.mleg > button[aria-pressed="false"] { color: var(--muted-ink); text-decoration: line-through; }
-.mleg > button[aria-pressed="false"] .slot { opacity: 0.35; }
+/* Map key swatches (line and site shapes), shown in the map filters at the foot of the Site A to B panel. */
 .slot { flex: none; width: 30px; display: inline-flex; align-items: center; justify-content: center; }
-.mleg-h { font-weight: 600; color: var(--muted-ink); white-space: nowrap; }
-.mleg .lc { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 16px; border-radius: 999px; border: 1px solid; font-weight: 700; font-size: 11px; line-height: 1; }
-.mleg .lc.h-green { border-color: var(--green); } .mleg .lc.h-amber { border-color: var(--amber); } .mleg .lc.h-red { border-color: var(--red); }
 .ll { width: 26px; height: 0; border-top: 6px solid var(--line-trunk); flex: none; }
 .ll.m { height: 4px; border-top: 0; background: repeating-linear-gradient(90deg, var(--line-metro) 0 10px, transparent 10px 13px, var(--line-metro) 13px 16px, transparent 16px 19px); } .ll.dd { border-top: 7px double var(--line-dcdc); }
 .ll.dt { border-top: 4px dashed var(--line-dctoc); } .ll.s { border-top: 4px solid var(--blue); }
-/* MapLibre's attribution sits bottom right, clear of the key. */
+/* MapLibre's attribution sits bottom right. */
 .maplibregl-ctrl-attrib { font-size: 11px; }

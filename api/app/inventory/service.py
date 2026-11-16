@@ -235,6 +235,13 @@ JOIN sites a ON a.id = s.site_a_id JOIN sites b ON b.id = s.site_b_id
 WHERE a.name ILIKE :like ESCAPE '\\' OR b.name ILIKE :like ESCAPE '\\'
 ORDER BY s.id LIMIT :n
 """
+# A cluster is the trimmed details->>'cluster' of active sites (same filter as the map sectors).
+SEARCH_CLUSTER_SQL = """
+SELECT btrim(details->>'cluster'), NULL::bigint, NULL::bigint, NULL::bigint FROM sites
+WHERE active AND btrim(coalesce(details->>'cluster', '')) <> ''
+  AND btrim(details->>'cluster') ILIKE :like ESCAPE '\\'
+GROUP BY btrim(details->>'cluster') ORDER BY btrim(details->>'cluster') LIMIT :n
+"""
 SEARCH_CORE_SQL = """
 SELECT 'Core ' || c.number || ' on ' || a.name || ' - ' || b.name, c.segment_id, c.id, NULL::bigint FROM cores c
 JOIN segments s ON s.id = c.segment_id AND (s.survey_cores IS NULL OR c.number <= s.survey_cores)
@@ -374,6 +381,7 @@ def search(db: Session, query: str) -> list[SearchResult]:
     searches = [
         ("customer", SEARCH_CUSTOMER_SQL),
         ("segment", SEARCH_SEGMENT_SQL),
+        ("cluster", SEARCH_CLUSTER_SQL),
     ]
     if number is not None:
         searches.append(("core", SEARCH_CORE_SQL))

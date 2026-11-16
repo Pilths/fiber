@@ -25,7 +25,7 @@ def _header_text(value: Any) -> str:
 
 
 def _find_sheet(wb: Any, kind: str, taken: set[str]) -> tuple[Any, int, list[str]] | None:
-    """Scan each sheet top to bottom, any row and column, for the name header (site_name / DC Name / Link).
+    """Scan each sheet top to bottom, any row and column, for the name header (site_name).
 
     That row, holding the other required headers too, is the header row.
     """
@@ -42,23 +42,13 @@ def _find_sheet(wb: Any, kind: str, taken: set[str]) -> tuple[Any, int, list[str
     return None
 
 
-def _first_present(fields: dict[str, Any], keys: tuple[str, ...]) -> Any:
-    for key in keys:
-        if key in fields:
-            return fields[key]
-    return None
-
-
-def _coordinate_problem(kind: str, lat: float | None, lon: float | None, lat_error: str | None,
+def _coordinate_problem(lat: float | None, lon: float | None, lat_error: str | None,
                         lon_error: str | None) -> str | None:
     if lat_error:
         return f"latitude {lat_error}"
     if lon_error:
         return f"longitude {lon_error}"
-    # a DC may leave its coordinates blank and fall back to its site
-    if kind == "sites" or lat is not None or lon is not None:
-        return checks.check_coords(lat, lon)
-    return None
+    return checks.check_coords(lat, lon)
 
 
 def _site_kind(site_type: Any) -> str | None:
@@ -83,17 +73,10 @@ def _parse_row(kind: str, headers: list[str], values: tuple[Any, ...]) -> Item:
     fields = {hkey(header): value for header, value in zip(headers, values) if header}
     reasons: list[str] = []
 
-    if kind == "sites":
-        key = _cell_text(fields.get("sitename"))
-        lat_source = fields.get("latitudeindecimal")
-        lon_source = fields.get("longitudeindecimal")
-    else:
-        key = _cell_text(fields.get("dcnamelink"))
-        lat_source = _first_present(fields, ("lat", "latitude"))
-        lon_source = _first_present(fields, ("long", "lon", "longitude"))
-    lat, lat_error = _num(lat_source)
-    lon, lon_error = _num(lon_source)
-    coordinate_problem = _coordinate_problem(kind, lat, lon, lat_error, lon_error)
+    key = _cell_text(fields.get("sitename"))
+    lat, lat_error = _num(fields.get("latitudeindecimal"))
+    lon, lon_error = _num(fields.get("longitudeindecimal"))
+    coordinate_problem = _coordinate_problem(lat, lon, lat_error, lon_error)
     if coordinate_problem:
         lat = None
         lon = None
@@ -106,17 +89,11 @@ def _parse_row(kind: str, headers: list[str], values: tuple[Any, ...]) -> Item:
     _normalise_cluster(details)
     parsed: dict[str, Any] = {"key": key, "lat": lat, "lon": lon, "details": details}
     if not key:
-        name_header = "site_name" if kind == "sites" else "DC Name / Link"
-        reasons.append(name_header + " is blank")
-    if kind == "sites":
-        if coordinate_problem:
-            reasons.append(coordinate_problem)
-    else:
-        parsed["lrd"] = _cell_text(fields.get("lrd"))
-        # not a problem by itself: the DC falls back to its site
-        parsed["own_coords_note"] = coordinate_problem
+        reasons.append("site_name is blank")
+    if coordinate_problem:
+        reasons.append(coordinate_problem)
     # no Type column: parsed has no "kind" and existing kinds are left alone
-    if kind == "sites" and "type" in fields:
+    if "type" in fields:
         parsed["kind"] = _site_kind(fields["type"])
         if parsed["kind"] is None:
             reasons.append("Type must be Trunk, DC, TOC or blank")
@@ -147,9 +124,9 @@ def _parse_rows(ws: Any, kind: str, header_row: int, headers: list[str]) -> list
 
 
 def parse_workbook(data: Any) -> dict[str, ParsedSheet]:
-    """Both parts of the site master workbook.
+    """The Sites sheet of the site master workbook; other sheets (such as an old DC List) are ignored.
 
-    A part with no matching sheet comes back found=False. Never raises on a row.
+    No matching sheet comes back found=False. Never raises on a row.
     """
     wb = openpyxl.load_workbook(data, read_only=True, data_only=True)
     out: dict[str, ParsedSheet] = {}

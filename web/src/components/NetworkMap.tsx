@@ -3,15 +3,16 @@ import { sectorClusters, sectorLabels, siteLayout } from "@/lib/clusterLayout";
 import { clustersOf } from "@/lib/mapClusters";
 import { declutter, drawnLines } from "@/lib/mapGeometry";
 import type { SegmentProps } from "@/lib/mapLayers";
-import { useNetworkMap, type Basemap } from "@/lib/useNetworkMap";
+import type { Basemap, NetworkMapState } from "@/lib/useNetworkMap";
 import { MapLines, SegmentChip, type ChipUsage } from "@/components/MapOverlay";
-import { MapControls, MapKey, NotDrawn } from "@/components/MapPanels";
+import { MapControls, NotDrawn } from "@/components/MapPanels";
 import { SectorLabels, SectorShapes } from "@/components/MapSectors";
 import { SiteMarkers } from "@/components/MapSites";
 import { requestName, type CustomerHighlight } from "@/lib/useCustomerHighlight";
 
-// Network map card body (TASK-054, TASK-055). One overlay draws segments (SVG lines), free-cores chips
-// and site markers (DOM buttons, app font, Tab reachable) in both modes:
+// Network map card body (TASK-054, TASK-055). The caller owns the state (useNetworkMap), so the layer filters
+// can sit outside the map (MapFilterPanel in the Site A to B panel).
+// One overlay draws segments (SVG lines), free-cores chips and site markers (DOM buttons, app font, Tab reachable) in both modes:
 //   "gl":  MapLibre renders the self-hosted PMTiles basemap underneath and owns the camera.
 //   "svg": no basemap (WebGL unavailable, or tiles not installed): plain background, own camera, drag to pan.
 // ponytail: the overlay re-renders on every camera move; fine for a few hundred segments, move lines into a
@@ -24,7 +25,8 @@ const NOTE: Partial<Record<Basemap, string>> = {
 };
 const NOTE_CLASS =
   "absolute top-3 right-3 z-10 max-w-[340px] note px-3 py-1.5 text-xs font-medium text-amber";
-const FRAMED_CLASS = "min-h-[clamp(520px,calc(100vh-210px),860px)] rounded-md border border-border";
+// The caller sets the height (the map card); the stage fills it.
+const FRAMED_CLASS = "rounded-md border border-border";
 
 function mapMode(base: Basemap): string {
   if (base === "gl") {
@@ -34,14 +36,11 @@ function mapMode(base: Basemap): string {
 }
 
 type NetworkMapProps = {
-  tools?: ReactNode; // extra toolbar controls (the Region filter)
-  selectedIds: number[];
-  routeKey: string | null;
+  state: NetworkMapState;
+  tools?: ReactNode; // extra toolbar controls (the customer chip)
   visible: (segment: SegmentProps) => boolean;
-  onSelectSegment: (id: number) => void;
   onSite: (name: string) => void;
   onClear: () => void;
-  version: number;
   customer?: CustomerHighlight | null; // customer mode: its chips show used cores
   onEmptyClick?: () => void;
 };
@@ -80,8 +79,7 @@ function chipUsage(customer: CustomerHighlight | null | undefined, segmentId: nu
 }
 
 export function NetworkMap(props: NetworkMapProps) {
-  const { selectedIds, routeKey, visible, onSelectSegment, onSite, onClear, version, tools, customer } = props;
-  const state = useNetworkMap({ selectedIds, routeKey, version, onSelectSegment, onClear });
+  const { state, visible, onSite, onClear, tools, customer } = props;
   const emptyClick = useEmptyMapClick(state.box, state.glBox, props.onEmptyClick);
   const { box, glBox, onPointerDown, onPointerMove, onPointerUp } = state;
   const { camera, size } = state;
@@ -98,13 +96,12 @@ export function NetworkMap(props: NetworkMapProps) {
   if (state.data.failed) {
     note = "Could not load the map data. Search and lists still work.";
   }
-  // Esc on a select (the request picker, Region) belongs to the select: the browser uses it to close the list.
+  // Esc on a select (the request picker) belongs to the select: the browser uses it to close the list.
   const onKeyDown = (event: React.KeyboardEvent) => {
     if (event.target instanceof HTMLSelectElement) {
       return;
     }
     if (event.key === "Escape") {
-      state.setLayersOpen(false);
       onClear();
     }
   };
@@ -137,7 +134,6 @@ export function NetworkMap(props: NetworkMapProps) {
           </>
         )}
         <MapControls state={state} tools={tools} />
-        <MapKey state={state} />
         {note && <p role="status" data-testid="map-note" className={NOTE_CLASS}>{note}</p>}
       </div>
       {state.data.segments && <NotDrawn items={state.data.segments.not_drawn} />}
