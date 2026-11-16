@@ -1,0 +1,103 @@
+import type { PlacedSite, SiteBadge, SiteLayout, SiteSpread } from "@/lib/clusterLayout";
+import type { Point } from "@/lib/mapGeometry";
+import { plural, siteLook, type SiteFeature } from "@/lib/mapLayers";
+import type { NetworkMapState } from "@/lib/useNetworkMap";
+
+// Site markers on the map, the count badges of crowded sites and the spread lists with their leader lines.
+
+type SiteMarkerProps = {
+  site: PlacedSite;
+  feature: SiteFeature;
+  segmentCount: number;
+  named: boolean;
+  onSite: (name: string) => void;
+};
+
+function markerClass(site: PlacedSite): string {
+  const classes = ["msite"];
+  if (site.end) {
+    classes.push("end");
+  }
+  if (site.spread) {
+    classes.push("spread");
+  }
+  return classes.join(" ");
+}
+
+function SiteMarker({ site, feature, segmentCount, named, onSite }: SiteMarkerProps) {
+  const { site_id, name, kind } = feature.properties;
+  const look = siteLook(kind);
+  const endNote = site.end ? ", end of the selection" : "";
+  const label = `Site ${name}, ${look.word}, ${plural(segmentCount, "segment")}${endNote}`;
+  const style = { left: site.point[0], top: site.point[1], opacity: site.opacity };
+  return (
+    <button type="button" data-testid="map-site" data-site-id={site_id} data-end={site.end}
+      aria-label={label} className={markerClass(site)} style={style} inert={!site.active}
+      onClick={() => onSite(name)}>
+      <span className={`shape ${look.shape}`} />
+      {(named || site.spread) && <span className="code" aria-hidden="true">{name}</span>}
+    </button>
+  );
+}
+
+type CrowdBadgeProps = { badge: SiteBadge; names: string[]; onZoom: (point: Point) => void };
+
+function CrowdBadge({ badge, names, onZoom }: CrowdBadgeProps) {
+  const [x, y] = badge.crowd.center;
+  const count = badge.crowd.members.length;
+  return (
+    <button type="button" data-testid="map-badge" className="mbadge" inert={!badge.active}
+      aria-label={`${count} sites: ${names.join(", ")}`}
+      style={{ left: x, top: y, opacity: badge.opacity }} onClick={() => onZoom(badge.crowd.center)}>
+      {count}
+    </button>
+  );
+}
+
+// Leader lines from the crowd's spot to each row of its spread list.
+function LeaderLines({ spreads }: { spreads: SiteSpread[] }) {
+  if (spreads.length === 0) {
+    return null;
+  }
+  return (
+    <svg className="pointer-events-none absolute inset-0 z-[4] size-full" aria-hidden="true">
+      {spreads.map(({ center, rows }) => (
+        <g key={rows.map((row) => row.index).join(",")} stroke="var(--use)" strokeWidth={1}>
+          {rows.map((row) => (
+            <line key={row.index} x1={center[0]} y1={center[1]} x2={row.point[0] - 6} y2={row.point[1]} />
+          ))}
+          <circle cx={center[0]} cy={center[1]} r={2.5} fill="var(--use)" stroke="none" />
+        </g>
+      ))}
+    </svg>
+  );
+}
+
+type SiteMarkersProps = {
+  state: NetworkMapState;
+  layout: SiteLayout;
+  nameShown: Set<number>;
+  onSite: (name: string) => void;
+};
+
+export function SiteMarkers({ state, layout, nameShown, onSite }: SiteMarkersProps) {
+  const features = state.data.sites?.features ?? [];
+  const segmentCount = (siteId: number) => state.features.filter((feature) => {
+    return feature.properties.site_a_id === siteId || feature.properties.site_b_id === siteId;
+  }).length;
+  const namesOf = (badge: SiteBadge) => badge.crowd.members.map((member) => features[member.index].properties.name);
+  return (
+    <>
+      <LeaderLines spreads={layout.spreads} />
+      {layout.sites.map((site) => (
+        <SiteMarker key={features[site.index].properties.site_id} site={site} feature={features[site.index]}
+          segmentCount={segmentCount(features[site.index].properties.site_id)}
+          named={nameShown.has(site.index)} onSite={onSite} />
+      ))}
+      {layout.badges.map((badge) => (
+        <CrowdBadge key={badge.crowd.members.map((member) => member.index).join(",")} badge={badge}
+          names={namesOf(badge)} onZoom={state.zoomAt} />
+      ))}
+    </>
+  );
+}

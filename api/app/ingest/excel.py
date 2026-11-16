@@ -1,4 +1,4 @@
-"""Parse the sample workbook (sheets Reservation, Site Location, DC List) into row results.
+"""Parse the Reservation workbook into row results.
 
 Reads only; never raises on a row.
 """
@@ -13,10 +13,7 @@ from openpyxl.utils.datetime import from_excel
 from app.ingest import checks
 from app.ingest.checks import blank, clean, norm
 
-SITE_HEADER_ROW = 4
 SRF_HEADERS = ("srf", "srf id", "srf no", "srf number", "srf ref")  # optional header, any one
-SITE_COLUMNS = ("site_name", "latitude_in_decimal", "longitude_in_decimal")
-DC_COLUMNS = ("dc name / link", "lat", "long")
 
 
 @dataclass
@@ -261,57 +258,6 @@ def _reservation(row: RowResult, fields: dict[str, Any], label: str | None, know
     _finish(row, reasons, reject=bool(no_customer))
 
 
-def _parse_site(
-    row: RowResult,
-    fields: dict[str, Any],
-    name: str,
-    headers: list[Any],
-    values: Any,
-    dc: bool,
-    columns: tuple[str, str, str],
-    own: set[str],
-    seen: set[str],
-) -> None:
-    _, lat_column, lon_column = columns
-    reasons = []
-    lat = _float(fields.get(lat_column))
-    lon = _float(fields.get(lon_column))
-    if why := checks.check_coords(lat, lon):
-        reasons.append(why)
-    if name in seen:
-        reasons.append("duplicate site name")
-    seen.add(name)
-    details = {
-        header: _json(value)
-        for header, value in zip(headers, values)
-        if header and norm(header) not in own and not blank(value)
-    }
-    kind = "data_center" if dc else "site"
-    row.parsed = {"name": name, "kind": kind, "lat": lat, "lon": lon, "details": details}
-    if dc:
-        row.parsed["lrd"] = _text(fields.get("lrd"))
-    _finish(row, reasons)
-
-
-def _sites(ws: Any, header_row: int, sheet: str, seen: set[str]) -> list[RowResult]:
-    headers, rows = _read(ws, header_row)
-    out: list[RowResult] = []
-    dc = sheet == "DC List"
-    columns = DC_COLUMNS if dc else SITE_COLUMNS
-    name_column = columns[0]
-    own: set[str] = set(columns)
-    if dc:
-        own.add("lrd")
-    for row_number, values in rows:
-        row, fields = _row(sheet, row_number, headers, values)
-        if blank(fields.get(name_column)):
-            continue
-        name = str(fields[name_column]).strip()
-        _guard(row, _parse_site, row, fields, name, headers, values, dc, columns, own, seen)
-        out.append(row)
-    return out
-
-
 def _reservation_sheet(wb: Any) -> Any:
     """The sheet named Reservation, else the first sheet with a Nodes column, else None."""
     ws = _sheet(wb, "Reservation")
@@ -335,36 +281,3 @@ def parse_reservation_workbook(path: Any) -> tuple[list[RowResult], list[str]]:
         raise ValueError("no Reservation sheet found, and no sheet has a Nodes column")
     left_out = [other.title for other in wb.worksheets if other is not ws]
     return _reservations(ws, set()), left_out
-
-
-def _check_dc_lrd_sites(rows: list[RowResult], known: set[str]) -> None:
-    for row in rows:
-        lrd = row.parsed.get("lrd")
-        if row.sheet != "DC List" or not lrd:
-            continue
-        why = checks.check_known_sites([lrd], known)
-        if why:
-            row.status = "needs_review"
-            row.reason = "; ".join(filter(None, [row.reason, why]))
-
-
-def parse_workbook(path: Any, known_sites: set[str] | None = None) -> list[RowResult]:
-    """Rows of Site Location, DC List and Reservation (in that order). Monitoring is skipped.
-
-    Site codes are judged against known_sites plus every site name listed in the workbook;
-    with neither, no judgement.
-    """
-    wb = openpyxl.load_workbook(path, data_only=True)
-    out: list[RowResult] = []
-    seen: set[str] = set()
-    for sheet, header_row in [("Site Location", SITE_HEADER_ROW), ("DC List", 1)]:
-        ws = _sheet(wb, sheet)
-        if ws:
-            out += _sites(ws, header_row, sheet, seen)
-    known = set(known_sites or ())
-    known |= {row.parsed["name"] for row in out if "name" in row.parsed}
-    _check_dc_lrd_sites(out, known)
-    ws = _sheet(wb, "Reservation")
-    if ws:
-        out += _reservations(ws, known)
-    return out

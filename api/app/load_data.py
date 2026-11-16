@@ -37,7 +37,7 @@ from app.ingest.excel import parse_reservation_workbook
 from app.ingest.reservation_import import add_cores
 from app.routing.graph import invalidate as invalidate_routes
 
-SITES = ["site_name", "latitude_in_decimal", "longitude_in_decimal", "region", "Type"]
+SITES = ["site_name", "latitude_in_decimal", "longitude_in_decimal", "region", "Type", "cluster"]
 SEGMENTS = ["Link", "Distance", "Route", "Section", "Verified cores", "Total cores"]
 RESERVATIONS = ["Region", "Nodes", "No of core requested", "Fiber core requestor", "Fiber core request date",
                 "Expected CV Ready", "Contractor", "Remark", "SRF", "Port Info", "Fiber monitored Y/N/WIP"]
@@ -185,7 +185,7 @@ def load(db: Session, admin: str, path: str) -> int:
     if parsed["sites"].found:
         up = sm.stage(db, admin_id, name, parsed, add_only=True)
         try:
-            out = sm.apply_upload(db, admin_id, up["upload_id"], {}, None, [], ["sites"])
+            out = sm.apply_upload(db, admin_id, up["upload_id"], {}, None, ["sites"])
             s = out["sheets"]["sites"]
             print(f"Sites: {s}")
         except sm.ApplyError as e:

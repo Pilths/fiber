@@ -14,11 +14,8 @@ export type Detail = components["schemas"]["SegmentDetail"];
 // not the AABB-BBCC form of the PRD.
 // A found route uses #route=... (see lib/useRoutePlanner.ts).
 function readSegmentHash(): string | null {
-  // Old links used #span=: rewrite them to #segment= in place.
-  if (location.hash.startsWith("#span=")) {
-    history.replaceState(null, "", "#segment=" + location.hash.slice(6));
-  }
-  const match = /^#segment=(.+)$/.exec(location.hash);
+  // Old links used #span=; they are read the same and rewritten to #segment= when the selection is written.
+  const match = /^#(?:segment|span)=(.+)$/.exec(location.hash);
   if (!match) {
     return null;
   }
@@ -62,7 +59,22 @@ export function useInventory(view: View, version: number) {
   const foundKey = found?.ids.join(",");
 
   useEffect(() => {
-    api.get("/api/segments").then(setSegments).catch(() => setError("Could not load segments."));
+    let stale = false;
+    api.get("/api/segments")
+      .then((loaded) => {
+        if (!stale) {
+          setSegments(loaded);
+          setError(null);
+        }
+      })
+      .catch(() => {
+        if (!stale) {
+          setError("Could not load segments.");
+        }
+      });
+    return () => {
+      stale = true;
+    };
   }, [version, view]);
 
   useEffect(() => {
@@ -75,6 +87,7 @@ export function useInventory(view: View, version: number) {
       .then((loaded) => {
         if (!stale) {
           setDetail(loaded);
+          setError(null);
         }
       })
       .catch(() => {
@@ -146,8 +159,9 @@ export function useInventory(view: View, version: number) {
       return;
     }
     const name = segmentName(segment);
-    if (readSegmentHash() !== name) {
-      history.replaceState(null, "", `#segment=${encodeURIComponent(name)}`);
+    const wantedHash = `#segment=${encodeURIComponent(name)}`;
+    if (location.hash !== wantedHash) {
+      history.replaceState(null, "", wantedHash);
     }
   }, [segmentId, segments, foundKey]);
 

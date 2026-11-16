@@ -37,12 +37,14 @@ WHERE a.id = s.site_a_id AND b.id = s.site_b_id AND a.name LIKE 'DEV %' AND b.na
 # One DEV segment with gaps in its ports, as real build sheets have:
 # cores 5-8 lack the site A port, 9-12 lack the site B port, 13-16 have no ports at all.
 # Clears ports only; the port rows stay, unused, so a later paste can reuse the label.
+# A core with a data_edits row was edited by hand, so running the seed again leaves it alone.
 PORT_GAPS_SEGMENT = (KG, CJ)
 CLEAR_PORT_GAPS_SQL = """
 UPDATE cores SET
   port_a_id = CASE WHEN number BETWEEN 5 AND 8 OR number BETWEEN 13 AND 16 THEN NULL ELSE port_a_id END,
   port_b_id = CASE WHEN number BETWEEN 9 AND 16 THEN NULL ELSE port_b_id END
 WHERE segment_id = :segment_id AND number BETWEEN 5 AND 16
+  AND NOT EXISTS (SELECT 1 FROM data_edits e WHERE e.entity = 'core' AND e.entity_id = cores.id)
 """
 # Older DEV databases have ports named before the FDF/ODF label shapes; rename them in place.
 DEV_PORTED_CORES_SQL = """
@@ -52,6 +54,7 @@ JOIN segments s ON s.id = c.segment_id
 JOIN sites a ON a.id = s.site_a_id
 JOIN sites b ON b.id = s.site_b_id
 WHERE a.name LIKE 'DEV %' AND b.name LIKE 'DEV %' AND (c.port_a_id IS NOT NULL OR c.port_b_id IS NOT NULL)
+  AND NOT EXISTS (SELECT 1 FROM data_edits e WHERE e.entity = 'core' AND e.entity_id = c.id)
 """
 RENAME_PORT_SQL = "UPDATE ports SET port_id = :label WHERE id = :port_row_id AND port_id <> :label"
 
@@ -75,12 +78,81 @@ SEGMENTS = [
 ]
 
 
+# Old regional sample values; a cluster is a campus now, so these are removed from DEV sites.
+OLD_REGIONAL_CLUSTERS = ("Northern", "Klang Valley", "Southern")
+CLEAR_OLD_CLUSTERS_SQL = """
+UPDATE sites SET details = details - 'cluster'
+WHERE name LIKE 'DEV %' AND details->>'cluster' IN ('Northern', 'Klang Valley', 'Southern')
+"""
+SET_DEV_CLUSTER_SQL = """
+UPDATE sites SET details = jsonb_set(coalesce(details, '{}'::jsonb), '{cluster}', to_jsonb(CAST(:cluster AS text)))
+WHERE name = :name AND coalesce(btrim(details->>'cluster'), '') = ''
+"""
+# Two campuses: an existing DEV data center plus new data centers 120 to 200 m away.
+KL_CAMPUS, CJ_CAMPUS = "DEV KL Campus", "DEV Cyberjaya Campus"
+CAMPUS_KM = 0.2
+# cluster name, anchor site, [(new site name, (lon, lat))]
+CAMPUSES = [
+    (KL_CAMPUS, KL, [
+        ("DEV KL Campus DC 2", (101.6869, 3.1401)),
+        ("DEV KL Campus DC 3", (101.6882, 3.1383)),
+    ]),
+    (CJ_CAMPUS, CJ, [
+        ("DEV Cyberjaya Campus DC 2", (101.6513, 2.9220)),
+    ]),
+]
+
+
+INSERT_CAMPUS_SITE_SQL = """
+INSERT INTO sites (name, kind, geom) VALUES (:name, 'data_center', ST_SetSRID(ST_MakePoint(:lon, :lat), 4326))
+RETURNING id
+"""
+FIND_SEGMENT_SQL = "SELECT id FROM segments WHERE site_a_id IN (:a, :b) AND site_b_id IN (:a, :b)"
+INSERT_CAMPUS_SEGMENT_SQL = """
+INSERT INTO segments (site_a_id, site_b_id, region, distance_km, survey_cores, cable_size)
+VALUES (:a, :b, 'Central', :km, :cores, 48) RETURNING id
+"""
+INSERT_PORT_SQL = "INSERT INTO ports (port_id, site_id) VALUES (:label, :site_id) RETURNING id"
+INSERT_CORE_SQL = """
+INSERT INTO cores (segment_id, number, port_a_id, port_b_id) VALUES (:segment_id, :number, :port_a, :port_b)
+"""
+
+
 def shape_pairs() -> list[tuple[str, str]]:
     """Every DEV segment (old and new) whose two sites have coordinates, as (name A, name B)."""
     xy = {n: ll for _, n, _, ll in OLD_SITES if ll} | {n: ll for n, _, ll in SITES}
     code = {c: n for c, n, _, _ in OLD_SITES}
     pairs = [(code[a], code[b]) for a, b, *_ in OLD_SEGMENTS] + [(a, b) for a, b, *_ in SEGMENTS]
     return [(a, b) for a, b in pairs if a in xy and b in xy]
+
+
+def seed_campuses(db: Session, site: dict[str, int]) -> int:
+    """Adds the campus sites, a short straight segment to each anchor, and fills blank clusters."""
+    added_segments = 0
+    for cluster, anchor, members in CAMPUSES:
+        for name, (lon, lat) in members:
+            if name not in site:
+                site[name] = db.execute(text(INSERT_CAMPUS_SITE_SQL),
+                                        {"name": name, "lon": lon, "lat": lat}).scalar_one()
+            exists = db.execute(text(FIND_SEGMENT_SQL), {"a": site[anchor], "b": site[name]}).scalar()
+            if exists is None:
+                add_campus_segment(db, site, anchor, name)
+                added_segments += 1
+        for name in [anchor] + [member_name for member_name, _ in members]:
+            db.execute(text(SET_DEV_CLUSTER_SQL), {"cluster": cluster, "name": name})
+    return added_segments
+
+
+def add_campus_segment(db: Session, site: dict[str, int], anchor: str, name: str) -> None:
+    segment_id = db.execute(text(INSERT_CAMPUS_SEGMENT_SQL),
+                            {"a": site[anchor], "b": site[name], "km": CAMPUS_KM, "cores": CORES}).scalar_one()
+    for number in range(1, CORES + 1):
+        port_ids = []
+        for end_name in (anchor, name):
+            label = dev_port_label(end_name, segment_id, number)
+            port_ids.append(db.execute(text(INSERT_PORT_SQL), {"label": label, "site_id": site[end_name]}).scalar_one())
+        db.execute(text(INSERT_CORE_SQL),
+                   {"segment_id": segment_id, "number": number, "port_a": port_ids[0], "port_b": port_ids[1]})
 
 
 def main() -> None:
@@ -133,6 +205,8 @@ def main() -> None:
             db.execute(text("INSERT INTO route_segments (route_id, segment_id, position) VALUES (:r, :s, 1)"), {"r": rid, "s": sid})
             shaped += 1
         relabel_dev_ports(db)
+        db.execute(text(CLEAR_OLD_CLUSTERS_SQL))
+        added_segments += seed_campuses(db, site)
         db.execute(text(CLEAR_PORT_GAPS_SQL), {"segment_id": seg[PORT_GAPS_SEGMENT]})
         # DEV trunk route labels: R1 up north and central, R3 down south. Only fills a blank route.
         db.execute(text(DEV_TRUNK_ROUTES_SQL))

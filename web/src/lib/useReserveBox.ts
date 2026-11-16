@@ -26,9 +26,11 @@ export function useReserveBox(
   onClose: () => void,
   onSent: (id: number) => void,
 ) {
-  const max = Math.min(...legs.map((leg) => leg.free));
+  const max = legs.length === 0 ? 0 : Math.min(...legs.map((leg) => leg.free));
   const [ticked, setTicked] = useState<Set<number>>(new Set());
-  const [perSegment, setPerSegment] = useState(clamp(need, 1, max));
+  const [wantedPerSegment, setWantedPerSegment] = useState(need);
+  // Free counts can change while the box is open, so the number is clamped on every render.
+  const perSegment = clamp(wantedPerSegment, 1, max);
   // The selected segment and each segment's cores and loss, fetched on its first select.
   const [picked, setPicked] = useState<number | null>(null);
   const [legData, setLegData] = useState<Record<number, LegData>>({});
@@ -75,7 +77,7 @@ export function useReserveBox(
     onClose();
   };
 
-  const step = (to: number) => setPerSegment(clamp(to, 1, max));
+  const step = (to: number) => setWantedPerSegment(clamp(to, 1, max));
 
   const toggle = (coreId: number) => {
     setTicked((current) => {

@@ -9,6 +9,7 @@ from app.inventory.schemas import (
     Customer,
     CustomerCreate,
     CustomerResult,
+    CustomerUsage,
     SearchResult,
     SegmentDetail,
     SegmentSummary,
@@ -47,6 +48,14 @@ def get_core(db: DB, user: Annotated[CurrentUser, Depends(get_current_user)], co
 @router.get("/customers")
 def list_customers(db: DB, q: str | None = None) -> list[Customer]:
     return service.list_customers(db, q)
+
+
+@router.get("/customers/{customer_id}/usage")
+def customer_usage(db: DB, customer_id: int) -> CustomerUsage:
+    usage = service.customer_usage(db, customer_id)
+    if usage is None:
+        raise HTTPException(404, "Customer not found")
+    return usage
 
 
 @router.post("/customers")

@@ -230,6 +230,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/customers/{customer_id}/usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Customer Usage */
+        get: operations["customer_usage_api_customers__customer_id__usage_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/reservations": {
         parameters: {
             query?: never;
@@ -1024,6 +1041,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/map/sectors": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Sectors */
+        get: operations["sectors_api_map_sectors_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/map/segments/{segment_id}/kmz": {
         parameters: {
             query?: never;
@@ -1065,21 +1099,15 @@ export interface components {
         /** ApplyIn */
         ApplyIn: {
             /** Sheets */
-            sheets?: ("sites" | "dcs")[] | null;
+            sheets?: "sites"[] | null;
             /**
              * @default {
-             *       "sites": false,
-             *       "dcs": false
+             *       "sites": false
              *     }
              */
             override_drop: components["schemas"]["OverrideIn"];
             /** Reason */
             reason?: string | null;
-            /**
-             * Renames
-             * @default []
-             */
-            renames: components["schemas"]["RenameIn"][];
         };
         /** Bell */
         Bell: {
@@ -1371,6 +1399,17 @@ export interface components {
             /** Similar */
             similar: components["schemas"]["Customer"][];
         };
+        /** CustomerUsage */
+        CustomerUsage: {
+            /** Customer Id */
+            customer_id: number;
+            /** Name */
+            name: string;
+            /** Segments */
+            segments: components["schemas"]["SegmentUsage"][];
+            /** Reservations */
+            reservations: components["schemas"]["ReservationUsage"][];
+        };
         /** Edited */
         Edited: {
             /** Id */
@@ -1564,11 +1603,6 @@ export interface components {
              * @default false
              */
             sites: boolean;
-            /**
-             * Dcs
-             * @default false
-             */
-            dcs: boolean;
         };
         /** Owner */
         Owner: {
@@ -1662,18 +1696,6 @@ export interface components {
             /** Applied */
             applied: boolean;
         };
-        /** RenameIn */
-        RenameIn: {
-            /** Missing Dc Id */
-            missing_dc_id: number;
-            /** New Row Id */
-            new_row_id: number;
-            /**
-             * Decision
-             * @enum {string}
-             */
-            decision: "rename" | "separate";
-        };
         /** ResCore */
         ResCore: {
             /** Core Id */
@@ -1746,6 +1768,19 @@ export interface components {
             /** Release Requested Cores */
             release_requested_cores: number[];
         };
+        /** ReservationUsage */
+        ReservationUsage: {
+            /** Reservation Id */
+            reservation_id: number;
+            /** Srf Id */
+            srf_id: string | null;
+            /** Planned Date */
+            planned_date: string | null;
+            /** Used Cores */
+            used_cores: number;
+            /** Segments */
+            segments: components["schemas"]["SegmentUsage"][];
+        };
         /** RouteCount */
         RouteCount: {
             /** Measured */
@@ -1806,13 +1841,15 @@ export interface components {
              * Type
              * @enum {string}
              */
-            type: "customer" | "segment" | "core";
+            type: "customer" | "segment" | "cluster" | "core";
             /** Label */
             label: string;
             /** Segment Id */
             segment_id?: number | null;
             /** Core Id */
             core_id?: number | null;
+            /** Customer Id */
+            customer_id?: number | null;
         };
         /** SegmentBody */
         SegmentBody: {
@@ -2048,13 +2085,20 @@ export interface components {
             /** Fiber Cut */
             fiber_cut: boolean;
         };
+        /** SegmentUsage */
+        SegmentUsage: {
+            /** Segment Id */
+            segment_id: number;
+            /** Used Cores */
+            used_cores: number;
+        };
         /** SheetOut */
         SheetOut: {
             /**
              * Kind
-             * @enum {string}
+             * @constant
              */
-            kind: "sites" | "dcs";
+            kind: "sites";
             /** Sheet Name */
             sheet_name: string | null;
             /** Found */
@@ -2082,6 +2126,8 @@ export interface components {
             lon?: number | null;
             /** Region */
             region?: string | null;
+            /** Cluster */
+            cluster?: string | null;
             /** Active */
             active?: boolean | null;
         };
@@ -2099,6 +2145,8 @@ export interface components {
             lon: number | null;
             /** Region */
             region: string | null;
+            /** Cluster */
+            cluster: string | null;
             /** Active */
             active: boolean;
             /** History */
@@ -2318,10 +2366,6 @@ export interface components {
             filename: string;
             /** Sheets */
             sheets: components["schemas"]["SheetOut"][];
-            /** Possible Renames */
-            possible_renames: {
-                [key: string]: unknown;
-            }[];
             /**
              * Add Only
              * @default false
@@ -2864,6 +2908,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CustomerResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    customer_usage_api_customers__customer_id__usage_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-dev-user"?: string | null;
+            };
+            path: {
+                customer_id: number;
+            };
+            cookie?: {
+                fiber_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerUsage"];
                 };
             };
             /** @description Validation Error */
@@ -3569,7 +3648,7 @@ export interface operations {
     rows_api_admin_site_master_uploads__upload_id__rows_get: {
         parameters: {
             query: {
-                sheet: "sites" | "dcs";
+                sheet: "sites";
                 group: "added" | "changed" | "missing" | "problem" | "unchanged";
                 page?: number;
                 page_size?: number;
@@ -4652,6 +4731,41 @@ export interface operations {
         };
     };
     sites_api_map_sites_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-dev-user"?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                fiber_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sectors_api_map_sectors_get: {
         parameters: {
             query?: never;
             header?: {

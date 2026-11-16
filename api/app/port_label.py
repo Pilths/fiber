@@ -4,6 +4,8 @@ Each part is a number or letters (1 to 4 characters of A-Z and 0-9), so FDF-A-MO
 Typed or pasted text is read leniently (any separator, M or MOD, T or TRAY, P or PORT, a new line from an
 Excel cell) and saved in the one canonical form, so the same port is never stored two ways."""
 import re
+# web/src/lib/portLabel.ts is the small browser twin: it only splits a canonical label into the picker's parts and
+# builds one back. This module is the one that reads loose text, so change a rule here first, then there.
 
 LABEL_HELP = "Use FDF1-MOD2-T3-P5 or ODF1-P5 (each part a number or letters)"
 
@@ -12,7 +14,10 @@ _VALUE = re.compile(r"[A-Z0-9]{1,4}")
 # Each part: the words that may name it, longest first.
 _FDF_PARTS = (("FDF",), ("MOD", "M"), ("TRAY", "T"), ("PORT", "P"))
 _ODF_PARTS = (("ODF",), ("PORT", "P"))
-_CANONICAL_NAMES = {"FDF": "FDF", "ODF": "ODF", "MOD": "MOD", "M": "MOD", "TRAY": "T", "T": "T", "PORT": "P", "P": "P"}
+_CANONICAL_NAMES = {
+    "FDF": "FDF", "ODF": "ODF", "MOD": "MOD", "M": "MOD",
+    "TRAY": "T", "T": "T", "PORT": "P", "P": "P",
+}
 
 
 def _canonical_value(value: str) -> str | None:

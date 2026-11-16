@@ -47,6 +47,8 @@ export function useDashboardView() {
     const sync = () => {
       if (location.hash === "#users") {
         setViewState("users");
+      } else {
+        setViewState((current) => (current === "users" ? "map" : current));
       }
       if (location.hash.startsWith("#route=")) {
         setViewState("map");

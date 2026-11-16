@@ -16,6 +16,10 @@ function readyCount(result: PastePortsResult | null): number {
   return result.counts.new + result.counts.replaces;
 }
 
+function inputKey(segmentId: number, startCore: string, portA: string, portB: string): string {
+  return JSON.stringify([segmentId, startCore, portA, portB]);
+}
+
 function pasteBody(startCore: string, portA: string, portB: string, apply: boolean): PastePortsBody {
   return {
     start_core: Number(startCore) || 1,
@@ -30,7 +34,8 @@ export function usePastePorts(segmentId: number, onApplied: () => void) {
   const [startCore, setStartCore] = useState("1");
   const [portA, setPortA] = useState("");
   const [portB, setPortB] = useState("");
-  const [result, setResult] = useState<PastePortsResult | null>(null);
+  // The preview and the exact text it was made from.
+  const [previewed, setPreviewed] = useState<{ key: string; result: PastePortsResult } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -46,7 +51,7 @@ export function usePastePorts(segmentId: number, onApplied: () => void) {
           body: pasteBody(startCore, portA, portB, false),
         });
         if (!stale) {
-          setResult(preview);
+          setPreviewed({ key: inputKey(segmentId, startCore, portA, portB), result: preview });
           setError(null);
         }
       } catch (err) {
@@ -63,7 +68,10 @@ export function usePastePorts(segmentId: number, onApplied: () => void) {
 
   // A preview of text that was since cleared is not shown.
   const nothingPasted = portA === "" && portB === "";
-  const shownResult = nothingPasted ? null : result;
+  const shownResult = nothingPasted ? null : (previewed?.result ?? null);
+  // Apply writes the text in the boxes, so it is offered only when the preview was made from that text.
+  const previewIsCurrent = previewed?.key === inputKey(segmentId, startCore, portA, portB);
+  const ready = previewIsCurrent ? readyCount(shownResult) : 0;
 
   const apply = async () => {
     setBusy(true);
@@ -88,7 +96,7 @@ export function usePastePorts(segmentId: number, onApplied: () => void) {
     portB,
     setPortB,
     result: shownResult,
-    ready: readyCount(shownResult),
+    ready,
     error,
     busy,
     apply,

@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useState, type FormEvent, type ReactNode } from "react";
 import { Icon } from "@/components/Icon";
 import { db, health } from "@/lib/status";
 import type { Endpoint, RouteOption, RoutePlanner, RouteSegment, Sort } from "@/lib/useRoutePlanner";
@@ -96,8 +96,9 @@ function SortChoice({ planner }: { planner: RoutePlanner }) {
 }
 
 // "Site A to B" panel beside the map (prototype 9e): sites, cores needed, Find route, sort, then the options.
-// Find route picks the best (first) option; the options below show all.
-export function RouteSearch({ planner }: { planner: RoutePlanner }) {
+// Find route picks the best (first) option; the options below show all and scroll inside the space left
+// above `filters` (the map filters, pinned to the panel's foot).
+export function RouteSearch({ planner, filters }: { planner: RoutePlanner; filters?: ReactNode }) {
   const [typingError, setTypingError] = useState<string | null>(null);
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -127,13 +128,13 @@ export function RouteSearch({ planner }: { planner: RoutePlanner }) {
   const message = formMessage(planner, typingError);
   return (
     <section className="card absolute inset-0 flex flex-col overflow-auto" aria-labelledby="route-h">
-      <div className="mb-3 flex items-baseline justify-between">
+      <div className="mb-2 flex items-baseline justify-between">
         <h2 id="route-h" className="card-title">Site A to B</h2>
         {planner.index != null && (
           <button type="button" className={LINK_CLASS} onClick={planner.reset}>Clear route</button>
         )}
       </div>
-      <form onSubmit={submit} className="flex flex-col gap-3">
+      <form onSubmit={submit} className="flex flex-col gap-2">
         <label>
           <span className="lbl">Site A</span>
           <input id="route-a" className="field" list="route-sites" value={planner.fromText}
@@ -168,6 +169,7 @@ export function RouteSearch({ planner }: { planner: RoutePlanner }) {
         </datalist>
       </form>
       <RouteOptions planner={planner} />
+      {filters}
     </section>
   );
 }
@@ -212,7 +214,7 @@ function RouteOptions({ planner }: { planner: RoutePlanner }) {
   }
   const need = planner.need ?? 1;
   return (
-    <section className="mt-3" aria-label="Route options">
+    <section className="my-2 min-h-0 flex-1 overflow-y-auto" aria-label="Route options">
       <ul aria-label="Route options" className="flex flex-col gap-2">
         {options.map((option, i) => (
           <li key={i}>

@@ -1,20 +1,27 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type PointerEvent } from "react";
-import { api } from "@/api/client";
-import { boundsOf, fitView, MALAYSIA, panned, type Camera, type Size } from "@/lib/mapGeometry";
+import { useCallback, useEffect, useRef, useState, type PointerEvent } from "react";
+import { CAMPUS_MAX_ZOOM, clusterName, FADE_TO } from "@/lib/mapClusters";
+import {
+  boundsOf,
+  fitView,
+  MAX_ZOOM,
+  MIN_ZOOM,
+  panned,
+  type Bounds,
+  type Camera,
+  type Point,
+} from "@/lib/mapGeometry";
+import { useClusterLayer, useFullscreen, useMapData, useMapSize } from "@/lib/mapHooks";
 import {
   ALL_ROUTES,
   ALL_SITES,
   routeLayerOn,
-  type MapData,
   type RouteLayers,
   type SegmentFeature,
-  type SiteFeature,
   type SiteLayers,
 } from "@/lib/mapLayers";
 
 export type Basemap = "loading" | "gl" | "missing" | "nogl" | "failed";
-const MAX_ZOOM = 18;
-const MIN_ZOOM = 4;
+const BADGE_ZOOM_STEP = 3;
 const CAMERA_MOVE_MS = 250;
 // a press on one of these never starts a drag
 const NOT_DRAGGABLE = "button,a,input,label,[data-hit],details";
@@ -39,72 +46,14 @@ export type NetworkMapOptions = {
   version: number;
   onSelectSegment: (id: number) => void;
   onClear: () => void;
+  // a campus picked in the header search, fitted once the map is ready, then onFocused
+  focusCluster: { name: string } | null;
+  onFocused: () => void;
 };
-
-function useFullscreen(box: React.RefObject<HTMLDivElement | null>) {
-  const [full, setFull] = useState(false);
-  useEffect(() => {
-    const onChange = () => setFull(document.fullscreenElement === box.current);
-    document.addEventListener("fullscreenchange", onChange);
-    return () => document.removeEventListener("fullscreenchange", onChange);
-  }, [box]);
-  const toggleFull = () => {
-    const request = full ? document.exitFullscreen() : box.current!.requestFullscreen();
-    request.catch(() => {});
-  };
-  return { full, toggleFull };
-}
-
-function useMapData(version: number) {
-  const [segments, setSegments] = useState<MapData<SegmentFeature> | null>(null);
-  const [sites, setSites] = useState<MapData<SiteFeature> | null>(null);
-  const [failed, setFailed] = useState(false);
-  useEffect(() => {
-    let live = true;
-    Promise.all([api.get("/api/map/segments"), api.get("/api/map/sites")])
-      .then(([loadedSegments, loadedSites]) => {
-        if (live) {
-          setSegments(loadedSegments as unknown as MapData<SegmentFeature>);
-          setSites(loadedSites as unknown as MapData<SiteFeature>);
-        }
-      })
-      .catch(() => {
-        if (live) {
-          setFailed(true);
-        }
-      });
-    return () => {
-      live = false;
-    };
-  }, [version]);
-  return { segments, sites, failed };
-}
-
-// Map size from the card; the camera starts on Malaysia (the data fit follows once segments arrive).
-type CameraUpdate = (current: Camera | null) => Camera | null;
-
-function useMapSize(box: React.RefObject<HTMLDivElement | null>, setCamera: (update: CameraUpdate) => void) {
-  const [size, setSize] = useState<Size>({ w: 0, h: 0 });
-  useLayoutEffect(() => {
-    const element = box.current!;
-    const observer = new ResizeObserver(() => {
-      setSize({ w: element.clientWidth, h: element.clientHeight });
-      setCamera((current) => {
-        if (current || !element.clientWidth) {
-          return current;
-        }
-        return fitView(MALAYSIA, element.clientWidth, element.clientHeight, 8);
-      });
-    });
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, [box, setCamera]);
-  return size;
-}
 
 // Network map state: data, camera (MapLibre or own), basemap mode, layers, fitting and dragging.
 export function useNetworkMap(options: NetworkMapOptions) {
-  const { selectedIds, routeKey, version, onSelectSegment, onClear } = options;
+  const { selectedIds, routeKey, version, onSelectSegment, onClear, focusCluster, onFocused } = options;
   const box = useRef<HTMLDivElement>(null);
   const glBox = useRef<HTMLDivElement>(null);
   const map = useRef<import("maplibre-gl").Map | null>(null);
@@ -114,10 +63,10 @@ export function useNetworkMap(options: NetworkMapOptions) {
   const [routeLayers, setRouteLayers] = useState<RouteLayers>(ALL_ROUTES);
   const [trunkOff, setTrunkOff] = useState<Set<string>>(new Set());
   const [siteLayers, setSiteLayers] = useState<SiteLayers>(ALL_SITES);
-  const [layersOpen, setLayersOpen] = useState(false);
   const fullscreen = useFullscreen(box);
   const data = useMapData(version);
   const size = useMapSize(box, setCamera);
+  const clusters = useClusterLayer(camera);
 
   const cameraRef = useRef(camera);
   useEffect(() => {
@@ -184,6 +133,36 @@ export function useNetworkMap(options: NetworkMapOptions) {
     }
     const zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, camera.zoom + step));
     go({ ...camera, zoom });
+  };
+
+  // A count badge: centre on it and zoom in a few levels.
+  const zoomAt = (point: Point) => {
+    if (!camera) {
+      return;
+    }
+    const centred = panned(camera, size.w / 2 - point[0], size.h / 2 - point[1]);
+    const zoom = Math.min(MAX_ZOOM, camera.zoom + BADGE_ZOOM_STEP);
+    go({ ...centred, zoom });
+  };
+
+  // A campus label: fit the campus, at least far enough in that its sites show and stand apart.
+  const zoomToBounds = (bounds: Bounds) => {
+    if (!size.w) {
+      return;
+    }
+    const fitted = fitView(bounds, size.w, size.h, 60, CAMPUS_MAX_ZOOM);
+    go({ ...fitted, zoom: Math.max(fitted.zoom, FADE_TO) });
+  };
+
+  // A campus's sector, or the bounds of its sites when it is too small for one (a single site).
+  const campusBounds = (cluster: string): Bounds | null => {
+    const sector = data.sectors?.features.find((feature) => feature.properties.cluster === cluster);
+    if (sector) {
+      return sector.properties.bbox;
+    }
+    const sites = data.sites?.features ?? [];
+    const members = sites.filter((feature) => clusterName(feature.properties.cluster) === cluster);
+    return boundsOf(members.map((feature) => feature.geometry.coordinates));
   };
 
   const features = data.segments?.features ?? [];
@@ -258,6 +237,19 @@ export function useNetworkMap(options: NetworkMapOptions) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- follow a segment selected outside the map
   }, [selectionKey]);
 
+  // Runs after the first fit above, so the campus wins over it when both happen at once.
+  useEffect(() => {
+    if (!focusCluster || !fitted.current) {
+      return;
+    }
+    const bounds = campusBounds(focusCluster.name);
+    if (bounds) {
+      zoomToBounds(bounds);
+    }
+    onFocused();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- a new pick, or the map becoming ready for it
+  }, [focusCluster, data.segments, size, base]);
+
   // SVG mode camera: drag to pan.
   const drag = useRef<{ x: number; y: number; start: Camera } | null>(null);
   const onPointerDown = (event: PointerEvent) => {
@@ -294,10 +286,11 @@ export function useNetworkMap(options: NetworkMapOptions) {
     setTrunkOff,
     siteLayers,
     setSiteLayers,
-    layersOpen,
-    setLayersOpen,
     ...fullscreen,
+    ...clusters,
     zoomBy,
+    zoomAt,
+    zoomToBounds,
     fitSelection,
     selectSegment,
     onPointerDown,
