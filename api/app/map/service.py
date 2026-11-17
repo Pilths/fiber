@@ -32,9 +32,9 @@ FROM sites s LEFT JOIN sites l ON l.id = s.lrd_site_id
 WHERE s.active AND EXISTS (SELECT 1 FROM segments p WHERE p.site_a_id = s.id OR p.site_b_id = s.id)
 ORDER BY s.id
 """
-# A sector is one campus: the buffered hull of the sites that share a cluster name (2 or more, with a point).
+# A sector is one cluster: the buffered hull of the sites that share a cluster name (2 or more, with a point).
 SECTOR_SQL = """
-WITH campus AS (
+WITH cluster_group AS (
     SELECT btrim(details->>'cluster') AS cluster,
            count(*) AS site_count,
            ST_Buffer(ST_ConvexHull(ST_Collect(geom))::geography, 150)::geometry AS geom
@@ -45,7 +45,7 @@ WITH campus AS (
 )
 SELECT cluster, site_count, ST_AsGeoJSON(geom) AS geom,
        ST_XMin(geom) AS minx, ST_YMin(geom) AS miny, ST_XMax(geom) AS maxx, ST_YMax(geom) AS maxy
-FROM campus
+FROM cluster_group
 ORDER BY cluster
 """
 

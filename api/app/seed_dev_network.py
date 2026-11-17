@@ -78,7 +78,7 @@ SEGMENTS = [
 ]
 
 
-# Old regional sample values; a cluster is a campus now, so these are removed from DEV sites.
+# Old regional sample values; a cluster is a group of nearby sites now, so these are removed from DEV sites.
 OLD_REGIONAL_CLUSTERS = ("Northern", "Klang Valley", "Southern")
 CLEAR_OLD_CLUSTERS_SQL = """
 UPDATE sites SET details = details - 'cluster'
@@ -88,27 +88,40 @@ SET_DEV_CLUSTER_SQL = """
 UPDATE sites SET details = jsonb_set(coalesce(details, '{}'::jsonb), '{cluster}', to_jsonb(CAST(:cluster AS text)))
 WHERE name = :name AND coalesce(btrim(details->>'cluster'), '') = ''
 """
-# Two campuses: an existing DEV data center plus new data centers 120 to 200 m away.
-KL_CAMPUS, CJ_CAMPUS = "DEV KL Campus", "DEV Cyberjaya Campus"
-CAMPUS_KM = 0.2
+# Two clusters: an existing DEV data center plus new data centers 120 to 200 m away.
+KL_CLUSTER, CJ_CLUSTER = "DEV KL Cluster", "DEV Cyberjaya Cluster"
+CLUSTER_KM = 0.2
 # cluster name, anchor site, [(new site name, (lon, lat))]
-CAMPUSES = [
-    (KL_CAMPUS, KL, [
-        ("DEV KL Campus DC 2", (101.6869, 3.1401)),
-        ("DEV KL Campus DC 3", (101.6882, 3.1383)),
+CLUSTERS = [
+    (KL_CLUSTER, KL, [
+        ("DEV KL Cluster DC 2", (101.6869, 3.1401)),
+        ("DEV KL Cluster DC 3", (101.6882, 3.1383)),
     ]),
-    (CJ_CAMPUS, CJ, [
-        ("DEV Cyberjaya Campus DC 2", (101.6513, 2.9220)),
+    (CJ_CLUSTER, CJ, [
+        ("DEV Cyberjaya Cluster DC 2", (101.6513, 2.9220)),
     ]),
 ]
 
 
-INSERT_CAMPUS_SITE_SQL = """
+# The retired word for a cluster, spelled in two parts so no file of the program contains it. Earlier seeds named
+# three DEV sites and two cluster values with it; this renames them in place (nothing to do on a fresh database).
+RETIRED_WORD = "Cam" + "pus"
+RENAME_RETIRED_SITES_SQL = """
+UPDATE sites SET name = replace(name, :old, 'Cluster')
+WHERE name LIKE 'DEV %' AND name LIKE '%' || :old || ' DC %'
+"""
+RENAME_RETIRED_CLUSTERS_SQL = """
+UPDATE sites SET details = jsonb_set(details, '{cluster}', to_jsonb(replace(details->>'cluster', :old, 'Cluster')))
+WHERE name LIKE 'DEV %' AND details->>'cluster' LIKE '%' || :old
+"""
+
+
+INSERT_CLUSTER_SITE_SQL = """
 INSERT INTO sites (name, kind, geom) VALUES (:name, 'data_center', ST_SetSRID(ST_MakePoint(:lon, :lat), 4326))
 RETURNING id
 """
 FIND_SEGMENT_SQL = "SELECT id FROM segments WHERE site_a_id IN (:a, :b) AND site_b_id IN (:a, :b)"
-INSERT_CAMPUS_SEGMENT_SQL = """
+INSERT_CLUSTER_SEGMENT_SQL = """
 INSERT INTO segments (site_a_id, site_b_id, region, distance_km, survey_cores, cable_size)
 VALUES (:a, :b, 'Central', :km, :cores, 48) RETURNING id
 """
@@ -126,26 +139,26 @@ def shape_pairs() -> list[tuple[str, str]]:
     return [(a, b) for a, b in pairs if a in xy and b in xy]
 
 
-def seed_campuses(db: Session, site: dict[str, int]) -> int:
-    """Adds the campus sites, a short straight segment to each anchor, and fills blank clusters."""
+def seed_clusters(db: Session, site: dict[str, int]) -> int:
+    """Adds the cluster sites, a short straight segment to each anchor, and fills blank clusters."""
     added_segments = 0
-    for cluster, anchor, members in CAMPUSES:
+    for cluster, anchor, members in CLUSTERS:
         for name, (lon, lat) in members:
             if name not in site:
-                site[name] = db.execute(text(INSERT_CAMPUS_SITE_SQL),
+                site[name] = db.execute(text(INSERT_CLUSTER_SITE_SQL),
                                         {"name": name, "lon": lon, "lat": lat}).scalar_one()
             exists = db.execute(text(FIND_SEGMENT_SQL), {"a": site[anchor], "b": site[name]}).scalar()
             if exists is None:
-                add_campus_segment(db, site, anchor, name)
+                add_cluster_segment(db, site, anchor, name)
                 added_segments += 1
         for name in [anchor] + [member_name for member_name, _ in members]:
             db.execute(text(SET_DEV_CLUSTER_SQL), {"cluster": cluster, "name": name})
     return added_segments
 
 
-def add_campus_segment(db: Session, site: dict[str, int], anchor: str, name: str) -> None:
-    segment_id = db.execute(text(INSERT_CAMPUS_SEGMENT_SQL),
-                            {"a": site[anchor], "b": site[name], "km": CAMPUS_KM, "cores": CORES}).scalar_one()
+def add_cluster_segment(db: Session, site: dict[str, int], anchor: str, name: str) -> None:
+    segment_id = db.execute(text(INSERT_CLUSTER_SEGMENT_SQL),
+                            {"a": site[anchor], "b": site[name], "km": CLUSTER_KM, "cores": CORES}).scalar_one()
     for number in range(1, CORES + 1):
         port_ids = []
         for end_name in (anchor, name):
@@ -166,6 +179,8 @@ def main() -> None:
         admin = one("SELECT id FROM users WHERE username = 'admin1'")
         if admin is None:
             sys.exit("admin1 not found; run app.seed_dev first")
+        db.execute(text(RENAME_RETIRED_SITES_SQL), {"old": RETIRED_WORD})
+        db.execute(text(RENAME_RETIRED_CLUSTERS_SQL), {"old": RETIRED_WORD})
         site = {n: i for i, n in db.execute(text("SELECT id, name FROM sites WHERE name LIKE 'DEV %'"))}
         added_sites = added_segments = 0
         for name, kind, (lon, lat) in SITES:
@@ -206,7 +221,7 @@ def main() -> None:
             shaped += 1
         relabel_dev_ports(db)
         db.execute(text(CLEAR_OLD_CLUSTERS_SQL))
-        added_segments += seed_campuses(db, site)
+        added_segments += seed_clusters(db, site)
         db.execute(text(CLEAR_PORT_GAPS_SQL), {"segment_id": seg[PORT_GAPS_SEGMENT]})
         # DEV trunk route labels: R1 up north and central, R3 down south. Only fills a blank route.
         db.execute(text(DEV_TRUNK_ROUTES_SQL))

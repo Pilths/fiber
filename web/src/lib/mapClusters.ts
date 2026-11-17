@@ -1,7 +1,7 @@
 import { MAX_ZOOM, type Bounds, type Point } from "@/lib/mapGeometry";
 
 // Cluster sectors (GET /api/map/sectors) and crowded site markers: the zoom rules and the grouping.
-// A cluster is a small campus of nearby sites; only a cluster of 2 or more sites has a sector.
+// A cluster is a small group of nearby sites; only a cluster of 2 or more sites has a sector.
 
 export type SectorProps = { cluster: string; site_count: number; bbox: Bounds };
 type PolygonRings = Point[][];
@@ -11,12 +11,12 @@ export type SectorFeature = {
 };
 export type SectorData = { features: SectorFeature[] };
 
-// Zoomed out a campus is one label; between these zooms the label fades out and its outline and sites fade in.
+// Zoomed out a cluster is one label; between these zooms the label fades out and its outline and sites fade in.
 // Below FADE_FROM the outline is only a few pixels wide.
 const FADE_FROM = 12;
 export const FADE_TO = 14;
-// Clicking a label fits the campus, but no further in than this (its bbox is only a few hundred metres).
-export const CAMPUS_MAX_ZOOM = 16.5;
+// Clicking a label fits the cluster, but no further in than this (its bbox is only a few hundred metres).
+export const CLUSTER_MAX_ZOOM = 16.5;
 // The markers become clickable around the middle of the fade, with a dead band either side so they never flicker.
 const SWITCH_ZOOM = (FADE_FROM + FADE_TO) / 2;
 const DEAD_BAND = 0.15;

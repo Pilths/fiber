@@ -4,8 +4,8 @@ import { project, type Bounds, type Point } from "@/lib/mapGeometry";
 import { plural } from "@/lib/mapLayers";
 import type { NetworkMapState } from "@/lib/useNetworkMap";
 
-// Campus outlines under the route lines (a light fill that fades to a thin outline as the zoom passes the fade
-// window) and the campus labels shown while zoomed out. Each campus has its own tint.
+// Cluster outlines under the route lines (a light fill that fades to a thin outline as the zoom passes the fade
+// window) and the cluster labels shown while zoomed out. Each cluster has its own tint.
 
 function ringPath(ring: Point[], toScreen: (point: Point) => Point): string {
   const points = ring.map((point) => {
@@ -41,8 +41,8 @@ export function SectorShapes({ state, sectors }: { state: NetworkMapState; secto
 
 type SectorLabelsProps = { labels: SectorLabel[]; clusters: string[]; onZoom: (bounds: Bounds) => void };
 
-// Campus label: a small dark count badge ringed in the campus tint, with the campus name in small text beside it
-// (dropped when it would overlap another campus label). Its sites are hidden under it.
+// Cluster label: a small dark count badge ringed in the cluster tint, with the cluster name in small text beside it
+// (dropped when it would overlap another cluster label). Its sites are hidden under it.
 export function SectorLabels({ labels, clusters, onZoom }: SectorLabelsProps) {
   return labels.map(({ sector, names, point, opacity, active, named }) => {
     const { cluster, site_count, bbox } = sector.properties;
