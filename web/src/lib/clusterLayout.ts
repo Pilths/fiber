@@ -12,7 +12,7 @@ import { makePlacer, project, type Point } from "@/lib/mapGeometry";
 import { siteLayerOn, type SiteFeature } from "@/lib/mapLayers";
 import type { NetworkMapState } from "@/lib/useNetworkMap";
 
-// Where the site markers, count badges, spread lists and campus labels go for the current camera.
+// Where the site markers, count badges, spread lists and cluster labels go for the current camera.
 
 // Below this a fading marker or label is not drawn at all (so it is neither seen nor reached by Tab).
 const MIN_OPACITY = 0.05;
@@ -27,7 +27,7 @@ export type SectorLabel = {
   point: Point;
   opacity: number;
   active: boolean;
-  named: boolean; // the campus name shows beside the count badge
+  named: boolean; // the cluster name shows beside the count badge
   box: number[]; // screen box of the badge, and of the name when it shows
 };
 
@@ -51,7 +51,7 @@ export function sectorClusters(state: NetworkMapState): Set<string> {
 
 type SiteLook = { opacity: number; active: boolean; crowds: boolean };
 
-// A site in a drawn campus fades in with the zoom; every other site is always fully shown. While the campus label
+// A site in a drawn cluster fades in with the zoom; every other site is always fully shown. While the cluster label
 // shows, its sites are grouped under the label, not by pixel distance; zoomed in they crowd like any other site.
 function siteLooks(state: NetworkMapState, sectored: Set<string>, zoom: number): (SiteLook | null)[] {
   const fade = clusterFade(zoom);
@@ -119,12 +119,12 @@ export function siteLayout(state: NetworkMapState): SiteLayout {
   return layout;
 }
 
-function campusSites(state: NetworkMapState, sector: SectorFeature): SiteFeature[] {
+function clusterSites(state: NetworkMapState, sector: SectorFeature): SiteFeature[] {
   const name = sector.properties.cluster;
   return (state.data.sites?.features ?? []).filter((feature) => clusterName(feature.properties.cluster) === name);
 }
 
-// The label sits at the mean of the campus's sites; the bbox centre when none of them is on the map.
+// The label sits at the mean of the cluster's sites; the bbox centre when none of them is on the map.
 function labelPoint(sector: SectorFeature, members: SiteFeature[]): Point {
   if (members.length === 0) {
     const [west, south, east, north] = sector.properties.bbox;
@@ -135,7 +135,7 @@ function labelPoint(sector: SectorFeature, members: SiteFeature[]): Point {
   return [lng, lat];
 }
 
-// A campus label is a count badge (24 px click target) with the campus name in small text to its right.
+// A cluster label is a count badge (24 px click target) with the cluster name in small text to its right.
 const BADGE_HALF = 12;
 const NAME_GAP = 2;
 const NAME_CHAR_PX = 6.5; // 11px bold
@@ -159,7 +159,7 @@ const SITE_NAME_TOP = 8; // a site name's top below its marker's centre
 const SITE_NAME_HEIGHT = 18;
 const SITE_NAME_CHAR_PX = 7.2;
 
-// What a campus name must not cover: every drawn site marker and the names of the selection's end sites (those
+// What a cluster name must not cover: every drawn site marker and the names of the selection's end sites (those
 // always show). Other site names give way to the label in the map's declutter.
 function siteBoxes(state: NetworkMapState, layout: SiteLayout): number[][] {
   const features = state.data.sites?.features ?? [];
@@ -175,7 +175,7 @@ function siteBoxes(state: NetworkMapState, layout: SiteLayout): number[][] {
   return boxes;
 }
 
-// Every badge shows; a name that would overlap another campus's badge, an earlier name or a site (see siteBoxes)
+// Every badge shows; a name that would overlap another cluster's badge, an earlier name or a site (see siteBoxes)
 // is dropped.
 function nameLabels(labels: SectorLabel[], sites: number[][]): SectorLabel[] {
   const placer = makePlacer([...sites, ...labels.map((label) => label.box)]);
@@ -201,7 +201,7 @@ export function sectorLabels(state: NetworkMapState, layout: SiteLayout): Sector
   const sectored = sectorClusters(state);
   const shown = (state.data.sectors?.features ?? []).filter((sector) => sectored.has(sector.properties.cluster));
   const labels = shown.map((sector) => {
-    const members = campusSites(state, sector);
+    const members = clusterSites(state, sector);
     const point = project(camera, size, labelPoint(sector, members));
     const names = members.map((feature) => feature.properties.name);
     const box = labelBox(point, sector.properties.cluster, false);

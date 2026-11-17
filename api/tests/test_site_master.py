@@ -401,3 +401,32 @@ def test_cluster_header_is_optional_and_trimmed():
     empty = {"Cluster": "   "}
     _normalise_cluster(empty)
     assert empty == {}
+
+
+def cluster_workbook(head, rows):
+    return workbook([[*site(name), *extra] for name, *extra in rows], None, site_head=[*SITE_HEAD, *head])
+
+
+def cluster_of(db, name):
+    return count(db, f"SELECT details->>'cluster' FROM sites WHERE name = '{name}'")
+
+
+def test_sheet_without_cluster_column_has_no_cluster_and_no_review_row(client, db, admin):
+    r = post(client, workbook([site("AAAA"), site("BBBB")], None))
+    assert sheets(r)["sites"]["counts"]["problem"] == 0
+    assert apply(client, r.json()["upload_id"]).status_code == 200
+    assert count(db, "SELECT count(*) FROM sites WHERE details ? 'cluster'") == 0
+
+
+def test_template_cluster_header_is_last_with_note_and_loads_back(client, db, admin, tmp_path):
+    from app import load_data
+
+    path = tmp_path / "template.xlsx"
+    load_data.template(str(path))
+    header = openpyxl.load_workbook(path)["Sites"][1]
+    assert header[-1].value == "cluster"
+    assert header[-1].comment.text == load_data.CLUSTER_NOTE
+    assert [cell.comment for cell in header[:-1]] == [None] * (len(header) - 1)
+    r = post(client, path.read_bytes())
+    assert r.status_code == 201
+    assert sheets(r)["sites"]["counts"]["problem"] == 0

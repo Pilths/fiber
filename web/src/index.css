@@ -216,8 +216,8 @@
 .mbadge { position: absolute; z-index: 4; transform: translate(-50%, -50%); min-width: 20px; height: 20px; padding: 0 5px; border: 1.5px solid #fff; border-radius: 4px; background: var(--ink); color: #fff; font-size: 11px; font-weight: 700; line-height: 1; cursor: pointer; }
 .mbadge::after { content: ""; position: absolute; inset: -4px; }
 .mbadge:focus-visible { outline-offset: 3px; z-index: 7; }
-/* Campus label (zoomed out): a dark count badge like .mbadge, ringed in the campus tint (--tint, set per label),
-   with the campus name as small text to its right. The button is the 24px badge spot; the name hangs off it.
+/* Cluster label (zoomed out): a dark count badge like .mbadge, ringed in the cluster tint (--tint, set per label),
+   with the cluster name as small text to its right. The button is the 24px badge spot; the name hangs off it.
    Over the site markers, so a member end site's marker cannot hide the count; the name gives way to sites. */
 .msector { position: absolute; z-index: 5; transform: translate(-50%, -50%); width: 24px; height: 24px; display: grid; place-items: center; padding: 0; border: 0; background: none; cursor: pointer; }
 .msector:focus-visible { outline-offset: 1px; z-index: 7; }

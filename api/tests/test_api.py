@@ -162,13 +162,13 @@ def test_search_cluster(client, net, db):
         db.execute(text("INSERT INTO sites (name, kind, active, details) VALUES (:n,'site',:a,CAST(:d AS jsonb))"),
                    {"n": name, "a": active, "d": details})
 
-    add_site("Cl One", " Cyber Campus ")
-    add_site("Cl Two", "Cyber Campus")
+    add_site("Cl One", " Cyber Cluster ")
+    add_site("Cl Two", "Cyber Cluster")
     add_site("Cl Off", "Cyber Retired", active=False)
     add_site("Cl Empty", "  ")
     hits = labels(client, "cyber", "cluster")
-    assert [h["label"] for h in hits] == ["Cyber Campus"]
+    assert [h["label"] for h in hits] == ["Cyber Cluster"]
     assert hits[0]["segment_id"] is None and hits[0]["core_id"] is None and hits[0]["customer_id"] is None
-    assert [h["label"] for h in labels(client, "CAMPUS", "cluster")] == ["Cyber Campus"]
+    assert [h["label"] for h in labels(client, "CLUSTER", "cluster")] == ["Cyber Cluster"]
     assert labels(client, "retired", "cluster") == []
     assert labels(client, "zzzz", "cluster") == []

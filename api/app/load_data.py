@@ -25,6 +25,7 @@ import sys
 from typing import Any
 
 import openpyxl
+from openpyxl.comments import Comment
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
@@ -42,6 +43,7 @@ SEGMENTS = ["Link", "Distance", "Route", "Section", "Verified cores", "Total cor
 RESERVATIONS = ["Region", "Nodes", "No of core requested", "Fiber core requestor", "Fiber core request date",
                 "Expected CV Ready", "Contractor", "Remark", "SRF", "Port Info", "Fiber monitored Y/N/WIP"]
 REASON = "data file load"
+CLUSTER_NOTE = "Optional. Cluster name. Sites with the same cluster are drawn together on the map."
 
 
 def template(path: str) -> None:
@@ -49,6 +51,7 @@ def template(path: str) -> None:
     ws = wb.active
     ws.title = "Sites"  # type: ignore[union-attr]
     ws.append(SITES)  # type: ignore[union-attr]
+    ws.cell(row=1, column=SITES.index("cluster") + 1).comment = Comment(CLUSTER_NOTE, "Fiber Dashboard")  # type: ignore[union-attr]
     wb.create_sheet("Segments").append(SEGMENTS)
     wb.save(path)
     print(f"Blank file written to {path}")

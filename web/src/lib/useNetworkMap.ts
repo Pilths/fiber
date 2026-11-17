@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type PointerEvent } from "react";
-import { CAMPUS_MAX_ZOOM, clusterName, FADE_TO } from "@/lib/mapClusters";
+import { CLUSTER_MAX_ZOOM, clusterName, FADE_TO } from "@/lib/mapClusters";
 import {
   boundsOf,
   fitView,
@@ -46,7 +46,7 @@ export type NetworkMapOptions = {
   version: number;
   onSelectSegment: (id: number) => void;
   onClear: () => void;
-  // a campus picked in the header search, fitted once the map is ready, then onFocused
+  // a cluster picked in the header search, fitted once the map is ready, then onFocused
   focusCluster: { name: string } | null;
   onFocused: () => void;
 };
@@ -145,17 +145,17 @@ export function useNetworkMap(options: NetworkMapOptions) {
     go({ ...centred, zoom });
   };
 
-  // A campus label: fit the campus, at least far enough in that its sites show and stand apart.
+  // A cluster label: fit the cluster, at least far enough in that its sites show and stand apart.
   const zoomToBounds = (bounds: Bounds) => {
     if (!size.w) {
       return;
     }
-    const fitted = fitView(bounds, size.w, size.h, 60, CAMPUS_MAX_ZOOM);
+    const fitted = fitView(bounds, size.w, size.h, 60, CLUSTER_MAX_ZOOM);
     go({ ...fitted, zoom: Math.max(fitted.zoom, FADE_TO) });
   };
 
-  // A campus's sector, or the bounds of its sites when it is too small for one (a single site).
-  const campusBounds = (cluster: string): Bounds | null => {
+  // A cluster's sector, or the bounds of its sites when it is too small for one (a single site).
+  const clusterBounds = (cluster: string): Bounds | null => {
     const sector = data.sectors?.features.find((feature) => feature.properties.cluster === cluster);
     if (sector) {
       return sector.properties.bbox;
@@ -237,12 +237,12 @@ export function useNetworkMap(options: NetworkMapOptions) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- follow a segment selected outside the map
   }, [selectionKey]);
 
-  // Runs after the first fit above, so the campus wins over it when both happen at once.
+  // Runs after the first fit above, so the cluster wins over it when both happen at once.
   useEffect(() => {
     if (!focusCluster || !fitted.current) {
       return;
     }
-    const bounds = campusBounds(focusCluster.name);
+    const bounds = clusterBounds(focusCluster.name);
     if (bounds) {
       zoomToBounds(bounds);
     }

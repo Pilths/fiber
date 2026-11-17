@@ -126,9 +126,9 @@ def test_sites_carry_cluster(client, db):
 
 def test_sectors(client, db):
     mkuser(db)
-    site(db, "A", xy=(101.000, 3.000), cluster="Campus")
-    site(db, "B", xy=(101.002, 3.000), cluster=" Campus ")
-    gone = site(db, "C", xy=(101.001, 3.001), cluster="Campus")
+    site(db, "A", xy=(101.000, 3.000), cluster="Cluster")
+    site(db, "B", xy=(101.002, 3.000), cluster=" Cluster ")
+    gone = site(db, "C", xy=(101.001, 3.001), cluster="Cluster")
     db.execute(text("UPDATE sites SET active = false WHERE id = :id"), {"id": gone})
     site(db, "L", xy=(105, 3), cluster="Solo")
     site(db, "N", xy=(101.5, 3))
@@ -136,7 +136,7 @@ def test_sectors(client, db):
     segment(db, other, site(db, "P", xy=(101.9, 3.1)), 4)  # a segment never changes a sector
     r = client.get("/api/map/sectors", headers=H()).json()
     assert r["type"] == "FeatureCollection"
-    assert [f["properties"]["cluster"] for f in r["features"]] == ["Campus"]
+    assert [f["properties"]["cluster"] for f in r["features"]] == ["Cluster"]
     feature = r["features"][0]
     assert feature["geometry"]["type"] == "Polygon"
     assert feature["properties"]["site_count"] == 2
