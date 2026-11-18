@@ -8,8 +8,8 @@ from sqlalchemy import text
 
 from app.auth.deps import DB, Admin, require_admin
 from app.ingest import segment_list as sl
-from app.ingest.site_master import ApplyError
 from app.ingest.upload_file import read_upload
+from app.ingest.uploads import ApplyError, parse_or_422, require_upload
 from app.observability import logged_apply
 
 router = APIRouter(prefix="/api/admin/segment-list", dependencies=[Depends(require_admin)])
@@ -87,18 +87,14 @@ class ApplyOut(BaseModel):
 @router.post("/uploads", status_code=201)
 def upload(db: DB, admin: Admin, file: UploadFile) -> UploadOut:
     name, data = read_upload(file, ".xlsx")
-    try:
-        parsed = sl.parse_workbook(io.BytesIO(data))
-    except Exception as e:
-        raise HTTPException(422, f"Cannot read the workbook: {type(e).__name__}") from e
+    parsed = parse_or_422(sl.parse_workbook, io.BytesIO(data))
     return UploadOut(**sl.stage(db, admin.id, name, parsed))
 
 
 @router.get("/uploads/{upload_id}/rows")
 def rows(db: DB, upload_id: int, group: Group, page: Annotated[int, Query(ge=1)] = 1,
          page_size: Annotated[int, Query(ge=1, le=500)] = 100) -> RowsOut:
-    if not db.execute(text("SELECT 1 FROM uploads WHERE id = :i AND kind = 'segment_list'"), {"i": upload_id}).first():
-        raise HTTPException(404, "Upload not found")
+    require_upload(db, upload_id, "segment_list")
     where = {"u": upload_id, "g": sl.GROUP_COL[group]}
     total = db.execute(text("SELECT count(*) FROM upload_rows WHERE upload_id = :u AND row_group = :g"), where).scalar_one()
     q = db.execute(text("SELECT id, row_number, sheet, status, reason, raw, payload FROM upload_rows "

@@ -1,6 +1,5 @@
 """Admin KMZ upload: stage a preview of segment shapes, then apply."""
 import io
-import json
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile
@@ -9,6 +8,7 @@ from sqlalchemy import text
 
 from app.auth.deps import DB, Admin, require_admin
 from app.ingest.upload_file import read_upload
+from app.ingest.uploads import ApplyError, finish_upload, insert_upload, lock_staged_upload
 from app.load_kmz import (
     SEGMENT_BY_ID_SQL,
     compute_shapes,
@@ -19,12 +19,6 @@ from app.load_kmz import (
 )
 from app.observability import logged_apply
 
-INSERT_UPLOAD_SQL = """
-INSERT INTO uploads (user_id, filename, kind, status, summary)
-VALUES (:user_id, :filename, 'kmz', 'staged', CAST(:summary AS jsonb)) RETURNING id
-"""
-SELECT_UPLOAD_SQL = "SELECT status, summary FROM uploads WHERE id = :upload_id AND kind = 'kmz' FOR UPDATE"
-CONFIRM_UPLOAD_SQL = "UPDATE uploads SET status = 'confirmed', confirmed_at = now() WHERE id = :upload_id"
 
 router = APIRouter(prefix="/api/admin/kmz", dependencies=[Depends(require_admin)])
 DEFAULT_FOLDER = "propose route"
@@ -132,8 +126,7 @@ def upload(
         "block_reason": block_reason,
         **result,
     }
-    parameters = {"user_id": admin.id, "filename": name, "summary": json.dumps(summary)}
-    upload_id = db.execute(text(INSERT_UPLOAD_SQL), parameters).scalar_one()
+    upload_id = insert_upload(db, admin.id, name, "kmz", summary)
     db.commit()
     return preview_from(upload_id, summary)
 
@@ -145,11 +138,10 @@ def apply(db: DB, admin: Admin, upload_id: int) -> KmzApplyOut:
 
 
 def _apply(db: DB, upload_id: int) -> KmzApplyOut:
-    upload_row = db.execute(text(SELECT_UPLOAD_SQL), {"upload_id": upload_id}).mappings().first()
-    if upload_row is None:
-        raise HTTPException(404, "Upload not found")
-    if upload_row["status"] != "staged":
-        raise HTTPException(409, "Already applied or discarded")
+    try:
+        upload_row = lock_staged_upload(db, upload_id, "kmz", "Already applied or discarded")
+    except ApplyError as error:
+        raise HTTPException(error.status, error.message) from error
     summary = upload_row["summary"]
     if summary["block_reason"] or not summary["shaped"]:
         raise HTTPException(409, summary["block_reason"] or "Nothing to apply")
@@ -160,6 +152,6 @@ def _apply(db: DB, upload_id: int) -> KmzApplyOut:
             continue
         save_shape(db, segment, item["coords"])
         saved += 1
-    db.execute(text(CONFIRM_UPLOAD_SQL), {"upload_id": upload_id})
+    finish_upload(db, upload_id)
     db.commit()
     return KmzApplyOut(upload_id=upload_id, shaped=saved)
