@@ -173,7 +173,21 @@ export function useInventory(view: View, version: number) {
     optionIds = new Set(allOptionIds ?? found.ids);
   }
 
+  const unselectSegment = () => {
+    setSegmentId(null);
+    setDetail(null);
+    setDrawerCore(null);
+    if (location.hash.startsWith("#segment=")) {
+      history.replaceState(null, "", location.pathname);
+    }
+  };
+
+  // Clicking the selected segment again unselects it; a found route stays.
   const pickOnMap = (id: number) => {
+    if (id === segmentId) {
+      unselectSegment();
+      return;
+    }
     if (!found || found.ids.includes(id)) {
       open(id);
       return;
@@ -188,13 +202,8 @@ export function useInventory(view: View, version: number) {
 
   // Map: Esc clears the selection and the searched route.
   const clearSelection = () => {
-    setSegmentId(null);
-    setDetail(null);
-    setDrawerCore(null);
+    unselectSegment();
     routePlanner.clear();
-    if (location.hash.startsWith("#segment=")) {
-      history.replaceState(null, "", location.pathname);
-    }
   };
 
   // "Clear route" also unselects the segment the route had selected.

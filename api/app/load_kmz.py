@@ -168,6 +168,73 @@ def parse_lines(source: str | BinaryIO, folder: str) -> tuple[list[list[tuple[fl
     return lines, names
 
 
+def child_folders(parent: ElementTree.Element) -> list[ElementTree.Element]:
+    """Folders directly under `parent`; other wrappers (Document) are walked through."""
+    found = []
+    for child in parent:
+        if local_tag(child) == "Folder":
+            found.append(child)
+        else:
+            found.extend(child_folders(child))
+    return found
+
+
+def folder_nodes(root: ElementTree.Element) -> dict[str, ElementTree.Element]:
+    """Every Folder by id: its index among its sibling Folders, joined by "/" ("0", "0/2")."""
+    nodes: dict[str, ElementTree.Element] = {}
+
+    def walk(parent: ElementTree.Element, prefix: str) -> None:
+        for index, folder in enumerate(child_folders(parent)):
+            folder_id = f"{prefix}{index}"
+            nodes[folder_id] = folder
+            walk(folder, f"{folder_id}/")
+
+    walk(root, "")
+    return nodes
+
+
+def folder_tree(source: str | BinaryIO) -> tuple[list[dict], int]:
+    """Folder tree with line counts, and the number of lines outside any folder."""
+    root = read_kml_root(source)
+
+    def build(parent: ElementTree.Element, prefix: str) -> list[dict]:
+        nodes = []
+        for index, folder in enumerate(child_folders(parent)):
+            folder_id = f"{prefix}{index}"
+            nodes.append({
+                "id": folder_id,
+                "name": folder_name(folder),
+                "lines": len(lines_in_folder(folder)),
+                "children": build(folder, f"{folder_id}/"),
+            })
+        return nodes
+
+    tree = build(root, "")
+    in_folders = sum(node["lines"] for node in tree)
+    return tree, len(lines_in_folder(root)) - in_folders
+
+
+def lines_in_folder_ids(
+    source: str | BinaryIO, ids: list[str]
+) -> tuple[list[list[tuple[float, float]]], list[str]]:
+    """Lines of the selected folders (a selected child of a selected folder is not counted twice)
+    and their names. Raises ValueError for an unknown id."""
+    nodes = folder_nodes(read_kml_root(source))
+    unknown = [folder_id for folder_id in ids if folder_id not in nodes]
+    if unknown:
+        raise ValueError(f"unknown folder id {unknown[0]}")
+    selected = set(ids)
+    lines: list[list[tuple[float, float]]] = []
+    names: list[str] = []
+    for folder_id in sorted(selected):
+        ancestors = {folder_id.rsplit("/", depth)[0] for depth in range(1, folder_id.count("/") + 1)}
+        if ancestors & selected:
+            continue
+        lines.extend(lines_in_folder(nodes[folder_id]))
+        names.append(folder_name(nodes[folder_id]))
+    return lines, names
+
+
 def build_graph(lines: list[list[tuple[float, float]]]) -> networkx.Graph:
     graph = networkx.Graph()
     for line_index, vertices in enumerate(lines):

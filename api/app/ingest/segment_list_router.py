@@ -10,6 +10,7 @@ from app.auth.deps import DB, Admin, require_admin
 from app.ingest import segment_list as sl
 from app.ingest.site_master import ApplyError
 from app.ingest.upload_file import read_upload
+from app.observability import logged_apply
 
 router = APIRouter(prefix="/api/admin/segment-list", dependencies=[Depends(require_admin)])
 Group = Literal["new", "changed", "unchanged", "problem"]
@@ -119,6 +120,7 @@ def rows(db: DB, upload_id: int, group: Group, page: Annotated[int, Query(ge=1)]
 @router.post("/uploads/{upload_id}/apply")
 def apply(db: DB, admin: Admin, upload_id: int) -> ApplyOut:
     try:
-        return ApplyOut(**sl.apply_upload(db, admin.id, upload_id))
+        with logged_apply("segment_list", upload_id, admin.id):
+            return ApplyOut(**sl.apply_upload(db, admin.id, upload_id))
     except ApplyError as e:
         raise HTTPException(e.status, e.message) from e

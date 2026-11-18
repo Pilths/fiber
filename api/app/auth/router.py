@@ -1,3 +1,4 @@
+import logging
 import os
 import secrets
 from datetime import UTC, datetime, timedelta
@@ -5,12 +6,14 @@ from typing import Annotated
 
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Response
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response
 from pydantic import BaseModel
 from sqlalchemy import text
 
 from app.auth.deps import COOKIE, DB, CurrentUser, get_session_user, hash_token
+from app.environment import cookie_secure
 
+logger = logging.getLogger("app.auth")
 router = APIRouter(prefix="/api")
 ph = PasswordHasher()
 DUMMY_HASH = ph.hash("not-a-real-password")  # verified against for unknown users, so timing does not reveal them
@@ -40,11 +43,13 @@ def _verify(hash_: str | None, password: str) -> bool:
 
 
 @router.post("/auth/login")
-def login(db: DB, response: Response, body: LoginBody) -> CurrentUser:
+def login(db: DB, request: Request, response: Response, body: LoginBody) -> CurrentUser:
     row = db.execute(text("SELECT id, username, display_name, role, must_change_password, password_hash, active "
                           "FROM users WHERE username = :u"), {"u": body.username}).mappings().first()
     ok = _verify(row["password_hash"] if row else None, body.password)
     if not (row and ok and row["active"]):
+        client = request.client.host if request.client else "unknown"
+        logger.warning("login failed username=%r client=%s", body.username, client)
         raise BAD_LOGIN
     hours = float(os.environ.get("SESSION_HOURS", "12"))
     token = secrets.token_urlsafe(32)
@@ -52,7 +57,7 @@ def login(db: DB, response: Response, body: LoginBody) -> CurrentUser:
                {"i": hash_token(token), "u": row["id"], "e": datetime.now(UTC) + timedelta(hours=hours)})
     db.commit()
     response.set_cookie(COOKIE, token, max_age=int(hours * 3600), httponly=True, samesite="lax",
-                        secure=os.environ.get("APP_ENV") == "production")
+                        secure=cookie_secure())
     return CurrentUser(**{k: row[k] for k in CurrentUser.model_fields})
 
 

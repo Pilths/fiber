@@ -249,7 +249,7 @@ export function ReservationUpload() {
     <div className="space-y-4">
     <section className="card" aria-labelledby="ru-h">
       <div className="card-h">
-        <h2 id="ru-h">Reservation workbook</h2>
+        <h2 id="ru-h">Reservations (Excel)</h2>
       </div>
       <div className="space-y-4">
         <FilePick label="Upload a Reservation workbook" busy={busy} onFile={pick} />

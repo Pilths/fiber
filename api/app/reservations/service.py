@@ -81,13 +81,17 @@ NEEDS_REVIEW_WHERE = (
 )
 OLDEST_EVENT_FIRST = "st.last_event_at, r.id"
 
-LOCK_RESERVATION_SQL = """
+LOCK_RESERVATION_SQL = "SELECT id FROM reservations WHERE id = :id FOR UPDATE"
+
+# Read in its own statement after the lock. A statement that waits for a row lock keeps the snapshot it took before
+# the wait, so lock and read in one statement would show the state from before the winning request committed.
+READ_RESERVATION_SQL = """
 SELECT r.id, r.planner_id, r.imported, r.planned_date, r.unassigned_segment_id, st.status, st.last_event,
   st.is_stale, COALESCE(un.remaining, 0) AS remaining
 FROM reservations r
 JOIN reservation_state_v st ON st.reservation_id = r.id
 LEFT JOIN reservation_unassigned_v un ON un.reservation_id = r.id
-WHERE r.id = :id FOR UPDATE OF r
+WHERE r.id = :id
 """
 
 INSERT_EVENT_SQL = """
@@ -222,9 +226,10 @@ def needs_review(db: Session, user: CurrentUser) -> list[NeedsReviewItem]:
 # ---------- helpers for writes ----------
 
 def _lock(db: Session, reservation_id: int) -> dict[str, Any]:
-    row = db.execute(text(LOCK_RESERVATION_SQL), {"id": reservation_id}).mappings().first()
-    if row is None:
+    locked = db.execute(text(LOCK_RESERVATION_SQL), {"id": reservation_id}).first()
+    if locked is None:
         raise HTTPException(404, "Reservation not found")
+    row = db.execute(text(READ_RESERVATION_SQL), {"id": reservation_id}).mappings().one()
     return dict(row)
 
 

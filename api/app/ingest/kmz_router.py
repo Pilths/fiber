@@ -9,7 +9,15 @@ from sqlalchemy import text
 
 from app.auth.deps import DB, Admin, require_admin
 from app.ingest.upload_file import read_upload
-from app.load_kmz import SEGMENT_BY_ID_SQL, compute_shapes, parse_lines, save_shape
+from app.load_kmz import (
+    SEGMENT_BY_ID_SQL,
+    compute_shapes,
+    folder_tree,
+    lines_in_folder_ids,
+    parse_lines,
+    save_shape,
+)
+from app.observability import logged_apply
 
 INSERT_UPLOAD_SQL = """
 INSERT INTO uploads (user_id, filename, kind, status, summary)
@@ -48,6 +56,18 @@ class KmzUploadOut(BaseModel):
     sites_attached: list[str]
 
 
+class KmzFolder(BaseModel):
+    id: str
+    name: str
+    lines: int
+    children: list["KmzFolder"]
+
+
+class KmzFoldersOut(BaseModel):
+    folders: list[KmzFolder]
+    loose_lines: int
+
+
 class KmzApplyOut(BaseModel):
     upload_id: int
     shaped: int
@@ -67,16 +87,32 @@ def preview_from(upload_id: int, summary: dict) -> KmzUploadOut:
     )
 
 
+@router.post("/folders")
+def folders(file: UploadFile) -> KmzFoldersOut:
+    _, data = read_upload(file, ".kmz")
+    try:
+        tree, loose_lines = folder_tree(io.BytesIO(data))
+    except ValueError as error:
+        raise HTTPException(422, f"Cannot read the KMZ: {error}") from error
+    return KmzFoldersOut(folders=tree, loose_lines=loose_lines)
+
+
 @router.post("/uploads", status_code=201)
 def upload(
     db: DB,
     admin: Admin,
     file: UploadFile,
     folder: Annotated[str, Form()] = DEFAULT_FOLDER,
+    folder_ids: Annotated[list[str], Form()] = [],
 ) -> KmzUploadOut:
     name, data = read_upload(file, ".kmz")
     try:
-        lines, folders_found = parse_lines(io.BytesIO(data), folder)
+        if folder_ids:
+            lines, selected_names = lines_in_folder_ids(io.BytesIO(data), folder_ids)
+            folder = ", ".join(selected_names)
+            folders_found = selected_names
+        else:
+            lines, folders_found = parse_lines(io.BytesIO(data), folder)
     except ValueError as error:
         raise HTTPException(422, f"Cannot read the KMZ: {error}") from error
     result = {"shaped": [], "skipped": [], "sites_attached": []}
@@ -86,6 +122,8 @@ def upload(
     else:
         found = ", ".join(folders_found) or "none"
         block_reason = f"No lines in folder '{folder}'. Folders in the file: {found}"
+        if folder_ids:
+            block_reason = "No lines in the selected folders."
     summary = {
         "filename": name,
         "folder": folder,
@@ -101,7 +139,12 @@ def upload(
 
 
 @router.post("/uploads/{upload_id}/apply")
-def apply(db: DB, upload_id: int) -> KmzApplyOut:
+def apply(db: DB, admin: Admin, upload_id: int) -> KmzApplyOut:
+    with logged_apply("kmz", upload_id, admin.id):
+        return _apply(db, upload_id)
+
+
+def _apply(db: DB, upload_id: int) -> KmzApplyOut:
     upload_row = db.execute(text(SELECT_UPLOAD_SQL), {"upload_id": upload_id}).mappings().first()
     if upload_row is None:
         raise HTTPException(404, "Upload not found")

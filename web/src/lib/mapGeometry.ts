@@ -116,6 +116,7 @@ export function makePlacer(reserved: number[][]) {
 
 const SITE_HALF = 12; // half the marker box, in px
 const NAME_BELOW = 17; // centre of a site name under its marker, in px
+const NAME_ZOOM = 11; // site names show from this zoom; the ends of the selection always do
 
 // Areas kept free of chips and names: the controls (top left) and the key (bottom left).
 function reservedAreas(height: number): number[][] {
@@ -204,10 +205,18 @@ export function declutter(
   }
   shown.filter((line) => !line.selected).forEach(placeChip);
   const nameShown = new Set<number>();
+  const zoomedOut = (state.camera?.zoom ?? 0) < NAME_ZOOM;
   for (const site of layout.sites.filter((placed) => !placed.spread)) {
     const [x, y] = site.point;
+    if (site.end) {
+      nameShown.add(site.index);
+      continue;
+    }
+    if (zoomedOut) {
+      continue;
+    }
     const fits = placer.fits(x, y + NAME_BELOW, nameWidth(sites[site.index].properties.name), 18);
-    if (fits || site.end) {
+    if (fits) {
       nameShown.add(site.index);
     }
   }

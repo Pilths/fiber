@@ -11,6 +11,7 @@ from app.auth.deps import DB, Admin, require_admin
 from app.ingest import reservation_upload as ru
 from app.ingest.excel import parse_reservation_workbook
 from app.ingest.upload_file import read_upload
+from app.observability import logged_apply
 
 router = APIRouter(prefix="/api/admin", dependencies=[Depends(require_admin)])
 Group = Literal["new", "changed", "unchanged", "missing", "reservations", "conflicts", "already_imported", "ignored",
@@ -77,7 +78,8 @@ def rows(db: DB, upload_id: int, group: Group, page: Annotated[int, Query(ge=1)]
 @router.post("/uploads/{upload_id}/confirm")
 def confirm(db: DB, admin: Admin, upload_id: int, body: ConfirmIn | None = None) -> dict[str, Any]:
     try:
-        return ru.confirm(db, admin.id, upload_id, [w.model_dump() for w in (body or ConfirmIn()).excel_wins])
+        with logged_apply("excel", upload_id, admin.id):
+            return ru.confirm(db, admin.id, upload_id, [w.model_dump() for w in (body or ConfirmIn()).excel_wins])
     except ru.ApplyError as e:
         raise _fail(e) from e
 

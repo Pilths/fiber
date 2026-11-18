@@ -206,7 +206,7 @@ export function SiteMasterUpload() {
     <div className="space-y-4">
     <section className="card" aria-labelledby="sm-h">
       <div className="card-h">
-        <h2 id="sm-h">Site master workbook</h2>
+        <h2 id="sm-h">Sites (Excel)</h2>
       </div>
       <div className="space-y-4">
         <FilePick label="Upload a site master workbook" busy={busy} onFile={pick} />
