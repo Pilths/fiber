@@ -82,3 +82,60 @@ def test_apply_twice_and_unknown(client, admin, segments, kmz_bytes):
     assert client.post(f"{URL}/uploads/{upload_id}/apply").status_code == 200
     assert client.post(f"{URL}/uploads/{upload_id}/apply").status_code == 409
     assert client.post(f"{URL}/uploads/99999/apply").status_code == 404
+
+
+def nested_kmz():
+    import zipfile
+    import io
+    from test_load_kmz import HIGHWAY, folder_xml, line_xml
+    inner = folder_xml("inner", line_xml(HIGHWAY))
+    outer = folder_xml("outer", line_xml(HIGHWAY[::-1]) + inner)
+    other = folder_xml("other", "")
+    loose = line_xml(HIGHWAY)
+    kml = f'<kml xmlns="http://www.opengis.net/kml/2.2"><Document>{outer}{other}{loose}</Document></kml>'
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        archive.writestr("doc.kml", kml)
+    return buffer.getvalue()
+
+
+def test_folder_tree_shape_and_counts(client, admin):
+    response = client.post(f"{URL}/folders", files={"file": ("n.kmz", nested_kmz())})
+    assert response.status_code == 200
+    assert response.json() == {
+        "folders": [
+            {"id": "0", "name": "outer", "lines": 2, "children": [
+                {"id": "0/0", "name": "inner", "lines": 1, "children": []}]},
+            {"id": "1", "name": "other", "lines": 0, "children": []},
+        ],
+        "loose_lines": 1,
+    }
+
+
+def test_folders_bad_file(client, admin):
+    assert client.post(f"{URL}/folders", files={"file": ("n.kmz", b"junk")}).status_code == 422
+
+
+def test_folder_ids_dedupe_parent_and_child(client, db, admin, segments):
+    body = stage(client, nested_kmz(), folder_ids=["0", "0/0"]).json()
+    assert body["lines"] == 2
+    assert body["folder"] == "outer"
+
+
+def test_folder_ids_child_only_and_empty(client, db, admin, segments):
+    assert stage(client, nested_kmz(), folder_ids=["0/0"]).json()["folder"] == "inner"
+    body = stage(client, nested_kmz(), folder_ids=["1"]).json()
+    assert body["block_reason"] == "No lines in the selected folders."
+
+
+def test_folder_ids_unknown_is_422(client, admin):
+    assert stage(client, nested_kmz(), folder_ids=["9"]).status_code == 422
+
+
+def test_folder_ids_preview_and_old_folder_path(client, db, admin, segments, kmz_bytes):
+    tree = client.post(f"{URL}/folders", files={"file": ("t.kmz", kmz_bytes)}).json()
+    route_id = next(node["id"] for node in tree["folders"] if node["lines"] == 3)
+    by_ids = stage(client, kmz_bytes, folder_ids=[route_id]).json()
+    by_name = stage(client, kmz_bytes).json()
+    assert by_ids["lines"] == by_name["lines"] == 3
+    assert [i["segment_id"] for i in by_ids["shaped"]] == [i["segment_id"] for i in by_name["shaped"]]

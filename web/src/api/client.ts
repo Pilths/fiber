@@ -93,10 +93,16 @@ export const api = {
   post: <P extends Path<"post">>(url: P, ...[opts]: {} extends Options<Op<P, "post">, "post"> ? [opts?: Options<Op<P, "post">, "post">] : [opts: Options<Op<P, "post">, "post">]) =>
     request("post", url, opts),
   // Multipart upload of one file as field "file". The generated types have no multipart body, so this is untyped.
-  postFile: <P extends Path<"post">>(url: P, file: File, fields: Record<string, string> = {}) => {
+  // A list value repeats the field once per item.
+  postFile: <P extends Path<"post">>(url: P, file: File, fields: Record<string, string | string[]> = {}) => {
     const body = new FormData();
     body.append("file", file);
-    for (const [k, v] of Object.entries(fields)) body.append(k, v);
+    for (const [name, value] of Object.entries(fields)) {
+      const values = Array.isArray(value) ? value : [value];
+      for (const item of values) {
+        body.append(name, item);
+      }
+    }
     return request("post", url, { body } as never);
   },
 };

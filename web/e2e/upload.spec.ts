@@ -22,7 +22,7 @@ const resRow = (customer: string | null) => ["East Coast", SEGMENT, null, null, 
 const file = (name: string, sheets: Sheet[]) => ({ name, mimeType: XLSX, buffer: xlsx(sheets) });
 const nav = (page: Page) => page.getByRole("navigation", { name: "Main" });
 
-type UploadTab = "Site master workbook" | "Segment list" | "KMZ route lines" | "Reservation workbook";
+type UploadTab = "Sites (Excel)" | "Segments (Excel)" | "Route lines (KMZ)" | "Reservations (Excel)";
 
 async function openUpload(page: Page, tab: UploadTab) {
   await signIn(page, "admin1");
@@ -32,7 +32,7 @@ async function openUpload(page: Page, tab: UploadTab) {
 
 // Missing 17: the 12 DEV sites plus the 5 DEV data centres (2 plus 3 cluster DCs), which belong to the Sites sheet.
 test("site master preview: counts, 10% drop override", async ({ page }) => {
-  await openUpload(page, "Site master workbook");
+  await openUpload(page, "Sites (Excel)");
   await page.getByLabel("Upload a site master workbook").setInputFiles(file(`e2e-sites-${stamp}.xlsx`, [
     { name: "Cover", rows: [["synthetic test file"]] },
     { name: "Site Location", rows: [SITE_HEAD, ["E2E Site One", 3.2, 101.5, "Central", "Tower"], ["E2E Site Two", "TBA", "TBA", "Central", "Tower"]] },
@@ -74,7 +74,7 @@ test("site master preview: counts, 10% drop override", async ({ page }) => {
 });
 
 test("site master add and update only: no Missing rows, no row-count block (not applied)", async ({ page }) => {
-  await openUpload(page, "Site master workbook");
+  await openUpload(page, "Sites (Excel)");
   const addOnly = page.getByLabel("Add and update only");
   await expect(addOnly).not.toBeChecked();
   await addOnly.check();
@@ -93,7 +93,7 @@ test("site master add and update only: no Missing rows, no row-count block (not 
 });
 
 test("site master apply: DC List sheet ignored, result shown, preview survives a tab change (apply mocked)", async ({ page }) => {
-  await openUpload(page, "Site master workbook");
+  await openUpload(page, "Sites (Excel)");
   await page.getByLabel("Upload a site master workbook").setInputFiles(file(`e2e-both-${stamp}.xlsx`, [
     { name: "Site Location", rows: [SITE_HEAD, ["E2E Site One", 3.2, 101.5, "Central", "Tower"], ["E2E Site Two", "TBA", "TBA", "Central", "Tower"]] },
     { name: "DC List", rows: [DC_HEAD, [1, "Penang", "E2E DC Beta", "DEV Penang Tower", 5.41, 100.33]] },
@@ -134,7 +134,7 @@ test("site master apply: DC List sheet ignored, result shown, preview survives a
 const SL_HEAD = ["Link", "Distance", "Route", "Section", "Type"];
 
 test("segment list preview: header found, problem rows in the table, nothing to apply", async ({ page }) => {
-  await openUpload(page, "Segment list");
+  await openUpload(page, "Segments (Excel)");
   await page.getByLabel("Upload a segment list").setInputFiles(file(`e2e-segments-${stamp}.xlsx`, [
     { name: "Cover", rows: [["synthetic test file"]] },
     { name: "Links", rows: [["title row"], SL_HEAD, ["ZZQA-ZZQB", 12.5, "R1", "N-C", "Trunk"], ["bad link", "x", null, null, "Ring"]] },
@@ -158,7 +158,7 @@ test("segment list preview: header found, problem rows in the table, nothing to 
 });
 
 test("segment list without the Link and Distance headers is blocked: no Apply", async ({ page }) => {
-  await openUpload(page, "Segment list");
+  await openUpload(page, "Segments (Excel)");
   await page.getByLabel("Upload a segment list").setInputFiles(file(`e2e-segments-bad-${stamp}.xlsx`, [{ name: "Sheet1", rows: [["Nodes", "km?"], ["A-B", 1]] }]));
   const preview = page.getByTestId("sl-preview");
   await expect(preview.getByRole("alert")).toContainText("This file will not be applied");
@@ -169,7 +169,7 @@ test("segment list without the Link and Distance headers is blocked: no Apply", 
 
 test("segment list apply: confirm counts, result note, preview survives a tab change (calls mocked)", async ({ page }) => {
   // Dev sites have spaces in their names, so no real link can be New or Changed: the upload, rows and apply are mocked.
-  await openUpload(page, "Segment list");
+  await openUpload(page, "Segments (Excel)");
   const id = 987654;
   await page.route("**/api/admin/segment-list/uploads", (r) => r.fulfill({ status: 201, json: {
     upload_id: id, filename: "e2e-mock.xlsx", sheet_name: "Links", found: true, block_reason: null,
@@ -198,9 +198,9 @@ test("segment list apply: confirm counts, result note, preview survives a tab ch
   await expect(changed).toContainText("Route: R1 → R2");
   await expect(changed).toContainText("kept: edited in dashboard");
 
-  await page.getByRole("tab", { name: "Reservation workbook" }).click();
+  await page.getByRole("tab", { name: "Reservations (Excel)" }).click();
   await expect(preview).toBeHidden();
-  await page.getByRole("tab", { name: "Segment list" }).click();
+  await page.getByRole("tab", { name: "Segments (Excel)" }).click();
   await expect(preview).toContainText("Preview of e2e-mock.xlsx");
 
   await preview.getByRole("button", { name: "Apply segment list…" }).click();
@@ -217,7 +217,7 @@ test("segment list apply: confirm counts, result note, preview survives a tab ch
 });
 
 test("reservation workbook: preview, confirm, re-upload shows Already imported", async ({ page }) => {
-  await openUpload(page, "Reservation workbook");
+  await openUpload(page, "Reservations (Excel)");
   const customer = `E2E Customer ${stamp}`;
   const wb = file(`e2e-res-${stamp}.xlsx`, [
     { name: "Reservation", rows: [RES_HEAD, ["E2E group"], resRow(customer), resRow(null)] },
@@ -266,7 +266,7 @@ test("reservation workbook: preview, confirm, re-upload shows Already imported",
 });
 
 test("close reservation import needs a reason, then shows the closed state (close call mocked)", async ({ page }) => {
-  await openUpload(page, "Reservation workbook");
+  await openUpload(page, "Reservations (Excel)");
   const sw = page.getByTestId("import-switch");
   await expect(sw).toContainText("Import open");
   await sw.getByRole("button", { name: "Close reservation import…" }).click();
@@ -311,9 +311,16 @@ function kmz(folder: string) {
   return { name: `e2e-${stamp}.kmz`, mimeType: "application/vnd.google-earth.kmz", buffer: zip([["doc.kml", kml]]) };
 }
 
-test("KMZ route lines: preview lists the segment to draw, apply shows the count (apply mocked)", async ({ page }) => {
-  await openUpload(page, "KMZ route lines");
+async function openKmzTree(page: Page) {
+  await openUpload(page, "Route lines (KMZ)");
   await page.getByLabel("Upload a KMZ file").setInputFiles(kmz("propose route"));
+  return page.getByRole("group", { name: "Folders" });
+}
+
+test("Route lines (KMZ): preview lists the segment to draw, apply shows the count (apply mocked)", async ({ page }) => {
+  const tree = await openKmzTree(page);
+  await expect(tree.getByRole("checkbox", { name: /propose route/ })).toBeChecked();
+  await page.getByRole("button", { name: "Preview", exact: true }).click();
   const preview = page.getByTestId("kmz-preview");
   await expect(preview).toContainText("1 line in folder “propose route”");
   const row = preview.getByRole("table", { name: "Segments to draw" }).getByRole("row", { name: /DEV Kuala Lumpur DC - DEV Cyberjaya DC/ });
@@ -326,11 +333,21 @@ test("KMZ route lines: preview lists the segment to draw, apply shows the count 
   await expect(preview).toHaveCount(0);
 });
 
-test("KMZ route lines: a folder with no lines blocks apply and names the folders found", async ({ page }) => {
-  await openUpload(page, "KMZ route lines");
-  await page.getByLabel("Folder").fill("route");
-  await page.getByLabel("Upload a KMZ file").setInputFiles(kmz("propose route"));
-  const preview = page.getByTestId("kmz-preview");
-  await expect(preview.getByRole("alert")).toContainText("No lines in folder 'route'. Folders in the file:");
-  await expect(preview.getByRole("button", { name: "Apply KMZ…" })).toHaveCount(0);
+test("Route lines (KMZ): folder tree ticks children, disables empty folders and needs a tick to preview", async ({ page }) => {
+  const tree = await openKmzTree(page);
+  const parent = tree.getByRole("checkbox", { name: /Asbuilt Cable E2E/ });
+  const exInfra = tree.getByRole("checkbox", { name: /ex infra/ });
+  const proposeRoute = tree.getByRole("checkbox", { name: /propose route/ });
+  const previewButton = page.getByRole("button", { name: "Preview", exact: true });
+  await expect(tree.getByRole("checkbox", { name: /site/ })).toBeDisabled();
+  await expect(parent).not.toBeChecked();
+  await proposeRoute.uncheck();
+  await expect(previewButton).toBeDisabled();
+  await parent.check();
+  await expect(exInfra).toBeChecked();
+  await expect(proposeRoute).toBeChecked();
+  await expect(previewButton).toBeEnabled();
+  await exInfra.uncheck();
+  await expect(parent).not.toBeChecked();
+  await expect(proposeRoute).toBeChecked();
 });

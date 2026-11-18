@@ -27,9 +27,10 @@ WHERE g.geom IS NOT NULL GROUP BY g.id ORDER BY g.id
 SITE_SQL = """
 SELECT s.id, s.name, s.kind, s.lrd_site_id, s.details->>'region' AS region,
        s.details->>'cluster' AS cluster,
-       ST_X(s.geom) AS x, ST_Y(s.geom) AS y, l.name AS lname, ST_X(l.geom) AS lx, ST_Y(l.geom) AS ly
+       ST_X(s.geom) AS x, ST_Y(s.geom) AS y, l.name AS lname, ST_X(l.geom) AS lx, ST_Y(l.geom) AS ly,
+       EXISTS (SELECT 1 FROM segments p WHERE p.site_a_id = s.id OR p.site_b_id = s.id) AS has_segment
 FROM sites s LEFT JOIN sites l ON l.id = s.lrd_site_id
-WHERE s.active AND EXISTS (SELECT 1 FROM segments p WHERE p.site_a_id = s.id OR p.site_b_id = s.id)
+WHERE s.active
 ORDER BY s.id
 """
 # A sector is one cluster: the buffered hull of the sites that share a cluster name (2 or more, with a point).
@@ -132,7 +133,9 @@ def map_sites(db: Session) -> dict[str, Any]:
             if r["kind"] == "data_center" and _ok(r["lx"], r["ly"]):
                 x, y, props["location_from_site"] = r["lx"], r["ly"], r["lname"]
             else:
-                not_drawn.append({"site_id": r["id"], "name": r["name"], "reason": "no valid coordinates"})
+                # A site with no segment and no point is not worth a "not drawn" note.
+                if r["has_segment"]:
+                    not_drawn.append({"site_id": r["id"], "name": r["name"], "reason": "no valid coordinates"})
                 continue
         feats.append({"type": "Feature", "properties": props, "geometry": {"type": "Point", "coordinates": [x, y]}})
     return {"type": "FeatureCollection", "features": feats, "not_drawn": not_drawn}

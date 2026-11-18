@@ -97,7 +97,7 @@ test("map loads with no request leaving the app origin; chips, sites, layers and
   expect(outside).toEqual([]);
 });
 
-test("clicking a chip selects the segment; Enter on a chip too; Esc clears", async ({ page }) => {
+test("clicking a chip selects the segment, clicking it again unselects; Enter on a chip too; Esc clears", async ({ page }) => {
   await signIn(page);
   await chip(page, FAR).click();
   await expect(page.locator("#segment-h", { hasText: FAR })).toBeVisible();
@@ -108,6 +108,11 @@ test("clicking a chip selects the segment; Enter on a chip too; Esc clears", asy
   await page.evaluate(() => scrollTo(0, 0));
   await settle(page);
   await page.screenshot({ path: "e2e/screenshots/map-segment-selected.png" });
+
+  await chip(page, FAR).click();
+  await expect(page.locator("#segment-h")).toHaveCount(0);
+  await expect(chip(page, FAR)).toHaveAttribute("aria-pressed", "false");
+  expect(page.url()).not.toContain("#segment=");
 
   const other = "DEV Tanjung Malim Hut - DEV Kuala Lumpur DC";
   await chip(page, other).focus();
@@ -358,7 +363,7 @@ test("clusters: label with site count zoomed out, outline and sites zoomed in, a
     await expect(map(page).getByRole("button", { name: new RegExp(`^Site ${name},`) })).toBeVisible();
   }
   await expect(map(page).locator(`[data-testid=map-sector][data-cluster="${CLUSTER}"]`)).toHaveCount(1);
-  await expect(map(page).getByTestId("map-site").locator(".shape.dc").first()).toHaveCSS("width", "10px");
+  await expect(map(page).getByTestId("map-site").locator(".shape.dc").first()).toHaveCSS("width", "12px");
   await settle(page);
   await page.screenshot({ path: "e2e/screenshots/map-cluster-in.png" });
   // Clusters are always drawn: the filters have no per-cluster chip.

@@ -4,8 +4,8 @@ import { SiteMasterUpload } from "@/components/SiteMasterUpload";
 import { SegmentListUpload } from "@/components/SegmentListUpload";
 import { KmzUpload } from "@/components/KmzUpload";
 
-const TABS = [["site-master", "Site master workbook"], ["segment-list", "Segment list"], ["kmz", "KMZ route lines"],
-  ["reservations", "Reservation workbook"]] as const;
+const TABS = [["site-master", "Sites (Excel)"], ["segment-list", "Segments (Excel)"], ["kmz", "Route lines (KMZ)"],
+  ["reservations", "Reservations (Excel)"]] as const;
 type Tab = (typeof TABS)[number][0];
 
 // Admin Upload page: four separate files, each Upload -> Preview -> Apply/Confirm. All panels stay mounted so a

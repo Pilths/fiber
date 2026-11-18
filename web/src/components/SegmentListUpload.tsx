@@ -116,7 +116,7 @@ export function SegmentListUpload() {
     <div className="space-y-4">
       <section className="card" aria-labelledby="sl-h">
         <div className="card-h">
-          <h2 id="sl-h">Segment list</h2>
+          <h2 id="sl-h">Segments (Excel)</h2>
           </div>
         <div className="space-y-4">
           <FilePick label="Upload a segment list" busy={busy} onFile={pick} />

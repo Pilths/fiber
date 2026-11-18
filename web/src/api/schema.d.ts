@@ -659,6 +659,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/kmz/folders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Folders */
+        post: operations["folders_api_admin_kmz_folders_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/kmz/uploads": {
         parameters: {
             query?: never;
@@ -1118,6 +1135,11 @@ export interface components {
             /** Total */
             total: number;
         };
+        /** Body_folders_api_admin_kmz_folders_post */
+        Body_folders_api_admin_kmz_folders_post: {
+            /** File */
+            file: string;
+        };
         /** Body_upload_api_admin_kmz_uploads_post */
         Body_upload_api_admin_kmz_uploads_post: {
             /** File */
@@ -1127,6 +1149,11 @@ export interface components {
              * @default propose route
              */
             folder: string;
+            /**
+             * Folder Ids
+             * @default []
+             */
+            folder_ids: string[];
         };
         /** Body_upload_api_admin_segment_list_uploads_post */
         Body_upload_api_admin_segment_list_uploads_post: {
@@ -1502,6 +1529,24 @@ export interface components {
             upload_id: number;
             /** Shaped */
             shaped: number;
+        };
+        /** KmzFolder */
+        KmzFolder: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Lines */
+            lines: number;
+            /** Children */
+            children: components["schemas"]["KmzFolder"][];
+        };
+        /** KmzFoldersOut */
+        KmzFoldersOut: {
+            /** Folders */
+            folders: components["schemas"]["KmzFolder"][];
+            /** Loose Lines */
+            loose_lines: number;
         };
         /** KmzShaped */
         KmzShaped: {
@@ -3857,6 +3902,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["app__ingest__segment_list_router__ApplyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    folders_api_admin_kmz_folders_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-dev-user"?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                fiber_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_folders_api_admin_kmz_folders_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KmzFoldersOut"];
                 };
             };
             /** @description Validation Error */

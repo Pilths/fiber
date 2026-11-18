@@ -1,71 +1,18 @@
-import { useState } from "react";
-import { api, errorText } from "@/api/client";
-import type { components } from "@/api/schema";
+import { KmzFolderTree } from "@/components/KmzFolderTree";
 import { Dialog, FilePick, Note } from "@/components/upload-parts";
-import { uploadError } from "@/lib/utils";
+import { useKmzUpload, type KmzStaged } from "@/lib/useKmzUpload";
 
-type Staged = components["schemas"]["KmzUploadOut"];
-type Applied = components["schemas"]["KmzApplyOut"];
+type Staged = KmzStaged;
 type Shaped = Staged["shaped"][number];
 type Skipped = Staged["skipped"][number];
 
 const KMZ = { accept: ".kmz,application/vnd.google-earth.kmz", button: "Choose .kmz file" };
-const DEFAULT_FOLDER = "propose route";
 
 function formatKm(km: number | null | undefined): string {
   if (km == null) {
     return "—";
   }
   return km.toFixed(2);
-}
-
-// Upload -> preview -> apply. State and actions live here so the screen parts stay plain.
-function useKmzUpload() {
-  const [folder, setFolder] = useState(DEFAULT_FOLDER);
-  const [staged, setStaged] = useState<Staged | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [confirming, setConfirming] = useState(false);
-  const [result, setResult] = useState<Applied | null>(null);
-
-  const pick = async (file: File) => {
-    setBusy(true);
-    setError(null);
-    setResult(null);
-    setStaged(null);
-    setConfirming(false);
-    try {
-      const folderName = folder.trim() || DEFAULT_FOLDER;
-      const uploaded = await api.postFile("/api/admin/kmz/uploads", file, { folder: folderName });
-      setStaged(uploaded as Staged);
-    } catch (caught) {
-      setError(uploadError(caught));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const apply = async () => {
-    if (!staged) {
-      return;
-    }
-    setError(null);
-    try {
-      const path = { upload_id: staged.upload_id };
-      setResult(await api.post("/api/admin/kmz/uploads/{upload_id}/apply", { path }));
-      setStaged(null);
-    } catch (caught) {
-      setError(errorText(caught, "Apply failed. Nothing was changed. Try again."));
-    } finally {
-      setConfirming(false);
-    }
-  };
-
-  const discard = () => {
-    setStaged(null);
-  };
-
-  return { folder, setFolder, staged, busy, error, confirming, setConfirming, result, pick, apply, discard };
 }
 
 function ShapedTable({ rows }: { rows: Shaped[] }) {
@@ -176,15 +123,18 @@ export function KmzUpload() {
     <div className="space-y-4">
       <section className="card" aria-labelledby="kmz-h">
         <div className="card-h">
-          <h2 id="kmz-h">KMZ route lines</h2>
+          <h2 id="kmz-h">Route lines (KMZ)</h2>
         </div>
         <div className="space-y-4">
-          <label className="flex items-center gap-3 text-body">
-            <span className="font-medium">Folder</span>
-            <input className="field w-64!" value={upload.folder}
-              onChange={(event) => upload.setFolder(event.target.value)} />
-          </label>
           <FilePick label="Upload a KMZ file" busy={upload.busy} onFile={upload.pick} kind={KMZ} />
+          {upload.folders.length > 0 && (
+            <>
+              <KmzFolderTree nodes={upload.folders} selected={upload.selected} onToggle={upload.toggle} />
+              <button type="button" className="btn btn-p" disabled={!upload.canPreview} onClick={upload.preview}>
+                Preview
+              </button>
+            </>
+          )}
           {upload.error && <Note tone="red" role="alert" title={upload.error} />}
           <div aria-live="polite" data-testid="kmz-result">
             {upload.result && (

@@ -74,12 +74,13 @@ def test_sites(client, db):
     dc_own = site(db, "DC own", "data_center", xy=(102, 3), lrd=lrd)
     toc = site(db, "TOC", "toc", xy=(103, 3))
     bad = site(db, "Nogeo")
-    site(db, "Lonely", xy=(105, 3))  # no segment: left out
+    site(db, "Lonely", xy=(105, 3))  # no segment: still drawn
+    site(db, "Lonely nogeo")  # no segment, no point: not listed as not drawn
     for x, y in ((lrd, dc_fallback), (dc_none, dc_own), (toc, bad)):
         segment(db, x, y, 2)
     r = client.get("/api/map/sites", headers=H()).json()
     by = {f["properties"]["name"]: f for f in r["features"]}
-    assert set(by) == {"LRD1", "DC fallback", "DC own", "TOC"}
+    assert set(by) == {"LRD1", "DC fallback", "DC own", "TOC", "Lonely"}
     assert by["DC fallback"]["properties"] == {"site_id": dc_fallback, "name": "DC fallback", "kind": "data_center",
                                                "lrd_site_id": lrd, "region": "North", "cluster": None,
                                                "location_from_site": "LRD1"}
