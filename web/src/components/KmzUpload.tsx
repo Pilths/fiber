@@ -1,6 +1,8 @@
 import { KmzFolderTree } from "@/components/KmzFolderTree";
-import { Dialog, FilePick, Note } from "@/components/upload-parts";
+import { FilePick, Note } from "@/components/upload-parts";
+import { ConfirmDialog, PreviewCard } from "@/components/upload-preview";
 import { useKmzUpload, type KmzStaged } from "@/lib/useKmzUpload";
+import { plural } from "@/lib/utils";
 
 type Staged = KmzStaged;
 type Shaped = Staged["shaped"][number];
@@ -69,34 +71,26 @@ function Preview({ staged, onApply, onDiscard }: { staged: Staged; onApply: () =
   const nothing = staged.shaped.length === 0;
   const sites = staged.sites_attached.join(", ") || "none";
   return (
-    <section aria-labelledby="kmz-prev-title" className="card" data-testid="kmz-preview">
-      <div className="card-h">
-        <h2 id="kmz-prev-title" className="truncate">Preview of {staged.filename}</h2>
-      </div>
-      <div className="space-y-4">
-        <p className="text-body text-muted-foreground">
-          {staged.lines} {staged.lines === 1 ? "line" : "lines"} in folder <b className="font-semibold text-foreground">“{staged.folder}”</b>.
-          Sites near the lines: <b className="font-semibold text-foreground">{sites}</b>
-        </p>
-        {staged.block_reason ? (
-          <Note tone="red" role="alert" title="This file will not be applied">{staged.block_reason}</Note>
-        ) : (
-          <>
-            {staged.shaped.length > 0 && <ShapedTable rows={staged.shaped} />}
-            {staged.skipped.length > 0 && <SkippedTable rows={staged.skipped} />}
-            {nothing && staged.skipped.length === 0 && (
-              <p className="text-body text-muted-foreground">No segment has both its sites near these lines.</p>
-            )}
-            <div className="flex flex-wrap items-center gap-4 border-t pt-4">
-              <button type="button" className="btn btn-p" disabled={nothing} onClick={onApply}>Apply KMZ…</button>
-            </div>
-          </>
-        )}
-        <div className="border-t pt-4">
-          <button type="button" className="btn" onClick={onDiscard}>Discard preview</button>
-        </div>
-      </div>
-    </section>
+    <PreviewCard titleId="kmz-prev-title" testId="kmz-preview" filename={staged.filename} onDiscard={onDiscard}>
+      <p className="text-body text-muted-foreground">
+        {plural(staged.lines, "line")} in folder <b className="font-semibold text-foreground">“{staged.folder}”</b>.
+        Sites near the lines: <b className="font-semibold text-foreground">{sites}</b>
+      </p>
+      {staged.block_reason ? (
+        <Note tone="red" role="alert" title="This file will not be applied">{staged.block_reason}</Note>
+      ) : (
+        <>
+          {staged.shaped.length > 0 && <ShapedTable rows={staged.shaped} />}
+          {staged.skipped.length > 0 && <SkippedTable rows={staged.skipped} />}
+          {nothing && staged.skipped.length === 0 && (
+            <p className="text-body text-muted-foreground">No segment has both its sites near these lines.</p>
+          )}
+          <div className="flex flex-wrap items-center gap-4 border-t pt-4">
+            <button type="button" className="btn btn-p" disabled={nothing} onClick={onApply}>Apply KMZ…</button>
+          </div>
+        </>
+      )}
+    </PreviewCard>
   );
 }
 
@@ -104,16 +98,12 @@ function ConfirmApply({ staged, onCancel, onApply }: { staged: Staged; onCancel:
   const total = staged.shaped.length;
   const replacing = staged.shaped.filter((row) => row.had_shape).length;
   return (
-    <Dialog title="Apply KMZ?" onClose={onCancel}>
+    <ConfirmDialog title="Apply KMZ?" onCancel={onCancel} onConfirm={onApply}>
       <p className="mt-3 text-body">
-        {total} segment lines drawn on the map, {replacing} of them replace the current line.
+        {plural(total, "segment line")} drawn on the map, {replacing} of them replace the current line.
         {staged.skipped.length > 0 && ` ${staged.skipped.length} need review and are skipped.`}
       </p>
-      <div className="mt-5 flex justify-end gap-2">
-        <button type="button" className="btn" onClick={onCancel}>Cancel</button>
-        <button type="button" className="btn btn-p" onClick={onApply} autoFocus>Apply</button>
-      </div>
-    </Dialog>
+    </ConfirmDialog>
   );
 }
 
@@ -139,7 +129,7 @@ export function KmzUpload() {
           <div aria-live="polite" data-testid="kmz-result">
             {upload.result && (
               <Note tone="green" title="KMZ applied">
-                <p>{upload.result.shaped} segment lines drawn on the map.</p>
+                <p>{plural(upload.result.shaped, "segment line")} drawn on the map.</p>
               </Note>
             )}
           </div>

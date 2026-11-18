@@ -329,7 +329,7 @@ test("Route lines (KMZ): preview lists the segment to draw, apply shows the coun
   await page.route("**/api/admin/kmz/uploads/*/apply", (route) => route.fulfill({ json: { upload_id: 1, shaped: 1 } }));
   await preview.getByRole("button", { name: "Apply KMZ…" }).click();
   await page.getByRole("dialog", { name: "Apply KMZ?" }).getByRole("button", { name: "Apply" }).click();
-  await expect(page.getByTestId("kmz-result")).toContainText("1 segment lines drawn on the map.");
+  await expect(page.getByTestId("kmz-result")).toContainText("1 segment line drawn on the map.");
   await expect(preview).toHaveCount(0);
 });
 

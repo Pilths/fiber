@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { api, errorText } from "@/api/client";
 import type { components } from "@/api/schema";
 import { uploadError } from "@/lib/utils";
 
-export type FolderNode = { id: string; name: string; lines: number; children: FolderNode[] };
+export type FolderNode = components["schemas"]["KmzFolder"];
 
 const DEFAULT_FOLDER = "propose route";
 
@@ -63,7 +63,6 @@ function toggleFolder(
 
 export type KmzStaged = components["schemas"]["KmzUploadOut"];
 type Applied = components["schemas"]["KmzApplyOut"];
-type FoldersOut = { folders: FolderNode[]; loose_lines: number };
 
 // A file with no folders sends a blank folder, so the API reads every line in it.
 function folderFields(folderIds: string[]): Record<string, string | string[]> {
@@ -83,10 +82,10 @@ export function useKmzUpload() {
   const [error, setError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [result, setResult] = useState<Applied | null>(null);
+  const applying = useRef(false);
 
   const upload = async (chosen: File, folderIds: string[]) => {
-    const uploaded = await api.postFile("/api/admin/kmz/uploads", chosen, folderFields(folderIds));
-    setStaged(uploaded as KmzStaged);
+    setStaged(await api.postFile("/api/admin/kmz/uploads", chosen, folderFields(folderIds)));
   };
 
   const pick = async (chosen: File) => {
@@ -98,7 +97,7 @@ export function useKmzUpload() {
     setFile(chosen);
     setFolders([]);
     try {
-      const found = (await api.postFile("/api/admin/kmz/folders", chosen)) as unknown as FoldersOut;
+      const found = await api.postFile("/api/admin/kmz/folders", chosen);
       if (found.folders.length === 0) {
         await upload(chosen, []);
         return;
@@ -133,10 +132,12 @@ export function useKmzUpload() {
     setSelected(toggleFolder(selected, node, ancestorIds, checked));
   };
 
+  // A double click on Apply sends one request.
   const apply = async () => {
-    if (!staged) {
+    if (!staged || applying.current) {
       return;
     }
+    applying.current = true;
     setError(null);
     try {
       const path = { upload_id: staged.upload_id };
@@ -145,6 +146,7 @@ export function useKmzUpload() {
     } catch (caught) {
       setError(errorText(caught, "Apply failed. Nothing was changed. Try again."));
     } finally {
+      applying.current = false;
       setConfirming(false);
     }
   };
