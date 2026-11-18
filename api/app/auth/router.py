@@ -1,6 +1,8 @@
 import logging
 import os
 import secrets
+import threading
+import time
 from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
@@ -18,6 +20,14 @@ router = APIRouter(prefix="/api")
 ph = PasswordHasher()
 DUMMY_HASH = ph.hash("not-a-real-password")  # verified against for unknown users, so timing does not reveal them
 MIN_PASSWORD = 8  # temporary, while the dashboard is in trial use
+MAX_FAILED_LOGINS = 5
+# Higher for an address than a username: one office can reach the API from one shared address.
+MAX_FAILED_LOGINS_PER_CLIENT = 20
+FAILED_LOGIN_WINDOW_SECONDS = 15 * 60
+# ponytail: kept in this process only, so it resets on restart and is counted per worker;
+# move to a DB table if more workers are added.
+_failed_logins: dict[str, list[float]] = {}
+_failed_logins_lock = threading.Lock()
 BAD_LOGIN = HTTPException(401, "Wrong username or password")
 
 
@@ -35,6 +45,44 @@ def temp_password() -> str:
     return secrets.token_urlsafe(12)
 
 
+def clear_login_throttle() -> None:
+    with _failed_logins_lock:
+        _failed_logins.clear()
+
+
+def _recent_failures(key: str, now: float) -> list[float]:
+    recent = [at for at in _failed_logins.get(key, []) if now - at < FAILED_LOGIN_WINDOW_SECONDS]
+    if recent:
+        _failed_logins[key] = recent
+    else:
+        _failed_logins.pop(key, None)
+    return recent
+
+
+def _limit_for(key: str) -> int:
+    if key.startswith("client:"):
+        return MAX_FAILED_LOGINS_PER_CLIENT
+    return MAX_FAILED_LOGINS
+
+
+def _check_throttle(keys: list[str]) -> None:
+    now = time.monotonic()
+    with _failed_logins_lock:
+        for key in keys:
+            recent = _recent_failures(key, now)
+            if len(recent) >= _limit_for(key):
+                minutes = max(1, int((recent[0] + FAILED_LOGIN_WINDOW_SECONDS - now) / 60) + 1)
+                raise HTTPException(429, f"Too many failed sign-ins. Try again in {minutes} minutes.")
+
+
+def _record_failure(keys: list[str]) -> None:
+    now = time.monotonic()
+    with _failed_logins_lock:
+        for key in keys:
+            _recent_failures(key, now)
+            _failed_logins.setdefault(key, []).append(now)
+
+
 def _verify(hash_: str | None, password: str) -> bool:
     try:
         return ph.verify(hash_ or DUMMY_HASH, password) and hash_ is not None
@@ -44,13 +92,19 @@ def _verify(hash_: str | None, password: str) -> bool:
 
 @router.post("/auth/login")
 def login(db: DB, request: Request, response: Response, body: LoginBody) -> CurrentUser:
+    client = request.client.host if request.client else "unknown"
+    user_key = f"user:{body.username.lower()}"
+    throttle_keys = [user_key, f"client:{client}"]
+    _check_throttle(throttle_keys)
     row = db.execute(text("SELECT id, username, display_name, role, must_change_password, password_hash, active "
                           "FROM users WHERE username = :u"), {"u": body.username}).mappings().first()
     ok = _verify(row["password_hash"] if row else None, body.password)
     if not (row and ok and row["active"]):
-        client = request.client.host if request.client else "unknown"
+        _record_failure(throttle_keys)
         logger.warning("login failed username=%r client=%s", body.username, client)
         raise BAD_LOGIN
+    with _failed_logins_lock:
+        _failed_logins.pop(user_key, None)
     hours = float(os.environ.get("SESSION_HOURS", "12"))
     token = secrets.token_urlsafe(32)
     db.execute(text("INSERT INTO sessions (id, user_id, expires_at) VALUES (:i, :u, :e)"),

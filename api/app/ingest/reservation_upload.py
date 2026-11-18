@@ -339,6 +339,10 @@ def load_staged(db: Session, upload_id: int) -> list[Row]:
 
 # ---- confirm --------------------------------------------------------------------------------------------------
 
+def _segment_id_order(item: SegmentItem) -> tuple[bool, int]:
+    return (item.segment_id is None, item.segment_id or 0)
+
+
 def confirm(db: Session, admin_id: int, upload_id: int, excel_wins: list[dict[str, Any]]) -> dict[str, Any]:
     up = db.execute(text("SELECT id, filename, status, summary FROM uploads WHERE id = :i AND kind = 'excel' FOR UPDATE"),
                     {"i": upload_id}).mappings().first()
@@ -364,7 +368,8 @@ def confirm(db: Session, admin_id: int, upload_id: int, excel_wins: list[dict[st
     sites = dict(db.execute(text("SELECT name, id FROM sites WHERE name = ANY(CAST(:n AS text[]))"),
                             {"n": sorted({n for s in ev.segments.values() for n in (s.a, s.b)})}).all())
     with db.begin_nested():  # all or nothing
-        for sp in ev.segments.values():
+        # Same order as reservation create(), which locks segments by id; new segments (no id yet) go last.
+        for sp in sorted(ev.segments.values(), key=_segment_id_order):
             if sp.group == "new":
                 ensure_segment(db, counts, sites[sp.a], sites[sp.b], sp.vals)
             sid = sp.segment_id or find_segment(db, sites[sp.a], sites[sp.b])[0]  # type: ignore[index]

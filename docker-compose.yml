@@ -1,7 +1,9 @@
-# Development stack. Machine-specific values live only in .env (copy .env.example).
+# Production stack: database and API. The API image contains the built web app and serves it.
+# Machine-specific values live only in .env (copy .env.example).
 services:
   db:
     image: postgis/postgis:18-3.6@sha256:b4466ea2ba7e3af54fcbba996d45325720f4b3ecb4f43f99b2f41367dc196f23
+    restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -19,38 +21,19 @@ services:
       context: ./api
       additional_contexts:
         certs: ./certs
+        web: ./web
+    restart: unless-stopped
     env_file: .env
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     volumes:
-      - ./api:/app
+      # Basemap and label fonts from scripts/get-tiles.sh, kept out of the image (about 600 MB).
+      - ./web/public/map:/app/static/map:ro
     ports:
-      - "8000:8000"
+      - "${API_PORT:-8000}:8000"
     depends_on:
       db:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-
-  web:
-    build:
-      context: ./web
-      additional_contexts:
-        certs: ./certs
-    environment:
-      API_URL: http://api:8000
-    volumes:
-      - ./web:/app
-      - /app/node_modules
-    ports:
-      - "5173:5173"
-    depends_on:
-      api:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://localhost:5173').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
       interval: 10s
       timeout: 5s
       retries: 10

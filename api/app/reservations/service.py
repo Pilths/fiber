@@ -297,7 +297,8 @@ def _record_cores(db: Session, sql: str, event_id: int, core_ids: list[int]) -> 
 
 def _check_segment(db: Session, segment_id: int, requested: int) -> None:
     segment = inventory.get_segment(db, segment_id)
-    assert segment is not None
+    if segment is None:
+        raise HTTPException(404, "Segment not found")
     label = f"{segment.site_a} - {segment.site_b}"
     if segment.fiber_cut:
         raise conflict(f"{label} has a fiber cut and cannot be booked until an admin restores it.")
