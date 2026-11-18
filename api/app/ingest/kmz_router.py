@@ -17,6 +17,7 @@ from app.load_kmz import (
     parse_lines,
     save_shape,
 )
+from app.observability import logged_apply
 
 INSERT_UPLOAD_SQL = """
 INSERT INTO uploads (user_id, filename, kind, status, summary)
@@ -138,7 +139,12 @@ def upload(
 
 
 @router.post("/uploads/{upload_id}/apply")
-def apply(db: DB, upload_id: int) -> KmzApplyOut:
+def apply(db: DB, admin: Admin, upload_id: int) -> KmzApplyOut:
+    with logged_apply("kmz", upload_id, admin.id):
+        return _apply(db, upload_id)
+
+
+def _apply(db: DB, upload_id: int) -> KmzApplyOut:
     upload_row = db.execute(text(SELECT_UPLOAD_SQL), {"upload_id": upload_id}).mappings().first()
     if upload_row is None:
         raise HTTPException(404, "Upload not found")

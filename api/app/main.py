@@ -10,6 +10,7 @@ from app.auth.admin import router as admin_users_router
 from app.auth.deps import PasswordChangeRequired
 from app.auth.router import router as auth_router
 from app.db import get_db
+from app.environment import check_startup_environment
 from app.history import router as history_router
 from app.ingest.kmz_router import router as kmz_router
 from app.ingest.reservation_upload_router import router as reservation_upload_router
@@ -18,10 +19,14 @@ from app.ingest.site_master_router import router as site_master_router
 from app.inventory.router import router as inventory_router
 from app.loss.router import router as loss_router
 from app.map.router import router as map_router
+from app.observability import add_request_log, configure_logging
 from app.reservations.router import router as reservations_router
 from app.routing.router import router as routing_router
 
+configure_logging()
+check_startup_environment()
 app = FastAPI(title="Fiber Dashboard API")
+add_request_log(app)
 app.include_router(auth_router)
 app.include_router(admin_users_router)
 app.include_router(inventory_router)

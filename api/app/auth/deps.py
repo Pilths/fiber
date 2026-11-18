@@ -1,5 +1,4 @@
 import hashlib
-import os
 from typing import Annotated
 
 from fastapi import Cookie, Depends, Header, HTTPException
@@ -8,6 +7,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.db import get_db
+from app.environment import dev_header_allowed
 
 COOKIE = "fiber_session"
 USER_COLS = "u.id, u.username, u.display_name, u.role, u.must_change_password"
@@ -34,8 +34,8 @@ def get_session_user(
     x_dev_user: Annotated[str | None, Header()] = None,
     fiber_session: Annotated[str | None, Cookie()] = None,
 ) -> CurrentUser:
-    """Cookie session; the X-Dev-User header works only when APP_ENV=development. No password-change gate."""
-    if os.environ.get("APP_ENV") == "development" and x_dev_user:
+    """Cookie session; the X-Dev-User header works only when dev_header_allowed(). No password-change gate."""
+    if dev_header_allowed() and x_dev_user:
         row = db.execute(text(f"SELECT {USER_COLS} FROM users u WHERE u.username = :u AND u.active"),
                          {"u": x_dev_user}).mappings().first()
         if row:

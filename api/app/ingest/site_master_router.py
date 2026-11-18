@@ -9,6 +9,7 @@ from sqlalchemy import text
 from app.auth.deps import DB, Admin, require_admin
 from app.ingest import site_master as sm
 from app.ingest.upload_file import read_upload
+from app.observability import logged_apply
 
 router = APIRouter(prefix="/api/admin/site-master", dependencies=[Depends(require_admin)])
 
@@ -96,8 +97,9 @@ def rows(db: DB, upload_id: int, sheet: Literal["sites"], group: Literal["added"
 @router.post("/uploads/{upload_id}/apply")
 def apply(db: DB, admin: Admin, upload_id: int, body: ApplyIn) -> ApplyOut:
     try:
-        return ApplyOut(**sm.apply_upload(db, admin.id, upload_id, body.override_drop.model_dump(), body.reason,
-                                          body.sheets))
+        with logged_apply("site_master", upload_id, admin.id):
+            return ApplyOut(**sm.apply_upload(db, admin.id, upload_id, body.override_drop.model_dump(), body.reason,
+                                              body.sheets))
     except sm.ApplyError as e:
         raise HTTPException(e.status, e.message) from e
 
