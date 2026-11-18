@@ -14,6 +14,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.auth.deps import CurrentUser
+from app.db import set_lock_timeout
 from app.inventory import service as inventory
 from app.reservations.schemas import NO_REASON, NeedsReviewItem, ReservationOut
 
@@ -226,6 +227,7 @@ def needs_review(db: Session, user: CurrentUser) -> list[NeedsReviewItem]:
 # ---------- helpers for writes ----------
 
 def _lock(db: Session, reservation_id: int) -> dict[str, Any]:
+    set_lock_timeout(db)
     locked = db.execute(text(LOCK_RESERVATION_SQL), {"id": reservation_id}).first()
     if locked is None:
         raise HTTPException(404, "Reservation not found")
@@ -260,7 +262,8 @@ def _customer_exists(db: Session, customer_id: int) -> bool:
     return db.execute(text(CUSTOMER_EXISTS_SQL), {"customer_id": customer_id}).first() is not None
 
 
-def _lock_segments(db: Session, segment_ids: set[int]) -> None:
+def lock_segments(db: Session, segment_ids: set[int]) -> None:
+    """Row-locks segments in id order; every path that books or places reservations goes through here."""
     if segment_ids:
         db.execute(text(LOCK_SEGMENTS_SQL), {"ids": sorted(segment_ids)})
 
@@ -318,7 +321,7 @@ def _check_book(db: Session, core_ids: list[int]) -> list[dict[str, Any]]:
     if len(cores) != len(core_ids):
         raise HTTPException(422, "Unknown core id")
     segment_ids = {core["segment_id"] for core in cores}
-    _lock_segments(db, segment_ids)
+    lock_segments(db, segment_ids)
     cores = _core_rows(db, core_ids)  # statuses as of now, after the lock
     taken = _not_bookable(cores)
     if taken:
@@ -335,6 +338,7 @@ def _check_book(db: Session, core_ids: list[int]) -> list[dict[str, Any]]:
 def create(db: Session, user: CurrentUser, customer_id: int, planned_date: date | None, core_ids: list[int],
            srf_id: str | None = None) -> ReservationOut:
     core_ids = sorted(set(core_ids))
+    set_lock_timeout(db)
     if not _customer_exists(db, customer_id):
         raise HTTPException(422, "Unknown customer")
     _check_book(db, core_ids)
@@ -482,7 +486,7 @@ def assign(db: Session, user: CurrentUser, reservation_id: int, core_ids: list[i
     cores = _core_rows(db, core_ids)
     if len(cores) != len(core_ids) or any(core["segment_id"] != segment_id for core in cores):
         raise HTTPException(422, "Cores must belong to the reservation's segment")
-    _lock_segments(db, {segment_id})
+    lock_segments(db, {segment_id})
     taken = _not_bookable(_core_rows(db, core_ids))
     if taken:
         raise conflict("Some cores are not Available.", taken_core_ids=taken)

@@ -8,6 +8,8 @@ from fastapi import HTTPException
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.db import set_lock_timeout
+
 logger = logging.getLogger("app.upload")
 
 INSERT_UPLOAD_SQL = """
@@ -36,6 +38,7 @@ def insert_upload(db: Session, user_id: int, filename: str, kind: str, summary: 
 
 
 def lock_staged_upload(db: Session, upload_id: int, kind: str, already_done_message: str) -> dict[str, Any]:
+    set_lock_timeout(db)
     upload = db.execute(text(LOCK_UPLOAD_SQL), {"upload_id": upload_id, "kind": kind}).mappings().first()
     if not upload:
         raise ApplyError(404, "Upload not found")

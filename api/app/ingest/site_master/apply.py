@@ -25,6 +25,7 @@ from app.ingest.site_master.model import (
     _can_apply,
 )
 from app.ingest.site_master.stage import load_staged
+from app.db import set_lock_timeout
 from app.ingest.uploads import ApplyError
 from app.routing.graph import invalidate as invalidate_routes
 
@@ -236,6 +237,7 @@ def apply_upload(db: Session, admin_id: int, upload_id: int, override: dict[str,
 
     The upload stays staged until no sheet is left that can still be applied.
     """
+    set_lock_timeout(db)
     upload = db.execute(text(SITE_MASTER_UPLOAD_SQL), {"upload_id": upload_id}).mappings().first()
     if not upload:
         raise ApplyError(404, "Upload not found")
