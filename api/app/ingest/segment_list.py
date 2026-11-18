@@ -15,10 +15,12 @@ import openpyxl
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.admin_edits.history import log_edits_for_user
 from app.ingest.checks import blank, clean, split_nodes
 from app.ingest.excel import _json
 from app.ingest.reservation_upload import REASON as RESERVATION_REASON
-from app.ingest.site_master import ApplyError, hkey, load_protected
+from app.ingest.site_master import hkey, load_protected
+from app.ingest.uploads import ApplyError, finish_upload, insert_upload, lock_staged_upload
 from app.routing.graph import invalidate as invalidate_routes
 
 UPLOAD_REASON = "segment list upload"
@@ -193,9 +195,7 @@ def stage(db: Session, admin_id: int, filename: str, parsed: Parsed) -> dict[str
     items = evaluate(db, parsed)
     summary = {"sheet_name": parsed.sheet_name, "found": parsed.found, "block_reason": block_reason(parsed),
                "counts": _counts(items), "applied": None}
-    uid = db.execute(text("INSERT INTO uploads (user_id, filename, kind, status, summary) "
-                          "VALUES (:u, :f, 'segment_list', 'staged', CAST(:s AS jsonb)) RETURNING id"),
-                     {"u": admin_id, "f": filename, "s": json.dumps(summary)}).scalar_one()
+    uid = insert_upload(db, admin_id, filename, "segment_list", summary)
     if items:
         db.execute(text("INSERT INTO upload_rows (upload_id, row_group, entity, payload, sheet, row_number, status, reason, raw) "
                         "VALUES (:u, :g, 'segment', CAST(:p AS jsonb), :sh, :n, :st, :r, CAST(:raw AS jsonb))"),
@@ -221,12 +221,7 @@ def _segment_id_order(item: Item) -> tuple[bool, int]:
 
 
 def apply_upload(db: Session, admin_id: int, upload_id: int) -> dict[str, Any]:
-    up = db.execute(text("SELECT id, filename, status, summary FROM uploads WHERE id = :i AND kind = 'segment_list' FOR UPDATE"),
-                    {"i": upload_id}).mappings().first()
-    if not up:
-        raise ApplyError(404, "Upload not found")
-    if up["status"] != "staged":
-        raise ApplyError(409, "This upload was already applied")
+    up = lock_staged_upload(db, upload_id, "segment_list", "This upload was already applied")
     parsed = load_staged(db, upload_id, up["summary"])
     if why := block_reason(parsed):
         raise ApplyError(409, f"Nothing can be applied: {why}")
@@ -234,7 +229,6 @@ def apply_upload(db: Session, admin_id: int, upload_id: int) -> dict[str, Any]:
     why = f"{UPLOAD_REASON} {up['filename']} #{upload_id}"
     out = {"created": 0, "changed": 0, "protected_kept": 0, "skipped": 0}
     warnings: list[str] = []
-    edits: list[dict[str, Any]] = []
     with db.begin_nested():  # all or nothing
         # Same order as reservation create(), which locks segments by id; new segments (no id yet) go last.
         for it in sorted(items, key=_segment_id_order):
@@ -254,14 +248,10 @@ def apply_upload(db: Session, admin_id: int, upload_id: int) -> dict[str, Any]:
                 for c in todo:  # c["field"] is one of FIELDS
                     db.execute(text(f"UPDATE segments SET {c['field']} = CAST(:v AS {'numeric' if c['field'] == 'distance_km' else 'text'}) WHERE id = :i"),
                                {"v": c["new"], "i": it.db_id})
-                    edits.append({"i": it.db_id, "f": c["field"], "o": c["old"], "n": c["new"], "r": why, "u": admin_id})
+                    log_edits_for_user(db, admin_id, "segment", it.db_id, [(c["field"], c["old"], c["new"])], why)  # type: ignore[arg-type]
                 out["changed"] += 1
-        if edits:
-            db.execute(text("INSERT INTO data_edits (entity, entity_id, field, old_value, new_value, reason, user_id) "
-                            "VALUES ('segment', :i, :f, :o, :n, :r, :u)"), edits)
         applied = {"by": admin_id, "at": datetime.now(UTC).isoformat(), **out, "warnings": warnings}
-        db.execute(text("UPDATE uploads SET status = 'confirmed', confirmed_at = now(), summary = CAST(:s AS jsonb) WHERE id = :i"),
-                   {"s": json.dumps(dict(up["summary"], applied=applied)), "i": upload_id})
+        finish_upload(db, upload_id, dict(up["summary"], applied=applied))
     db.commit()
     invalidate_routes()
     return {"upload_id": upload_id, **out, "warnings": warnings}

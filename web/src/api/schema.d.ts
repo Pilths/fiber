@@ -1109,6 +1109,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/ready": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Ready */
+        get: operations["ready_api_ready_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1210,6 +1227,21 @@ export interface components {
              * @default []
              */
             excel_wins: components["schemas"]["WinIn"][];
+        };
+        /** ConfirmOut */
+        ConfirmOut: {
+            /** Upload Id */
+            upload_id: number;
+            /** Counts */
+            counts: {
+                [key: string]: number;
+            };
+            /** Skipped */
+            skipped: components["schemas"]["SkippedOut"][];
+            /** Warnings */
+            warnings: components["schemas"]["WarningOut"][];
+            /** Ignored Reservation Rows */
+            ignored_reservation_rows: number;
         };
         /** CoreDetail */
         CoreDetail: {
@@ -1382,6 +1414,12 @@ export interface components {
             /** Routes */
             routes: components["schemas"]["RouteCount"][];
         };
+        /** CurrentOut */
+        CurrentOut: {
+            current: components["schemas"]["UploadInfo"] | null;
+            /** Previous */
+            previous: components["schemas"]["UploadInfo"][];
+        };
         /** CurrentUser */
         CurrentUser: {
             /** Id */
@@ -1522,6 +1560,17 @@ export interface components {
             owner: components["schemas"]["Owner"];
             /** Is Mine */
             is_mine: boolean;
+        };
+        /** ImportStateOut */
+        ImportStateOut: {
+            /** Closed */
+            closed: boolean;
+            /** Closed At */
+            closed_at: string | null;
+            /** Closed By */
+            closed_by: string | null;
+            /** Reason */
+            reason: string | null;
         };
         /** KmzApplyOut */
         KmzApplyOut: {
@@ -1741,6 +1790,36 @@ export interface components {
             /** Applied */
             applied: boolean;
         };
+        /** PreviewOut */
+        PreviewOut: {
+            /** Upload Id */
+            upload_id: number;
+            /** Filename */
+            filename: string;
+            /** Status */
+            status: string;
+            /** Counts */
+            counts: {
+                [key: string]: number;
+            };
+            /** Warnings */
+            warnings: components["schemas"]["WarningOut"][];
+            /** Switch Closed */
+            switch_closed: boolean;
+            /** Ignored Sheets */
+            ignored_sheets: string[];
+            /** Applied */
+            applied: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Confirmed At */
+            confirmed_at: string | null;
+        };
         /** ResCore */
         ResCore: {
             /** Core Id */
@@ -1848,37 +1927,40 @@ export interface components {
             /** Level */
             level: ("green" | "amber" | "red" | "off_scale") | null;
         };
-        /** RowOut */
-        RowOut: {
+        /** RowItem */
+        RowItem: {
             /** Id */
             id: number;
             /** Row Number */
-            row_number: number;
+            row_number: number | null;
             /** Sheet Name */
             sheet_name: string | null;
-            /**
-             * Group
-             * @enum {string}
-             */
-            group: "new" | "changed" | "unchanged" | "problem";
-            /**
-             * Status
-             * @enum {string}
-             */
-            status: "ready" | "needs_review" | "rejected";
+            /** Key */
+            key: string;
+            /** Group */
+            group: string;
+            /** Status */
+            status: string | null;
             /** Reason */
             reason: string | null;
             /** Raw */
             raw: {
                 [key: string]: unknown;
-            };
-            parsed: components["schemas"]["Parsed"];
+            } | null;
+            /** Parsed */
+            parsed: {
+                [key: string]: unknown;
+            } | null;
             /** Changes */
-            changes: components["schemas"]["Change"][];
+            changes: {
+                [key: string]: unknown;
+            }[];
             /** Edited In Dashboard */
             edited_in_dashboard: boolean;
-            /** Segment Id */
-            segment_id: number | null;
+            /** Db Id */
+            db_id: number | null;
+            /** In Use */
+            in_use: boolean | null;
         };
         /** SearchResult */
         SearchResult: {
@@ -2137,6 +2219,25 @@ export interface components {
             /** Used Cores */
             used_cores: number;
         };
+        /** SheetInfo */
+        SheetInfo: {
+            /** Rows */
+            rows: number;
+            /** Added */
+            added: number;
+            /** Changed */
+            changed: number;
+            /** Missing */
+            missing: number;
+            /** Problem */
+            problem: number;
+            /** Unchanged */
+            unchanged: number;
+            /** Sheet Name */
+            sheet_name: string | null;
+            /** Found */
+            found: boolean;
+        };
         /** SheetOut */
         SheetOut: {
             /**
@@ -2197,6 +2298,36 @@ export interface components {
             /** History */
             history: components["schemas"]["HistoryRow"][];
         };
+        /** SkippedOut */
+        SkippedOut: {
+            /** Row Number */
+            row_number: number | null;
+            /** Reason */
+            reason: string | null;
+        };
+        /** StagedOut */
+        StagedOut: {
+            /** Upload Id */
+            upload_id: number;
+            /** Filename */
+            filename: string;
+            /** Status */
+            status: string;
+            /** Counts */
+            counts: {
+                [key: string]: number;
+            };
+            /** Warnings */
+            warnings: components["schemas"]["WarningOut"][];
+            /** Switch Closed */
+            switch_closed: boolean;
+            /** Ignored Sheets */
+            ignored_sheets: string[];
+            /** Applied */
+            applied: {
+                [key: string]: unknown;
+            } | null;
+        };
         /** UnassignedHold */
         UnassignedHold: {
             /** Reservation Id */
@@ -2213,6 +2344,28 @@ export interface components {
             planner?: string | null;
             /** Age Days */
             age_days: number;
+        };
+        /** UploadInfo */
+        UploadInfo: {
+            /** Upload Id */
+            upload_id: number;
+            /** Filename */
+            filename: string;
+            /** Status */
+            status: string;
+            /**
+             * Uploaded At
+             * Format: date-time
+             */
+            uploaded_at: string;
+            /** Applied At */
+            applied_at: string | null;
+            /** Uploaded By */
+            uploaded_by: string;
+            /** Sheets */
+            sheets: {
+                [key: string]: components["schemas"]["SheetInfo"];
+            };
         };
         /** UserCreate */
         UserCreate: {
@@ -2286,6 +2439,15 @@ export interface components {
             /** Context */
             ctx?: Record<string, never>;
         };
+        /** WarningOut */
+        WarningOut: {
+            /** Kind */
+            kind: string;
+            /** Message */
+            message: string;
+            /** Rows */
+            rows: number[];
+        };
         /** WinIn */
         WinIn: {
             /** Row Id */
@@ -2303,6 +2465,45 @@ export interface components {
              * @default admin action
              */
             reason: string;
+        };
+        /** RowOut */
+        app__ingest__reservation_upload_router__RowOut: {
+            /** Id */
+            id: number;
+            /** Row Number */
+            row_number: number | null;
+            /** Sheet Name */
+            sheet_name: string | null;
+            /**
+             * Group
+             * @enum {string}
+             */
+            group: "new" | "changed" | "unchanged" | "missing" | "reservations" | "conflicts" | "already_imported" | "ignored" | "needs_review" | "rejected";
+            /** Status */
+            status: string | null;
+            /** Reason */
+            reason: string | null;
+            /** Raw */
+            raw: {
+                [key: string]: unknown;
+            } | null;
+            /** Warnings */
+            warnings: string[];
+            /** Data */
+            data: {
+                [key: string]: unknown;
+            };
+        };
+        /** RowsOut */
+        app__ingest__reservation_upload_router__RowsOut: {
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Items */
+            items: components["schemas"]["app__ingest__reservation_upload_router__RowOut"][];
         };
         /** ApplyOut */
         app__ingest__segment_list_router__ApplyOut: {
@@ -2332,6 +2533,38 @@ export interface components {
             /** Problem */
             problem: number;
         };
+        /** RowOut */
+        app__ingest__segment_list_router__RowOut: {
+            /** Id */
+            id: number;
+            /** Row Number */
+            row_number: number;
+            /** Sheet Name */
+            sheet_name: string | null;
+            /**
+             * Group
+             * @enum {string}
+             */
+            group: "new" | "changed" | "unchanged" | "problem";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ready" | "needs_review" | "rejected";
+            /** Reason */
+            reason: string | null;
+            /** Raw */
+            raw: {
+                [key: string]: unknown;
+            };
+            parsed: components["schemas"]["Parsed"];
+            /** Changes */
+            changes: components["schemas"]["Change"][];
+            /** Edited In Dashboard */
+            edited_in_dashboard: boolean;
+            /** Segment Id */
+            segment_id: number | null;
+        };
         /** RowsOut */
         app__ingest__segment_list_router__RowsOut: {
             /** Total */
@@ -2341,7 +2574,7 @@ export interface components {
             /** Page Size */
             page_size: number;
             /** Items */
-            items: components["schemas"]["RowOut"][];
+            items: components["schemas"]["app__ingest__segment_list_router__RowOut"][];
         };
         /** UploadOut */
         app__ingest__segment_list_router__UploadOut: {
@@ -2399,9 +2632,7 @@ export interface components {
             /** Page Size */
             page_size: number;
             /** Items */
-            items: {
-                [key: string]: unknown;
-            }[];
+            items: components["schemas"]["RowItem"][];
         };
         /** UploadOut */
         app__ingest__site_master_router__UploadOut: {
@@ -3788,9 +4019,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["CurrentOut"];
                 };
             };
             /** @description Validation Error */
@@ -4047,9 +4276,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["StagedOut"];
                 };
             };
             /** @description Validation Error */
@@ -4084,9 +4311,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PreviewOut"];
                 };
             };
             /** @description Validation Error */
@@ -4125,9 +4350,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["app__ingest__reservation_upload_router__RowsOut"];
                 };
             };
             /** @description Validation Error */
@@ -4166,9 +4389,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["ConfirmOut"];
                 };
             };
             /** @description Validation Error */
@@ -4201,9 +4422,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["ImportStateOut"];
                 };
             };
             /** @description Validation Error */
@@ -4240,9 +4459,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["ImportStateOut"];
                 };
             };
             /** @description Validation Error */
@@ -4933,6 +5150,26 @@ export interface operations {
                     "application/json": {
                         [key: string]: string;
                     };
+                };
+            };
+        };
+    };
+    ready_api_ready_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
         };

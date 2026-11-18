@@ -16,6 +16,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.admin_edits.history import log_edits_for_user
 from app.ingest.excel import RowResult
 from app.ingest.reservation_import import (
     Skip,
@@ -24,7 +25,8 @@ from app.ingest.reservation_import import (
     find_segment,
     place_reservation,
 )
-from app.ingest.site_master import ApplyError, load_protected
+from app.ingest.site_master import load_protected
+from app.ingest.uploads import ApplyError, finish_upload, insert_upload, lock_staged_upload
 from app.inventory import service as inventory
 from app.routing.graph import invalidate as invalidate_routes
 
@@ -54,8 +56,7 @@ def close_import(db: Session, admin_id: int, reason: str) -> dict[str, Any]:
     db.execute(text("SELECT pg_advisory_xact_lock(7001)"))  # two simultaneous closes: the second sees the first
     if import_state(db)["closed"]:
         raise ApplyError(409, "Reservation import is already closed")
-    db.execute(text("INSERT INTO data_edits (entity, entity_id, field, old_value, new_value, reason, user_id) "
-                    "VALUES ('system', 0, 'reservation_import', 'open', 'closed', :r, :u)"), {"r": reason.strip(), "u": admin_id})
+    log_edits_for_user(db, admin_id, "system", 0, [("reservation_import", "open", "closed")], reason.strip())
     db.commit()
     return import_state(db)
 
@@ -301,8 +302,7 @@ def stage(db: Session, admin_id: int, filename: str, results: list[RowResult], i
     warnings = ([{"kind": "ignored_sheet", "rows": [], "message": "Sheets left out of this upload (sites come from the site "
                   "master upload): " + ", ".join(ignored)}] if ignored else []) + ev.warnings
     summary = {"counts": ev.counts(), "warnings": warnings, "switch_closed": ev.closed, "ignored_sheets": ignored, "applied": None}
-    uid = db.execute(text("INSERT INTO uploads (user_id, filename, kind, status, summary) VALUES (:u, :f, 'excel', 'staged', "
-                          "CAST(:s AS jsonb)) RETURNING id"), {"u": admin_id, "f": filename, "s": json.dumps(summary)}).scalar_one()
+    uid = insert_upload(db, admin_id, filename, "excel", summary)
     out = []
     for r in ev.rows:
         out.append({"u": uid, "g": ROW_GROUP[r.group], "e": "reservation" if r.group in ("reservations", "conflicts", "already_imported", "ignored")
@@ -344,12 +344,7 @@ def _segment_id_order(item: SegmentItem) -> tuple[bool, int]:
 
 
 def confirm(db: Session, admin_id: int, upload_id: int, excel_wins: list[dict[str, Any]]) -> dict[str, Any]:
-    up = db.execute(text("SELECT id, filename, status, summary FROM uploads WHERE id = :i AND kind = 'excel' FOR UPDATE"),
-                    {"i": upload_id}).mappings().first()
-    if not up:
-        raise ApplyError(404, "Upload not found")
-    if up["status"] != "staged":
-        raise ApplyError(409, "This upload was already confirmed")
+    up = lock_staged_upload(db, upload_id, "excel", "This upload was already confirmed")
     segment_rows = dict(db.execute(text("SELECT id, payload->>'key' FROM upload_rows WHERE upload_id = :u AND entity = 'segment' "
                                      "AND row_group <> 'missing'"), {"u": upload_id}).all())
     wins: set[tuple[str, str]] = set()
@@ -377,9 +372,7 @@ def confirm(db: Session, admin_id: int, upload_id: int, excel_wins: list[dict[st
                 if not c["applied"]:
                     continue
                 db.execute(text(f"UPDATE segments SET {c['field']} = :v WHERE id = :i"), {"v": c["new"], "i": sid})
-                db.execute(text("INSERT INTO data_edits (entity, entity_id, field, old_value, new_value, reason, user_id) "
-                                "VALUES ('segment', :i, :f, :o, :n, :r, :u)"),
-                           {"i": sid, "f": c["field"], "o": None if c["old"] is None else str(c["old"]), "n": str(c["new"]), "r": why, "u": admin_id})
+                log_edits_for_user(db, admin_id, "segment", sid, [(c["field"], c["old"], c["new"])], why)
                 if c["field"] == "survey_cores":
                     counts["cores"] += add_cores(db, sid, c["new"])
                 counts["segment_updates"] += 1
@@ -400,8 +393,7 @@ def confirm(db: Session, admin_id: int, upload_id: int, excel_wins: list[dict[st
         summary = dict(up["summary"], applied={"by": admin_id, "at": datetime.now(UTC).isoformat(), "counts": counts,
                                                "skipped": skipped, "excel_wins": [list(w) for w in sorted(wins)],
                                                "ignored_reservation_rows": ev.counts()["ignored"]})
-        db.execute(text("UPDATE uploads SET status = 'confirmed', confirmed_at = now(), summary = CAST(:s AS jsonb) WHERE id = :i"),
-                   {"s": json.dumps(summary), "i": upload_id})
+        finish_upload(db, upload_id, summary)
     db.commit()
     invalidate_routes()  # new segments or distances
     return {"upload_id": upload_id, "counts": counts, "skipped": skipped, "warnings": ev.warnings,

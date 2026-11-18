@@ -59,6 +59,11 @@ def _text_or_none(value: Any) -> str | None:
 
 def log_edits(db: Session, user: CurrentUser, entity: str, entity_id: int, edits: list[tuple[str, Any, Any]],
               reason: str) -> list[str]:
+    return log_edits_for_user(db, user.id, entity, entity_id, edits, reason)
+
+
+def log_edits_for_user(db: Session, user_id: int, entity: str, entity_id: int, edits: list[tuple[str, Any, Any]],
+                       reason: str) -> list[str]:
     for field_name, old, new in edits:
         params = {
             "entity": entity,
@@ -67,7 +72,7 @@ def log_edits(db: Session, user: CurrentUser, entity: str, entity_id: int, edits
             "old_value": _text_or_none(old),
             "new_value": _text_or_none(new),
             "reason": reason or NO_REASON,
-            "user_id": user.id,
+            "user_id": user_id,
         }
         db.execute(text(INSERT_EDIT_SQL), params)
     return [field_name for field_name, _, _ in edits]

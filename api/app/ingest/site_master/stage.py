@@ -7,11 +7,8 @@ from sqlalchemy.orm import Session
 
 from app.ingest.site_master.evaluate import evaluate
 from app.ingest.site_master.model import GROUP_COL, SHEETS, DbSite, Item, ParsedSheet, SheetResult
+from app.ingest.uploads import insert_upload
 
-INSERT_UPLOAD_SQL = """
-INSERT INTO uploads (user_id, filename, kind, status, summary)
-VALUES (:user_id, :filename, 'site_master', 'staged', CAST(:summary AS jsonb)) RETURNING id
-"""
 INSERT_UPLOAD_ROW_SQL = """
 INSERT INTO upload_rows (upload_id, row_group, entity, payload, sheet, row_number, status, reason, raw)
 VALUES (:upload_id, :row_group, :entity, CAST(:payload AS jsonb), :sheet, :row_number, :status, :reason,
@@ -77,8 +74,7 @@ def stage(db: Session, admin_id: int, filename: str, parsed: dict[str, ParsedShe
         "applied": None,
         "add_only": add_only,
     }
-    upload_params = {"user_id": admin_id, "filename": filename, "summary": json.dumps(summary)}
-    upload_id = db.execute(text(INSERT_UPLOAD_SQL), upload_params).scalar_one()
+    upload_id = insert_upload(db, admin_id, filename, "site_master", summary)
     row_params = []
     for kind, result in results.items():
         entity = SHEETS[kind][2]

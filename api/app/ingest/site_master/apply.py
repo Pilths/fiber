@@ -7,6 +7,7 @@ from typing import Any
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.admin_edits.history import log_edits_for_user
 from app.ingest.checks import norm
 from app.ingest.site_master.evaluate import (
     evaluate,
@@ -24,6 +25,7 @@ from app.ingest.site_master.model import (
     _can_apply,
 )
 from app.ingest.site_master.stage import load_staged
+from app.ingest.uploads import ApplyError
 from app.routing.graph import invalidate as invalidate_routes
 
 INSERT_SITE_SQL = """
@@ -37,10 +39,6 @@ UPDATE sites SET name = :name, kind = :kind,
        geom = ST_SetSRID(ST_MakePoint(CAST(:lon AS double precision), CAST(:lat AS double precision)), 4326),
        details = CAST(:details AS jsonb), lrd_site_id = :lrd_site_id, active = :active
 WHERE id = :id
-"""
-INSERT_SITE_EDIT_SQL = """
-INSERT INTO data_edits (entity, entity_id, field, old_value, new_value, reason, user_id)
-VALUES ('site', :site_id, :field, :old_value, :new_value, :reason, :user_id)
 """
 SITE_MASTER_UPLOAD_SQL = """
 SELECT id, filename, status, summary FROM uploads WHERE id = :upload_id AND kind = 'site_master'
@@ -133,19 +131,9 @@ def _write_sites(db: Session, admin_id: int, reason: str, inserts: list[dict[str
         db.execute(text(INSERT_SITE_SQL), inserts)
     if updates:
         db.execute(text(UPDATE_SITE_SQL), updates)
-    if edits:
-        edit_params = [
-            {
-                "site_id": site_id,
-                "field": field_name,
-                "old_value": _edit_text(old),
-                "new_value": _edit_text(new),
-                "reason": reason,
-                "user_id": admin_id,
-            }
-            for site_id, field_name, old, new in edits
-        ]
-        db.execute(text(INSERT_SITE_EDIT_SQL), edit_params)
+    for site_id, field_name, old, new in edits:
+        site_edit = [(field_name, _edit_text(old), _edit_text(new))]
+        log_edits_for_user(db, admin_id, "site", site_id, site_edit, reason)
 
 
 def apply_sheet(
@@ -193,12 +181,6 @@ def apply_sheet(
     _write_sites(db, admin_id, reason, inserts, updates, edits)
     out["added"] = len(inserts)
     return out
-
-
-class ApplyError(Exception):
-    def __init__(self, status: int, message: str):
-        self.status = status
-        self.message = message
 
 
 def _check_request(upload: Any, override: dict[str, bool], reason: str | None, only: Sequence[str] | None,
