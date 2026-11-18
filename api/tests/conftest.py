@@ -56,3 +56,13 @@ def client(db):
     app.dependency_overrides[get_db] = override
     yield TestClient(app)
     app.dependency_overrides.clear()
+
+
+@pytest.fixture(autouse=True)
+def clear_login_throttle():
+    # Every test client shares one address, so failed logins would add up across tests.
+    from app.auth.router import clear_login_throttle as clear
+
+    clear()
+    yield
+    clear()

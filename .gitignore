@@ -41,5 +41,8 @@ web/e2e/screenshots/
 docs/Dark fibre network dashboard (v6 mock).html
 api/data/
 
+# Database backups from scripts/backup-db.sh (real data, never commit)
+backups/
+
 # graphify output (local map of the code)
 graphify-out/

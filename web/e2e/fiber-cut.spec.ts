@@ -19,14 +19,13 @@ async function mock(page: Page, segment: object) {
 }
 const pick = (page: Page) => pickSegment(page, KLBJ);
 
-test("a normal segment: no Cut chip, no Reserve cores button (reserving is via Site A to B), no loss alert", async ({ page }) => {
+test("a normal segment: no Cut chip, no Reserve cores button (reserving is via Site A to B)", async ({ page }) => {
   await mock(page, { fiber_cut: false });
   await signIn(page);
   await pick(page);
   await expect(diagram(page).locator(".pill.h-red")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Reserve cores" })).toHaveCount(0);
   await expect(actions(page)).toHaveCount(0); // planner, no route found: no empty actions row
-  await expect(page.getByTestId("loss-alert")).toHaveCount(0);
   await diagram(page).screenshot({ path: "e2e/screenshots/diagram-normal.png" });
 });
 

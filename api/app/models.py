@@ -90,6 +90,8 @@ class Site(Base):
 class Segment(Base):
     __tablename__ = "segments"
     __table_args__ = (
+        Index("segments_site_a_id_ix", "site_a_id"),
+        Index("segments_site_b_id_ix", "site_b_id"),
         CheckConstraint("site_a_id <> site_b_id", name="segments_sites_differ_ck"),
         _in("region", ("North", "Central", "South", "East Coast"), "segments_region_ck"),
         CheckConstraint("distance_km >= 0", name="segments_distance_ck"),
@@ -113,6 +115,8 @@ class Segment(Base):
 class Route(Base):
     __tablename__ = "routes"
     __table_args__ = (
+        Index("routes_site_a_id_ix", "site_a_id"),
+        Index("routes_site_b_id_ix", "site_b_id"),
         CheckConstraint("site_a_id <> site_b_id", name="routes_sites_differ_ck"),
         _pair_ix("routes_site_pair_ix"),
     )
@@ -125,7 +129,10 @@ class Route(Base):
 
 class RouteSpan(Base):
     __tablename__ = "route_segments"
-    __table_args__ = (UniqueConstraint("route_id", "position"),)
+    __table_args__ = (
+        UniqueConstraint("route_id", "position"),
+        Index("route_segments_segment_id_ix", "segment_id"),
+    )
     route_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("routes.id"), primary_key=True)
     segment_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("segments.id"), primary_key=True)
     position: Mapped[int] = mapped_column(Integer)
@@ -141,7 +148,11 @@ class Port(Base):
 
 class Core(Base):
     __tablename__ = "cores"
-    __table_args__ = (UniqueConstraint("segment_id", "number"),)
+    __table_args__ = (
+        UniqueConstraint("segment_id", "number"),
+        Index("cores_port_a_id_ix", "port_a_id"),
+        Index("cores_port_b_id_ix", "port_b_id"),
+    )
     id: Mapped[int] = _id()
     segment_id: Mapped[int] = _fk("segments")
     number: Mapped[int] = mapped_column(Integer)
@@ -162,6 +173,9 @@ class Customer(Base):
 class Reservation(Base):
     __tablename__ = "reservations"
     __table_args__ = (
+        Index("reservations_customer_id_ix", "customer_id"),
+        Index("reservations_planner_id_ix", "planner_id"),
+        Index("reservations_unassigned_segment_id_ix", "unassigned_segment_id"),
         _in("fiber_monitored", ("Y", "N", "WIP"), "reservations_fiber_monitored_ck"),
         CheckConstraint("unassigned_cores >= 0", name="reservations_unassigned_ck"),
         CheckConstraint("unassigned_cores = 0 OR unassigned_segment_id IS NOT NULL", name="reservations_unassigned_segment_ck"),
@@ -188,6 +202,9 @@ class Reservation(Base):
 
 class ReservationCore(Base):
     __tablename__ = "reservation_cores"
+    __table_args__ = (
+        Index("reservation_cores_core_id_ix", "core_id"),
+    )
     reservation_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("reservations.id"), primary_key=True)
     core_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("cores.id"), primary_key=True)
 
@@ -199,6 +216,7 @@ EVENT_TYPES = ("requested", "approved", "rejected", "withdrawn", "kept", "releas
 class ReservationEvent(Base):
     __tablename__ = "reservation_events"
     __table_args__ = (
+        Index("reservation_events_user_id_ix", "user_id"),
         _in("type", EVENT_TYPES, "reservation_events_type_ck"),
         CheckConstraint("type = 'corrected' OR (customer_id IS NULL AND planned_date IS NULL)",
                         name="reservation_events_correction_ck"),
@@ -219,18 +237,27 @@ class ReservationEvent(Base):
 
 class ReleaseCore(Base):
     __tablename__ = "release_cores"
+    __table_args__ = (
+        Index("release_cores_core_id_ix", "core_id"),
+    )
     event_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("reservation_events.id"), primary_key=True)
     core_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("cores.id"), primary_key=True)
 
 
 class AssignCore(Base):
     __tablename__ = "assign_cores"
+    __table_args__ = (
+        Index("assign_cores_core_id_ix", "core_id"),
+    )
     event_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("reservation_events.id"), primary_key=True)
     core_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("cores.id"), primary_key=True)
 
 
 class CoreHold(Base):
     __tablename__ = "core_holds"
+    __table_args__ = (
+        Index("core_holds_reservation_id_ix", "reservation_id"),
+    )
     core_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("cores.id"), primary_key=True)
     reservation_id: Mapped[int] = _fk("reservations")
 
@@ -238,7 +265,7 @@ class CoreHold(Base):
 class Upload(Base):
     __tablename__ = "uploads"
     __table_args__ = (
-        _in("kind", ("excel", "kmz", "site_master"), "uploads_kind_ck"),
+        _in("kind", ("excel", "kmz", "site_master", "segment_list"), "uploads_kind_ck"),
         _in("status", ("staged", "confirmed", "discarded"), "uploads_status_ck"),
     )
     id: Mapped[int] = _id()
@@ -254,6 +281,7 @@ class Upload(Base):
 class UploadRow(Base):
     __tablename__ = "upload_rows"
     __table_args__ = (
+        Index("upload_rows_upload_id_ix", "upload_id"),
         _in("row_group", ("new", "changed", "conflict", "missing", "rejected", "needs_review", "unchanged"), "upload_rows_group_ck"),
         _in("status", ("ready", "needs_review", "rejected"), "upload_rows_status_ck"),
     )

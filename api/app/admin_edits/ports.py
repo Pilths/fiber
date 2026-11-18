@@ -137,7 +137,8 @@ def set_core_ports(db: DB, admin: Admin, core_id: int, body: CorePortsBody) -> C
     if _write_core_ports(db, admin, core_id, wanted, body.reason):
         db.commit()
     core = inventory.get_core(db, core_id, admin.id)
-    assert core is not None
+    if core is None:
+        raise HTTPException(404, "Core not found")
     return core
 
 

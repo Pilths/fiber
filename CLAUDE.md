@@ -16,6 +16,8 @@ Read before working: `docs/PRD.md` (requirements), `docs/architecture.md` (desig
 - Host venv for the editor and pyright only (the app runs in Docker): `python3 -m venv --without-pip api/.venv && python3 -m pip --python api/.venv/bin/python install -r api/requirements.lock`.
 - UI tests: `docker compose exec web npx playwright install --with-deps chromium` once after each web image rebuild, then `docker compose exec web npm run test:e2e`.
 - Map basemap: `./scripts/get-tiles.sh` once per machine with internet (downloads `web/public/map/malaysia.pmtiles` and the label fonts into `web/public/map/fonts/`, git-ignored, never shipped by git or email; `FORCE=1` downloads again). Without them the map falls back to a plain overlay with a note.
+- Backups: `./scripts/backup-db.sh` writes `backups/fiber-<time>.dump` (git-ignored, keeps the newest 14, `KEEP=n` to change; cron line in the script header). `./scripts/restore-check.sh [file]` is the restore drill: loads a dump into a separate `fiber_restore_check` database, prints row counts, drops it.
+- `GET /api/health` is liveness; `GET /api/ready` returns 503 when the database is not at the Alembic head.
 - Ship to another machine: `git archive --format=zip -o fiber.zip HEAD` (source only; images are built on each machine).
 
 ## Domain rules

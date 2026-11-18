@@ -216,6 +216,10 @@ def load_staged(db: Session, upload_id: int, summary: dict[str, Any]) -> Parsed:
 
 # ---- apply ----------------------------------------------------------------------------------------------------
 
+def _segment_id_order(item: Item) -> tuple[bool, int]:
+    return (item.db_id is None, item.db_id or 0)
+
+
 def apply_upload(db: Session, admin_id: int, upload_id: int) -> dict[str, Any]:
     up = db.execute(text("SELECT id, filename, status, summary FROM uploads WHERE id = :i AND kind = 'segment_list' FOR UPDATE"),
                     {"i": upload_id}).mappings().first()
@@ -232,7 +236,8 @@ def apply_upload(db: Session, admin_id: int, upload_id: int) -> dict[str, Any]:
     warnings: list[str] = []
     edits: list[dict[str, Any]] = []
     with db.begin_nested():  # all or nothing
-        for it in items:
+        # Same order as reservation create(), which locks segments by id; new segments (no id yet) go last.
+        for it in sorted(items, key=_segment_id_order):
             if it.group == "problem":
                 out["skipped"] += 1
             elif it.group == "new":

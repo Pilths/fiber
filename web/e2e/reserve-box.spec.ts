@@ -99,6 +99,10 @@ test("count-only reservation shows on the segment and in My reservations", async
   await pendingChip.click();
   await expect(pendingChip).toHaveAttribute("aria-pressed", "true");
   const mine = page.getByRole("region", { name: "My reservations" });
+  // The DEV data may hold no pending reservation, so check the filter against the chip count
+  // instead of only looping over the cards (an empty loop proves nothing).
+  const pendingCount = Number((await pendingChip.innerText()).replace(/\D/g, ""));
+  await expect(mine.getByTestId("reservation")).toHaveCount(pendingCount);
   for (const card of await mine.getByTestId("reservation").all()) {
     await expect(card).toContainText("Pending approval");
   }

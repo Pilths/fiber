@@ -1,5 +1,9 @@
+from functools import lru_cache
+from pathlib import Path
 from typing import Annotated
 
+from alembic.config import Config
+from alembic.script import ScriptDirectory
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
@@ -46,6 +50,30 @@ app.include_router(map_router)
 def health(db: Annotated[Session, Depends(get_db)]) -> dict[str, str]:
     postgis = db.execute(text("SELECT postgis_version()")).scalar_one()
     return {"status": "ok", "postgis": postgis}
+
+
+_API_DIR = Path(__file__).resolve().parent.parent
+
+ALEMBIC_VERSION_SQL = text("SELECT version_num FROM alembic_version")
+
+
+@lru_cache
+def _alembic_head() -> str | None:
+    config = Config(str(_API_DIR / "alembic.ini"))
+    config.set_main_option("script_location", str(_API_DIR / "alembic"))
+    return ScriptDirectory.from_config(config).get_current_head()
+
+
+@app.get("/api/ready")
+def ready(db: Annotated[Session, Depends(get_db)]) -> JSONResponse:
+    database_revision = db.execute(ALEMBIC_VERSION_SQL).scalar_one_or_none()
+    head = _alembic_head()
+    if database_revision == head:
+        return JSONResponse({"status": "ready", "revision": head})
+    return JSONResponse(
+        {"status": "schema behind", "database": database_revision, "head": head},
+        status_code=503,
+    )
 
 
 @app.exception_handler(PasswordChangeRequired)
