@@ -1,10 +1,11 @@
-import os
 from collections.abc import Iterator
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session
 
-engine = create_engine(os.environ["DATABASE_URL"], pool_pre_ping=True)
+from app.environment import database_url
+
+engine = create_engine(database_url(), pool_pre_ping=True)
 
 
 def get_db() -> Iterator[Session]:

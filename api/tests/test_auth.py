@@ -143,3 +143,13 @@ def test_admin_cannot_deactivate_self_and_activate_restores(client, db, admin):
     assert client.post(f"/api/admin/users/{uid}/activate").json()["active"] is True
     client.cookies.clear()
     assert login(client, "kim").status_code == 200
+
+
+def test_login_purges_expired_sessions_only(client, db):
+    uid = mkuser(db, "pat")
+    login(client, "pat")
+    expired = "INSERT INTO sessions (id, user_id, expires_at) VALUES ('old', :u, now() - interval '1 hour')"
+    db.execute(text(expired), {"u": uid})
+    login(client, "pat")
+    ids = {row[0] for row in db.execute(text("SELECT id FROM sessions WHERE user_id = :u"), {"u": uid})}
+    assert "old" not in ids and len(ids) == 2

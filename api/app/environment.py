@@ -13,9 +13,29 @@ def app_env() -> str:
     return os.environ.get("APP_ENV", "")
 
 
+def dev_header_flag() -> bool:
+    return os.environ.get("ALLOW_DEV_HEADER") == "1"
+
+
+def session_hours() -> float:
+    return float(os.environ.get("SESSION_HOURS", "12"))
+
+
+def log_level() -> str:
+    return os.environ.get("LOG_LEVEL", "INFO")
+
+
+def database_url() -> str:
+    return os.environ["DATABASE_URL"]
+
+
+def dev_password() -> str:
+    return os.environ.get("DEV_PASSWORD", "dev-password-123")  # development only
+
+
 def dev_header_allowed() -> bool:
     """The X-Dev-User header logs in as any user, so it needs two switches, not one copied APP_ENV."""
-    return app_env() == "development" and os.environ.get("ALLOW_DEV_HEADER") == "1"
+    return app_env() == "development" and dev_header_flag()
 
 
 def cookie_secure() -> bool:
@@ -37,7 +57,7 @@ def unsafe_settings() -> list[str]:
     if app_env() == "development":
         return []
     problems = []
-    if os.environ.get("ALLOW_DEV_HEADER") == "1":
+    if dev_header_flag():
         problems.append("ALLOW_DEV_HEADER=1 is only for APP_ENV=development")
     for name in SECRETS_THAT_MUST_BE_CHANGED:
         if PLACEHOLDER in os.environ.get(name, PLACEHOLDER):

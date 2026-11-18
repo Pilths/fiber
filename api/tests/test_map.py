@@ -173,3 +173,11 @@ def test_sectors(client, db):
     assert "free_cores" not in feature["properties"]
     minx, miny, maxx, maxy = feature["properties"]["bbox"]
     assert minx < 101.000 and maxx > 101.002 and miny < 3 < maxy
+
+
+def test_segment_kmz_without_coordinates_is_404(client, db):
+    mkuser(db)
+    a = site(db, "EJH1", xy=(101.60, 3.10))
+    b = site(db, "RINI")
+    sid = segment(db, a, b, 4)
+    assert client.get(f"/api/map/segments/{sid}/kmz", headers=H()).status_code == 404

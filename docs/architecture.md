@@ -1,6 +1,6 @@
 # Fiber Dashboard: Epic Architecture Specification
 
-Updated 6 November 2026 to match the code on `dev`.
+Updated 19 November 2026 to match the code on `dev`. Features not built yet are marked "Planned, not built".
 
 Source: `docs/PRD.md` (26 October 2026). Where this document and the PRD disagree, the PRD wins.
 
@@ -8,17 +8,17 @@ Note on the template: the `breakdown-epic-arch` template assumes Next.js, tRPC, 
 
 ## 1. Epic Architecture Overview
 
-One Docker Compose stack on a company-managed server, with three runtime pieces:
+One Docker Compose stack on a company-managed server, with three runtime pieces. Development (`dev` branch) runs `db`, `api` (with reload) and `web` (Vite dev server). Production (`main` branch) runs `db` and `api` only: the api image builds the web app in a Node stage and FastAPI serves it from `api/static`, with the map tiles mounted read-only. Production code on `main` is the runtime code copied from `dev`, without the DEV seeds, tests, docs and dev tools.
 
 - **Web:** a React + TypeScript single-page app (Vite build) plus the self-hosted map assets (PMTiles basemap, glyphs, sprites) and the Geist and Geist Mono fonts, served as static files. Desktop only, minimum width 1200px, light theme only.
-- **API:** one FastAPI service, built as a modular monolith. It holds every business rule: ingest (Excel and KMZ), inventory, reservations, loss, routing and identity. Notifications and the daily job (APScheduler) are not built yet (planned); they will run inside this service.
+- **API:** one FastAPI service, built as a modular monolith. It holds every business rule: ingest (Excel and KMZ), inventory, reservations, loss, routing and identity. Notifications and the daily job are planned, not built; they will run inside this service.
 - **Database:** PostgreSQL with PostGIS. It is the source of truth after the first import.
 
 The design rules that shape everything else:
 
 1. **Append-only history.** Reservations, measurements and data edits are insert-only rows. Current state is derived from them, never overwritten. Nothing is deleted.
 2. **The database enforces invariants where it can.** "First request submitted wins" is a unique constraint on active core holds, not an application check.
-3. **Every write carries `user_id`.** A dev-only header supplied the user until login landed (Session 5); the session cookie replaced it with no change to the domain code.
+3. **Every write carries `user_id`.** A dev-only header supplied the user until login landed (Session 5); the session cookie replaced it with no change to the domain code. The header still works only when `APP_ENV=development` and `ALLOW_DEV_HEADER=1`.
 4. **Contract first.** FastAPI's OpenAPI spec generates the TypeScript client (`openapi-typescript`). Stub endpoints come first, and real logic replaces them one endpoint at a time.
 5. **No data leaves the network.** No external map API, CDN or font host. Email, when built (planned), goes only through the company SMTP relay.
 
@@ -43,8 +43,8 @@ flowchart TB
     LOSS["Loss<br/>calculated vs measured<br/>warning levels"]
     ROUTE["Routing<br/>NetworkX graph of segments, up to 3 options"]
     REVIEW["Action needed list + waiting counts<br/>stale, upload conflicts, cut segments"]
-    JOB["APScheduler daily job (planned)<br/>stale check, digest<br/>records last run"]
-    NOTIFY["Notifications (planned)<br/>in-app + email"]
+    JOB["Daily job (planned, not built)<br/>stale check, digest<br/>records last run"]
+    NOTIFY["Notifications (planned, not built)<br/>in-app + email"]
   end
 
   subgraph DATA["Data layer"]
@@ -54,11 +54,11 @@ flowchart TB
   end
 
   subgraph INFRA["Infrastructure layer"]
-    DC["Docker Compose on company server<br/>web, api, db containers<br/>secrets in environment variables"]
+    DC["Docker Compose on company server<br/>dev: web, api, db; main: api, db<br/>secrets in environment variables"]
   end
 
-  P -->|HTTPS| WEB
-  A -->|HTTPS| WEB
+  P -->|HTTP| WEB
+  A -->|HTTP| WEB
   WEB -->|"REST /api (generated TS client)"| AUTH
   AUTH --> INV & RES & LOSS & ROUTE & REVIEW
   AUTH -->|admin only| INGEST
@@ -101,13 +101,13 @@ Solid lines are synchronous request paths. Dotted lines are asynchronous or sche
 | F7 | Admin editing | 8 | Fiber cut on a segment (cut or restore), then segment and site details (third cut). Reasons are optional (a blank one is stored as "no reason given"); closing the reservation import and a site master override still ask for one. Every edit protects the field. |
 | F8 | Route planning | 5 | NetworkX graph of segments (each segment joins two sites, weighted by km); any site to any site; up to 3 options with km, Calculated loss, minimum free cores (the bottleneck), loss confidence; Optimise for shortest distance or most free cores; options without enough cores last; a "Best match" tag. Shown as the 2D route ribbon on the map page. |
 | F9 | Inventory page | 6 | The home page: MapLibre map (8 of 12 columns, never shrunk) with segment lines over the basemap (straight unless a KMZ or seed shape is stored for the segment) and the segment list beside it, the segment diagram with "Reserve cores", then the Cores table; reserving opens as a box over Inventory (`docs/DESIGN.md` section 3). A segment with a stored route geometry draws road-shaped; one without draws a straight line. The fallback is a plain SVG map of sites and straight segment lines, without a basemap. Selection lives in the URL hash. Search and lists work without the map. |
-| F10 | Email digest and request emails | 3, 2 | Daily digest and new-request emails through SMTP (first cut). Not built yet. |
+| F10 | Email digest and request emails | 3, 2 | Daily digest and new-request emails through SMTP (first cut). Planned, not built. |
 
 ### Technical enablers
 
-**E1. Docker Compose stack (Session 0).** Three services: `db` (PostGIS image), `api` (FastAPI, Uvicorn), `web` (Vite dev server in development, static build in production). One `.env` file for secrets, kept out of the repository.
+**E1. Docker Compose stack (Session 0).** Two compose setups, one per branch, each running unchanged on every machine; anything machine-specific lives only in `.env`, which is kept out of the repository. `dev`: `db` (PostGIS image), `api` (FastAPI, Uvicorn with reload and source mounts) and `web` (Vite dev server). `main`: `db` and `api` only; the api image builds the web app in a Node stage, FastAPI serves the build from `api/static`, and `web/public/map` (from `scripts/get-tiles.sh`) is mounted read-only. Production serves plain HTTP with `COOKIE_SECURE=0` and has no TLS proxy (owner decision, 18 November 2026). `GET /api/health` is liveness. `GET /api/ready` returns 503 when the database is not at the Alembic head. `scripts/backup-db.sh` writes dumps and `scripts/restore-check.sh` loads one into a scratch database to check it.
 
-**E2. Schema and migrations (Session 1).** Alembic; the migrations are squashed into one baseline, `api/alembic/versions/0001_baseline.py` (raw SQL: tables, the views `core_status_v`, `reservation_state_v` and `reservation_unassigned_v`, `forbid_change` append-only triggers, and the indexes). Internal IDs for sites, segments and routes. Natural keys for upload matching: segment by (site A, site B), since two sites never share more than one segment; route by its two end sites (several routes can share the same two end sites, so that index is not unique); port by Port ID (an FDF or ODF label, see `api/app/port_label.py`, unique per site). Route type is not stored or uploaded: it is derived on every read from the kinds of the segment's two end sites (`api/app/link_type.py`: DC-DC, DC-TOC, Metro, Trunk); segments have no route type column (dropped from the baseline in the November 2026 cleanup). Cores have no circuit ID (dropped by migration 0004, 11 Nov 2026). Site names are unique across all regions. Regions are North, Central, South and East Coast; a new value comes by migration, and an unknown region (after spelling variants are mapped) is a Needs review upload row. Sites also get `kind` 'data_center' with `lrd_site_id`, a link to the LRD site row from the site list (the DC is not a separate place; the map shows the linked site as a data center), and a `details` jsonb column for every non-core Excel column (part of the baseline, as are the next items). Segments get `survey_cores`. The baseline also has `segments.cable_size` (info only, default 144, admin-editable), `reservations.unassigned_cores` (int, not null, default 0, set at insert) `reservations.unassigned_segment_id` (the segment a count-only reservation holds cores on), the event type 'assigned', and the views `reservation_state_v` and `reservation_unassigned_v` (E4a). Measurements store `test_method` and `field_team`. It also has `sites.active` (bool, default true; a site missing from a site master upload is set inactive, never deleted) and the upload kind 'site_master'. All timestamps are `timestamptz` stored in UTC.
+**E2. Schema and migrations (Session 1).** Alembic; the migrations are squashed into one baseline, `api/alembic/versions/0001_baseline.py`, plus later migrations (0002 port unique per site, 0003 measurement creator, 0004 drop core circuit ID, 0005 btree indexes on foreign-key columns) (raw SQL: tables, the views `core_status_v`, `reservation_state_v` and `reservation_unassigned_v`, `forbid_change` append-only triggers, and the indexes). Internal IDs for sites, segments and routes. Natural keys for upload matching: segment by (site A, site B), since two sites never share more than one segment; route by its two end sites (several routes can share the same two end sites, so that index is not unique); port by Port ID (an FDF or ODF label, see `api/app/port_label.py`, unique per site). Route type is not stored or uploaded: it is derived on every read from the kinds of the segment's two end sites (`api/app/link_type.py`: DC-DC, DC-TOC, Metro, Trunk); segments have no route type column (dropped from the baseline in the November 2026 cleanup). Cores have no circuit ID (dropped by migration 0004, 11 Nov 2026). Site names are unique across all regions. Regions are North, Central, South and East Coast; a new value comes by migration, and an unknown region (after spelling variants are mapped) is a Needs review upload row. Sites also get `kind` 'data_center' with `lrd_site_id`, a link to the LRD site row from the site list (the DC is not a separate place; the map shows the linked site as a data center), and a `details` jsonb column for every non-core Excel column (part of the baseline, as are the next items). Segments get `survey_cores`. The baseline also has `segments.cable_size` (info only, default 144, admin-editable), `reservations.unassigned_cores` (int, not null, default 0, set at insert) `reservations.unassigned_segment_id` (the segment a count-only reservation holds cores on), the event type 'assigned', and the views `reservation_state_v` and `reservation_unassigned_v` (E4a). Measurements store `test_method` and `field_team`. It also has `sites.active` (bool, default true; a site missing from a site master upload is set inactive, never deleted) and the upload kind 'site_master'. All timestamps are `timestamptz` stored in UTC.
 
 **E3. Derived core status.** One SQL view gives each core's current status, in priority order (a fiber cut, `segments.fiber_cut`, makes all cores on that segment unavailable; it is not a core status):
 
@@ -124,7 +124,7 @@ Available  otherwise
 
 **E5. Edit history and protected fields.** One `data_edits` table: entity type, entity ID, field, old value, new value, reason, `user_id`, timestamp. A field is protected from uploads when an edit row exists for it. Admin corrections to reservations go through E4, not here.
 
-**E6. Two-phase upload.** Parse and validate into a staging area keyed by upload ID (openpyxl for Excel, zipfile + XML for KMZ). Compute the preview diff against current data and protected fields. On confirm, apply everything in one transaction and write the upload log (who, when, counts, changes). Nothing outside staging changes before confirm. The Reservation workbook and the site master workbook are separate uploads, each recognised by its sheets' headers. Reservation rows from Excel are a separate preview group and import only until the one-time "Close reservation import" switch is closed. The switch is a `data_edits` row (entity 'system', entity_id 0, field 'reservation_import', new_value 'closed', with user and reason), so no new table is needed; staging and confirm both check it, and it cannot be reopened in the MVP. After it is closed, reservation rows are ignored and shown as a warning.
+**E6. Two-phase upload.** Parse and validate into a staging area keyed by upload ID (openpyxl for Excel, zipfile + XML for KMZ). Compute the preview diff against current data and protected fields. On confirm, apply everything in one transaction and write the upload log (who, when, counts, changes). Nothing outside staging changes before confirm. The Reservation workbook and the site master workbook are separate uploads, each recognised by its sheets' headers. Reservation apply re-checks Free under the same segment locks the request path takes. A request that waits more than 5 seconds for a lock (`lock_timeout`, per transaction) gets 409. Reservation rows from Excel are a separate preview group and import only until the one-time "Close reservation import" switch is closed. The switch is a `data_edits` row (entity 'system', entity_id 0, field 'reservation_import', new_value 'closed', with user and reason), so no new table is needed; staging and confirm both check it, and it cannot be reopened in the MVP. After it is closed, reservation rows are ignored and shown as a warning.
 
 **E6a. Layered parsing, row status and the sample workbook.** Every row of every imported sheet is first stored raw in `upload_rows` (sheet name, row number, raw cells as jsonb). Parsers then add parsed fields on top; the raw text is never dropped, and a parser failure sets the row to Needs review instead of stopping the upload. Each row has a status (Ready, Needs review, Rejected) and a reason; Needs review means a row the admin must look at. The admin fixes a row in the dashboard, reason optional (a `data_edits` row, protected from later uploads) or cleans the Excel and uploads again. One module, `api/app/ingest/checks.py`, holds the check functions (coordinate box, site lookup, region spelling map, port range pairing, blank requestor, duplicate site names). The upload preview and `app.load_data` use them. The standalone `excel_check` command and the old sample-workbook seed (`seed.py`, sheets Site Location and DC List) were removed on 16 Nov 2026; data loads via `app.load_data`.
 
@@ -144,9 +144,9 @@ Reservations are insert-only, so the new reservation fields (`group_label`, `add
 
 **E8. Routing graph.** A NetworkX graph in which each segment joins two sites (weight = km), built in memory from the Postgres segment table lazily on first use (not at startup), skipping segments with `fiber_cut`; a segment with no distance weighs `FALLBACK_KM` (10 km). The graph is cached per process behind a lock and cleared by `invalidate()` after a segment change (including an upload). Any site can route to any site. Candidate paths come from `shortest_simple_paths` (capped at `MAX_CANDIDATES`, more than the 5 shown at most, `SHOWN`); the API returns the best options (sanity cap 5; normally up to 3) ranked by Optimise for: km (shortest, default) or free cores (the fewest free cores on any segment of the path, higher is better). Only candidates with weight up to `MAX_DETOUR` (1.5) times the shortest path are kept, and a near-copy of a kept candidate (one that contains all its segments) is dropped, so one or two options is normal and the list is never padded to 3. Options with fewer free cores than needed come last, and the first option that fits gets "Best match". No "lowest loss" ranking until loss data exists. Routes are labels only. The graph holds only sites that have segments (hundreds), even though the database holds about 36,000 sites, so NetworkX in memory stays. There is no graph database. 36,000 sites and up to about 100,000 cores are small for PostgreSQL with indexes: pg_trgm GIN on site names, btree on `cores.segment_id`, GiST on site location.
 
-**E9. Scheduler with run record (not built yet).** Only the `job_runs` table exists in the schema; nothing writes to it. No daily job, digest or email runs. Planned: APScheduler inside the `api` container, with `job_runs` recording each run by date so a restart never sends twice, and a PostgreSQL advisory lock so only one Uvicorn worker runs the job.
+**E9. Scheduler with run record (planned, not built).** Only the `job_runs` table exists in the schema; nothing writes to it. No daily job, digest or email runs. Planned: a daily job (a cron entry or a small looping service; APScheduler is not installed) running the `api` code, with `job_runs` recording each run by date so a restart never sends twice, and a PostgreSQL advisory lock so only one Uvicorn worker runs the job.
 
-**E10. Auth.** Passwords hashed with Argon2. An httpOnly session cookie on the same origin as the SPA (no token storage in the browser). Role checks are FastAPI dependencies. Login (Session 5) is done: local accounts, Argon2, the httpOnly session cookie and a `sessions` table. It replaced the dev-only header.
+**E10. Auth.** Passwords hashed with Argon2. An httpOnly session cookie on the same origin as the SPA (no token storage in the browser). Role checks are FastAPI dependencies. Login (Session 5) is done: local accounts, Argon2, the httpOnly session cookie and a `sessions` table. It replaced the dev-only header. Failed sign-ins are throttled (429) with counters in process memory, so each worker counts on its own and a restart resets them.
 
 **E11. Map assets and KMZ lines.** One PMTiles extract capped at zoom 14, plus glyphs, sprites and a light style (dark is Later), all served as static files by `web` (PMTiles is read with HTTP range requests, so no tile server is needed). The map (`api/app/map/service.py`) is served as GeoJSON: each segment is drawn between its sites (data center square, other site diamond, line weight by route type, free-cores chip). A segment without a stored shape draws as a straight line; a segment with a stored route geometry draws road-shaped. There is also a per-segment KML export (`segment_kml`). The dev seed `app.seed_dev_network` adds road-shaped DEV lines from `api/app/dev_road_shapes.json`. KMZ import is built: the Upload tab "KMZ route lines" (`api/app/ingest/kmz_router.py`) and `python -m app.load_kmz USERNAME data/file.kmz [--folder "propose route"]` (`api/app/load_kmz.py`, zipfile, xml.etree and networkx). It reads the lines of one KML folder (default "propose route"; a file with no folders, or a blank folder name, reads every line). Pins, other folders and line names are ignored. Lines are matched to segments by where their ends are: each dashboard segment whose two sites are near the lines gets the shortest path over them as its own stored PostGIS LineString (one route row per segment). Preview first; apply replaces a segment's line. Segments are never created from a KMZ. Tuned constants: `SNAP_M` 50, `SITE_M` 300, `PATH_FACTOR` 3. By default the map shows only sites that have segments plus segment lines; the other sites are an optional clustered layer. No tile or response caching: test performance and cache only if slow.
 
@@ -154,7 +154,7 @@ Reservations are insert-only, so the new reservation fields (`group_label`, `add
 
 **E12a. Inventory page state.** One page holds the segment and route workflow. The account menu (top right) holds Sign out and, for admins, Users. Loss shows per core in core details and the reserve box. The selection is written to the URL hash (`#segment=AABB-BBCC`, `#route=AABB-DDEE`) so links can be shared; the page reads the hash on load. Every list and search works without the map or tiles.
 
-**E13. Tests.** pytest for the reservation flow (request, approve, reject, release, correct), upload validation and the loss bands, against a real PostGIS container. Playwright for the Cores table checks (status not by colour alone, keyboard operation, 4.5:1 contrast) and the map page at widths 1200, 1280, 1440 and 1920.
+**E13. Tests, logging and lint.** `api/app/observability.py` sets up logging (`LOG_LEVEL`) and logs one line per 409, server error or slow request, never the query string. ruff (`api/ruff.toml`) and oxlint (`web/.oxlintrc.json`) enforce the code-style rules. pytest for the reservation flow (request, approve, reject, release, correct), upload validation and the loss bands, against a real PostGIS container. Playwright for the Cores table checks (status not by colour alone, keyboard operation, 4.5:1 contrast) and the map page at widths 1200, 1280, 1440 and 1920.
 
 ### Performance approach
 
@@ -177,15 +177,15 @@ Reservations are insert-only, so the new reservation fields (`group_label`, `add
 | Routing | NetworkX |
 | Auth | Local accounts, Argon2 password hashes, httpOnly session cookie |
 | Database | PostgreSQL with PostGIS |
-| Lint | oxlint |
+| Lint | ruff (Python), oxlint (web) |
 | Testing | pytest, Playwright |
-| Deployment | Docker Compose on a company-managed server (host confirmed with IT before go-live) |
+| Deployment | Docker Compose on a company-managed server, one stack per branch (host confirmed with IT before go-live) |
 
-Planned, not installed: APScheduler (daily job, with the `job_runs` table and an advisory lock) and a company SMTP relay for email (access TBD).
+Planned, not built, not installed: the daily job and a company SMTP relay for email (access TBD). A cron entry or a small looping service is simpler than APScheduler; the E9 plan with `job_runs` and an advisory lock still applies.
 
-### Pinned versions (21 October 2026)
+### Pinned versions (pinned 21 October 2026, checked against the lock files 19 November 2026)
 
-Latest stable at the time of pinning, per the data owner's "latest" rule. Source: registry lookups by a research subagent, not yet re-verified; Session 0 confirms each by actually installing.
+Latest stable at the time of pinning, per the data owner's "latest" rule. Every pin below matches `api/requirements.lock`, `web/package.json`, the Dockerfiles and `docker-compose.yml` as of 19 November 2026.
 
 | Item | Version |
 | --- | --- |
@@ -199,8 +199,7 @@ Latest stable at the time of pinning, per the data owner's "latest" rule. Source
 | openpyxl | 3.1.5 |
 | NetworkX | 3.7 |
 | argon2-cffi / python-multipart | 25.1.0 / 0.0.32 |
-| pytest / httpx | 9.1.1 / 0.28.1 |
-| shapely (only if KMZ needs it) | 2.2.0 |
+| pytest / httpx / ruff | 9.1.1 / 0.28.1 / 0.14.6 |
 | React / React DOM | 19.3.1 |
 | Vite | 8.3.5 |
 | TypeScript | 6.0.3 (7.x skipped by decision: new native-port major, tooling support unproven) |
@@ -223,7 +222,7 @@ Latest stable at the time of pinning, per the data owner's "latest" rule. Source
 | Decision | Affects | Default until confirmed |
 | --- | --- | --- |
 | SMTP relay access | F10, E9 (not built) | Later, per data owner. In-app Action needed list and counts ship first |
-| Production web serving | E1 | Static build served by a small web server container; confirm with IT along with the host |
+| Production web serving | E1 | Decided: FastAPI serves the static build from the api container (`main`); plain HTTP, no TLS proxy (owner, 18 November 2026) |
 
 Decided by the owner (26 October 2026): straight segment lines in the MVP with one mock route to prove drawn shapes; no site master rollback in the MVP; the site master is a separate workbook from the Reservation workbook; loss shows per core (core details, reserve box); Users is in the account menu. Since then (6 November 2026) the KMZ import is built: segments with a stored shape (KMZ or dev seed) draw road-shaped, the rest stay straight.
 

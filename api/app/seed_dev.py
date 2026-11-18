@@ -9,6 +9,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.db import engine
+from app.environment import dev_password
 from app.loss.service import calculated_loss_db
 
 # code, name, kind, (lon, lat) or None
@@ -51,7 +52,7 @@ def run(db: Session) -> None:
     def ins(sql: str, **p: Any) -> None:
         db.execute(text(sql), p)
 
-    dev_hash = PasswordHasher().hash(os.environ.get("DEV_PASSWORD", "dev-password-123"))  # development only
+    dev_hash = PasswordHasher().hash(dev_password())  # development only
     user = {
         u: one("INSERT INTO users (username, display_name, role, password_hash, must_change_password) "
                "VALUES (:u, :d, :r, :h, false) RETURNING id", u=u, d=f"DEV {u}", r=r, h=dev_hash)
