@@ -34,7 +34,10 @@ COPY . .
 COPY --from=web-build /web/dist ./static
 
 # Run as a plain user, not root. The map tiles are mounted read-only at /app/static/map.
-RUN useradd --system --no-create-home fiber
+# data/ takes workbooks copied in for the app.load_* commands (docker compose cp FILE api:/app/data/).
+RUN useradd --system --no-create-home fiber \
+    && mkdir -p /app/data \
+    && chown fiber /app/data
 USER fiber
 
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
