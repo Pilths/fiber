@@ -221,7 +221,9 @@ export interface paths {
         put?: never;
         /**
          * Create Customer
-         * @description Existing name (any case): returned as is. Similar names (>= 0.4) need confirm_new=true before a new one is created.
+         * @description Existing name (any case): returned as is.
+         *
+         *     Similar names (>= 0.4) need confirm_new=true before a new one is created.
          */
         post: operations["create_customer_api_customers_post"];
         delete?: never;
@@ -936,7 +938,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/reservations/{rid}/history": {
+    "/api/reservations/{reservation_id}/history": {
         parameters: {
             query?: never;
             header?: never;
@@ -944,7 +946,7 @@ export interface paths {
             cookie?: never;
         };
         /** Reservation History */
-        get: operations["reservation_history_api_reservations__rid__history_get"];
+        get: operations["reservation_history_api_reservations__reservation_id__history_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -953,7 +955,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/cores/{cid}/history": {
+    "/api/cores/{core_id}/history": {
         parameters: {
             query?: never;
             header?: never;
@@ -961,7 +963,7 @@ export interface paths {
             cookie?: never;
         };
         /** Core History */
-        get: operations["core_history_api_cores__cid__history_get"];
+        get: operations["core_history_api_cores__core_id__history_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1013,7 +1015,9 @@ export interface paths {
         };
         /**
          * Pick
-         * @description The cores a route reservation would take: the first free cores on each segment. The UI sends them to POST /api/reservations.
+         * @description The cores a route reservation would take: the first free cores on each segment.
+         *
+         *     The UI sends them to POST /api/reservations.
          */
         get: operations["pick_api_routes_pick_get"];
         put?: never;
@@ -4811,14 +4815,14 @@ export interface operations {
             };
         };
     };
-    reservation_history_api_reservations__rid__history_get: {
+    reservation_history_api_reservations__reservation_id__history_get: {
         parameters: {
             query?: never;
             header?: {
                 "x-dev-user"?: string | null;
             };
             path: {
-                rid: number;
+                reservation_id: number;
             };
             cookie?: {
                 fiber_session?: string | null;
@@ -4846,14 +4850,14 @@ export interface operations {
             };
         };
     };
-    core_history_api_cores__cid__history_get: {
+    core_history_api_cores__core_id__history_get: {
         parameters: {
             query?: never;
             header?: {
                 "x-dev-user"?: string | null;
             };
             path: {
-                cid: number;
+                core_id: number;
             };
             cookie?: {
                 fiber_session?: string | null;

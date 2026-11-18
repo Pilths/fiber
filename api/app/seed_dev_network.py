@@ -1,7 +1,7 @@
 """Dev only: more DEV sites and segments so routes have alternatives, plus road-shaped lines for DEV segments.
-Run: python -m app.seed_dev_network. Idempotent. Reads app/dev_road_shapes.json (OSRM, fetched once; no network here)."""
+Run: python -m app.seed_dev_network. Idempotent.
+Reads app/dev_road_shapes.json (OSRM, fetched once; no network here)."""
 import json
-import os
 import sys
 from pathlib import Path
 from typing import Any
@@ -10,6 +10,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.db import engine
+from app.environment import require_development
 from app.seed_dev import CORES, dev_port_label
 from app.seed_dev import SEGMENTS as OLD_SEGMENTS
 from app.seed_dev import SITES as OLD_SITES
@@ -28,6 +29,25 @@ SITES = [
 ]
 KL, CJ, IPH, PEN = "DEV Kuala Lumpur DC", "DEV Cyberjaya DC", "DEV Ipoh Exchange", "DEV Penang Tower"
 BW, TP, TI, TM, KG, SB, ML, KJ = (s[0] for s in SITES)
+INSERT_SITE_SQL = (
+    "INSERT INTO sites (name, kind, geom) VALUES (:n, :k, ST_SetSRID(ST_MakePoint(:x, :y), 4326)) RETURNING id"
+)
+FIND_SEGMENT_SQL = "SELECT id FROM segments WHERE site_a_id IN (:a, :b) AND site_b_id IN (:a, :b)"
+INSERT_SEGMENT_SQL = """
+INSERT INTO segments (site_a_id, site_b_id, region, distance_km, survey_cores, cable_size)
+VALUES (:a, :b, :g, :d, :n, :c) RETURNING id
+"""
+INSERT_CORE_WITH_PORTS_SQL = "INSERT INTO cores (segment_id, number, port_a_id, port_b_id) VALUES (:s, :n, :pa, :pb)"
+HAS_OWN_SHAPE_SQL = """
+SELECT 1 FROM routes g JOIN route_segments p ON p.route_id = g.id AND p.segment_id = :s
+WHERE g.geom IS NOT NULL
+  AND NOT EXISTS (SELECT 1 FROM route_segments q WHERE q.route_id = g.id AND q.segment_id <> :s)
+"""
+INSERT_ROUTE_SQL = """
+INSERT INTO routes (site_a_id, site_b_id, geom)
+VALUES (:a, :b, ST_SetSRID(ST_GeomFromGeoJSON(:g), 4326)) RETURNING id
+"""
+INSERT_ROUTE_SEGMENT_SQL = "INSERT INTO route_segments (route_id, segment_id, position) VALUES (:r, :s, 1)"
 DEV_TRUNK_ROUTES_SQL = """
 UPDATE segments s SET route = CASE WHEN s.region = 'South' THEN 'R3' ELSE 'R1' END
 FROM sites a, sites b
@@ -169,8 +189,7 @@ def add_cluster_segment(db: Session, site: dict[str, int], anchor: str, name: st
 
 
 def main() -> None:
-    if os.environ.get("APP_ENV") != "development":
-        sys.exit("refusing: APP_ENV is not development")
+    require_development("seed_dev_network")
     shapes: dict[str, Any] = json.loads(SHAPES.read_text())
     with Session(engine) as db:
         def one(sql: str, **p: Any) -> int | None:
@@ -185,21 +204,19 @@ def main() -> None:
         added_sites = added_segments = 0
         for name, kind, (lon, lat) in SITES:
             if name not in site:
-                site[name] = one("INSERT INTO sites (name, kind, geom) VALUES (:n, :k, ST_SetSRID(ST_MakePoint(:x, :y), 4326)) RETURNING id",
-                                 n=name, k=kind, x=lon, y=lat)
+                site[name] = one(INSERT_SITE_SQL, n=name, k=kind, x=lon, y=lat)
                 added_sites += 1
         seg: dict[tuple[str, str], int] = {}
         for n, (a, b, _route_type, region, cable) in enumerate(SEGMENTS):
-            sid = one("SELECT id FROM segments WHERE site_a_id IN (:a, :b) AND site_b_id IN (:a, :b)", a=site[a], b=site[b])
+            sid = one(FIND_SEGMENT_SQL, a=site[a], b=site[b])
             if sid is None:
                 km = shapes[f"{a}|{b}"]["km"]
-                sid = one("INSERT INTO segments (site_a_id, site_b_id, region, distance_km, survey_cores, cable_size) "
-                          "VALUES (:a, :b, :g, :d, :n, :c) RETURNING id", a=site[a], b=site[b], g=region, d=km, n=CORES, c=cable)
+                sid = one(INSERT_SEGMENT_SQL, a=site[a], b=site[b], g=region, d=km, n=CORES, c=cable)
                 for num in range(1, CORES + 1):
                     ports = [one("INSERT INTO ports (port_id, site_id) VALUES (:p, :s) RETURNING id",
                                  p=dev_port_label(name, sid, num), s=site[name])
                              for name, end in ((a, "A"), (b, "B"))]
-                    db.execute(text("INSERT INTO cores (segment_id, number, port_a_id, port_b_id) VALUES (:s, :n, :pa, :pb)"),
+                    db.execute(text(INSERT_CORE_WITH_PORTS_SQL),
                                {"s": sid, "n": num, "pa": ports[0], "pb": ports[1]})
                 added_segments += 1
             seg[(a, b)] = sid
@@ -207,17 +224,16 @@ def main() -> None:
         shaped = 0
         for a, b in shape_pairs():
             key = f"{a}|{b}"
-            sid = one("SELECT id FROM segments WHERE site_a_id IN (:a, :b) AND site_b_id IN (:a, :b)", a=site[a], b=site[b])
+            sid = one(FIND_SEGMENT_SQL, a=site[a], b=site[b])
             if key not in shapes or sid is None:
                 continue
-            if one("SELECT 1 FROM routes g JOIN route_segments p ON p.route_id = g.id AND p.segment_id = :s "
-                   "WHERE g.geom IS NOT NULL AND NOT EXISTS (SELECT 1 FROM route_segments q WHERE q.route_id = g.id AND q.segment_id <> :s)", s=sid):
+            if one(HAS_OWN_SHAPE_SQL, s=sid):
                 continue
             coords = shapes[key]["coords"]
             assert all(99.5 <= x <= 119.5 and 0.8 <= y <= 7.5 for x, y in coords), f"{key}: shape outside Malaysia bbox"
-            rid = one("INSERT INTO routes (site_a_id, site_b_id, geom) VALUES (:a, :b, ST_SetSRID(ST_GeomFromGeoJSON(:g), 4326)) RETURNING id",
-                      a=site[a], b=site[b], g=json.dumps({"type": "LineString", "coordinates": coords}))
-            db.execute(text("INSERT INTO route_segments (route_id, segment_id, position) VALUES (:r, :s, 1)"), {"r": rid, "s": sid})
+            line = json.dumps({"type": "LineString", "coordinates": coords})
+            rid = one(INSERT_ROUTE_SQL, a=site[a], b=site[b], g=line)
+            db.execute(text(INSERT_ROUTE_SEGMENT_SQL), {"r": rid, "s": sid})
             shaped += 1
         relabel_dev_ports(db)
         db.execute(text(CLEAR_OLD_CLUSTERS_SQL))

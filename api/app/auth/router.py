@@ -30,6 +30,16 @@ _failed_logins: dict[str, list[float]] = {}
 _failed_logins_lock = threading.Lock()
 BAD_LOGIN = HTTPException(401, "Wrong username or password")
 
+SELECT_USER_FOR_LOGIN = """
+    SELECT id, username, display_name, role, must_change_password, password_hash, active
+    FROM users
+    WHERE username = :username
+"""
+INSERT_SESSION = "INSERT INTO sessions (id, user_id, expires_at) VALUES (:session_id, :user_id, :expires_at)"
+DELETE_SESSION = "DELETE FROM sessions WHERE id = :session_id"
+SELECT_PASSWORD_HASH = "SELECT password_hash FROM users WHERE id = :user_id"
+UPDATE_PASSWORD = "UPDATE users SET password_hash = :password_hash, must_change_password = false WHERE id = :user_id"
+
 
 class LoginBody(BaseModel):
     username: str
@@ -83,9 +93,9 @@ def _record_failure(keys: list[str]) -> None:
             _failed_logins.setdefault(key, []).append(now)
 
 
-def _verify(hash_: str | None, password: str) -> bool:
+def _verify(password_hash: str | None, password: str) -> bool:
     try:
-        return ph.verify(hash_ or DUMMY_HASH, password) and hash_ is not None
+        return ph.verify(password_hash or DUMMY_HASH, password) and password_hash is not None
     except (VerificationError, InvalidHashError):
         return False
 
@@ -96,10 +106,9 @@ def login(db: DB, request: Request, response: Response, body: LoginBody) -> Curr
     user_key = f"user:{body.username.lower()}"
     throttle_keys = [user_key, f"client:{client}"]
     _check_throttle(throttle_keys)
-    row = db.execute(text("SELECT id, username, display_name, role, must_change_password, password_hash, active "
-                          "FROM users WHERE username = :u"), {"u": body.username}).mappings().first()
-    ok = _verify(row["password_hash"] if row else None, body.password)
-    if not (row and ok and row["active"]):
+    row = db.execute(text(SELECT_USER_FOR_LOGIN), {"username": body.username}).mappings().first()
+    password_ok = _verify(row["password_hash"] if row else None, body.password)
+    if not (row and password_ok and row["active"]):
         _record_failure(throttle_keys)
         logger.warning("login failed username=%r client=%s", body.username, client)
         raise BAD_LOGIN
@@ -107,33 +116,41 @@ def login(db: DB, request: Request, response: Response, body: LoginBody) -> Curr
         _failed_logins.pop(user_key, None)
     hours = float(os.environ.get("SESSION_HOURS", "12"))
     token = secrets.token_urlsafe(32)
-    db.execute(text("INSERT INTO sessions (id, user_id, expires_at) VALUES (:i, :u, :e)"),
-               {"i": hash_token(token), "u": row["id"], "e": datetime.now(UTC) + timedelta(hours=hours)})
+    session = {
+        "session_id": hash_token(token),
+        "user_id": row["id"],
+        "expires_at": datetime.now(UTC) + timedelta(hours=hours),
+    }
+    db.execute(text(INSERT_SESSION), session)
     db.commit()
-    response.set_cookie(COOKIE, token, max_age=int(hours * 3600), httponly=True, samesite="lax",
-                        secure=cookie_secure())
-    return CurrentUser(**{k: row[k] for k in CurrentUser.model_fields})
+    response.set_cookie(
+        COOKIE, token, max_age=int(hours * 3600), httponly=True, samesite="lax", secure=cookie_secure(),
+    )
+    return CurrentUser(**{name: row[name] for name in CurrentUser.model_fields})
 
 
 @router.post("/auth/logout", status_code=204)
 def logout(db: DB, response: Response, fiber_session: Annotated[str | None, Cookie()] = None) -> None:
     if fiber_session:
-        db.execute(text("DELETE FROM sessions WHERE id = :i"), {"i": hash_token(fiber_session)})
+        db.execute(text(DELETE_SESSION), {"session_id": hash_token(fiber_session)})
         db.commit()
     response.delete_cookie(COOKIE)
 
 
 @router.post("/auth/change-password", status_code=204)
-def change_password(db: DB, user: Annotated[CurrentUser, Depends(get_session_user)], body: ChangePasswordBody) -> None:
-    current = db.execute(text("SELECT password_hash FROM users WHERE id = :i"), {"i": user.id}).scalar_one()
+def change_password(
+    db: DB,
+    user: Annotated[CurrentUser, Depends(get_session_user)],
+    body: ChangePasswordBody,
+) -> None:
+    current = db.execute(text(SELECT_PASSWORD_HASH), {"user_id": user.id}).scalar_one()
     if not _verify(current, body.current_password):
         raise HTTPException(400, "Current password is wrong")
     if len(body.new_password) < MIN_PASSWORD:
         raise HTTPException(422, f"New password must be at least {MIN_PASSWORD} characters")
     if body.new_password == body.current_password:
         raise HTTPException(422, "New password must differ from the current one")
-    db.execute(text("UPDATE users SET password_hash = :h, must_change_password = false WHERE id = :i"),
-               {"h": ph.hash(body.new_password), "i": user.id})
+    db.execute(text(UPDATE_PASSWORD), {"password_hash": ph.hash(body.new_password), "user_id": user.id})
     db.commit()
 
 

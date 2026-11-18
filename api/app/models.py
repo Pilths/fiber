@@ -178,7 +178,10 @@ class Reservation(Base):
         Index("reservations_unassigned_segment_id_ix", "unassigned_segment_id"),
         _in("fiber_monitored", ("Y", "N", "WIP"), "reservations_fiber_monitored_ck"),
         CheckConstraint("unassigned_cores >= 0", name="reservations_unassigned_ck"),
-        CheckConstraint("unassigned_cores = 0 OR unassigned_segment_id IS NOT NULL", name="reservations_unassigned_segment_ck"),
+        CheckConstraint(
+            "unassigned_cores = 0 OR unassigned_segment_id IS NOT NULL",
+            name="reservations_unassigned_segment_ck",
+        ),
     )
     id: Mapped[int] = _id()
     customer_id: Mapped[int] = _fk("customers")
@@ -282,7 +285,11 @@ class UploadRow(Base):
     __tablename__ = "upload_rows"
     __table_args__ = (
         Index("upload_rows_upload_id_ix", "upload_id"),
-        _in("row_group", ("new", "changed", "conflict", "missing", "rejected", "needs_review", "unchanged"), "upload_rows_group_ck"),
+        _in(
+            "row_group",
+            ("new", "changed", "conflict", "missing", "rejected", "needs_review", "unchanged"),
+            "upload_rows_group_ck",
+        ),
         _in("status", ("ready", "needs_review", "rejected"), "upload_rows_status_ck"),
     )
     id: Mapped[int] = _id()
@@ -300,7 +307,10 @@ class UploadRow(Base):
 
 class Measurement(Base):
     __tablename__ = "measurements"
-    __table_args__ = (Index("measurements_segment_created_ix", "segment_id", "created_at"), Index("measurements_core_ix", "core_id"))
+    __table_args__ = (
+        Index("measurements_segment_created_ix", "segment_id", "created_at"),
+        Index("measurements_core_ix", "core_id"),
+    )
     id: Mapped[int] = _id()
     segment_id: Mapped[int] = _fk("segments")
     loss_db: Mapped[Decimal] = mapped_column(Numeric(8, 3))

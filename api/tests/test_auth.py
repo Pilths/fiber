@@ -73,12 +73,17 @@ def test_new_user_forced_to_change_password(client, db):
     assert login(client, "newbie").json()["must_change_password"] is True
     assert client.get("/api/me").json()["must_change_password"] is True
     r = client.get("/api/needs-review")
-    assert r.status_code == 403 and r.json() == {"detail": "Password change required", "code": "password_change_required"}
+    assert r.status_code == 403
+    assert r.json() == {"detail": "Password change required", "code": "password_change_required"}
     body = {"current_password": PW, "new_password": PW}
     assert client.post("/api/auth/change-password", json=body).status_code == 422  # same password
     assert client.post("/api/auth/change-password", json={**body, "new_password": "short"}).status_code == 422
-    assert client.post("/api/auth/change-password", json={**body, "current_password": "nope-nope-nope"}).status_code == 400
-    assert client.post("/api/auth/change-password", json={**body, "new_password": "a-brand-new-pass"}).status_code == 204
+    assert (
+        client.post("/api/auth/change-password", json={**body, "current_password": "nope-nope-nope"}).status_code == 400
+    )
+    assert (
+        client.post("/api/auth/change-password", json={**body, "new_password": "a-brand-new-pass"}).status_code == 204
+    )
     assert client.get("/api/needs-review").status_code == 200  # same session still works
     client.cookies.clear()
     assert login(client, "newbie", "a-brand-new-pass").status_code == 200
@@ -115,11 +120,15 @@ def test_admin_creates_user_with_one_time_password(client, db, admin):
 
 def test_reset_password_and_deactivate_delete_sessions(client, db, admin):
     uid = mkuser(db, "kim")
-    db.execute(text("INSERT INTO sessions (id, user_id, expires_at) VALUES ('x', :u, now() + interval '1 hour')"), {"u": uid})
+    db.execute(
+        text("INSERT INTO sessions (id, user_id, expires_at) VALUES ('x', :u, now() + interval '1 hour')"), {"u": uid}
+    )
     r = client.post(f"/api/admin/users/{uid}/reset-password")
     assert r.status_code == 200 and r.json()["must_change_password"] is True and r.json()["temporary_password"]
     assert sessions(db, uid) == 0
-    db.execute(text("INSERT INTO sessions (id, user_id, expires_at) VALUES ('y', :u, now() + interval '1 hour')"), {"u": uid})
+    db.execute(
+        text("INSERT INTO sessions (id, user_id, expires_at) VALUES ('y', :u, now() + interval '1 hour')"), {"u": uid}
+    )
     assert client.post(f"/api/admin/users/{uid}/deactivate").json()["active"] is False
     assert sessions(db, uid) == 0
 

@@ -3,6 +3,9 @@
   "plugins": ["react", "typescript", "oxc"],
   "rules": {
     "react/rules-of-hooks": "error",
+    "curly": "error",
+    "no-nested-ternary": "error",
+    "no-unused-expressions": "error",
     "react/only-export-components": ["warn", { "allowConstantExport": true }]
   }
 }

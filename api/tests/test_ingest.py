@@ -54,8 +54,9 @@ def test_checks():
     assert checks.check_coords(3.1, 101.6) is None
     assert "swapped" in checks.check_coords(101.6, 3.1)
     assert checks.check_coords(0, 0) and checks.check_coords(None, 1) and checks.check_coords(50, 50)
-    assert [checks.map_region(v)[0] for v in ("Nothern", " northern", "SOUTHERN", "Souther", "East  coast", "Central")] == \
-        ["North", "North", "South", "South", "East Coast", "Central"]
+    assert [
+        checks.map_region(v)[0] for v in ("Nothern", " northern", "SOUTHERN", "Souther", "East  coast", "Central")
+    ] == ["North", "North", "South", "South", "East Coast", "Central"]
     assert checks.map_region("Atlantis")[0] is None
     assert checks.split_nodes("AABB-BBCC") == ("AABB", "BBCC", False)
     assert checks.split_nodes("aabb-bbcc (Additional CORE)") == ("aabb", "bbcc", True)
@@ -75,7 +76,9 @@ def test_reservation_sheet(workbook):
     assert "Tray 1" in r3.raw["Core assignment"]
     assert r3.parsed["cv_ready_date"] == date(2025, 10, 10) and r3.parsed["planned_date"] == date(2025, 10, 10)
     assert r3.parsed["distance_km"] == 3 and r3.parsed["survey_cores"] == 4
-    assert r3.parsed["port_info_raw"] == "raw port info" and r3.parsed["contractor"] == "Vendor" and r3.parsed["monitoring_code"] == "ABC"
+    assert r3.parsed["port_info_raw"] == "raw port info"
+    assert r3.parsed["contractor"] == "Vendor"
+    assert r3.parsed["monitoring_code"] == "ABC"
     assert "Aging(days)" in r3.raw and "Aging(days)" not in r3.parsed and "core balance" not in r3.parsed
     assert r3.raw["Fiber montiored Y/N/WIP"] == "Y" and r3.raw["Fiber core request date"] == "2025-10-10T00:00:00"
     assert (r4.parsed["site_a"], r4.parsed["site_b"]) == ("BBCC", "AABB")

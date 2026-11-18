@@ -56,14 +56,27 @@ def apply(client, uid):
 
 
 def segment(db, a, b):
-    return db.execute(text("SELECT s.* FROM segments s JOIN sites x ON x.id = s.site_a_id JOIN sites y ON y.id = s.site_b_id "
-                           "WHERE x.name = :a AND y.name = :b"), {"a": a, "b": b}).mappings().first()
+    return (
+        db.execute(
+            text(
+                "SELECT s.* FROM segments s JOIN sites x ON x.id = s.site_a_id JOIN sites y ON y.id = s.site_b_id "
+                "WHERE x.name = :a AND y.name = :b"
+            ),
+            {"a": a, "b": b},
+        )
+        .mappings()
+        .first()
+    )
 
 
 def seed_segment(db, a, b, dist="5.000", route=None, section=None):
-    return db.execute(text("INSERT INTO segments (site_a_id, site_b_id, distance_km, route, section) "
-                           "SELECT x.id, y.id, :d, :r, :s FROM sites x, sites y WHERE x.name = :a AND y.name = :b RETURNING id"),
-                      {"a": a, "b": b, "d": dist, "r": route, "s": section}).scalar_one()
+    return db.execute(
+        text(
+            "INSERT INTO segments (site_a_id, site_b_id, distance_km, route, section) "
+            "SELECT x.id, y.id, :d, :r, :s FROM sites x, sites y WHERE x.name = :a AND y.name = :b RETURNING id"
+        ),
+        {"a": a, "b": b, "d": dist, "r": route, "s": section},
+    ).scalar_one()
 
 
 def problems(client, uid):
@@ -76,7 +89,9 @@ def test_happy_path_new_changed_unchanged_and_apply(client, admin, sites, db):
     r = post(client, workbook([row("AAAA-BBBB"), row("BBBB-CCCC", 6), row("CCCC-DDDD", 7), row("AAAA-ZZZZ")]))
     assert r.status_code == 201
     j = r.json()
-    assert j["found"] and j["sheet_name"] == "Segments" and j["counts"] == {"rows": 4, "new": 1, "changed": 1, "unchanged": 1, "problem": 1}
+    assert j["found"]
+    assert j["sheet_name"] == "Segments"
+    assert j["counts"] == {"rows": 4, "new": 1, "changed": 1, "unchanged": 1, "problem": 1}
     ch = rows(client, j["upload_id"], "changed")["items"][0]
     assert {(c["field"], c["old"], c["new"]) for c in ch["changes"]} == {
         ("distance_km", "5.000", "6.000"), ("route", "R9", "R1"), ("section", "S9", "S1")}
@@ -85,21 +100,35 @@ def test_happy_path_new_changed_unchanged_and_apply(client, admin, sites, db):
     assert segment(db, "AAAA", "BBBB") is None  # staging writes no segment
     res = apply(client, j["upload_id"])
     assert res.status_code == 200
-    assert res.json() == {"upload_id": j["upload_id"], "created": 1, "changed": 1, "protected_kept": 0, "skipped": 1, "warnings": []}
+    assert res.json() == {
+        "upload_id": j["upload_id"],
+        "created": 1,
+        "changed": 1,
+        "protected_kept": 0,
+        "skipped": 1,
+        "warnings": [],
+    }
     new = segment(db, "AAAA", "BBBB")
     assert (str(new["distance_km"]), new["route"], new["section"]) == ("10.500", "R1", "S1")
     assert new["survey_cores"] is None and new["region"] is None and new["cable_size"] == 144
     assert db.execute(text("SELECT count(*) FROM cores WHERE segment_id = :i"), {"i": new["id"]}).scalar_one() == 0
     assert str(segment(db, "BBBB", "CCCC")["distance_km"]) == "6.000"
-    assert db.execute(text("SELECT status FROM uploads WHERE id = :i"), {"i": j["upload_id"]}).scalar_one() == "confirmed"
+    assert (
+        db.execute(text("SELECT status FROM uploads WHERE id = :i"), {"i": j["upload_id"]}).scalar_one() == "confirmed"
+    )
 
 
 def test_history_rows_written(client, admin, sites, db):
     sid = seed_segment(db, "AAAA", "BBBB", "5.000")
     uid = post(client, workbook([row("AAAA-BBBB", 6, typ="Trunk")]), "my.xlsx").json()["upload_id"]
     apply(client, uid)
-    h = db.execute(text("SELECT field, old_value, new_value, reason, user_id FROM data_edits WHERE entity = 'segment' AND entity_id = :i "
-                        "ORDER BY field"), {"i": sid}).all()
+    h = db.execute(
+        text(
+            "SELECT field, old_value, new_value, reason, user_id FROM data_edits "
+            "WHERE entity = 'segment' AND entity_id = :i ORDER BY field"
+        ),
+        {"i": sid},
+    ).all()
     assert [(x[0], x[1], x[2]) for x in h] == [("distance_km", "5.000", "6.000"), ("route", None, "R1"),
                                                 ("section", None, "S1")]
     assert all(x[3] == f"segment list upload my.xlsx #{uid}" and x[4] == admin for x in h)

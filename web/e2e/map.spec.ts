@@ -14,14 +14,29 @@ const chip = (page: Page, name: string) => map(page).getByRole("button", { name:
 async function offline(page: Page) {
   const outside: string[] = [];
   const app = new URL(test.info().project.use.baseURL ?? "http://localhost:5173").host;
-  page.on("request", (r) => { const u = new URL(r.url()); if (/^https?:$/.test(u.protocol) && u.host !== app) outside.push(r.url()); });
-  await page.route("**/*", (r) => (new URL(r.request().url()).host === app ? r.continue() : r.abort()));
+  page.on("request", (request) => {
+    const url = new URL(request.url());
+    if (/^https?:$/.test(url.protocol) && url.host !== app) {
+      outside.push(request.url());
+    }
+  });
+  await page.route("**/*", (route) => {
+    if (new URL(route.request().url()).host === app) {
+      return route.continue();
+    }
+    return route.abort();
+  });
   return outside;
 }
 const noWebGL = (page: Page) => page.addInitScript(() => {
   const get = HTMLCanvasElement.prototype.getContext;
   // @ts-expect-error test override
-  HTMLCanvasElement.prototype.getContext = function (t: string, ...a: unknown[]) { return /webgl/.test(t) ? null : get.call(this, t, ...a); };
+  HTMLCanvasElement.prototype.getContext = function (type: string, ...rest: unknown[]) {
+    if (/webgl/.test(type)) {
+      return null;
+    }
+    return get.call(this, type, ...rest);
+  };
 });
 // Which path the browser took: "gl" (MapLibre + PMTiles) or "svg" (fallback).
 const mode = async (page: Page) => {
@@ -30,7 +45,11 @@ const mode = async (page: Page) => {
 };
 
 // Screenshots: on the MapLibre path give tiles and glyphs a moment to draw.
-const settle = async (page: Page) => { if ((await mode(page)) === "gl") await page.waitForTimeout(2000); };
+const settle = async (page: Page) => {
+  if ((await mode(page)) === "gl") {
+    await page.waitForTimeout(2000);
+  }
+};
 
 test.use({ viewport: { width: 1440, height: 900 } });
 
@@ -53,7 +72,8 @@ test("map loads with no request leaving the app origin; chips, sites, layers and
   const m = await mode(page);
   test.info().annotations.push({ type: "map path", description: m ?? "" });
   await expect(chips(page)).toHaveCount(DRAWN); // in the DOM; chips that would overlap are hidden until zoomed in
-  await expect.poll(() => chips(page).filter({ visible: true }).count()).toBeGreaterThanOrEqual(2); // after the first fit eases in
+  // after the first fit eases in
+  await expect.poll(() => chips(page).filter({ visible: true }).count()).toBeGreaterThanOrEqual(2);
   // Sites closer than 16px share a count badge and cluster sites sit under their label: together they cover every site.
   const siteTotal = (await mapSites(page)).features.length;
   await expect.poll(() => drawnSiteCount(page)).toBe(siteTotal);
@@ -134,7 +154,8 @@ test("Layers: route types and trunk routes hide their lines; turning off the sel
   const total = await lines.count();
   const drawnIds = await lines.evaluateAll((es) => es.map((e) => Number(e.getAttribute("data-segment-id"))));
   const drawn = segs.filter((s) => drawnIds.includes(s.id)); // segments without coordinates are not drawn
-  const count = (test: (s: { route_type: string | null; route: string | null }) => boolean) => drawn.filter(test).length;
+  type Drawn = { route_type: string | null; route: string | null };
+  const count = (test: (segment: Drawn) => boolean) => drawn.filter(test).length;
   await expect(map(page).getByLabel("Type")).toHaveCount(0); // route types are in Layers, not a filter
   const metro = page.getByRole("checkbox", { name: "Metro", exact: true });
   await metro.uncheck();
@@ -224,7 +245,11 @@ test("map page has no horizontal scroll at 1200, 1280, 1440 and 1920", async ({ 
   await expect(chips(page)).toHaveCount(DRAWN);
   for (const w of [1200, 1280, 1440, 1920]) {
     await page.setViewportSize({ width: w, height: 900 });
-    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
+    const overflow = () => page.evaluate(() => {
+      const root = document.documentElement;
+      return root.scrollWidth - root.clientWidth;
+    });
+    await expect.poll(overflow).toBe(0);
   }
 });
 
@@ -236,10 +261,14 @@ test("the stage fills the map card: nothing, segment and route selected", async 
     const card = document.querySelector('section[aria-label="Network map"]')!;
     const body = card.lastElementChild!; // NetworkMap root: stage, then the note line and "not on the map"
     const pad = parseFloat(getComputedStyle(card).paddingBottom);
-    return { inCard: Math.round(card.getBoundingClientRect().bottom - pad - body.lastElementChild!.getBoundingClientRect().bottom) };
+    const lastBottom = body.lastElementChild!.getBoundingClientRect().bottom;
+    return { inCard: Math.round(card.getBoundingClientRect().bottom - pad - lastBottom) };
   });
   // Within a few px: the last line's box rounds to a pixel or two.
-  const check = async () => expect.poll(async () => { const g = await gaps(); return Math.abs(g.inCard) <= 3; }).toBe(true);
+  const check = async () => expect.poll(async () => {
+    const gap = await gaps();
+    return Math.abs(gap.inCard) <= 3;
+  }).toBe(true);
   await check();
   await chip(page, FAR).click();
   await expect(page.locator("#segment-h", { hasText: FAR })).toBeVisible();
@@ -252,16 +281,22 @@ test("the stage fills the map card: nothing, segment and route selected", async 
   await check();
 });
 
-// A segment picked outside the map (top bar search) is followed by the camera; a segment clicked on the map is already in view and stays put.
+// A segment picked outside the map (top bar search) is followed by the camera; a segment clicked on the map is
+// already in view and stays put.
 test("picking a segment in the top bar search moves the camera; clicking it on the map does not", async ({ page }) => {
   await signIn(page);
   test.skip((await mode(page)) !== "gl", "camera checks need MapLibre (basemap installed and WebGL)");
   await page.waitForFunction(() => (window as { fiberMap?: { loaded(): boolean } }).fiberMap?.loaded());
   const cam = () => page.evaluate(() => {
-    const m = (window as unknown as { fiberMap: import("maplibre-gl").Map }).fiberMap, c = m.getCenter();
-    return { zoom: m.getZoom(), lng: c.lng, lat: c.lat, moving: m.isMoving() };
+    const fiberMap = (window as unknown as { fiberMap: import("maplibre-gl").Map }).fiberMap;
+    const center = fiberMap.getCenter();
+    return { zoom: fiberMap.getZoom(), lng: center.lng, lat: center.lat, moving: fiberMap.isMoving() };
   });
-  const still = async () => { await expect.poll(async () => (await cam()).moving).toBe(false); await page.waitForTimeout(400); return cam(); };
+  const still = async () => {
+    await expect.poll(async () => (await cam()).moving).toBe(false);
+    await page.waitForTimeout(400);
+    return cam();
+  };
   const start = await still(); // the first fit to all segments
 
   await page.getByRole("combobox", { name: /^Find a segment/ }).fill("Cyberjaya");
@@ -300,7 +335,8 @@ test("zoomed to 17 near DEV Kuala Lumpur DC the buildings layer draws", async ({
   test.skip(counts.buildings === 0, "the installed extract has no buildings near this site");
   expect(counts.zoom).toBeGreaterThanOrEqual(16);
   expect(counts.buildings).toBeGreaterThan(0);
-  test.info().annotations.push({ type: "rendered", description: `${counts.buildings} buildings, ${counts.paths} path pieces at z${counts.zoom}` });
+  const description = `${counts.buildings} buildings, ${counts.paths} path pieces at z${counts.zoom}`;
+  test.info().annotations.push({ type: "rendered", description });
   await page.waitForTimeout(1000); // glyphs for street names
   await page.screenshot({ path: "e2e/screenshots/map-buildings.png" });
   expect(outside).toEqual([]);
@@ -343,7 +379,8 @@ test("clusters: label with site count zoomed out, outline and sites zoomed in, a
     .map((site) => site.properties.name);
   const label = map(page).getByRole("button", { name: new RegExp(`^Cluster ${CLUSTER}, ${members.length} sites:`) });
   const klMarkerOrBadge = map(page).getByRole("button", { name: /^(Site |\d+ sites: .*)DEV Kuala Lumpur DC/ });
-  // Zoomed out: one label per cluster, a count badge with its name; the cluster's sites are under it, other sites are drawn.
+  // Zoomed out: one label per cluster, a count badge with its name; the cluster's sites are under it,
+  // other sites are drawn.
   await expect(map(page).getByTestId("map-sector-label")).toHaveCount(sectors.features.length);
   await expect(label).toBeVisible();
   await expect(label.locator(".msector-n")).toHaveText(String(members.length));

@@ -15,7 +15,9 @@ def test_creates_admin_who_can_sign_in(client, db, monkeypatch):
     assert run(monkeypatch, db, "a-long-password", "a-long-password") == 0
     r = login(client, "boss1", "a-long-password")
     assert r.status_code == 200 and r.json()["role"] == "admin" and not r.json()["must_change_password"]
-    edit = db.exec_driver_sql("SELECT user_id, new_value FROM data_edits WHERE entity = 'user' AND field = 'account'").first()
+    edit = db.exec_driver_sql(
+        "SELECT user_id, new_value FROM data_edits WHERE entity = 'user' AND field = 'account'"
+    ).first()
     assert edit[1] == "created as admin"
 
 

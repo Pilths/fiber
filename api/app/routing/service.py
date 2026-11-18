@@ -1,4 +1,7 @@
-"""Route options over the segment graph. Free cores use inventory.list_segments (free_to_reserve), loss uses loss.segment_rows."""
+"""Route options over the segment graph.
+
+Free cores use inventory.list_segments (free_to_reserve), loss uses loss.segment_rows.
+"""
 import re
 import time
 from itertools import islice, pairwise
@@ -35,7 +38,10 @@ def _section_rank(section: str | None) -> tuple[int, int]:
 
 
 def endpoints(db: Session) -> list[dict[str, Any]]:
-    """Sites that have a segment, ordered by the best section of their segments (N-N, N-C, ... then no section), then name."""
+    """Sites that have a segment, ordered by the best section of their segments.
+
+    Order: N-N, N-C, ... then no section, then name.
+    """
     rows = db.execute(text(
         "SELECT s.id, s.name, s.kind, array_remove(array_agg(DISTINCT p.section), NULL) AS sections FROM sites s "
         "JOIN segments p ON s.id IN (p.site_a_id, p.site_b_id) GROUP BY s.id, s.name, s.kind")).mappings().all()
@@ -103,7 +109,9 @@ def find_routes(db: Session, frm: int, to: int, cores_needed: int, sort: str) ->
         for u, v in pairwise(path):
             sid = graph[u][v]["segment_id"]
             s, lo = inv[sid], ls[sid]
-            segments.append({"segment_id": sid, "name": f"{s['site_a']} - {s['site_b']}", "site_a": names[u], "site_b": names[v],  # travel order
+            # site_a and site_b are in travel order
+            segments.append({"segment_id": sid, "name": f"{s['site_a']} - {s['site_b']}",
+                          "site_a": names[u], "site_b": names[v],
                           "km": None if s["distance_km"] is None else float(s["distance_km"]),
                           "free_to_reserve": s["free_to_reserve"], "surveyed": s["survey_cores"] is not None,
                           "route_label": labels.get(sid), "measured": lo["measured_db"] is not None,
@@ -113,7 +121,8 @@ def find_routes(db: Session, frm: int, to: int, cores_needed: int, sort: str) ->
         fewest = bottleneck["free_to_reserve"]
         options.append({
             "segments": segments, "total_km": round(sum(x["km"] or 0 for x in segments), 3),
-            "_weight": sum(graph[u][v]["weight"] for u, v in pairwise(path)),  # fallback km for segments without distance
+            # fallback km for segments without distance
+            "_weight": sum(graph[u][v]["weight"] for u, v in pairwise(path)),
             "distance_incomplete": any(x["km"] is None for x in segments),
             "estimated_db": None if None in calc else round(float(sum(calc)), 2),
             "fewest_free": fewest, "bottleneck_segment_id": bottleneck["segment_id"],
@@ -144,10 +153,11 @@ def pick(db: Session, segment_ids: list[int], cores_needed: int) -> dict[str, An
             raise HTTPException(422, f"Unknown segment {sid}")
         label = f"{s['site_a']} - {s['site_b']}"
         if s["survey_cores"] is None:
-            raise HTTPException(409, {"message": f"{label} has no verified core count yet; it cannot be booked.", "segment_id": sid})
+            message = f"{label} has no verified core count yet; it cannot be booked."
+            raise HTTPException(409, {"message": message, "segment_id": sid})
         if s["free_to_reserve"] < cores_needed:
-            raise HTTPException(409, {"message": f"{label}: {cores_needed} needed but only {s['free_to_reserve']} free to reserve.",
-                                      "segment_id": sid})
+            message = f"{label}: {cores_needed} needed but only {s['free_to_reserve']} free to reserve."
+            raise HTTPException(409, {"message": message, "segment_id": sid})
         rows = db.execute(text(
             "SELECT c.id AS core_id, c.number FROM cores c JOIN core_status_v v ON v.core_id = c.id "
             "WHERE c.segment_id = :s AND v.status = 'Available' AND c.number <= :n ORDER BY c.number LIMIT :k"),

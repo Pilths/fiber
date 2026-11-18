@@ -39,8 +39,13 @@ def net(db):
 
     reserve(cores[2], approved=False)  # Requested
     reserve(cores[3], approved=True)   # Reserved
-    db.execute(text("INSERT INTO data_edits (entity, entity_id, field, new_value, reason, user_id) "
-                    "VALUES ('core', :c, 'status', 'Faulty', 'old edit, now history only', :u)"), {"c": cores[5], "u": adm})
+    db.execute(
+        text(
+            "INSERT INTO data_edits (entity, entity_id, field, new_value, reason, user_id) "
+            "VALUES ('core', :c, 'status', 'Faulty', 'old edit, now history only', :u)"
+        ),
+        {"c": cores[5], "u": adm},
+    )
     return {"s1": s1, "s2": s2, "cores": cores}
 
 

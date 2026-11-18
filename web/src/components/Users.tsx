@@ -1,61 +1,89 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api, errorText } from "@/api/client";
 import type { components } from "@/api/schema";
+import { Dialog } from "@/components/upload-parts";
 
 type Me = components["schemas"]["CurrentUser"];
 type User = components["schemas"]["UserOut"];
 type Temp = components["schemas"]["UserWithPassword"];
 
-const created = (iso: string) =>
-  new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Kuala_Lumpur", day: "numeric", month: "short", year: "numeric" }).format(new Date(iso));
+const DAY_FORMAT = new Intl.DateTimeFormat("en-GB", {
+  timeZone: "Asia/Kuala_Lumpur", day: "numeric", month: "short", year: "numeric",
+});
+const created = (iso: string) => DAY_FORMAT.format(new Date(iso));
 const ROLE = { admin: "Admin", planner: "Planner" } as Record<string, string>;
+const ERROR_BOX = "rounded-md border border-red bg-red-bg px-3 py-2 text-body font-semibold text-red";
+const lbl = "lbl mb-1 block text-body! text-foreground!";
 
-function TempPassword({ t, onClose }: { t: Temp; onClose: () => void }) {
+function TempPassword({ temp, onClose }: { temp: Temp; onClose: () => void }) {
   const [copied, setCopied] = useState(false);
+  const copy = () => {
+    navigator.clipboard?.writeText(temp.temporary_password).then(() => setCopied(true), () => {});
+  };
   return (
     <div role="region" aria-label="Temporary password" className="mb-4 note px-4 py-3">
-      <p className="text-body font-semibold text-amber">Temporary password for {t.username}</p>
+      <p className="text-body font-semibold text-amber">Temporary password for {temp.username}</p>
       <div className="mt-2 flex items-center gap-3">
-        <code data-testid="temp-password" className="rounded border border-amber-bd bg-white px-3 py-1.5 font-mono text-base font-semibold tracking-wide">{t.temporary_password}</code>
-        <button type="button" className="btn btn-sm" onClick={() => navigator.clipboard?.writeText(t.temporary_password).then(() => setCopied(true), () => {})}>
+        <code data-testid="temp-password"
+          className="rounded border border-amber-bd bg-white px-3 py-1.5 font-mono text-base font-semibold tracking-wide">
+          {temp.temporary_password}
+        </code>
+        <button type="button" className="btn btn-sm" onClick={copy}>
           {copied ? "Copied" : "Copy"}
         </button>
         <button type="button" className="btn btn-sm ml-auto" onClick={onClose}>Done</button>
       </div>
-      <p className="mt-2 text-body text-foreground">Shown once. Give it to the user; they must change it at first sign-in.</p>
+      <p className="mt-2 text-body text-foreground">
+        Shown once. Give it to the user; they must change it at first sign-in.
+      </p>
     </div>
   );
 }
 
-function AddUser({ onCreated, onCancel }: { onCreated: (t: Temp) => void; onCancel: () => void }) {
+function AddUser({ onCreated, onCancel }: { onCreated: (temp: Temp) => void; onCancel: () => void }) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const submit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const f = new FormData(e.currentTarget);
-    const s = (k: string) => String(f.get(k) ?? "").trim();
+  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const text = (name: string) => String(form.get(name) ?? "").trim();
     setBusy(true);
     setError(null);
     try {
-      onCreated(await api.post("/api/admin/users", {
-        body: { username: s("username"), display_name: s("display_name") || null, role: s("role") as "planner" | "admin", reason: s("reason") },
-      }));
+      const body = {
+        username: text("username"),
+        display_name: text("display_name") || null,
+        role: text("role") as "planner" | "admin",
+        reason: text("reason"),
+      };
+      onCreated(await api.post("/api/admin/users", { body }));
     } catch (err) {
       setError(errorText(err, "Could not create the user. Try again."));
       setBusy(false);
     }
   };
-  const lbl = "lbl mb-1 block text-body! text-foreground!";
   return (
     <form onSubmit={submit} aria-label="Add user" className="mb-4 rounded-md border bg-subtle p-4">
-      {error && <p role="alert" className="mb-3 rounded-md border border-red bg-red-bg px-3 py-2 text-body font-semibold text-red">{error}</p>}
+      {error && <p role="alert" className={`mb-3 ${ERROR_BOX}`}>{error}</p>}
       <div className="grid grid-cols-[1fr_1fr_160px_1.4fr] gap-3">
-        <label><span className={lbl}>Username</span><input name="username" className="field" required autoFocus autoComplete="off" spellCheck={false} /></label>
-        <label><span className={lbl}>Display name</span><input name="display_name" className="field" autoComplete="off" /></label>
-        <label><span className={lbl}>Role</span>
-          <select name="role" className="field" defaultValue="planner"><option value="planner">Planner</option><option value="admin">Admin</option></select>
+        <label>
+          <span className={lbl}>Username</span>
+          <input name="username" className="field" required autoFocus autoComplete="off" spellCheck={false} />
         </label>
-        <label><span className={lbl}>Reason (optional)</span><input name="reason" className="field" autoComplete="off" /></label>
+        <label>
+          <span className={lbl}>Display name</span>
+          <input name="display_name" className="field" autoComplete="off" />
+        </label>
+        <label><span className={lbl}>Role</span>
+          <select name="role" className="field" defaultValue="planner">
+            <option value="planner">Planner</option>
+            <option value="admin">Admin</option>
+          </select>
+        </label>
+        <label>
+          <span className={lbl}>Reason (optional)</span>
+          <input name="reason" className="field" autoComplete="off" />
+        </label>
       </div>
       <div className="mt-3 flex gap-2">
         <button type="submit" className="btn btn-p" disabled={busy}>{busy ? "Creating…" : "Create"}</button>
@@ -66,11 +94,9 @@ function AddUser({ onCreated, onCancel }: { onCreated: (t: Temp) => void; onCanc
 }
 
 function ConfirmDeactivate({ user, onDone, onCancel }: { user: User; onDone: () => void; onCancel: () => void }) {
-  const ref = useRef<HTMLDialogElement>(null);
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
-  useEffect(() => { ref.current?.showModal(); }, []);
-  const go = async () => {
+  const deactivate = async () => {
     try {
       await api.post("/api/admin/users/{user_id}/deactivate", { path: { user_id: user.id }, body: { reason } });
       onDone();
@@ -79,18 +105,69 @@ function ConfirmDeactivate({ user, onDone, onCancel }: { user: User; onDone: () 
     }
   };
   return (
-    <dialog ref={ref} aria-labelledby="deact-h" onClose={onCancel} className="m-auto w-[440px] rounded-lg border bg-white p-6 backdrop:bg-black/30">
-      <h2 id="deact-h" className="text-base font-semibold">Deactivate {user.username}?</h2>
+    <Dialog title={`Deactivate ${user.username}?`} onClose={onCancel} cls="m-auto w-[440px]">
       <p className="mt-1 text-body text-muted-foreground">They are signed out and cannot sign in until activated.</p>
-      {error && <p role="alert" className="mt-3 rounded-md border border-red bg-red-bg px-3 py-2 text-body font-semibold text-red">{error}</p>}
-      <label className="mt-4 block"><span className="lbl mb-1 block text-body! text-foreground!">Reason (optional)</span>
-        <input className="field" value={reason} onChange={(e) => setReason(e.target.value)} autoFocus />
+      {error && <p role="alert" className={`mt-3 ${ERROR_BOX}`}>{error}</p>}
+      <label className="mt-4 block"><span className={lbl}>Reason (optional)</span>
+        <input className="field" value={reason} onChange={(event) => setReason(event.target.value)} autoFocus />
       </label>
       <div className="mt-5 flex justify-end gap-2">
-        <button type="button" className="btn" onClick={() => ref.current?.close()}>Cancel</button>
-        <button type="button" className="btn btn-danger" onClick={go}>Deactivate</button>
+        <button type="button" className="btn" onClick={onCancel}>Cancel</button>
+        <button type="button" className="btn btn-danger" onClick={deactivate}>Deactivate</button>
       </div>
-    </dialog>
+    </Dialog>
+  );
+}
+
+type UserRowProps = {
+  user: User;
+  me: Me;
+  onAct: (user: User, action: "reset-password" | "activate") => void;
+  onDeactivate: (user: User) => void;
+};
+
+// Active users other than me can be deactivated; deactivated users can be activated again.
+function StatusButton({ user, me, onAct, onDeactivate }: UserRowProps) {
+  if (!user.active) {
+    return (
+      <button type="button" className="btn btn-sm" onClick={() => onAct(user, "activate")}
+        aria-label={`Activate ${user.username}`}>Activate</button>
+    );
+  }
+  if (user.id === me.id) {
+    return null;
+  }
+  return (
+    <button type="button" className="btn btn-sm" onClick={() => onDeactivate(user)}
+      aria-label={`Deactivate ${user.username}`}>Deactivate</button>
+  );
+}
+
+function UserRow(props: UserRowProps) {
+  const { user, me, onAct } = props;
+  return (
+    <tr data-testid="user-row" data-username={user.username}>
+      <th scope="row" className="font-semibold">
+        {user.username}
+        {user.id === me.id && <span className="ml-2 text-xs font-medium text-muted-foreground">(you)</span>}
+      </th>
+      <td>{user.display_name}</td>
+      <td>{ROLE[user.role] ?? user.role}</td>
+      <td>
+        <span className="flex flex-wrap gap-1.5">
+          {user.active ? <span className="pill h-green">Active</span> : <span className="pill h-ns">Deactivated</span>}
+          {user.must_change_password && user.active && <span className="pill h-amber">Must change password</span>}
+        </span>
+      </td>
+      <td className="whitespace-nowrap">{created(user.created_at)}</td>
+      <td>
+        <span className="flex justify-end gap-2">
+          <button type="button" className="btn btn-sm" onClick={() => onAct(user, "reset-password")}
+            aria-label={`Reset password for ${user.username}`}>Reset password</button>
+          <StatusButton {...props} />
+        </span>
+      </td>
+    </tr>
   );
 }
 
@@ -101,9 +178,15 @@ export function Users({ me }: { me: Me }) {
   const [temp, setTemp] = useState<Temp | null>(null);
   const [confirm, setConfirm] = useState<User | null>(null);
   const load = useCallback(() => {
-    api.get("/api/admin/users").then(setUsers).catch((e) => setError(errorText(e, "Could not load users.")));
+    api.get("/api/admin/users")
+      .then(setUsers)
+      .catch((err) => setError(errorText(err, "Could not load users.")));
   }, []);
-  useEffect(() => { if (me.role === "admin") load(); }, [me.role, load]);
+  useEffect(() => {
+    if (me.role === "admin") {
+      load();
+    }
+  }, [me.role, load]);
 
   if (me.role !== "admin") {
     return (
@@ -115,56 +198,59 @@ export function Users({ me }: { me: Me }) {
     );
   }
 
-  const act = async (u: User, action: "reset-password" | "activate") => {
+  const act = async (user: User, action: "reset-password" | "activate") => {
     setError(null);
+    const path = { user_id: user.id };
     try {
-      if (action === "reset-password") setTemp(await api.post("/api/admin/users/{user_id}/reset-password", { path: { user_id: u.id } }));
-      else await api.post("/api/admin/users/{user_id}/activate", { path: { user_id: u.id } });
+      if (action === "reset-password") {
+        setTemp(await api.post("/api/admin/users/{user_id}/reset-password", { path }));
+      } else {
+        await api.post("/api/admin/users/{user_id}/activate", { path });
+      }
       load();
-    } catch (e) {
-      setError(errorText(e, "Action failed. Try again."));
+    } catch (err) {
+      setError(errorText(err, "Action failed. Try again."));
     }
+  };
+  const startAdding = () => {
+    setAdding(true);
+    setTemp(null);
+  };
+  const userCreated = (created: Temp) => {
+    setAdding(false);
+    setTemp(created);
+    load();
+  };
+  const deactivated = () => {
+    setConfirm(null);
+    load();
   };
 
   return (
     <section className="card" aria-labelledby="users-h">
       <div className="card-h items-center">
         <h2 id="users-h">Users</h2>
-        {!adding && <button type="button" className="btn btn-p" onClick={() => { setAdding(true); setTemp(null); }}>Add user</button>}
+        {!adding && <button type="button" className="btn btn-p" onClick={startAdding}>Add user</button>}
       </div>
-      {error && <p role="alert" className="mb-4 rounded-md border border-red bg-red-bg px-3 py-2 text-body font-semibold text-red">{error}</p>}
-      {temp && <TempPassword t={temp} onClose={() => setTemp(null)} />}
-      {adding && <AddUser onCancel={() => setAdding(false)} onCreated={(t) => { setAdding(false); setTemp(t); load(); }} />}
+      {error && <p role="alert" className={`mb-4 ${ERROR_BOX}`}>{error}</p>}
+      {temp && <TempPassword temp={temp} onClose={() => setTemp(null)} />}
+      {adding && <AddUser onCancel={() => setAdding(false)} onCreated={userCreated} />}
       {!users ? <p className="text-body text-muted-foreground">Loading…</p> : (
         <table className="tbl">
-          <thead><tr><th>Username</th><th>Display name</th><th>Role</th><th>Status</th><th>Created</th><th><span className="sr-only">Actions</span></th></tr></thead>
+          <thead>
+            <tr>
+              <th>Username</th><th>Display name</th><th>Role</th><th>Status</th><th>Created</th>
+              <th><span className="sr-only">Actions</span></th>
+            </tr>
+          </thead>
           <tbody>
-            {users.map((u) => (
-              <tr key={u.id} data-testid="user-row" data-username={u.username}>
-                <th scope="row" className="font-semibold">{u.username}{u.id === me.id && <span className="ml-2 text-xs font-medium text-muted-foreground">(you)</span>}</th>
-                <td>{u.display_name}</td>
-                <td>{ROLE[u.role] ?? u.role}</td>
-                <td>
-                  <span className="flex flex-wrap gap-1.5">
-                    {u.active ? <span className="pill h-green">Active</span> : <span className="pill h-ns">Deactivated</span>}
-                    {u.must_change_password && u.active && <span className="pill h-amber">Must change password</span>}
-                  </span>
-                </td>
-                <td className="whitespace-nowrap">{created(u.created_at)}</td>
-                <td>
-                  <span className="flex justify-end gap-2">
-                    <button type="button" className="btn btn-sm" onClick={() => act(u, "reset-password")} aria-label={`Reset password for ${u.username}`}>Reset password</button>
-                    {u.active
-                      ? u.id !== me.id && <button type="button" className="btn btn-sm" onClick={() => setConfirm(u)} aria-label={`Deactivate ${u.username}`}>Deactivate</button>
-                      : <button type="button" className="btn btn-sm" onClick={() => act(u, "activate")} aria-label={`Activate ${u.username}`}>Activate</button>}
-                  </span>
-                </td>
-              </tr>
+            {users.map((user) => (
+              <UserRow key={user.id} user={user} me={me} onAct={act} onDeactivate={setConfirm} />
             ))}
           </tbody>
         </table>
       )}
-      {confirm && <ConfirmDeactivate user={confirm} onCancel={() => setConfirm(null)} onDone={() => { setConfirm(null); load(); }} />}
+      {confirm && <ConfirmDeactivate user={confirm} onCancel={() => setConfirm(null)} onDone={deactivated} />}
     </section>
   );
 }

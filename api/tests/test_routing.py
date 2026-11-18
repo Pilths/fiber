@@ -22,7 +22,8 @@ def fresh_graph():
 @pytest.fixture
 def g(db):
     """Sites A..F. Paths A->D: short A-B-D (3+3=6 km, B-D has 1 free core), mid A-C-D (4+4=8 km, 3 free),
-    plus A-D direct (7 km, not surveyed). A-E-D (E-D has no distance, weighs 15) is over 1.5 x 6 and never shown. F has no segment.
+    plus A-D direct (7 km, not surveyed). A-E-D (E-D has no distance, weighs 15) is over 1.5 x 6 and never shown.
+    F has no segment.
     Route 'A - D' labels A-B, B-D. B-C exists too (more paths)."""
     w = {}
     for u, role in [("planner1", "planner"), ("admin1", "admin")]:
@@ -31,8 +32,14 @@ def g(db):
     w["site"] = s
 
     def segment(a, b, km, survey):
-        sid = one(db, "INSERT INTO segments (site_a_id, site_b_id, distance_km, survey_cores) VALUES (:a,:b,:k,:n) RETURNING id",
-                  a=s[a], b=s[b], k=km, n=survey)
+        sid = one(
+            db,
+            "INSERT INTO segments (site_a_id, site_b_id, distance_km, survey_cores) VALUES (:a,:b,:k,:n) RETURNING id",
+            a=s[a],
+            b=s[b],
+            k=km,
+            n=survey,
+        )
         for n in range(1, (survey or 0) + 1):
             db.execute(text("INSERT INTO cores (segment_id, number) VALUES (:s,:n)"), {"s": sid, "n": n})
         return sid
@@ -43,7 +50,10 @@ def g(db):
     w["AD"] = segment("A", "D", 7, None)
     seg = one(db, "INSERT INTO routes (site_a_id, site_b_id) VALUES (:a,:d) RETURNING id", a=s["A"], d=s["D"])
     for i, k in enumerate(("AB", "BD")):
-        db.execute(text("INSERT INTO route_segments (route_id, segment_id, position) VALUES (:g,:s,:p)"), {"g": seg, "s": w[k], "p": i})
+        db.execute(
+            text("INSERT INTO route_segments (route_id, segment_id, position) VALUES (:g,:s,:p)"),
+            {"g": seg, "s": w[k], "p": i},
+        )
     db.execute(text("INSERT INTO measurements (segment_id, loss_db) VALUES (:s, 1.0)"), {"s": w["AB"]})
     w["cust"] = one(db, "INSERT INTO customers (name) VALUES ('Acme') RETURNING id")
     return w
@@ -58,7 +68,8 @@ def test_012_km_order_and_shape(client, g):
     r = routes(client, g, n=1)
     assert r.status_code == 200
     opts = r.json()["options"]
-    assert [o["total_km"] for o in opts] == [6, 8, 7]  # A-E-D (15) is over 1.5 x 6 and dropped; the unsurveyed A-D is last
+    # A-E-D (15) is over 1.5 x 6 and dropped; the unsurveyed A-D is last
+    assert [o["total_km"] for o in opts] == [6, 8, 7]
     first = opts[0]
     assert [s["name"] for s in first["segments"]] == ["A - B", "B - D"]
     assert [(s["site_a"], s["site_b"]) for s in first["segments"]] == [("A", "B"), ("B", "D")]
@@ -84,7 +95,8 @@ def test_012_insufficient_last_and_best_match_first_that_fits(client, g):
 
 def test_012_free_cores_sort(client, g):
     opts = routes(client, g, n=1, sort="free_cores").json()["options"]
-    assert [o["fewest_free"] for o in opts] == [3, 1, 0]  # A-C-D, A-B-D (1 free), then the unsurveyed A-D (insufficient)
+    # A-C-D, A-B-D (1 free), then the unsurveyed A-D (insufficient)
+    assert [o["fewest_free"] for o in opts] == [3, 1, 0]
     assert opts[0]["best_match"] is True
 
 
@@ -106,7 +118,8 @@ def test_012_null_db_when_segment_has_no_distance_and_not_surveyed_insufficient(
 
 def test_012_route_inside_a_route(client, g):
     r = routes(client, g, a="B", b="D").json()  # B is inside route A - D
-    assert r["options"][0]["segments"][0]["segment_id"] == g["BD"] and r["options"][0]["segments"][0]["route_label"] == "A - D"
+    assert r["options"][0]["segments"][0]["segment_id"] == g["BD"]
+    assert r["options"][0]["segments"][0]["route_label"] == "A - D"
 
 
 def test_012_errors_and_no_path(client, g):
@@ -131,7 +144,9 @@ def test_endpoints_only_sites_with_segments_sorted(client, g):
 def test_graph_invalidated_after_segment_edit(client, g, db):
     before = routes(client, g, n=1).json()["options"][0]
     assert before["total_km"] == 6
-    r = client.post(f"/api/admin/segments/{g['BD']}", json={"distance_km": 50, "reason": "re-measured"}, headers=H("admin1"))
+    r = client.post(
+        f"/api/admin/segments/{g['BD']}", json={"distance_km": 50, "reason": "re-measured"}, headers=H("admin1")
+    )
     assert r.status_code == 200, r.text
     after = routes(client, g, n=1).json()["options"][0]
     assert after["total_km"] == 8  # A-B-D now costs 53
@@ -160,13 +175,21 @@ def test_pick_takes_first_free_cores_and_posts_one_reservation(client, g, db):
 
 
 def test_pick_respects_count_only_holds_and_409_names_short_segment(client, g, db):
-    rid = one(db, "INSERT INTO reservations (customer_id, planner_id, imported, unassigned_cores, unassigned_segment_id) "
-                  "VALUES (:c,:u,true,2,:s) RETURNING id", c=g["cust"], u=g["planner1"], s=g["AC"])
+    rid = one(
+        db,
+        "INSERT INTO reservations (customer_id, planner_id, imported, unassigned_cores, unassigned_segment_id) "
+        "VALUES (:c,:u,true,2,:s) RETURNING id",
+        c=g["cust"],
+        u=g["planner1"],
+        s=g["AC"],
+    )
     for kind in ("requested", "approved"):
         db.execute(text("INSERT INTO reservation_events (reservation_id, type, user_id) VALUES (:r,:t,:u)"),
                    {"r": rid, "t": kind, "u": g["admin1"]})
     r = client.get(f"/api/routes/pick?segment_ids={g['AB']}&segment_ids={g['AC']}&cores_needed=2", headers=H())
-    assert r.status_code == 409 and "A - C" in r.json()["detail"]["message"] and r.json()["detail"]["segment_id"] == g["AC"]
+    assert r.status_code == 409
+    assert "A - C" in r.json()["detail"]["message"]
+    assert r.json()["detail"]["segment_id"] == g["AC"]
     assert client.get(f"/api/routes/pick?segment_ids={g['AC']}&cores_needed=1", headers=H()).status_code == 200
     # not surveyed
     r = client.get(f"/api/routes/pick?segment_ids={g['AD']}&cores_needed=1", headers=H())
@@ -192,9 +215,18 @@ def test_fiber_cut_segment_is_not_routed(client, g, db):
 def graph(db, edges):
     """Make sites for the letters in edges [(a, b, km)] with segments (2 cores each); returns {letter: site id}."""
     one(db, "INSERT INTO users (username, display_name, role) VALUES ('planner1','planner1','planner') RETURNING id")
-    s = {n: one(db, "INSERT INTO sites (name, kind) VALUES (:n,'site') RETURNING id", n=n) for n in sorted({x for a, b, _ in edges for x in (a, b)})}
+    s = {
+        n: one(db, "INSERT INTO sites (name, kind) VALUES (:n,'site') RETURNING id", n=n)
+        for n in sorted({x for a, b, _ in edges for x in (a, b)})
+    }
     for a, b, km in edges:
-        sid = one(db, "INSERT INTO segments (site_a_id, site_b_id, distance_km, survey_cores) VALUES (:a,:b,:k,2) RETURNING id", a=s[a], b=s[b], k=km)
+        sid = one(
+            db,
+            "INSERT INTO segments (site_a_id, site_b_id, distance_km, survey_cores) VALUES (:a,:b,:k,2) RETURNING id",
+            a=s[a],
+            b=s[b],
+            k=km,
+        )
         db.execute(text("INSERT INTO cores (segment_id, number) VALUES (:s,1)"), {"s": sid})
     return s
 
@@ -220,7 +252,9 @@ def test_two_reasonable_alternatives(client, db):
 
 
 def test_count_follows_the_network_not_a_fixed_three(client, db):
-    s = graph(db, [("A", "B", 10), ("A", "C", 6), ("C", "B", 6), ("A", "D", 5), ("D", "B", 8), ("A", "E", 9), ("E", "B", 5)])
+    s = graph(
+        db, [("A", "B", 10), ("A", "C", 6), ("C", "B", 6), ("A", "D", 5), ("D", "B", 8), ("A", "E", 9), ("E", "B", 5)]
+    )
     assert kms(client, s, "A", "B") == [10, 12, 13, 14]  # four separate reasonable paths, all shown
 
 

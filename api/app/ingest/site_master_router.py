@@ -90,7 +90,8 @@ class OverrideIn(BaseModel):
 
 
 class ApplyIn(BaseModel):
-    sheets: list[Literal["sites"]] | None = None  # apply only these sheets; None applies every sheet that can be applied
+    # apply only these sheets; None applies every sheet that can be applied
+    sheets: list[Literal["sites"]] | None = None
     override_drop: OverrideIn = OverrideIn()
     reason: str | None = None
 
@@ -111,8 +112,14 @@ def upload(db: DB, admin: Admin, file: UploadFile, add_only: Annotated[bool, For
 
 
 @router.get("/uploads/{upload_id}/rows")
-def rows(db: DB, upload_id: int, sheet: Literal["sites"], group: Literal["added", "changed", "missing", "problem", "unchanged"],
-         page: Annotated[int, Query(ge=1)] = 1, page_size: Annotated[int, Query(ge=1, le=500)] = 100) -> RowsOut:
+def rows(
+    db: DB,
+    upload_id: int,
+    sheet: Literal["sites"],
+    group: Literal["added", "changed", "missing", "problem", "unchanged"],
+    page: Annotated[int, Query(ge=1)] = 1,
+    page_size: Annotated[int, Query(ge=1, le=500)] = 100,
+) -> RowsOut:
     require_upload(db, upload_id, "site_master")
     where = {"u": upload_id, "e": sm.SHEETS[sheet][2], "g": sm.GROUP_COL[group]}
     cond = "upload_id = :u AND entity = :e AND row_group = :g"
@@ -144,8 +151,9 @@ def current(db: DB) -> CurrentOut:
         "SELECT u.id AS upload_id, u.filename, u.status, u.created_at AS uploaded_at, u.confirmed_at AS applied_at, "
         "usr.username AS uploaded_by, u.summary FROM uploads u JOIN users usr ON usr.id = u.user_id "
         "WHERE u.kind = 'site_master' ORDER BY u.id DESC")).mappings().all()
-    cur = next((r for r in sorted((r for r in rows_ if r["status"] == "confirmed"), key=lambda r: (r["applied_at"], r["upload_id"]),
-                                  reverse=True)), None)
+    confirmed = [row for row in rows_ if row["status"] == "confirmed"]
+    newest_first = sorted(confirmed, key=lambda row: (row["applied_at"], row["upload_id"]), reverse=True)
+    cur = newest_first[0] if newest_first else None
 
     def info(r: Any) -> UploadInfo:
         sheets = {s["kind"]: SheetInfo(sheet_name=s["sheet_name"], found=s["found"], **s["counts"])

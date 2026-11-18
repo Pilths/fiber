@@ -1,0 +1,12 @@
+line-length = 120
+exclude = [
+    ".venv",
+    "app/seed.py",
+    "app/ingest/excel.py",
+    "**/excel_check*",
+    "**/parse_workbook*",
+    "alembic/versions/0001_baseline.py",
+]
+
+[lint]
+select = ["E701", "E702", "E703", "E501", "E741"]

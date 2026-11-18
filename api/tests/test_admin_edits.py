@@ -18,8 +18,16 @@ def post(client, path, user="admin1", **body):
 
 
 def edits(db, entity, eid):
-    return [tuple(r) for r in db.execute(text("SELECT field, old_value, new_value, reason FROM data_edits WHERE entity = :e AND entity_id = :i "
-                                              "ORDER BY id"), {"e": entity, "i": eid})]
+    return [
+        tuple(r)
+        for r in db.execute(
+            text(
+                "SELECT field, old_value, new_value, reason FROM data_edits WHERE entity = :e AND entity_id = :i "
+                "ORDER BY id"
+            ),
+            {"e": entity, "i": eid},
+        )
+    ]
 
 
 def core_status(db, cid):
@@ -75,7 +83,15 @@ def test_survey_raise_adds_portless_cores(client, w, db):
     rows = db.execute(text("SELECT number, port_a_id FROM cores WHERE segment_id = :s ORDER BY number"), {"s": s}).all()
     assert [r[0] for r in rows] == list(range(1, 8)) and all(r[1] is None for r in rows)
     assert edits(db, "segment", s) == [("survey_cores", "4", "7", "resurvey")]
-    assert one(db, "SELECT count(*) FROM cores c JOIN core_status_v v ON v.core_id = c.id WHERE c.segment_id = :s AND v.status = 'Available'", s=s) == 7
+    assert (
+        one(
+            db,
+            "SELECT count(*) FROM cores c JOIN core_status_v v ON v.core_id = c.id "
+            "WHERE c.segment_id = :s AND v.status = 'Available'",
+            s=s,
+        )
+        == 7
+    )
 
 
 def test_survey_lower_blocked_by_held_or_history_allowed_when_free(client, w, db):
@@ -125,7 +141,8 @@ def test_segment_sites_change_rules(client, w, db):
     r = post(client, f"segments/{s1}", site_b_id=e, reason="re-routed")
     assert r.status_code == 200 and r.json()["changed"] == ["site_b_id"]
     assert edits(db, "segment", s1) == [("site_b_id", str(b), str(e), "re-routed")]
-    assert post(client, f"segments/{s1}", site_a_id=e, site_b_id=a, reason="swap").status_code == 200  # same pair, swapped
+    # same pair, swapped
+    assert post(client, f"segments/{s1}", site_a_id=e, site_b_id=a, reason="swap").status_code == 200
     # an active hold blocks
     rid = approved(client, w, [w["c2"][1]])
     f = one(db, "INSERT INTO sites (name, kind) VALUES ('F','site') RETURNING id")
@@ -141,11 +158,14 @@ def test_site_edit(client, w, db):
     r = post(client, f"sites/{a}", lat=3.2, lon=101.7, region="north", name="  Alpha  ", reason="moved")
     assert r.status_code == 200 and sorted(r.json()["changed"]) == ["location", "name", "region"]
     got = {e[0]: e[1:] for e in edits(db, "site", a)}
-    assert got["name"] == ("A", "Alpha", "moved") and got["location"] == (None, "3.2,101.7", "moved") and got["region"] == (None, "North", "moved")
+    assert got["name"] == ("A", "Alpha", "moved")
+    assert got["location"] == (None, "3.2,101.7", "moved")
+    assert got["region"] == (None, "North", "moved")
     g = client.get(f"/api/admin/sites/{a}", headers=H("admin1")).json()
     assert (g["name"], g["lat"], g["lon"], g["region"]) == ("Alpha", 3.2, 101.7, "North") and len(g["history"]) == 3
     r = post(client, f"sites/{a}", lat=3.3, reason="nudge")
-    assert r.json()["changed"] == ["location"] and edits(db, "site", a)[-1] == ("location", "3.2,101.7", "3.3,101.7", "nudge")
+    assert r.json()["changed"] == ["location"]
+    assert edits(db, "site", a)[-1] == ("location", "3.2,101.7", "3.3,101.7", "nudge")
     assert post(client, f"sites/{a}", lat=3.3, reason="same").status_code == 400
     assert post(client, f"sites/{a}", name="B", reason="x").status_code == 409
     assert post(client, f"sites/{a}", lat=0, lon=0, reason="x").status_code == 422
@@ -156,12 +176,17 @@ def test_site_edit(client, w, db):
     e = one(db, "INSERT INTO sites (name, kind) VALUES ('E','site') RETURNING id")
     assert post(client, f"sites/{e}", active=False, reason="closed").status_code == 200
     assert edits(db, "site", e) == [("active", "true", "false", "closed")]
-    assert [q["name"] for q in client.get("/api/admin/sites", params={"q": "alph"}, headers=H("admin1")).json()] == ["Alpha"]
+    assert [q["name"] for q in client.get("/api/admin/sites", params={"q": "alph"}, headers=H("admin1")).json()] == [
+        "Alpha"
+    ]
 
 
 def test_planner_gets_403_on_every_admin_edit_endpoint(client, w, db):
     a = one(db, "SELECT id FROM sites WHERE name = 'A'")
-    for path, body in [(f"segments/{w['s1']}", {"cable_size": 96, "reason": "x"}), (f"sites/{a}", {"name": "Z", "reason": "x"})]:
+    for path, body in [
+        (f"segments/{w['s1']}", {"cable_size": 96, "reason": "x"}),
+        (f"sites/{a}", {"name": "Z", "reason": "x"}),
+    ]:
         assert post(client, path, user="planner1", **body).status_code == 403
     for path in ("history?entity=core&id=1", f"segments/{w['s1']}", f"sites/{a}", "sites?q=A"):
         assert client.get(f"/api/admin/{path}", headers=H("planner1")).status_code == 403
@@ -190,7 +215,14 @@ def test_021_reservation_history_in_order(client, w, db):
     act(client, rid, "correct", reason="typo", planned_date="2026-12-01")
     act(client, rid, "release", cores=[c1])
     h = client.get(f"/api/reservations/{rid}/history", headers=H("planner1")).json()
-    assert [e["type"] for e in h] == ["requested", "approved", "release_requested", "release_declined", "corrected", "released"]
+    assert [e["type"] for e in h] == [
+        "requested",
+        "approved",
+        "release_requested",
+        "release_declined",
+        "corrected",
+        "released",
+    ]
     nums = lambda e: [c["number"] for c in e["cores"]]
     assert nums(h[0]) == [1, 2, 3] and nums(h[1]) == [] and nums(h[2]) == [3] and nums(h[5]) == [1]
     assert [e["user"] for e in h] == ["planner1", "admin1", "planner1", "admin1", "admin1", "admin1"]
@@ -223,10 +255,18 @@ def test_core_history_events_edits_and_visibility(client, w, db):
                     "VALUES ('core', :c, 'status', 'Reserved', 'Faulty', 'cut', :u)"), {"c": c1, "u": w["admin1"]})
     act(client, rid, "release", cores=[c2])
     h = client.get(f"/api/cores/{c1}/history", headers=H("planner1")).json()
-    assert {(i["kind"], i["type"]) for i in h} == {("reservation_event", "requested"), ("reservation_event", "approved"),
-                                                  ("data_edit", "status")}  # the release of core 2 is not about core 1
+    assert {(i["kind"], i["type"]) for i in h} == {
+        ("reservation_event", "requested"),
+        ("reservation_event", "approved"),
+        ("data_edit", "status"),
+    }  # the release of core 2 is not about core 1
     edit = next(i for i in h if i["kind"] == "data_edit")
-    assert (edit["old_value"], edit["new_value"], edit["reason"], edit["user"]) == ("Reserved", "Faulty", "cut", "admin1")
+    assert (edit["old_value"], edit["new_value"], edit["reason"], edit["user"]) == (
+        "Reserved",
+        "Faulty",
+        "cut",
+        "admin1",
+    )
     h2 = client.get(f"/api/cores/{c2}/history", headers=H("admin1")).json()
     assert "released" in [i["type"] for i in h2]
     # another planner sees no reservation events, only the status edits
@@ -241,12 +281,23 @@ def test_dashboard_site_edit_marks_site_master_field_protected(client, db):
     mkuser(db, "boss", "admin")
     tsm.seed_sites(db, ["AAAA"])
     sid = one(db, "SELECT id FROM sites WHERE name = 'AAAA'")
-    r = client.post(f"/api/admin/sites/{sid}", json={"lat": 3.5, "lon": 101.9, "region": "North", "reason": "surveyed"}, headers=tru.ADMIN)
+    r = client.post(
+        f"/api/admin/sites/{sid}",
+        json={"lat": 3.5, "lon": 101.9, "region": "North", "reason": "surveyed"},
+        headers=tru.ADMIN,
+    )
     assert r.status_code == 200
-    up = client.post(f"{tsm.URL}/uploads", headers=tru.ADMIN,
-                     files={"file": ("sm.xlsx", tsm.workbook([tsm.site("AAAA", 3.1, 101.6, "South")], None), "application/octet-stream")})
+    up = client.post(
+        f"{tsm.URL}/uploads",
+        headers=tru.ADMIN,
+        files={
+            "file": ("sm.xlsx", tsm.workbook([tsm.site("AAAA", 3.1, 101.6, "South")], None), "application/octet-stream")
+        },
+    )
     uid = up.json()["upload_id"]
-    items = client.get(f"{tsm.URL}/uploads/{uid}/rows", params={"sheet": "sites", "group": "changed"}, headers=tru.ADMIN).json()["items"]
+    items = client.get(
+        f"{tsm.URL}/uploads/{uid}/rows", params={"sheet": "sites", "group": "changed"}, headers=tru.ADMIN
+    ).json()["items"]
     ch = {c["field"]: c for c in items[0]["changes"]}
     assert items[0]["edited_in_dashboard"]
     assert ch["location"]["protected"] and ch["location"]["note"] == "edited in dashboard, file differs"
@@ -264,7 +315,11 @@ def test_dashboard_segment_edit_marks_reservation_upload_field_protected(client,
         db.execute(text("INSERT INTO sites (name, kind) VALUES (:n, 'site')"), {"n": n})
     tru.run(client, tru.row())
     sid = one(db, "SELECT id FROM segments")
-    for body in ({"distance_km": "9", "reason": "re-measured"}, {"survey_cores": 6, "reason": "resurvey"}, {"region": "South", "reason": "moved"}):
+    for body in (
+        {"distance_km": "9", "reason": "re-measured"},
+        {"survey_cores": 6, "reason": "resurvey"},
+        {"region": "South", "reason": "moved"},
+    ):
         assert client.post(f"/api/admin/segments/{sid}", json=body, headers=tru.ADMIN).status_code == 200
     j = tru.up(client, tru.workbook(tru.row(km=5, survey=4, region="Central"))).json()
     ch = tru.rows_of(client, j["upload_id"], "changed")[0]["data"]
@@ -292,7 +347,15 @@ def test_lowered_cores_are_hidden_everywhere_and_raise_reuses_rows(client, w, db
     assert post(client, f"segments/{s}", survey_cores=5, reason="resurvey").status_code == 200
     now = dict(db.execute(text("SELECT number, id FROM cores WHERE segment_id = :s"), {"s": s}).all())
     assert sorted(now) == [1, 2, 3, 4, 5] and all(now[n] == ids[n] for n in ids)
-    assert one(db, "SELECT count(*) FROM (SELECT number FROM cores WHERE segment_id = :s GROUP BY number HAVING count(*) > 1) t", s=s) == 0
+    assert (
+        one(
+            db,
+            "SELECT count(*) FROM "
+            "(SELECT number FROM cores WHERE segment_id = :s GROUP BY number HAVING count(*) > 1) t",
+            s=s,
+        )
+        == 0
+    )
     assert client.get(f"/api/segments/{s}", headers=H("planner1")).json()["free_cores"] == 5
     assert book(client, w, [ids[3]]).status_code == 200
 
@@ -303,16 +366,27 @@ def test_core_ports_set_change_clear_with_history(client, w, db):
     c = w["c1"][1]
     path = f"cores/{c}/ports"
     r = post(client, path, port_a=" fdf1 mod1 t1 p1 ", port_b="FDF2-MOD1-T1-P1", reason="from the patch panel")
-    assert r.status_code == 200 and (r.json()["port_a"], r.json()["port_b"], r.json()["core_id"]) == ("FDF1-MOD1-T1-P1", "FDF2-MOD1-T1-P1", c)
-    assert one(db, "SELECT site_id FROM ports WHERE port_id = 'FDF1-MOD1-T1-P1'") == one(db, "SELECT site_a_id FROM segments WHERE id = :s", s=w["s1"])
-    assert one(db, "SELECT site_id FROM ports WHERE port_id = 'FDF2-MOD1-T1-P1'") == one(db, "SELECT site_b_id FROM segments WHERE id = :s", s=w["s1"])
-    assert edits(db, "core", c) == [("port_a", None, "FDF1-MOD1-T1-P1", "from the patch panel"), ("port_b", None, "FDF2-MOD1-T1-P1", "from the patch panel")]
+    assert r.status_code == 200
+    assert (r.json()["port_a"], r.json()["port_b"], r.json()["core_id"]) == ("FDF1-MOD1-T1-P1", "FDF2-MOD1-T1-P1", c)
+    assert one(db, "SELECT site_id FROM ports WHERE port_id = 'FDF1-MOD1-T1-P1'") == one(
+        db, "SELECT site_a_id FROM segments WHERE id = :s", s=w["s1"]
+    )
+    assert one(db, "SELECT site_id FROM ports WHERE port_id = 'FDF2-MOD1-T1-P1'") == one(
+        db, "SELECT site_b_id FROM segments WHERE id = :s", s=w["s1"]
+    )
+    assert edits(db, "core", c) == [
+        ("port_a", None, "FDF1-MOD1-T1-P1", "from the patch panel"),
+        ("port_b", None, "FDF2-MOD1-T1-P1", "from the patch panel"),
+    ]
     assert one(db, "SELECT user_id FROM data_edits WHERE entity = 'core' AND field = 'port_a'") == w["admin1"]
     # nothing changed: 200 and no history
     assert post(client, path, port_a="FDF1-MOD1-T1-P1", port_b="FDF2-MOD1-T1-P1", reason="same").status_code == 200
     assert len(edits(db, "core", c)) == 2
     # change one end only
-    assert post(client, path, port_a="FDF1-MOD1-T1-P2", port_b="FDF2-MOD1-T1-P1", reason="moved").json()["port_a"] == "FDF1-MOD1-T1-P2"
+    assert (
+        post(client, path, port_a="FDF1-MOD1-T1-P2", port_b="FDF2-MOD1-T1-P1", reason="moved").json()["port_a"]
+        == "FDF1-MOD1-T1-P2"
+    )
     assert edits(db, "core", c)[2:] == [("port_a", "FDF1-MOD1-T1-P1", "FDF1-MOD1-T1-P2", "moved")]
     # an end that is not sent stays as it is
     r = post(client, path, port_b="FDF2-MOD1-T1-P1", reason="only b")
@@ -320,13 +394,17 @@ def test_core_ports_set_change_clear_with_history(client, w, db):
     # clear: null and empty string; the ports rows stay
     r = post(client, path, port_a=None, port_b="  ", reason="wrong core")
     assert (r.json()["port_a"], r.json()["port_b"]) == (None, None)
-    assert edits(db, "core", c)[3:] == [("port_a", "FDF1-MOD1-T1-P2", None, "wrong core"), ("port_b", "FDF2-MOD1-T1-P1", None, "wrong core")]
+    assert edits(db, "core", c)[3:] == [
+        ("port_a", "FDF1-MOD1-T1-P2", None, "wrong core"),
+        ("port_b", "FDF2-MOD1-T1-P1", None, "wrong core"),
+    ]
     assert one(db, "SELECT count(*) FROM ports") == 3
     assert one(db, "SELECT port_a_id IS NULL AND port_b_id IS NULL FROM cores WHERE id = :c", c=c)
 
 
 def test_core_ports_label_is_one_core_per_site(client, w, db):
-    assert post(client, f"cores/{w['c1'][1]}/ports", port_b="ODF1-P1", reason="r").status_code == 200  # ODF1-P1 at site B
+    # ODF1-P1 at site B
+    assert post(client, f"cores/{w['c1'][1]}/ports", port_b="ODF1-P1", reason="r").status_code == 200
     taken = post(client, f"cores/{w['c2'][1]}/ports", port_a="ODF1-P1", reason="r")  # also site B: refused
     assert taken.status_code == 409 and "ODF1-P1 is on core 1" in taken.json()["detail"]
     assert one(db, "SELECT count(*) FROM ports WHERE port_id = 'ODF1-P1'") == 1
@@ -356,12 +434,16 @@ def test_segment_detail_lists_unassigned_holds(client, w, db):
     r1 = count_only(db, w, 2, segment="s2")
     r2 = count_only(db, w, 1, segment="s2")
     d = client.get(f"/api/segments/{w['s2']}", headers=H("planner1")).json()
-    assert [(u["reservation_id"], u["remaining"], u["customer"]) for u in d["unassigned"]] == [(r1, 2, "Beta"), (r2, 1, "Beta")]
+    assert [(u["reservation_id"], u["remaining"], u["customer"]) for u in d["unassigned"]] == [
+        (r1, 2, "Beta"),
+        (r2, 1, "Beta"),
+    ]
     assert d["unassigned_reserved"] == sum(u["remaining"] for u in d["unassigned"]) == 3
     assert "planned_date" in d["unassigned"][0]
     assert act(client, r1, "assign", cores=[w["c2"][1], w["c2"][2]]).status_code == 200  # fully assigned: drops out
     d = client.get(f"/api/segments/{w['s2']}", headers=H("planner1")).json()
-    assert [(u["reservation_id"], u["remaining"]) for u in d["unassigned"]] == [(r2, 1)] and d["unassigned_reserved"] == 1
+    assert [(u["reservation_id"], u["remaining"]) for u in d["unassigned"]] == [(r2, 1)]
+    assert d["unassigned_reserved"] == 1
     assert client.get(f"/api/segments/{w['s1']}", headers=H("planner1")).json()["unassigned"] == []
 
 
@@ -379,7 +461,10 @@ def test_fiber_cut_edit_history_and_roles(client, w, db):
     assert cut(client, s1).status_code == 400  # no change
     assert client.get(f"/api/admin/segments/{s1}", headers=H("admin1")).json()["fiber_cut"] is True
     assert cut(client, s1, False, reason="spliced").status_code == 200
-    assert edits(db, "segment", s1) == [("fiber_cut", "false", "true", "backhoe"), ("fiber_cut", "true", "false", "spliced")]
+    assert edits(db, "segment", s1) == [
+        ("fiber_cut", "false", "true", "backhoe"),
+        ("fiber_cut", "true", "false", "spliced"),
+    ]
     assert one(db, "SELECT user_id FROM data_edits WHERE field = 'fiber_cut' LIMIT 1") == w["admin1"]
 
 
@@ -400,7 +485,8 @@ def test_fiber_cut_read_side_and_free_to_reserve(client, w):
 def test_fiber_cut_refuses_booking_single_and_route(client, w, db):
     cut(client, w["s2"])
     r = book(client, w, [w["c2"][1]])
-    assert r.status_code == 409 and r.json()["detail"]["message"] == "B - C has a fiber cut and cannot be booked until an admin restores it."
+    assert r.status_code == 409
+    assert r.json()["detail"]["message"] == "B - C has a fiber cut and cannot be booked until an admin restores it."
     assert book(client, w, [w["c1"][1], w["c2"][1]]).status_code == 409  # route request touching it
     assert one(db, "SELECT count(*) FROM reservations") == 0
     assert book(client, w, [w["c1"][1]]).status_code in (200, 201)  # other segments still book
@@ -415,7 +501,10 @@ def test_fiber_cut_needs_review_and_existing_actions_not_blocked(client, w, db):
     assert client.get("/api/needs-review", headers=H("planner1")).json() == []
     cut(client, w["s2"])
     items = client.get("/api/needs-review", headers=H("planner1")).json()
-    assert sorted((i["kind"], i["reservation"]["id"], i["detail"]) for i in items) == [("fiber_cut", rid, "Fiber cut: B - C"), ("fiber_cut", counted, "Fiber cut: B - C")]
+    assert sorted((i["kind"], i["reservation"]["id"], i["detail"]) for i in items) == [
+        ("fiber_cut", rid, "Fiber cut: B - C"),
+        ("fiber_cut", counted, "Fiber cut: B - C"),
+    ]
     assert act(client, pending, "approve").status_code == 200  # approve, release not blocked
     assert act(client, rid, "release", cores=[w["c2"][1]]).status_code == 200
     assert [i["reservation"]["id"] for i in client.get("/api/needs-review", headers=H("planner1")).json()] == [counted]

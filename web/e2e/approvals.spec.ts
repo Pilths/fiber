@@ -10,12 +10,14 @@ const SEGMENT = "DEV Bukit Jalil TOC - DEV Kuantan Hut";
 async function request(req: APIRequestContext) {
   const segments = await (await req.get("/api/segments")).json() as { id: number; site_a: string; site_b: string }[];
   const segment = segments.find((s) => `${s.site_a} - ${s.site_b}` === SEGMENT)!;
-  const detail = await (await req.get(`/api/segments/${segment.id}`)).json() as { cores: { id: number; status: string }[] };
+  const detailResponse = await req.get(`/api/segments/${segment.id}`);
+  const detail = await detailResponse.json() as { cores: { id: number; status: string }[] };
   const cores = detail.cores.filter((c) => c.status === "Available").slice(0, 2).map((c) => c.id);
   const customer = (await (await req.get("/api/customers?q=DEV Telco Alpha")).json() as { id: number }[])[0];
-  const r = await req.post("/api/reservations", { data: { customer_id: customer.id, planned_date: "2026-12-01", cores } });
-  expect(r.ok()).toBe(true);
-  return (await r.json() as { id: number }).id;
+  const data = { customer_id: customer.id, planned_date: "2026-12-01", cores };
+  const response = await req.post("/api/reservations", { data });
+  expect(response.ok()).toBe(true);
+  return (await response.json() as { id: number }).id;
 }
 
 test("approvals: one table row per request, details open, reject offers an optional reason", async ({ browser }) => {
@@ -27,7 +29,8 @@ test("approvals: one table row per request, details open, reject offers an optio
     await signIn(page, "admin1");
     await page.getByRole("navigation", { name: "Main" }).getByRole("button", { name: /^Approvals/ }).click();
     const table = page.getByTestId("approvals-table");
-    const row = table.getByTestId("approval").filter({ has: page.getByRole("button", { name: `Details of request #${rid}` }) });
+    const detailsButton = page.getByRole("button", { name: `Details of request #${rid}` });
+    const row = table.getByTestId("approval").filter({ has: detailsButton });
     await expect(row.getByRole("row").first()).toContainText("DEV Telco Alpha");
     await expect(row.getByRole("row").first()).toContainText(SEGMENT);
     await expect(row.getByRole("row").first()).toContainText("2026-12-01");

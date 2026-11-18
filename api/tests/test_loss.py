@@ -57,7 +57,12 @@ def measure(db, segment, loss, at="now()"):
 
 
 def test_loss_requires_sign_in(client, segments):
-    for url in ("/api/loss/segments", f"/api/loss/segments/{segments[0]}", "/api/loss/coverage", "/api/loss/route?segment_ids=1"):
+    for url in (
+        "/api/loss/segments",
+        f"/api/loss/segments/{segments[0]}",
+        "/api/loss/coverage",
+        "/api/loss/route?segment_ids=1",
+    ):
         assert client.get(url).status_code == 401
 
 
@@ -81,8 +86,13 @@ def test_latest_is_newest_test_date_not_recorded_time(client, db, segments):
     from sqlalchemy import text
     a = segments[0]
     for loss, day, rec in ((3.3, "2026-10-24", "now() - interval '2 days'"), (3.0, "2026-10-19", "now()")):
-        db.execute(text(f"INSERT INTO measurements (segment_id, loss_db, tested_on, created_at, test_method, field_team) "
-                        f"VALUES (:s,:l,:d,{rec},'OTDR','T1')"), {"s": a, "l": loss, "d": day})
+        db.execute(
+            text(
+                f"INSERT INTO measurements (segment_id, loss_db, tested_on, created_at, test_method, field_team) "
+                f"VALUES (:s,:l,:d,{rec},'OTDR','T1')"
+            ),
+            {"s": a, "l": loss, "d": day},
+        )
     rows = {r["segment_id"]: r for r in client.get("/api/loss/segments", headers=H()).json()}
     assert rows[a]["measured_db"] == 3.3 and str(rows[a]["last_test_date"]) == "2026-10-24"
     assert [h["loss_db"] for h in client.get(f"/api/loss/segments/{a}", headers=H()).json()["history"]] == [3.3, 3.0]
@@ -113,7 +123,10 @@ def test_route_totals_and_worst_level(client, db, segments):
 
 # ---- loss per core ----
 def mk_cores(db, segment, n=2):
-    return [one(db, "INSERT INTO cores (segment_id, number) VALUES (:s,:n) RETURNING id", s=segment, n=i + 1) for i in range(n)]
+    return [
+        one(db, "INSERT INTO cores (segment_id, number) VALUES (:s,:n) RETURNING id", s=segment, n=i + 1)
+        for i in range(n)
+    ]
 
 
 def measure_core(db, segment, core, loss, at="now()"):
@@ -155,8 +168,17 @@ def test_null_core_measurement_still_works(client, db, segments):
 
 
 def test_measurement_core_column_and_index(db):
-    assert one(db, "SELECT count(*) FROM information_schema.columns WHERE table_name='measurements' AND column_name='core_id'") == 1
-    assert one(db, "SELECT count(*) FROM pg_indexes WHERE tablename='measurements' AND indexname='measurements_core_ix'") == 1
+    assert (
+        one(
+            db,
+            "SELECT count(*) FROM information_schema.columns WHERE table_name='measurements' AND column_name='core_id'",
+        )
+        == 1
+    )
+    assert (
+        one(db, "SELECT count(*) FROM pg_indexes WHERE tablename='measurements' AND indexname='measurements_core_ix'")
+        == 1
+    )
 
 
 def test_calculated_loss_formula():

@@ -47,16 +47,23 @@ def worst(levels: list[Level | None]) -> Level | None:
 
 
 _ROWS = """
-SELECT s.id AS segment_id, a.name || ' - ' || b.name AS segment_name, s.region, @@ROUTE_TYPE@@ AS route_type, s.distance_km,
+SELECT s.id AS segment_id, a.name || ' - ' || b.name AS segment_name, s.region,
+       @@ROUTE_TYPE@@ AS route_type, s.distance_km,
        m.loss_db AS measured_db, m.test_method, m.field_team, c.number AS worst_core_number,
        (SELECT count(DISTINCT core_id) FROM measurements WHERE segment_id = s.id) AS measured_cores,
        coalesce(s.survey_cores, 0) AS total_cores,
        coalesce(m.tested_on, (m.created_at AT TIME ZONE 'Asia/Kuala_Lumpur')::date) AS last_test_date
 FROM segments s JOIN sites a ON a.id = s.site_a_id JOIN sites b ON b.id = s.site_b_id
 LEFT JOIN LATERAL (
-  SELECT * FROM (SELECT DISTINCT ON (coalesce(core_id, -1)) * FROM measurements WHERE segment_id = s.id
-                 ORDER BY coalesce(core_id, -1), coalesce(tested_on, (created_at AT TIME ZONE 'Asia/Kuala_Lumpur')::date) DESC, created_at DESC, id DESC) l
-  ORDER BY loss_db DESC, coalesce(tested_on, (created_at AT TIME ZONE 'Asia/Kuala_Lumpur')::date) DESC, id DESC LIMIT 1) m ON true
+  SELECT * FROM (
+    SELECT DISTINCT ON (coalesce(core_id, -1)) * FROM measurements WHERE segment_id = s.id
+    ORDER BY coalesce(core_id, -1),
+             coalesce(tested_on, (created_at AT TIME ZONE 'Asia/Kuala_Lumpur')::date) DESC,
+             created_at DESC, id DESC
+  ) l
+  ORDER BY loss_db DESC,
+           coalesce(tested_on, (created_at AT TIME ZONE 'Asia/Kuala_Lumpur')::date) DESC, id DESC
+  LIMIT 1) m ON true
 LEFT JOIN cores c ON c.id = m.core_id
 WHERE (CAST(:segment_id AS bigint) IS NULL OR s.id = :segment_id)
   AND (CAST(:region AS text) IS NULL OR s.region = :region)
@@ -75,21 +82,30 @@ def _row(r: dict) -> dict:
 
 def segment_rows(db: Session, segment_id: int | None = None, region: str | None = None,
               route_type: str | None = None) -> list[dict]:
-    rs = db.execute(text(_ROWS + " ORDER BY s.id"), {"segment_id": segment_id, "region": region, "route_type": route_type})
+    params = {"segment_id": segment_id, "region": region, "route_type": route_type}
+    rs = db.execute(text(_ROWS + " ORDER BY s.id"), params)
     return [_row(dict(r)) for r in rs.mappings()]
 
 
+_HISTORY = """
+SELECT m.loss_db, m.tested_on, m.created_at, m.test_method, m.field_team, m.core_id, c.number AS core_number
+FROM measurements m LEFT JOIN cores c ON c.id = m.core_id
+WHERE m.segment_id = :s
+ORDER BY coalesce(m.tested_on, (m.created_at AT TIME ZONE 'Asia/Kuala_Lumpur')::date) DESC,
+         m.created_at DESC, m.id DESC
+"""
+
+
 def history(db: Session, segment_id: int) -> list[dict]:
-    rs = db.execute(text(
-        "SELECT m.loss_db, m.tested_on, m.created_at, m.test_method, m.field_team, m.core_id, c.number AS core_number "
-        "FROM measurements m LEFT JOIN cores c ON c.id = m.core_id WHERE m.segment_id = :s "
-        "ORDER BY coalesce(m.tested_on, (m.created_at AT TIME ZONE 'Asia/Kuala_Lumpur')::date) DESC, m.created_at DESC, m.id DESC"),
-        {"s": segment_id})
+    rs = db.execute(text(_HISTORY), {"s": segment_id})
     return [dict(r) for r in rs.mappings()]
 
 
 def core_losses(db: Session, segment_id: int, calculated: Decimal | None) -> list[dict]:
-    """One entry per core with measurements, by core number; history newest first. Anonymous (no core) rows are left out."""
+    """One entry per core with measurements, by core number; history newest first.
+
+    Anonymous (no core) rows are left out.
+    """
     by_core: dict[int, list[dict]] = {}
     for h in history(db, segment_id):
         if h["core_id"] is not None:
@@ -98,8 +114,9 @@ def core_losses(db: Session, segment_id: int, calculated: Decimal | None) -> lis
     for hs in by_core.values():
         latest = hs[0]
         dev = deviation_pct(latest["loss_db"], calculated)
+        difference = None if calculated is None else latest["loss_db"] - calculated
         out.append({"core_id": latest["core_id"], "core_number": latest["core_number"], "calculated_db": calculated,
-                    "measured_db": latest["loss_db"], "difference_db": None if calculated is None else latest["loss_db"] - calculated,
+                    "measured_db": latest["loss_db"], "difference_db": difference,
                     "deviation_pct": dev, "level": warning_level(dev), "tested_on": latest["tested_on"],
                     "test_method": latest["test_method"], "field_team": latest["field_team"], "history": hs})
     return sorted(out, key=lambda c: c["core_number"])

@@ -13,11 +13,21 @@ const XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 const SITE_HEAD = ["SITE_NAME", "LATITUDE_IN_DECIMAL", "LONGITUDE_IN_DECIMAL", "REGION", "SITE_TYPE"];
 // The DC List sheet was dropped on 16 Nov 2026: a workbook that still has one shows only the Sites sheet.
 const DC_HEAD = ["No", "State", "DC NAME / LINK", "LRD", "lat", "long"];
-const RES_HEAD = ["Region", "Nodes", "Distance(KM)", "Core Secured", "Expected CV Ready", "Port Info", "Contractor", "Remark",
+const RES_HEAD = [
+  "Region", "Nodes", "Distance(KM)", "Core Secured", "Expected CV Ready", "Port Info", "Contractor", "Remark",
   "Fiber core monitoring", "Fiber montiored Y/N/WIP", "Fiber core requestor", "Fiber core request date", "Aging(days)",
-  "No of core requested", "Core assignment", "Core balnce", "Core status"];
+  "No of core requested", "Core assignment", "Core balnce", "Core status",
+];
 const SEGMENT = "DEV Kuala Lumpur DC-DEV Kuantan Hut"; // dev segment 6, not used by other specs
-const resRow = (customer: string | null) => ["East Coast", SEGMENT, null, null, null, "raw", "E2E Vendor", "e2e", null, "Y", customer, null, null, 1, null, null, null];
+const resRow = (customer: string | null) => [
+  "East Coast", SEGMENT, null, null, null, "raw", "E2E Vendor", "e2e", null, "Y", customer, null, null, 1, null, null, null,
+];
+
+const SITE_ROWS = [
+  SITE_HEAD,
+  ["E2E Site One", 3.2, 101.5, "Central", "Tower"],
+  ["E2E Site Two", "TBA", "TBA", "Central", "Tower"],
+];
 
 const file = (name: string, sheets: Sheet[]) => ({ name, mimeType: XLSX, buffer: xlsx(sheets) });
 const nav = (page: Page) => page.getByRole("navigation", { name: "Main" });
@@ -35,7 +45,7 @@ test("site master preview: counts, 10% drop override", async ({ page }) => {
   await openUpload(page, "Sites (Excel)");
   await page.getByLabel("Upload a site master workbook").setInputFiles(file(`e2e-sites-${stamp}.xlsx`, [
     { name: "Cover", rows: [["synthetic test file"]] },
-    { name: "Site Location", rows: [SITE_HEAD, ["E2E Site One", 3.2, 101.5, "Central", "Tower"], ["E2E Site Two", "TBA", "TBA", "Central", "Tower"]] },
+    { name: "Site Location", rows: SITE_ROWS },
   ]));
   const preview = page.getByTestId("sm-preview");
   await expect(preview).toBeVisible();
@@ -51,7 +61,8 @@ test("site master preview: counts, 10% drop override", async ({ page }) => {
   await expect(sites.getByRole("table")).toContainText("E2E Site Two");
   await expect(sites.getByRole("table")).toContainText("missing coordinates");
   await expect(sites.getByRole("table")).toContainText("Needs review");
-  await expect(sites.getByRole("columnheader")).toHaveText(["Row", "Site name", "Latitude", "Longitude", "Status or reason"]);
+  await expect(sites.getByRole("columnheader"))
+    .toHaveText(["Row", "Site name", "Latitude", "Longitude", "Status or reason"]);
   const two = sites.getByRole("row", { name: /E2E Site Two/ });
   await expect(two.getByRole("cell")).toHaveText(["3", "TBA", "TBA", /^Needs review.*missing coordinates/]);
   await sites.getByRole("button", { name: "Missing 17" }).click();
@@ -70,7 +81,8 @@ test("site master preview: counts, 10% drop override", async ({ page }) => {
   await page.evaluate(() => scrollTo(0, 0));
   await page.screenshot({ path: "e2e/screenshots/upload-site-master-preview.png", fullPage: true });
   await page.screenshot({ path: "e2e/screenshots/upload-clean-site-master.png", fullPage: true });
-  await preview.getByRole("button", { name: "Discard preview" }).click(); // never applied: would deactivate nothing, but keep the dev data as seeded
+  // never applied: would deactivate nothing, but keep the dev data as seeded
+  await preview.getByRole("button", { name: "Discard preview" }).click();
 });
 
 test("site master add and update only: no Missing rows, no row-count block (not applied)", async ({ page }) => {
@@ -79,7 +91,7 @@ test("site master add and update only: no Missing rows, no row-count block (not 
   await expect(addOnly).not.toBeChecked();
   await addOnly.check();
   await page.getByLabel("Upload a site master workbook").setInputFiles(file(`e2e-addonly-${stamp}.xlsx`, [
-    { name: "Site Location", rows: [SITE_HEAD, ["E2E Site One", 3.2, 101.5, "Central", "Tower"], ["E2E Site Two", "TBA", "TBA", "Central", "Tower"]] },
+    { name: "Site Location", rows: SITE_ROWS },
   ]));
   const preview = page.getByTestId("sm-preview");
   await expect(preview).toContainText("Add and update only: sites not in this file are kept.");
@@ -95,7 +107,7 @@ test("site master add and update only: no Missing rows, no row-count block (not 
 test("site master apply: DC List sheet ignored, result shown, preview survives a tab change (apply mocked)", async ({ page }) => {
   await openUpload(page, "Sites (Excel)");
   await page.getByLabel("Upload a site master workbook").setInputFiles(file(`e2e-both-${stamp}.xlsx`, [
-    { name: "Site Location", rows: [SITE_HEAD, ["E2E Site One", 3.2, 101.5, "Central", "Tower"], ["E2E Site Two", "TBA", "TBA", "Central", "Tower"]] },
+    { name: "Site Location", rows: SITE_ROWS },
     { name: "DC List", rows: [DC_HEAD, [1, "Penang", "E2E DC Beta", "DEV Penang Tower", 5.41, 100.33]] },
   ]));
   const sites = page.getByTestId("sheet-sites");
@@ -117,10 +129,12 @@ test("site master apply: DC List sheet ignored, result shown, preview survives a
   const counts = { added: 1, changed: 0, deactivated: 0, kept_active: 4, protected_kept: 0, skipped: 0 };
   await page.route("**/api/admin/site-master/uploads/*/apply", async (route) => {
     bodies.push(route.request().postDataJSON());
-    await route.fulfill({ json: { upload_id: 1, warnings: ["E2E warning"], complete: true, sheets: { sites: { applied: true, ...counts } } } });
+    const sheets = { sites: { applied: true, ...counts } };
+    await route.fulfill({ json: { upload_id: 1, warnings: ["E2E warning"], complete: true, sheets } });
   });
   await sites.getByRole("button", { name: "Apply Site Location…" }).click();
-  await page.getByRole("dialog", { name: "Apply Site Location?" }).getByRole("button", { name: "Apply", exact: true }).click();
+  const confirm = page.getByRole("dialog", { name: "Apply Site Location?" });
+  await confirm.getByRole("button", { name: "Apply", exact: true }).click();
   const result = page.getByTestId("sm-result");
   await expect(result).toContainText("Site master applied");
   await expect(result).toContainText("Site Location: 1 added, 0 changed, 0 set inactive");
@@ -137,7 +151,10 @@ test("segment list preview: header found, problem rows in the table, nothing to 
   await openUpload(page, "Segments (Excel)");
   await page.getByLabel("Upload a segment list").setInputFiles(file(`e2e-segments-${stamp}.xlsx`, [
     { name: "Cover", rows: [["synthetic test file"]] },
-    { name: "Links", rows: [["title row"], SL_HEAD, ["ZZQA-ZZQB", 12.5, "R1", "N-C", "Trunk"], ["bad link", "x", null, null, "Ring"]] },
+    {
+      name: "Links",
+      rows: [["title row"], SL_HEAD, ["ZZQA-ZZQB", 12.5, "R1", "N-C", "Trunk"], ["bad link", "x", null, null, "Ring"]],
+    },
   ]));
   const preview = page.getByTestId("sl-preview");
   await expect(preview).toContainText(`Preview of e2e-segments-${stamp}.xlsx`);
@@ -145,9 +162,11 @@ test("segment list preview: header found, problem rows in the table, nothing to 
   await expect(preview.getByRole("button", { name: "New 0" })).toBeVisible();
   await expect(preview.getByRole("button", { name: "Problem 2", pressed: true })).toBeVisible();
   const table = preview.getByRole("table", { name: "Segment list: Problem rows" });
-  await expect(table.getByRole("columnheader")).toHaveText(["Row", "Link", "Distance (km)", "Route", "Section", "Status or reason"]);
+  await expect(table.getByRole("columnheader"))
+    .toHaveText(["Row", "Link", "Distance (km)", "Route", "Section", "Status or reason"]);
   const one = table.getByRole("row", { name: /ZZQA-ZZQB/ });
-  await expect(one.getByRole("cell")).toHaveText(["3", "12.500", "R1", "N-C", /^Needs review.*site ZZQA is not in the dashboard/]);
+  await expect(one.getByRole("cell"))
+    .toHaveText(["3", "12.500", "R1", "N-C", /^Needs review.*site ZZQA is not in the dashboard/]);
   await expect(table.getByRole("row", { name: /bad link/ })).toContainText("distance is not a number");
   await expect(preview.getByRole("button", { name: "Apply segment list…" })).toBeDisabled();
   await expect(preview).toContainText("Nothing new or changed to apply.");
@@ -159,7 +178,8 @@ test("segment list preview: header found, problem rows in the table, nothing to 
 
 test("segment list without the Link and Distance headers is blocked: no Apply", async ({ page }) => {
   await openUpload(page, "Segments (Excel)");
-  await page.getByLabel("Upload a segment list").setInputFiles(file(`e2e-segments-bad-${stamp}.xlsx`, [{ name: "Sheet1", rows: [["Nodes", "km?"], ["A-B", 1]] }]));
+  const badSheet = { name: "Sheet1", rows: [["Nodes", "km?"], ["A-B", 1]] };
+  await page.getByLabel("Upload a segment list").setInputFiles(file(`e2e-segments-bad-${stamp}.xlsx`, [badSheet]));
   const preview = page.getByTestId("sl-preview");
   await expect(preview.getByRole("alert")).toContainText("This file will not be applied");
   await expect(preview.getByRole("alert")).toContainText("No worksheet has the expected headers: Link, Distance");
@@ -174,21 +194,58 @@ test("segment list apply: confirm counts, result note, preview survives a tab ch
   await page.route("**/api/admin/segment-list/uploads", (r) => r.fulfill({ status: 201, json: {
     upload_id: id, filename: "e2e-mock.xlsx", sheet_name: "Links", found: true, block_reason: null,
     counts: { rows: 3, new: 1, changed: 1, unchanged: 0, problem: 1 } } }));
-  const row = (n: number, group: string, link: string, extra: object = {}) => ({ id: n, row_number: n, sheet_name: "Links", group, status: "ready", reason: null, raw: {},
-    parsed: { link, site_a: link.slice(0, 4), site_b: link.slice(5), distance_km: "10.000", route: "R2", section: null, type: "Metro" },
-    changes: [], edited_in_dashboard: false, segment_id: null, ...extra });
-  await page.route(`**/api/admin/segment-list/uploads/${id}/rows*`, (r) => {
-    const g = new URL(r.request().url()).searchParams.get("group");
-    const items = g === "new" ? [row(2, "new", "AAAA-BBBB")] : g === "changed" ? [row(3, "changed", "CCCC-DDDD", { segment_id: 9, edited_in_dashboard: true,
-      changes: [{ field: "distance_km", old: "9.000", new: "10.000", protected: false, note: null }, { field: "route", old: "R1", new: "R2", protected: true, note: "edited in dashboard, file differs" }] })] : [];
-    return r.fulfill({ json: { total: items.length, page: 1, page_size: 100, items } });
+  const row = (number: number, group: string, link: string, extra: object = {}) => ({
+    id: number,
+    row_number: number,
+    sheet_name: "Links",
+    group,
+    status: "ready",
+    reason: null,
+    raw: {},
+    parsed: {
+      link,
+      site_a: link.slice(0, 4),
+      site_b: link.slice(5),
+      distance_km: "10.000",
+      route: "R2",
+      section: null,
+      type: "Metro",
+    },
+    changes: [],
+    edited_in_dashboard: false,
+    segment_id: null,
+    ...extra,
+  });
+  const changedRow = row(3, "changed", "CCCC-DDDD", {
+    segment_id: 9,
+    edited_in_dashboard: true,
+    changes: [
+      { field: "distance_km", old: "9.000", new: "10.000", protected: false, note: null },
+      { field: "route", old: "R1", new: "R2", protected: true, note: "edited in dashboard, file differs" },
+    ],
+  });
+  const rowsOfGroup = (group: string | null) => {
+    if (group === "new") {
+      return [row(2, "new", "AAAA-BBBB")];
+    }
+    if (group === "changed") {
+      return [changedRow];
+    }
+    return [];
+  };
+  await page.route(`**/api/admin/segment-list/uploads/${id}/rows*`, (route) => {
+    const group = new URL(route.request().url()).searchParams.get("group");
+    const items = rowsOfGroup(group);
+    return route.fulfill({ json: { total: items.length, page: 1, page_size: 100, items } });
   });
   let body: string | null = "unset";
   await page.route(`**/api/admin/segment-list/uploads/${id}/apply`, (r) => {
     body = r.request().postData();
-    return r.fulfill({ json: { upload_id: id, created: 1, changed: 1, protected_kept: 1, skipped: 1, warnings: ["E2E segment warning"] } });
+    const applied = { created: 1, changed: 1, protected_kept: 1, skipped: 1, warnings: ["E2E segment warning"] };
+    return r.fulfill({ json: { upload_id: id, ...applied } });
   });
-  await page.getByLabel("Upload a segment list").setInputFiles(file("e2e-mock.xlsx", [{ name: "Links", rows: [SL_HEAD] }]));
+  const linksSheet = { name: "Links", rows: [SL_HEAD] };
+  await page.getByLabel("Upload a segment list").setInputFiles(file("e2e-mock.xlsx", [linksSheet]));
   const preview = page.getByTestId("sl-preview");
   await expect(preview.getByRole("button", { name: "New 1", pressed: true })).toBeVisible();
   await expect(preview.getByRole("table")).toContainText("AAAA-BBBB");
@@ -282,12 +339,14 @@ test("close reservation import needs a reason, then shows the closed state (clos
   let posted: unknown = null;
   await page.route("**/api/admin/reservation-import/close", async (route) => {
     posted = route.request().postDataJSON();
-    await route.fulfill({ json: { closed: true, closed_at: "2026-10-26T02:00:00Z", closed_by: "admin1", reason: "E2E: dashboard is now the source of truth" } });
+    const reason = "E2E: dashboard is now the source of truth";
+    await route.fulfill({ json: { closed: true, closed_at: "2026-10-26T02:00:00Z", closed_by: "admin1", reason } });
   });
   await dialog.getByRole("button", { name: "Close import" }).click();
   expect(posted).toEqual({ reason: "E2E: dashboard is now the source of truth" });
   await expect(dialog).toHaveCount(0);
-  await expect(sw).toContainText("Reservation import closed on 26 Oct 2026, 10:00 by admin1: E2E: dashboard is now the source of truth");
+  await expect(sw)
+    .toContainText("Reservation import closed on 26 Oct 2026, 10:00 by admin1: E2E: dashboard is now the source of truth");
   await expect(sw.getByRole("button")).toHaveCount(0);
 });
 
@@ -323,7 +382,8 @@ test("Route lines (KMZ): preview lists the segment to draw, apply shows the coun
   await page.getByRole("button", { name: "Preview", exact: true }).click();
   const preview = page.getByTestId("kmz-preview");
   await expect(preview).toContainText("1 line in folder “propose route”");
-  const row = preview.getByRole("table", { name: "Segments to draw" }).getByRole("row", { name: /DEV Kuala Lumpur DC - DEV Cyberjaya DC/ });
+  const toDraw = preview.getByRole("table", { name: "Segments to draw" });
+  const row = toDraw.getByRole("row", { name: /DEV Kuala Lumpur DC - DEV Cyberjaya DC/ });
   await expect(row).toBeVisible();
   await page.screenshot({ path: "e2e/screenshots/upload-kmz-preview.png", fullPage: true });
   await page.route("**/api/admin/kmz/uploads/*/apply", (route) => route.fulfill({ json: { upload_id: 1, shaped: 1 } }));

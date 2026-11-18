@@ -15,6 +15,15 @@ from app.observability import logged_apply
 router = APIRouter(prefix="/api/admin/segment-list", dependencies=[Depends(require_admin)])
 Group = Literal["new", "changed", "unchanged", "problem"]
 
+COUNT_GROUP_ROWS = "SELECT count(*) FROM upload_rows WHERE upload_id = :upload_id AND row_group = :row_group"
+SELECT_GROUP_ROWS = """
+    SELECT id, row_number, sheet, status, reason, raw, payload
+    FROM upload_rows
+    WHERE upload_id = :upload_id AND row_group = :row_group
+    ORDER BY row_number, id
+    LIMIT :limit OFFSET :offset
+"""
+
 
 class Counts(BaseModel):
     rows: int
@@ -91,26 +100,45 @@ def upload(db: DB, admin: Admin, file: UploadFile) -> UploadOut:
     return UploadOut(**sl.stage(db, admin.id, name, parsed))
 
 
+def _row_out(row: Any, group: Group) -> RowOut:
+    payload = row["payload"]
+    parsed = payload["parsed"]
+    return RowOut(
+        id=row["id"],
+        row_number=row["row_number"],
+        sheet_name=row["sheet"],
+        group=group,
+        status=row["status"],
+        reason=row["reason"],
+        raw=row["raw"] or {},
+        parsed=Parsed(
+            link=parsed["link"],
+            site_a=parsed["a"],
+            site_b=parsed["b"],
+            distance_km=parsed["distance"],
+            route=parsed["route"],
+            section=parsed["section"],
+        ),
+        changes=[Change(**change) for change in payload.get("changes", []) if change["field"] in CHANGE_FIELDS],
+        edited_in_dashboard=payload.get("edited_in_dashboard", False),
+        segment_id=payload.get("db_id"),
+    )
+
+
 @router.get("/uploads/{upload_id}/rows")
-def rows(db: DB, upload_id: int, group: Group, page: Annotated[int, Query(ge=1)] = 1,
-         page_size: Annotated[int, Query(ge=1, le=500)] = 100) -> RowsOut:
+def rows(
+    db: DB,
+    upload_id: int,
+    group: Group,
+    page: Annotated[int, Query(ge=1)] = 1,
+    page_size: Annotated[int, Query(ge=1, le=500)] = 100,
+) -> RowsOut:
     require_upload(db, upload_id, "segment_list")
-    where = {"u": upload_id, "g": sl.GROUP_COL[group]}
-    total = db.execute(text("SELECT count(*) FROM upload_rows WHERE upload_id = :u AND row_group = :g"), where).scalar_one()
-    q = db.execute(text("SELECT id, row_number, sheet, status, reason, raw, payload FROM upload_rows "
-                        "WHERE upload_id = :u AND row_group = :g ORDER BY row_number, id LIMIT :l OFFSET :o"),
-                   {**where, "l": page_size, "o": (page - 1) * page_size}).mappings()
-    items = []
-    for r in q:
-        p, pp = r["payload"], r["payload"]["parsed"]
-        items.append(RowOut(
-            id=r["id"], row_number=r["row_number"], sheet_name=r["sheet"], group=group, status=r["status"], reason=r["reason"],
-            raw=r["raw"] or {}, parsed=Parsed(link=pp["link"], site_a=pp["a"], site_b=pp["b"], distance_km=pp["distance"],
-                                              route=pp["route"], section=pp["section"]),
-            changes=[Change(**c) for c in p.get("changes", []) if c["field"] in CHANGE_FIELDS],
-            edited_in_dashboard=p.get("edited_in_dashboard", False),
-            segment_id=p.get("db_id")))
-    return RowsOut(total=total, page=page, page_size=page_size, items=items)
+    where = {"upload_id": upload_id, "row_group": sl.GROUP_COL[group]}
+    total = db.execute(text(COUNT_GROUP_ROWS), where).scalar_one()
+    page_params = {**where, "limit": page_size, "offset": (page - 1) * page_size}
+    found = db.execute(text(SELECT_GROUP_ROWS), page_params).mappings()
+    return RowsOut(total=total, page=page, page_size=page_size, items=[_row_out(row, group) for row in found])
 
 
 @router.post("/uploads/{upload_id}/apply")
@@ -118,5 +146,5 @@ def apply(db: DB, admin: Admin, upload_id: int) -> ApplyOut:
     try:
         with logged_apply("segment_list", upload_id, admin.id):
             return ApplyOut(**sl.apply_upload(db, admin.id, upload_id))
-    except ApplyError as e:
-        raise HTTPException(e.status, e.message) from e
+    except ApplyError as error:
+        raise HTTPException(error.status, error.message) from error

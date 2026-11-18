@@ -23,11 +23,18 @@ def ids(db):
 @pytest.mark.parametrize("op", ["UPDATE {t} SET created_at = now()", "DELETE FROM {t}"])
 def test_append_only(db, ids, table, op):
     i = ids
-    db.execute(text({
-        "reservation_events": "INSERT INTO reservation_events (reservation_id, type, user_id) VALUES (:res,'requested',:user)",
-        "measurements": "INSERT INTO measurements (segment_id, loss_db) VALUES (:segment, 1.5)",
-        "data_edits": "INSERT INTO data_edits (entity, entity_id, field, reason, user_id) VALUES ('core',1,'f','r',:user)",
-    }[table]), i)
+    db.execute(
+        text(
+            {
+                "reservation_events": "INSERT INTO reservation_events (reservation_id, type, user_id) "
+                "VALUES (:res,'requested',:user)",
+                "measurements": "INSERT INTO measurements (segment_id, loss_db) VALUES (:segment, 1.5)",
+                "data_edits": "INSERT INTO data_edits (entity, entity_id, field, reason, user_id) "
+                "VALUES ('core',1,'f','r',:user)",
+            }[table]
+        ),
+        i,
+    )
     with pytest.raises(DBAPIError, match="append-only"):
         db.execute(text(op.format(t=table)))
 

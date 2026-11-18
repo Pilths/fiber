@@ -56,14 +56,19 @@ test("planner sees no Keep on others' cores and no edit buttons", async ({ page 
 
 test("taken-cores table tags stale cores", async ({ page }) => {
   await signIn(page, "admin1");
-  const rs: { stale: boolean; cores: { core_id: number; held: boolean }[] }[] = await (await page.request.get("/api/reservations")).json();
-  const core = rs.filter((r) => r.stale).flatMap((r) => r.cores).find((c) => c.held);
+  type Reservation = { stale: boolean; cores: { core_id: number; held: boolean }[] };
+  const reservations: Reservation[] = await (await page.request.get("/api/reservations")).json();
+  const core = reservations
+    .filter((reservation) => reservation.stale)
+    .flatMap((reservation) => reservation.cores)
+    .find((each) => each.held);
   test.skip(!core, "Dev data has no stale reservation holding a core; not faking one by changing server data.");
-  const c: { number: number; segment_name: string } = await (await page.request.get(`/api/cores/${core!.core_id}`)).json();
-  await pick(page, new RegExp(`^${c.segment_name}`));
-  await openCore(page, c.number);
+  const coreResponse = await page.request.get(`/api/cores/${core!.core_id}`);
+  const coreDetail: { number: number; segment_name: string } = await coreResponse.json();
+  await pick(page, new RegExp(`^${coreDetail.segment_name}`));
+  await openCore(page, coreDetail.number);
   await page.keyboard.press("Escape");
-  const row = coresTable(page).getByRole("row").filter({ has: coreBtn(page, c.number) });
+  const row = coresTable(page).getByRole("row").filter({ has: coreBtn(page, coreDetail.number) });
   await expect(row).toContainText(/Stale: no keep for over 3 months since /);
 });
 
@@ -104,10 +109,17 @@ test("lowering the verified core count below taken cores is refused in plain wor
   await dlg.getByLabel("Verified cores").fill("1");
   await dlg.getByLabel("Reason (optional)").fill("E2E: should be refused");
   await dlg.getByRole("button", { name: "Save" }).click();
-  await expect(dlg.getByRole("alert")).toContainText(/^Cores 2, .* are allocated or have history and cannot be removed/);
+  await expect(dlg.getByRole("alert"))
+    .toContainText(/^Cores 2, .* are allocated or have history and cannot be removed/);
   await dlg.getByRole("button", { name: "Cancel" }).click();
-  const n = await coresTable(page).getByTestId("core-group").evaluateAll((gs) => gs.filter((g) => g.getAttribute("data-status") !== "Unassigned")
-    .reduce((t, g) => t + Number(/(\d+)\s*$/.exec(g.querySelector("th[scope=rowgroup]")!.textContent!)![1]), 0));
+  const n = await coresTable(page).getByTestId("core-group").evaluateAll((groups) => {
+    const statusGroups = groups.filter((group) => group.getAttribute("data-status") !== "Unassigned");
+    const counts = statusGroups.map((group) => {
+      const heading = group.querySelector("th[scope=rowgroup]")!.textContent!;
+      return Number(/(\d+)\s*$/.exec(heading)![1]);
+    });
+    return counts.reduce((total, count) => total + count, 0);
+  });
   expect(n).toBe(24); // verified core count unchanged: the group counts add up to 24 cores
 });
 
@@ -254,7 +266,11 @@ test("admin opens a site from the segment diagram: fields, reason required, hist
 test("reservation History disclosure lists events in order", async ({ page }) => {
   await signIn(page, "planner1");
   await page.getByRole("button", { name: /My reservations/ }).click();
-  const card = page.getByRole("region", { name: "My reservations" }).getByTestId("reservation").filter({ hasText: "DEV Telco Alpha" }).filter({ hasText: "Approved" }).first();
+  const card = page.getByRole("region", { name: "My reservations" })
+    .getByTestId("reservation")
+    .filter({ hasText: "DEV Telco Alpha" })
+    .filter({ hasText: "Approved" })
+    .first();
   await card.getByText("History", { exact: true }).click();
   const items = card.getByTestId("res-history").getByRole("listitem");
   await expect(items.first()).toContainText("Requested by DEV planner1");
@@ -313,18 +329,25 @@ test("one Unassigned row per reservation; admin assign dialog limits the choice"
   await expect(rows.first()).toBeVisible();
   const counts = (await rows.getByRole("rowheader").allInnerTexts()).map((t) => Number(/\d+/.exec(t)![0]));
   await expect(rows.first().getByRole("rowheader")).toHaveText(/^\d+ cores?$/);
-  await expect(rows.first().locator("xpath=ancestor::tbody")).toHaveAttribute("data-status", "Unassigned"); // status lives in the group heading
+  // status lives in the group heading
+  await expect(rows.first().locator("xpath=ancestor::tbody")).toHaveAttribute("data-status", "Unassigned");
   const total = counts.reduce((a, b) => a + b, 0);
-  await expect(coresTable(page).locator('tbody[data-status="Unassigned"] th[scope=rowgroup]')).toHaveText(new RegExp(`Unassigned\\s*${total} cores?$`));
+  const unassignedHeading = coresTable(page).locator('tbody[data-status="Unassigned"] th[scope=rowgroup]');
+  await expect(unassignedHeading).toHaveText(new RegExp(`Unassigned\\s*${total} cores?$`));
   const remaining = counts[0];
   let posted: unknown = null;
-  await page.route("**/api/reservations/*/assign", (r) => { posted = r.request().postDataJSON(); return r.fulfill({ json: {} }); });
+  await page.route("**/api/reservations/*/assign", (route) => {
+    posted = route.request().postDataJSON();
+    return route.fulfill({ json: {} });
+  });
   await rows.first().getByRole("button", { name: "Assign cores" }).click();
   const dlg = page.getByRole("dialog", { name: /^Assign cores to / });
   await expect(dlg).toContainText(`Choose up to ${remaining}`);
   const cores = dlg.getByRole("group", { name: "Available cores" }).getByRole("button");
   test.skip(await cores.count() <= remaining, "Not enough Available cores on this segment to test the limit.");
-  for (let i = 0; i < remaining; i++) await cores.nth(i).click();
+  for (let i = 0; i < remaining; i++) {
+    await cores.nth(i).click();
+  }
   await expect(cores.nth(remaining)).toBeDisabled();
   await expect(cores.nth(0)).toHaveAttribute("aria-pressed", "true");
   await dlg.getByRole("button", { name: new RegExp(`^Assign ${remaining} cores?$`) }).click();

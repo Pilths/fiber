@@ -20,7 +20,8 @@ SITES = [
     ("PEN", "DEV Penang Tower", "building", (100.3327, 5.4164)),
     ("KTN", "DEV Kuantan Hut", "site", None),
 ]
-# site A, site B, route type (unused: derived from the site kinds), region, distance_km, loss factor vs distance*0.3 (None = no measurements)
+# site A, site B, route type (unused: derived from the site kinds), region, distance_km,
+# loss factor vs distance*0.3 (None = no measurements)
 SEGMENTS: list[tuple[str, str, str, str, float | None, float | None]] = [
     ("KL", "CJ", "Metro", "Central", 32.5, 1.0),
     ("CJ", "BJ", "Metro", "Central", 18.2, 1.05),
@@ -84,9 +85,11 @@ def run(db: Session) -> None:
                 s=sid, n=num, pa=ports[0], pb=ports[1], u=in_use)
         if km is not None and factor is not None:
             for _ in range(3):
+                loss_db = round(float(calculated_loss_db(km)) * factor * rng.uniform(0.97, 1.03), 3)
+                days_ago = rng.randint(1, 300)
                 ins("INSERT INTO measurements (segment_id, core_id, loss_db, tested_on) "
                     "VALUES (:s, :c, :l, current_date - :d)",
-                    s=sid, c=cores[sid][1], l=round(float(calculated_loss_db(km)) * factor * rng.uniform(0.97, 1.03), 3), d=rng.randint(1, 300))
+                    s=sid, c=cores[sid][1], l=loss_db, d=days_ago)
 
     # routes: a long route (several segments) and a short one
     for sites_ab, segments_in in [(("KL", "PEN"), [segment[3], segment[4]]), (("KL", "BJ"), [segment[2]])]:
@@ -99,7 +102,9 @@ def run(db: Session) -> None:
     cust = [one("INSERT INTO customers (name, created_by) VALUES (:n, :u) RETURNING id", n=n, u=user["planner1"])
             for n in ("DEV Telco Alpha", "DEV Telco Beta", "DEV Bank Gamma")]
 
-    def reserve(customer: int, planner: str, segment_id: int, nums: list[int], approver: str | None, srf: str | None = None) -> None:
+    def reserve(
+        customer: int, planner: str, segment_id: int, nums: list[int], approver: str | None, srf: str | None = None,
+    ) -> None:
         res = one("INSERT INTO reservations (customer_id, planner_id, planned_date, srf_id) "
                   "VALUES (:c, :u, current_date + 30, :srf) RETURNING id", c=customer, u=user[planner], srf=srf)
         ins("INSERT INTO reservation_events (reservation_id, type, user_id) VALUES (:r, 'requested', :u)",
@@ -108,7 +113,8 @@ def run(db: Session) -> None:
             ins("INSERT INTO reservation_events (reservation_id, type, user_id) VALUES (:r, 'approved', :u)",
                 r=res, u=user[approver])
         for num in nums:
-            ins("INSERT INTO reservation_cores (reservation_id, core_id) VALUES (:r, :c)", r=res, c=cores[segment_id][num])
+            core_id = cores[segment_id][num]
+            ins("INSERT INTO reservation_cores (reservation_id, core_id) VALUES (:r, :c)", r=res, c=core_id)
             ins("INSERT INTO core_holds (core_id, reservation_id) VALUES (:c, :r)", c=cores[segment_id][num], r=res)
 
     reserve(cust[0], "planner1", segment[0], [1, 2], "admin1", "SRF-DEV-001")

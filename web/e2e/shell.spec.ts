@@ -26,7 +26,8 @@ test("tabs by role: planner sees Inventory and My reservations; admin (via dev s
 test("selecting a segment from the header search writes the hash and shows its diagram and cores; the hash restores it", async ({ page }) => {
   await signIn(page);
   await page.getByRole("combobox", { name: /^Find a segment/ }).fill(SEGMENT.split(" - ")[0]);
-  await page.getByRole("listbox", { name: "Search results" }).getByRole("option", { name: SEGMENT, exact: true }).click();
+  const results = page.getByRole("listbox", { name: "Search results" });
+  await results.getByRole("option", { name: SEGMENT, exact: true }).click();
   await expect(page.locator("#segment-h")).toHaveText(SEGMENT);
   await expect(page.getByRole("heading", { name: "Cores", exact: true })).toBeVisible();
   await expect(page).toHaveURL(new RegExp(`#segment=${encodeURIComponent(SEGMENT)}$`));

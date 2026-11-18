@@ -16,7 +16,8 @@ from app.reservations.service import conflict
 router = APIRouter()
 
 SITE_SQL = """
-SELECT id, name, kind, ST_Y(geom) AS lat, ST_X(geom) AS lon, details->>'region' AS region, details->>'cluster' AS cluster, active
+SELECT id, name, kind, ST_Y(geom) AS lat, ST_X(geom) AS lon,
+       details->>'region' AS region, details->>'cluster' AS cluster, active
 FROM sites WHERE id = :site_id
 """
 FIND_SITES_SQL = "SELECT id, name FROM sites WHERE name ILIKE '%' || :q || '%' ORDER BY name LIMIT 20"

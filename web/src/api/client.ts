@@ -9,7 +9,8 @@ type Part<O, K extends string> = O extends { [k in K]?: infer V } ? NonNullable<
 type Json<O> = O extends { responses: { 200: { content: { "application/json": infer R } } } } ? R
   : O extends { responses: { 201: { content: { "application/json": infer R } } } } ? R : void; // 204: no body
 type BodyOpt<O> = O extends { requestBody: { content: { "application/json": infer B } } } ? { body: B }
-  : O extends { requestBody?: { content: { "application/json": infer B } } } ? { body?: B } : { body?: undefined };
+  : O extends { requestBody?: { content: { "application/json": infer B } } } ? { body?: B }
+  : { body?: undefined };
 
 type Options<O, M extends Method> = {
   path?: Part<Part<O, "parameters">, "path">;
@@ -21,19 +22,26 @@ type Options<O, M extends Method> = {
 // header unless APP_ENV=development. Signing in or out with a password clears it, so the cookie decides.
 export const DEV_USERS = ["planner1", "planner2", "admin1", "admin2"];
 export const devUser = (): string | undefined => {
-  if (!import.meta.env.DEV) return undefined;
+  if (!import.meta.env.DEV) {
+    return undefined;
+  }
   try {
-    const u = localStorage.getItem("devUser");
-    if (u && DEV_USERS.includes(u)) return u;
+    const username = localStorage.getItem("devUser");
+    if (username && DEV_USERS.includes(username)) {
+      return username;
+    }
   } catch {
     /* storage unavailable */
   }
   return undefined;
 };
-export const setDevUser = (u: string | null) => {
+export const setDevUser = (username: string | null) => {
   try {
-    if (u) localStorage.setItem("devUser", u);
-    else localStorage.removeItem("devUser");
+    if (username) {
+      localStorage.setItem("devUser", username);
+    } else {
+      localStorage.removeItem("devUser");
+    }
   } catch {
     /* storage unavailable */
   }
@@ -42,10 +50,17 @@ export const setDevUser = (u: string | null) => {
 // The app listens here: "signed-out" on any 401, "password-change" on 403 password_change_required.
 export const authEvents = new EventTarget();
 
-export const errorText = (e: unknown, fallback: string): string => {
-  const d = e instanceof ApiError ? (e.detail as { detail?: unknown } | null)?.detail : null;
-  if (typeof d === "string") return d;
-  if (d && typeof d === "object" && "message" in d) return String((d as { message: unknown }).message);
+export const errorText = (error: unknown, fallback: string): string => {
+  if (!(error instanceof ApiError)) {
+    return fallback;
+  }
+  const detail = (error.detail as { detail?: unknown } | null)?.detail;
+  if (typeof detail === "string") {
+    return detail;
+  }
+  if (detail && typeof detail === "object" && "message" in detail) {
+    return String((detail as { message: unknown }).message);
+  }
   return fallback;
 };
 
@@ -59,39 +74,97 @@ export class ApiError extends Error {
   }
 }
 
+type RequestOptions = { path?: Record<string, string>; query?: Record<string, unknown>; body?: unknown };
+
+function withPathParams(url: string, path: Record<string, string> | undefined): string {
+  let href = url;
+  for (const [name, value] of Object.entries(path ?? {})) {
+    href = href.replace(`{${name}}`, encodeURIComponent(String(value)));
+  }
+  return href;
+}
+
+// A list value repeats the key once per item; null and undefined items are left out.
+function withQuery(href: string, query: Record<string, unknown> | undefined): string {
+  const params = new URLSearchParams();
+  for (const [name, value] of Object.entries(query ?? {})) {
+    const values = Array.isArray(value) ? value : [value];
+    for (const item of values) {
+      if (item != null) {
+        params.append(name, String(item));
+      }
+    }
+  }
+  if (params.size === 0) {
+    return href;
+  }
+  return `${href}?${params}`;
+}
+
+// Multipart bodies get no Content-Type here: the browser sets it with the boundary.
+function requestHeaders(sendsJson: boolean): Record<string, string> {
+  const headers: Record<string, string> = {};
+  const dev = devUser();
+  if (dev) {
+    headers["X-Dev-User"] = dev;
+  }
+  if (sendsJson) {
+    headers["Content-Type"] = "application/json";
+  }
+  return headers;
+}
+
+function requestBody(body: unknown, isForm: boolean): BodyInit | undefined {
+  if (body === undefined) {
+    return undefined;
+  }
+  if (isForm) {
+    return body as FormData;
+  }
+  return JSON.stringify(body);
+}
+
+function announceAuthProblem(status: number, url: string, detail: unknown) {
+  if (status === 401 && url !== "/api/auth/login") {
+    authEvents.dispatchEvent(new Event("signed-out"));
+  }
+  const code = (detail as { code?: string } | null)?.code;
+  if (status === 403 && code === "password_change_required") {
+    authEvents.dispatchEvent(new Event("password-change"));
+  }
+}
+
 async function request<P extends Path<M>, M extends Method>(
   method: M,
   url: P,
   opts: Options<Op<P, M>, M> | undefined,
 ): Promise<Json<Op<P, M>>> {
-  const o = (opts ?? {}) as { path?: Record<string, string>; query?: Record<string, unknown>; body?: unknown };
-  let href: string = url;
-  for (const [k, v] of Object.entries(o.path ?? {})) href = href.replace(`{${k}}`, encodeURIComponent(String(v)));
-  const qs = new URLSearchParams();
-  for (const [k, v] of Object.entries(o.query ?? {})) for (const x of Array.isArray(v) ? v : [v]) if (x != null) qs.append(k, String(x)); // arrays repeat the key
-  const headers: Record<string, string> = {};
-  const dev = devUser();
-  if (dev) headers["X-Dev-User"] = dev;
-  const form = o.body instanceof FormData; // multipart: the browser sets the boundary header
-  if (o.body !== undefined && !form) headers["Content-Type"] = "application/json";
-  const res = await fetch(qs.size ? `${href}?${qs}` : href, {
+  const options = (opts ?? {}) as RequestOptions;
+  const href = withQuery(withPathParams(url, options.path), options.query);
+  const isForm = options.body instanceof FormData;
+  const response = await fetch(href, {
     method: method.toUpperCase(),
-    headers,
-    body: o.body === undefined ? undefined : form ? (o.body as FormData) : JSON.stringify(o.body),
+    headers: requestHeaders(options.body !== undefined && !isForm),
+    body: requestBody(options.body, isForm),
   });
-  if (!res.ok) {
-    const detail = await res.json().catch(() => null);
-    if (res.status === 401 && url !== "/api/auth/login") authEvents.dispatchEvent(new Event("signed-out"));
-    if (res.status === 403 && (detail as { code?: string } | null)?.code === "password_change_required") authEvents.dispatchEvent(new Event("password-change"));
-    throw new ApiError(res.status, detail);
+  if (!response.ok) {
+    const detail = await response.json().catch(() => null);
+    announceAuthProblem(response.status, url, detail);
+    throw new ApiError(response.status, detail);
   }
-  return res.status === 204 ? (undefined as Json<Op<P, M>>) : res.json();
+  if (response.status === 204) {
+    return undefined as Json<Op<P, M>>;
+  }
+  return response.json();
 }
+
+type PostOptions<P extends Path<"post">> = Options<Op<P, "post">, "post">;
+// The options argument may be left out only when every part of it is optional.
+type PostArgs<P extends Path<"post">> = {} extends PostOptions<P> ? [opts?: PostOptions<P>] : [opts: PostOptions<P>];
 
 export const api = {
   get: <P extends Path<"get">>(url: P, opts?: Options<Op<P, "get">, "get">) => request("get", url, opts),
-  post: <P extends Path<"post">>(url: P, ...[opts]: {} extends Options<Op<P, "post">, "post"> ? [opts?: Options<Op<P, "post">, "post">] : [opts: Options<Op<P, "post">, "post">]) =>
-    request("post", url, opts),
+  post: <P extends Path<"post">>(url: P, ...[opts]: PostArgs<P>) => request("post", url, opts),
   // Multipart upload of one file as field "file". The generated types have no multipart body, so this is untyped.
   // A list value repeats the field once per item.
   postFile: <P extends Path<"post">>(url: P, file: File, fields: Record<string, string | string[]> = {}) => {
@@ -110,5 +183,9 @@ export const api = {
 // One call site for every reservation action (the reservation cards and the core detail drawer).
 // The generated client types each body; one cast keeps this a single function for seven actions.
 export type Action = "approve" | "reject" | "withdraw" | "keep" | "request-release" | "release" | "decline-release";
-export const resAction = (rid: number, action: Action, body?: { reason?: string; cores?: number[] }) =>
-  (api.post as unknown as (u: string, o: { path: { rid: number }; body?: unknown }) => Promise<unknown>)(`/api/reservations/{rid}/${action}`, { path: { rid }, body });
+type ActionBody = { reason?: string; cores?: number[] };
+type UntypedPost = (url: string, options: { path: { rid: number }; body?: unknown }) => Promise<unknown>;
+export const resAction = (rid: number, action: Action, body?: ActionBody) => {
+  const post = api.post as unknown as UntypedPost;
+  return post(`/api/reservations/{rid}/${action}`, { path: { rid }, body });
+};

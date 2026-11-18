@@ -1,8 +1,11 @@
 import { expect, test, type Page } from "@playwright/test";
 import { contrast, openReserve, pickSegment, signIn } from "./helpers";
 
-const A = "DEV Kuala Lumpur DC", B = "DEV Cyberjaya DC"; // dev seed: one segment with Available, Reserved and In use cores
-const reserveRoute = (page: Page) => page.getByTestId("segment-actions").getByRole("button", { name: "Reserve on this route" });
+// dev seed: one segment with Available, Reserved and In use cores
+const A = "DEV Kuala Lumpur DC";
+const B = "DEV Cyberjaya DC";
+const reserveRoute = (page: Page) =>
+  page.getByTestId("segment-actions").getByRole("button", { name: "Reserve on this route" });
 
 test.use({ viewport: { width: 1440, height: 900 } });
 
@@ -14,7 +17,9 @@ test("Reserve box: Cores needed 3 is the target, tick 3, customer, Reserve; succ
   await expect(list.locator("thead th")).toHaveText(["Chosen", "Core", "Ports", "Calculated loss", "Measured loss"]);
   await expect(list.locator("tbody")).not.toContainText(/In service|Reserved|Requested/); // Available cores only
   const ticks = list.getByRole("checkbox");
-  for (let i = 0; i < 3; i++) await ticks.nth(i).check();
+  for (let i = 0; i < 3; i++) {
+    await ticks.nth(i).check();
+  }
   await expect(box.getByTestId("leg-count")).toHaveText("3 of 3");
   await expect(ticks.nth(3)).toBeDisabled(); // target reached: others locked
   await ticks.nth(2).uncheck();
@@ -33,11 +38,13 @@ test("Reserve box: Cores needed 3 is the target, tick 3, customer, Reserve; succ
   await expect(sent).toContainText(/^Request #\d+ sent\. Waiting for admin approval\./);
   const id = /#(\d+)/.exec((await sent.textContent())!)![1];
   const row = page.getByRole("table", { name: /^Cores of / }).locator("tr[data-flash]");
-  await expect(row.first().locator("xpath=ancestor::tbody")).toHaveAttribute("data-status", "Requested"); // status lives in the group heading
+  // status lives in the group heading
+  await expect(row.first().locator("xpath=ancestor::tbody")).toHaveAttribute("data-status", "Requested");
   await expect(reserveRoute(page)).toBeFocused();
   await sent.getByRole("button", { name: "Close" }).click();
   await expect(sent).toHaveCount(0);
-  expect((await page.request.post(`/api/reservations/${id}/withdraw`)).ok()).toBeTruthy(); // leave the dev data as found
+  // leave the dev data as found
+  expect((await page.request.post(`/api/reservations/${id}/withdraw`)).ok()).toBeTruthy();
 });
 
 test("Reserve box: closing with ticked cores asks to discard; Esc and × both ask", async ({ page }) => {
@@ -86,7 +93,9 @@ test("Reserve box contrast >= 4.5", async ({ page }) => {
     button: "[data-testid=reserve-box] button.btn-p",
   });
   expect(Object.keys(ratios).length).toBe(4);
-  for (const [k, v] of Object.entries(ratios)) expect(v, `${k} ${v.toFixed(2)}`).toBeGreaterThanOrEqual(4.5);
+  for (const [name, ratio] of Object.entries(ratios)) {
+    expect(ratio, `${name} ${ratio.toFixed(2)}`).toBeGreaterThanOrEqual(4.5);
+  }
 });
 
 test("count-only reservation shows on the segment and in My reservations", async ({ page }) => {

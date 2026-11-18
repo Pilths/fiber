@@ -16,7 +16,8 @@ test("route search, pick a segment in the diagram: totals, one Cores table group
   await search.getByLabel("Site A").fill("DEV Cyberjaya DC");
   await search.getByLabel("Site B").fill("DEV Kuantan Hut");
   await search.getByRole("button", { name: "Find route" }).click();
-  await expect(page.locator("[data-testid=route-option][aria-pressed=true]")).toContainText(/\d+ segments?, [\d.]+\+? km/);
+  const pickedOption = page.locator("[data-testid=route-option][aria-pressed=true]");
+  await expect(pickedOption).toContainText(/\d+ segments?, [\d.]+\+? km/);
 
   const diagram = page.getByTestId("segment-diagram");
   const segs = diagram.getByRole("list", { name: "Segments on the route" }).getByRole("button");
@@ -51,7 +52,8 @@ test("route search, pick a segment in the diagram: totals, one Cores table group
     await toggle.click();
     await expect(avail.getByRole("button", { name: /^Available \d+$/ })).toHaveAttribute("aria-expanded", "true");
     await expect(avail.locator("tr.colhead").getByRole("columnheader")).toHaveText(["Cores", "Ports"]);
-    await expect(avail.locator("tr[data-core] > td[colspan='5']").filter({ hasText: /\S/ })).toHaveCount(0); // free cores: no holder columns
+    // free cores: no holder columns
+    await expect(avail.locator("tr[data-core] > td[colspan='5']").filter({ hasText: /\S/ })).toHaveCount(0);
   }
   await expect(table).not.toContainText("None"); // empty cells show "-"
 

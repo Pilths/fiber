@@ -1,7 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
 import { contrast, signIn } from "./helpers";
 
-// seed_dev_network: Ipoh Exchange to Kuala Lumpur DC has three paths within 1.5x of the shortest (direct, via Tanjung Malim, via Teluk Intan and Klang). Site ids vary by database.
+// seed_dev_network: Ipoh Exchange to Kuala Lumpur DC has three paths within 1.5x of the shortest (direct,
+// via Tanjung Malim, via Teluk Intan and Klang). Site ids vary by database.
 const FROM = "DEV Ipoh Exchange", TO = "DEV Kuala Lumpur DC";
 async function routeHash(page: Page, cores = 1, idx = 0, from = FROM, to = TO) {
   const eps: { id: number; name: string }[] = await (await page.request.get("/api/routes/endpoints")).json();
@@ -9,8 +10,10 @@ async function routeHash(page: Page, cores = 1, idx = 0, from = FROM, to = TO) {
   return `#route=${id(from)}-${id(to)}-${cores}-km-${idx}`;
 }
 const options = (page: Page) => page.getByRole("list", { name: "Route options" }).getByTestId("route-option");
-const chain = (page: Page) => page.getByTestId("segment-diagram").getByRole("list", { name: "Segments on the route" }).getByRole("button");
-const reserveRoute = (page: Page) => page.getByTestId("segment-actions").getByRole("button", { name: "Reserve on this route" });
+const chain = (page: Page) =>
+  page.getByTestId("segment-diagram").getByRole("list", { name: "Segments on the route" }).getByRole("button");
+const reserveRoute = (page: Page) =>
+  page.getByTestId("segment-actions").getByRole("button", { name: "Reserve on this route" });
 
 async function search(page: Page, from = FROM, to = TO) {
   const s = page.getByRole("region", { name: "Site A to B" });
@@ -58,7 +61,8 @@ test("#route= link opens Inventory with that route found and drawn; #segment= st
   await expect(page.getByRole("region", { name: "Site A to B" }).getByLabel("Site A")).toHaveValue(FROM);
   await expect(options(page).nth(1)).toHaveAttribute("aria-pressed", "true");
   await expect(chain(page).first()).toBeVisible();
-  await expect(page.getByTestId("network-map").locator("[data-testid=map-line][data-selected=true]").first()).toBeAttached();
+  const selectedLine = page.getByTestId("network-map").locator("[data-testid=map-line][data-selected=true]");
+  await expect(selectedLine.first()).toBeAttached();
   await expect(reserveRoute(page)).toBeVisible();
   // Old #span= links still redirect to #segment= (fresh page load first).
   await page.goto("/");
@@ -153,7 +157,9 @@ test("Most free cores sends sort=free_cores, re-ranks and goes into the link", a
   await expect(s.getByRole("radio", { name: "Most free cores" })).toBeChecked();
   await expect(options(page)).toHaveCount(before);
   const fewest = ((await res.json()) as { options: { fewest_free: number }[] }).options.map((o) => o.fewest_free);
-  for (let i = 1; i < fewest.length; i++) expect(fewest[i - 1]).toBeGreaterThanOrEqual(fewest[i]);
+  for (let i = 1; i < fewest.length; i++) {
+    expect(fewest[i - 1]).toBeGreaterThanOrEqual(fewest[i]);
+  }
   await expect(page).toHaveURL(/-free_cores-0$/);
 });
 
@@ -162,12 +168,14 @@ test("route mode on the map: other options' segments switch option, the rest are
   await search(page);
   const eps: { id: number; name: string }[] = await (await page.request.get("/api/routes/endpoints")).json();
   const id = (n: string) => eps.find((e) => e.name === n)!.id;
-  const opts: { segments: { segment_id: number }[] }[] = (await (await page.request.get(`/api/routes?from=${id(FROM)}&to=${id(TO)}&cores_needed=1`)).json()).options;
+  const routes = await page.request.get(`/api/routes?from=${id(FROM)}&to=${id(TO)}&cores_needed=1`);
+  const opts: { segments: { segment_id: number }[] }[] = (await routes.json()).options;
   const [first, second] = opts.map((o) => o.segments.map((x) => x.segment_id));
   const other = second.find((x) => !first.includes(x))!;
   const line = (id: number) => page.locator(`[data-testid=map-line][data-segment-id="${id}"]`);
   // a segment on no option: faint, no chip to click
-  const all = await page.locator("[data-testid=map-line]").evaluateAll((es) => es.map((e) => Number(e.getAttribute("data-segment-id"))));
+  const all = await page.locator("[data-testid=map-line]").evaluateAll((lines) =>
+    lines.map((each) => Number(each.getAttribute("data-segment-id"))));
   const off = all.find((x) => !first.includes(x) && !second.includes(x))!;
   await expect(line(off)).toHaveAttribute("data-state", "hidden");
   await expect(page.locator(`[data-testid=map-chip][data-segment-id="${off}"]`)).toHaveCount(0);

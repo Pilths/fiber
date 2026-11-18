@@ -55,7 +55,9 @@ def post(client, data, name="sm.xlsx"):
 
 
 def post_add_only(client, data, name="sm.xlsx"):
-    return client.post(f"{URL}/uploads", files={"file": (name, data, "application/octet-stream")}, data={"add_only": "true"})
+    return client.post(
+        f"{URL}/uploads", files={"file": (name, data, "application/octet-stream")}, data={"add_only": "true"}
+    )
 
 
 def sheets(r):
@@ -72,8 +74,14 @@ def count(db, sql="SELECT count(*) FROM sites"):
 
 def seed_sites(db, names, kind="site"):
     for n in names:
-        db.execute(text("INSERT INTO sites (name, kind, geom, details) VALUES (:n, :k, ST_SetSRID(ST_MakePoint(101.6, 3.1), 4326), "
-                        "CAST('{\"region\": \"Central\", \"SITE_TYPE\": \"Tower\"}' AS jsonb))"), {"n": n, "k": kind})
+        db.execute(
+            text(
+                "INSERT INTO sites (name, kind, geom, details) "
+                "VALUES (:n, :k, ST_SetSRID(ST_MakePoint(101.6, 3.1), 4326), "
+                'CAST(\'{"region": "Central", "SITE_TYPE": "Tower"}\' AS jsonb))'
+            ),
+            {"n": n, "k": kind},
+        )
 
 
 def rows(client, uid, sheet, group, **q):
@@ -105,8 +113,9 @@ def test_no_matching_sheet_blocks_that_part_with_expected_headers(client, admin)
 
 
 def test_placeholders_are_blank_not_invalid_text(client, admin):
-    data = workbook([["AAAA", "TBA", "N/A", "North", "-"], ["BBBB", 3.1, 101.6, "na", "TBC"], ["CCCC", 3.1, 101.6, "North", "tba"]],
-                    )
+    data = workbook(
+        [["AAAA", "TBA", "N/A", "North", "-"], ["BBBB", 3.1, 101.6, "na", "TBC"], ["CCCC", 3.1, 101.6, "North", "tba"]],
+    )
     r = post(client, data)
     p = {i["key"]: i for i in rows(client, r.json()["upload_id"], "sites", "problem")["items"]}
     assert p["AAAA"]["reason"] == "missing coordinates"
@@ -119,7 +128,8 @@ def test_preview_groups_and_nothing_written_before_apply(client, admin, db):
     seed_sites(db, ["KEEP", "OLDD", "SAME"])
     db.execute(text("UPDATE sites SET geom = ST_SetSRID(ST_MakePoint(101.7, 3.2), 4326) WHERE name = 'KEEP'"))
     before = (count(db), count(db, "SELECT count(*) FROM data_edits"))
-    data = workbook([site("KEEP"), site("SAME"), site("NEWW"), site("BADD", 0, 0), site("ODDR", region="Atlantis")])  # region is ignored
+    # region is ignored
+    data = workbook([site("KEEP"), site("SAME"), site("NEWW"), site("BADD", 0, 0), site("ODDR", region="Atlantis")])
     r = post(client, data)
     uid = r.json()["upload_id"]
     c = sheets(r)["sites"]["counts"]
@@ -172,7 +182,9 @@ def test_duplicate_names_are_problem_rows_and_do_not_block_the_sheet(client, adm
     assert [i["key"] for i in p] == ["DUPE", "DUPE"] and "duplicate site_name 'DUPE' in file (rows" in p[0]["reason"]
     assert apply(client, uid).status_code == 200
     assert count(db, "SELECT count(*) FROM sites WHERE name IN ('AAAA', 'BBBB')") == 2
-    assert count(db, "SELECT count(*) FROM sites WHERE name = 'DUPE'") == 1 and count(db, "SELECT active FROM sites WHERE name = 'DUPE'")  # untouched
+    # untouched
+    assert count(db, "SELECT count(*) FROM sites WHERE name = 'DUPE'") == 1
+    assert count(db, "SELECT active FROM sites WHERE name = 'DUPE'")
 
 
 def test_missing_headers_block_not_overridable(client, admin):
@@ -219,11 +231,19 @@ def test_apply_updates_with_history_and_deactivates_missing(client, admin, db):
     uid = r.json()["upload_id"]
     res = apply(client, uid)
     assert res.status_code == 200
-    assert res.json()["sheets"]["sites"] | {"applied": True} == {"added": 1, "changed": 2, "protected_kept": 0,
-                                                                  "deactivated": 1, "kept_active": 0, "skipped": 0, "applied": True}
+    assert res.json()["sheets"]["sites"] | {"applied": True} == {
+        "added": 1,
+        "changed": 2,
+        "protected_kept": 0,
+        "deactivated": 1,
+        "kept_active": 0,
+        "skipped": 0,
+        "applied": True,
+    }
     assert count(db, "SELECT active FROM sites WHERE name = 'GONE'") is False  # never deleted
     assert count(db, "SELECT active FROM sites WHERE name = 'BACK'") is True
-    assert count(db, "SELECT details->>'region' FROM sites WHERE name = 'AAAA'") == "Central"  # an upload never touches region
+    # an upload never touches region
+    assert count(db, "SELECT details->>'region' FROM sites WHERE name = 'AAAA'") == "Central"
     edits = db.execute(text("SELECT field, old_value, new_value, reason FROM data_edits WHERE entity = 'site' "
                             "AND entity_id = (SELECT id FROM sites WHERE name = 'AAAA') ORDER BY field")).all()
     assert [e[0] for e in edits] == ["details.SITE_TYPE", "location"]
@@ -315,7 +335,8 @@ def test_timing_36k_sites(client, admin, db):
 
 def test_add_only_keeps_sites_missing_from_the_file_and_skips_the_row_count_check(client, admin, db):
     seed_sites(db, [f"S{i:03d}" for i in range(30)])
-    data = workbook([site("S000", 3.5), site("NEWW")])  # 2 rows against 30 active: normally blocked, rest would be deactivated
+    # 2 rows against 30 active: normally blocked, rest would be deactivated
+    data = workbook([site("S000", 3.5), site("NEWW")])
     normal = post(client, data)
     assert sheets(normal)["sites"]["blocked"] and sheets(normal)["sites"]["counts"]["missing"] == 29
     r = post_add_only(client, data)
@@ -324,7 +345,8 @@ def test_add_only_keeps_sites_missing_from_the_file_and_skips_the_row_count_chec
     assert s["counts"]["missing"] == 0 and s["counts"]["added"] == 1 and s["counts"]["changed"] == 1
     assert apply(client, r.json()["upload_id"]).status_code == 200
     assert count(db, "SELECT count(*) FROM sites WHERE active") == 31  # 30 kept + 1 new, none deactivated
-    assert count(db, "SELECT ST_Y(geom) FROM sites WHERE name = 'S000'") == pytest.approx(3.5)  # S000 was updated by the file
+    # S000 was updated by the file
+    assert count(db, "SELECT ST_Y(geom) FROM sites WHERE name = 'S000'") == pytest.approx(3.5)
 
 
 TYPED_HEAD = ["SITE_NAME", "LATITUDE_IN_DECIMAL", "LONGITUDE_IN_DECIMAL", "REGION", "Type"]
@@ -376,8 +398,13 @@ def test_type_change_updates_kind_with_history(client, admin, db):
 
 def test_dashboard_edited_kind_is_protected(client, admin, db):
     apply(client, post(client, typed_workbook(("AAAA", "TOC"))).json()["upload_id"])
-    db.execute(text("INSERT INTO data_edits (entity, entity_id, field, old_value, new_value, reason, user_id) "
-                    "SELECT 'site', id, 'kind', 'site', 'toc', 'fixed by hand', :u FROM sites WHERE name = 'AAAA'"), {"u": admin})
+    db.execute(
+        text(
+            "INSERT INTO data_edits (entity, entity_id, field, old_value, new_value, reason, user_id) "
+            "SELECT 'site', id, 'kind', 'site', 'toc', 'fixed by hand', :u FROM sites WHERE name = 'AAAA'"
+        ),
+        {"u": admin},
+    )
     uid = post(client, typed_workbook(("AAAA", "DC"))).json()["upload_id"]
     res = apply(client, uid).json()["sheets"]["sites"]
     assert res["protected_kept"] == 1 and res["changed"] == 0

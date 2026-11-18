@@ -6,7 +6,7 @@ Read before working: `docs/PRD.md` (requirements), `docs/architecture.md` (desig
 
 - `docker compose up -d --build`: start db, api (http://localhost:8000) and web (http://localhost:5173). Copy `.env.example` to `.env` first.
 - `docker compose exec api pytest`: backend tests.
-- Lint: `docker compose exec web npm run lint` (oxlint, TypeScript).
+- Lint: `docker compose exec web npm run lint` (oxlint, TypeScript; `curly`, `no-nested-ternary` and `no-unused-expressions` are errors). Typecheck: `docker compose exec web npx tsc -b --noEmit` (plain `tsc --noEmit` at the root checks nothing: the root tsconfig only references the others). Backend: `docker compose exec api ruff check .` (line length 120, no one-line `if`/`;` statements; config `api/ruff.toml`).
 - `docker compose exec api alembic upgrade head`: apply migrations.
 - `docker compose exec api python -m app.create_admin USERNAME "Display name"`: first admin on an empty database; asks for the password (hidden). The dev seeds are for DEV data only.
 - `docker compose exec api python -m app.seed_dev_network`: DEV only (refuses unless APP_ENV=development, safe to run again): adds 8 DEV west-coast sites, 14 segments with loops, port gaps on DEV Klang Hut - DEV Cyberjaya DC (cores 5-16), and a road-shaped line per DEV segment from `api/app/dev_road_shapes.json` (OSRM, fetched once, no network at seed time).

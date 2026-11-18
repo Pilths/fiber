@@ -34,7 +34,8 @@ def test_loads_sites_segments_and_counts_then_reruns_cleanly(db, monkeypatch, tm
     seg = db.exec_driver_sql("SELECT s.distance_km, s.survey_cores, s.cable_size, "
                              "(SELECT count(*) FROM cores c WHERE c.segment_id = s.id) FROM segments s").all()
     assert [(str(d), sc, cs, n) for d, sc, cs, n in seg] == [("32.500", 24, 144, 24)]
-    assert db.exec_driver_sql("SELECT count(*) FROM data_edits WHERE reason LIKE 'data file load%%'").scalar() == 1  # survey count
+    # survey count
+    assert db.exec_driver_sql("SELECT count(*) FROM data_edits WHERE reason LIKE 'data file load%%'").scalar() == 1
     # second run with a different survey count keeps the first one
     segs[0][4] = 48
     assert run(monkeypatch, db, tmp_path, sites, segs[:1]) == 0
@@ -65,9 +66,14 @@ def test_invisible_characters_from_copied_cells_are_ignored(db, monkeypatch, tmp
     sites = [["AAAA" + zw, f"3.1{zw}", f"{nb}101.6", None], ["BBBB", "3.2", f"101.7{zw}", None]]
     segs = [[f"AAAA-BBBB{zw}", f"32.5{zw}", None, None, f"24{zw}", None]]
     assert run(monkeypatch, db, tmp_path, sites, segs) == 0
-    assert db.exec_driver_sql("SELECT count(*) FROM sites WHERE name IN ('AAAA', 'BBBB') AND geom IS NOT NULL").scalar() == 2
+    assert (
+        db.exec_driver_sql("SELECT count(*) FROM sites WHERE name IN ('AAAA', 'BBBB') AND geom IS NOT NULL").scalar()
+        == 2
+    )
     assert db.exec_driver_sql("SELECT survey_cores FROM segments").scalar() == 24
-    raw = db.exec_driver_sql("SELECT raw->>'latitude_in_decimal' FROM upload_rows WHERE raw->>'site_name' LIKE 'AAAA%%'").scalar()
+    raw = db.exec_driver_sql(
+        "SELECT raw->>'latitude_in_decimal' FROM upload_rows WHERE raw->>'site_name' LIKE 'AAAA%%'"
+    ).scalar()
     assert raw == f"3.1{zw}"  # raw cell kept exactly as read
 
 
@@ -108,7 +114,12 @@ def test_no_reservation_rows_creates_no_upload(db, monkeypatch, tmp_path, capsys
     mkuser(db, "boss1", "admin")
     assert run(monkeypatch, db, tmp_path, SITES, SEGS, []) == 0
     assert "Reservations: none" in capsys.readouterr().out
-    assert db.exec_driver_sql("SELECT count(*) FROM uploads WHERE filename = 'data.xlsx' AND summary ? 'ignored_sheets'").scalar() == 0
+    assert (
+        db.exec_driver_sql(
+            "SELECT count(*) FROM uploads WHERE filename = 'data.xlsx' AND summary ? 'ignored_sheets'"
+        ).scalar()
+        == 0
+    )
 
 
 def test_reservation_region_is_optional_but_an_unknown_one_needs_review(db, monkeypatch, tmp_path, capsys):

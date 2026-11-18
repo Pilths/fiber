@@ -8,9 +8,27 @@ from app.ingest import reservation_upload as ru
 from sqlalchemy import text
 from test_auth import mkuser
 
-HEAD = ["Region", "Nodes", "Distance(KM)", "Core Secured", "Expected CV Ready", "Port Info", "Contractor", "Remark",
-        "Fiber core monitoring ", "Fiber montiored \nY/N/WIP", "Fiber core requestor", "Fiber core request date",
-        "Aging(days)", "No of core requested", "Core assignment", "Core balnce", "Core status", "Loss (dB)", "Tested on"]
+HEAD = [
+    "Region",
+    "Nodes",
+    "Distance(KM)",
+    "Core Secured",
+    "Expected CV Ready",
+    "Port Info",
+    "Contractor",
+    "Remark",
+    "Fiber core monitoring ",
+    "Fiber montiored \nY/N/WIP",
+    "Fiber core requestor",
+    "Fiber core request date",
+    "Aging(days)",
+    "No of core requested",
+    "Core assignment",
+    "Core balnce",
+    "Core status",
+    "Loss (dB)",
+    "Tested on",
+]
 URL = "/api/admin/uploads"
 SWITCH = "/api/admin/reservation-import"
 ADMIN = {"X-Dev-User": "boss"}
@@ -20,11 +38,44 @@ def ports(a, b, ra="P1-P2", rb="P23-24"):
     return f"{a}\nTray 1\n{ra}\n\n{b}\nMOD B\n{rb}"
 
 
-def row(nodes="AABB-BBCC", who="Acme", cores="ports", count=2, km=3, survey=4, region="Central", date=datetime(2025, 10, 10),
-        status=None, loss=None, tested=None, ra="P1-P2", rb="P23-24"):
+def row(
+    nodes="AABB-BBCC",
+    who="Acme",
+    cores="ports",
+    count=2,
+    km=3,
+    survey=4,
+    region="Central",
+    date=datetime(2025, 10, 10),
+    status=None,
+    loss=None,
+    tested=None,
+    ra="P1-P2",
+    rb="P23-24",
+):
     a, b = nodes[:4], nodes[5:9]
     asg = ports(a, b, ra, rb) if cores == "ports" else None
-    return [region, nodes, km, survey, None, "raw", "Vendor", "note", "ABC", "Y", who, date, 9, count, asg, 9, status, loss, tested]
+    return [
+        region,
+        nodes,
+        km,
+        survey,
+        None,
+        "raw",
+        "Vendor",
+        "note",
+        "ABC",
+        "Y",
+        who,
+        date,
+        9,
+        count,
+        asg,
+        9,
+        status,
+        loss,
+        tested,
+    ]
 
 
 def workbook(*rows, extra_sheets=()):
@@ -104,7 +155,12 @@ def test_unreadable_and_non_xlsx(client, db, admin):
 
 
 def test_confirm_imports_then_reupload_is_idempotent(client, db, admin):
-    out = run(client, row(), row("BBCC-CCDD", who="Beta", cores=None, count=2, survey=4), row("AABB-BBCC (additional core)", ra="P3-P4", rb="P25-26", survey=None, km=None))
+    out = run(
+        client,
+        row(),
+        row("BBCC-CCDD", who="Beta", cores=None, count=2, survey=4),
+        row("AABB-BBCC (additional core)", ra="P3-P4", rb="P25-26", survey=None, km=None),
+    )
     assert out["counts"]["reservations"] == 3 and out["counts"]["segments"] == 2
     assert n(db, "SELECT count(*) FROM reservations WHERE imported") == 3
     assert n(db, "SELECT count(*) FROM reservations WHERE unassigned_segment_id IS NOT NULL") == 3
@@ -112,10 +168,20 @@ def test_confirm_imports_then_reupload_is_idempotent(client, db, admin):
     assert n(db, "SELECT count(*) FROM ports") == 0 and n(db, "SELECT count(*) FROM core_holds") == 0
     assert n(db, "SELECT count(DISTINCT user_id) FROM reservation_events") == 1  # the uploading admin
     assert n(db, "SELECT count(*) FROM reservation_events WHERE type IN ('requested','approved')") == 6
-    before = {t: n(db, f"SELECT count(*) FROM {t}") for t in ("segments", "ports", "cores", "reservations", "customers", "core_holds")}
+    before = {
+        t: n(db, f"SELECT count(*) FROM {t}")
+        for t in ("segments", "ports", "cores", "reservations", "customers", "core_holds")
+    }
     snap = db.execute(text("SELECT * FROM reservations ORDER BY id")).all()
     events = n(db, "SELECT count(*) FROM reservation_events")
-    r = up(client, workbook(row(), row("BBCC-CCDD", who="Beta", cores=None, count=2, survey=4), row("AABB-BBCC (additional core)", ra="P3-P4", rb="P25-26", survey=None, km=None)))
+    r = up(
+        client,
+        workbook(
+            row(),
+            row("BBCC-CCDD", who="Beta", cores=None, count=2, survey=4),
+            row("AABB-BBCC (additional core)", ra="P3-P4", rb="P25-26", survey=None, km=None),
+        ),
+    )
     j = r.json()
     assert j["counts"]["already_imported"] == 3 and j["counts"]["reservations"] == 0 and j["counts"]["new"] == 0
     assert confirm(client, j["upload_id"]).json()["counts"]["reservations"] == 0
@@ -146,8 +212,12 @@ def test_missing_rows_untouched_and_protected_fields(client, db, admin):
     confirm(client, uid)
     assert n(db, f"SELECT distance_km FROM segments WHERE id = {sid}") == 9
     assert n(db, f"SELECT region FROM segments WHERE id = {sid}") == "North"
-    assert n(db, "SELECT reason FROM data_edits WHERE entity = 'segment' AND field = 'region'").startswith("reservation upload res.xlsx #")
-    assert n(db, "SELECT count(*) FROM segments") == 2 and n(db, "SELECT count(*) FROM reservations") == 2  # missing segment untouched
+    assert n(db, "SELECT reason FROM data_edits WHERE entity = 'segment' AND field = 'region'").startswith(
+        "reservation upload res.xlsx #"
+    )
+    # missing segment untouched
+    assert n(db, "SELECT count(*) FROM segments") == 2
+    assert n(db, "SELECT count(*) FROM reservations") == 2
     # now the admin ticks Excel wins
     j = up(client, workbook(row(km=5, region="North"))).json()
     row_id = rows_of(client, j["upload_id"], "changed")[0]["id"]
@@ -155,7 +225,14 @@ def test_missing_rows_untouched_and_protected_fields(client, db, admin):
     assert bad.status_code == 422  # region is not protected
     assert confirm(client, j["upload_id"], excel_wins=[{"row_id": row_id, "field": "distance_km"}]).status_code == 200
     assert float(n(db, f"SELECT distance_km FROM segments WHERE id = {sid}")) == 5
-    assert n(db, "SELECT count(*) FROM data_edits WHERE entity = 'segment' AND field = 'distance_km' AND reason LIKE 'reservation upload%'") == 1
+    assert (
+        n(
+            db,
+            "SELECT count(*) FROM data_edits "
+            "WHERE entity = 'segment' AND field = 'distance_km' AND reason LIKE 'reservation upload%'",
+        )
+        == 1
+    )
     assert db.execute(text("SELECT * FROM reservations ORDER BY id")).all() == res_before
 
 
@@ -172,7 +249,9 @@ def test_measurements_appended_once(client, db, admin):
 def test_core_status_column_is_ignored_and_raw_cell_kept(client, db, admin):
     j = up(client, workbook(row(status="Faulty"))).json()
     assert j["counts"]["reservations"] == 1 and j["counts"]["needs_review"] == 0 and "faulty" not in j["counts"]
-    assert "Faulty" in n(db, f"SELECT raw::text FROM upload_rows WHERE upload_id = {j['upload_id']} AND entity = 'reservation'")
+    assert "Faulty" in n(
+        db, f"SELECT raw::text FROM upload_rows WHERE upload_id = {j['upload_id']} AND entity = 'reservation'"
+    )
     out = confirm(client, j["upload_id"]).json()
     assert out["counts"]["reservations"] == 1 and "faulty_cores" not in out["counts"]
     assert n(db, "SELECT count(*) FROM data_edits WHERE entity = 'core'") == 0
@@ -189,10 +268,19 @@ def test_switch_closed(client, db, admin):
     assert client.post(f"{SWITCH}/close", json={"reason": "again"}, headers=ADMIN).status_code == 409
     st = client.get(SWITCH, headers=ADMIN).json()
     assert st["closed"] and st["reason"] == "dashboard is the source now" and st["closed_at"]
-    assert n(db, "SELECT count(*) FROM data_edits WHERE entity = 'system' AND entity_id = 0 AND field = 'reservation_import'") == 1
+    assert (
+        n(
+            db,
+            "SELECT count(*) FROM data_edits "
+            "WHERE entity = 'system' AND entity_id = 0 AND field = 'reservation_import'",
+        )
+        == 1
+    )
     out = confirm(client, j["upload_id"]).json()  # re-checked at confirm
     assert out["counts"]["reservations"] == 0 and out["ignored_reservation_rows"] == 2
-    assert n(db, "SELECT count(*) FROM reservations") == 0 and n(db, "SELECT count(*) FROM segments") == 2  # segments still feed
+    # segments still feed
+    assert n(db, "SELECT count(*) FROM reservations") == 0
+    assert n(db, "SELECT count(*) FROM segments") == 2
     j = up(client, workbook(row(), row("BBCC-CCDD", who="Beta"))).json()
     assert j["switch_closed"] and j["counts"]["ignored"] == 2 and j["counts"]["reservations"] == 0
     assert "import_closed" in kinds(j) and len([w for w in j["warnings"] if w["kind"] == "import_closed"]) == 1
@@ -205,7 +293,12 @@ def test_planner_forbidden(client, db, admin):
     assert client.post(URL, files=f, headers=P).status_code == 403
     for method, url in [("get", f"{URL}/1"), ("get", f"{URL}/1/rows?group=new"), ("post", f"{URL}/1/confirm"),
                         ("get", SWITCH), ("post", f"{SWITCH}/close")]:
-        assert getattr(client, method)(url, headers=P, **({"json": {"reason": "x"}} if method == "post" else {})).status_code == 403, url
+        assert (
+            getattr(client, method)(
+                url, headers=P, **({"json": {"reason": "x"}} if method == "post" else {})
+            ).status_code
+            == 403
+        ), url
     assert client.get(f"{URL}/999", headers=ADMIN).status_code == 404
 
 
@@ -218,17 +311,23 @@ def test_count_only_and_capacity(client, db, admin):
     assert n(db, "SELECT unassigned_cores FROM reservations") == 3 and n(db, "SELECT count(*) FROM core_holds") == 0
     assert n(db, "SELECT survey_cores FROM segments") == 4 and n(db, "SELECT count(*) FROM cores") == 4
     j = up(client, workbook(row("BBCC-CCDD", cores=None, count=1, survey=None))).json()
-    assert j["counts"]["needs_review"] == 1 and "no verified core count" in rows_of(client, j["upload_id"], "needs_review")[0]["reason"]
-    dup = up(client, workbook(row("BBCC-CCDD", cores=None, count=1, survey=5), row("BBCC-CCDD", cores=None, count=1, survey=5))).json()
+    assert j["counts"]["needs_review"] == 1
+    assert "no verified core count" in rows_of(client, j["upload_id"], "needs_review")[0]["reason"]
+    dup = up(
+        client,
+        workbook(row("BBCC-CCDD", cores=None, count=1, survey=5), row("BBCC-CCDD", cores=None, count=1, survey=5)),
+    ).json()
     assert dup["counts"]["reservations"] == 1 and dup["counts"]["needs_review"] == 1
 
 
 def test_capacity_rechecked_at_confirm(client, db, admin):
     a = up(client, workbook(row(count=3, survey=4))).json()["upload_id"]
-    b = up(client, workbook(row(who="Beta", count=2, survey=4))).json()["upload_id"]  # staged while all 4 cores are free
+    # staged while all 4 cores are free
+    b = up(client, workbook(row(who="Beta", count=2, survey=4))).json()["upload_id"]
     assert confirm(client, a).json()["counts"]["reservations"] == 1
     assert confirm(client, b).json()["counts"]["reservations"] == 0  # only 1 free now: nobody can book more
-    assert n(db, "SELECT count(*) FROM reservations") == 1 and n(db, "SELECT sum(unassigned_cores) FROM reservations") == 3
+    assert n(db, "SELECT count(*) FROM reservations") == 1
+    assert n(db, "SELECT sum(unassigned_cores) FROM reservations") == 3
 
 
 def test_core_assignment_text_is_not_imported(client, db, admin):
@@ -240,7 +339,9 @@ def test_core_assignment_text_is_not_imported(client, db, admin):
     assert n(db, "SELECT count(*) FROM cores WHERE port_a_id IS NOT NULL OR port_b_id IS NOT NULL") == 0
     assert n(db, "SELECT port_info_raw FROM reservations") == "raw"
     uid = n(db, "SELECT max(id) FROM uploads")
-    assert "Tray 1" in n(db, f"SELECT raw->>'Core assignment' FROM upload_rows WHERE upload_id = {uid} AND entity = 'reservation'")
+    assert "Tray 1" in n(
+        db, f"SELECT raw->>'Core assignment' FROM upload_rows WHERE upload_id = {uid} AND entity = 'reservation'"
+    )
 
 
 @pytest.mark.parametrize("count", [None, " ", 0, -1, 1.5, "two"])
@@ -276,7 +377,12 @@ def test_confirm_is_atomic(client, db, admin, monkeypatch):
 
 
 def test_site_master_kind_not_visible(client, db, admin):
-    uid = db.execute(text("INSERT INTO uploads (user_id, filename, kind) VALUES ((SELECT id FROM users WHERE username='boss'), 'x', 'site_master') RETURNING id")).scalar_one()
+    uid = db.execute(
+        text(
+            "INSERT INTO uploads (user_id, filename, kind) "
+            "VALUES ((SELECT id FROM users WHERE username='boss'), 'x', 'site_master') RETURNING id"
+        )
+    ).scalar_one()
     assert client.get(f"{URL}/{uid}", headers=ADMIN).status_code == 404
     assert confirm(client, uid).status_code == 404
 

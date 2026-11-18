@@ -12,7 +12,8 @@ from sqlalchemy.orm import Session
 FALLBACK_KM = 10.0
 
 _lock = Lock()
-_graph: nx.Graph | None = None  # ponytail: one process-wide cache; with several workers each rebuilds on its own restart only
+# ponytail: one process-wide cache; with several workers each rebuilds on its own restart only
+_graph: nx.Graph | None = None
 
 
 def invalidate() -> None:
@@ -23,7 +24,8 @@ def invalidate() -> None:
 
 def build(db: Session) -> nx.Graph:
     g = nx.Graph()
-    for sid, a, b, km in db.execute(text("SELECT id, site_a_id, site_b_id, distance_km FROM segments WHERE NOT fiber_cut")):
+    uncut_segments = db.execute(text("SELECT id, site_a_id, site_b_id, distance_km FROM segments WHERE NOT fiber_cut"))
+    for sid, a, b, km in uncut_segments:
         g.add_edge(a, b, segment_id=sid, weight=float(km) if km is not None else FALLBACK_KM, no_distance=km is None)
     return g
 

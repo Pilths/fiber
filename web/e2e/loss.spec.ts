@@ -14,7 +14,9 @@ test("segment-level views show no loss: diagram totals and Cores table", async (
   await signIn(page);
   await pick(page, SEGMENTS.measured);
   await expect(page.getByTestId("route-totals")).toHaveText(/^Segments1Distance[\d.]+ km$/);
-  await expect(page.getByRole("table", { name: /^Cores of / }).getByRole("columnheader", { name: /loss/i })).toHaveCount(0); // no loss column
+  // no loss column
+  const coresTable = page.getByRole("table", { name: /^Cores of / });
+  await expect(coresTable.getByRole("columnheader", { name: /loss/i })).toHaveCount(0);
 });
 
 test("a measured core: its Calculated loss and Measured loss in core details", async ({ page }) => {
@@ -23,21 +25,25 @@ test("a measured core: its Calculated loss and Measured loss in core details", a
   const segs: { id: number; site_a: string; site_b: string }[] = await (await page.request.get("/api/segments")).json();
   const seg = segs.find((s) => SEGMENTS.measured.test(`${s.site_a} - ${s.site_b}`))!;
   const loss = await (await page.request.get(`/api/loss/segments/${seg.id}`)).json();
-  const core = loss.cores[0] as { core_number: number; measured_db: number; calculated_db: number | null; history: unknown[] };
+  type CoreLoss = { core_number: number; measured_db: number; calculated_db: number | null; history: unknown[] };
+  const core = loss.cores[0] as CoreLoss;
   await openCore(page, core.core_number);
   const d = page.getByRole("dialog", { name: new RegExp(`^Core ${core.core_number} on `) });
-  const row = (k: string) => d.locator("dt", { hasText: new RegExp(`^${k}$`) }).locator("xpath=following-sibling::dd[1]");
+  const row = (label: string) =>
+    d.locator("dt", { hasText: new RegExp(`^${label}$`) }).locator("xpath=following-sibling::dd[1]");
   await expect(row("Calculated loss")).toHaveText(/^\d+\.\d\d dB$/);
   await expect(row("Measured loss")).toContainText(core.measured_db.toFixed(2) + " dB");
   await expect(d.locator("dt", { hasText: /^Loss$/ })).toHaveCount(0); // never just "Loss"
-  await expect(d.getByRole("list", { name: "Measured loss tests, newest first" }).locator("li")).toHaveCount(core.history.length);
+  const tests = d.getByRole("list", { name: "Measured loss tests, newest first" }).locator("li");
+  await expect(tests).toHaveCount(core.history.length);
   await d.screenshot({ path: "e2e/screenshots/core-details.png" });
 });
 
 test("admin adds a Measured loss test from core details", async ({ page }) => {
   await signIn(page, "admin1");
   await pick(page, SEGMENTS.measured);
-  const segments: { id: number; site_a: string; site_b: string }[] = await (await page.request.get("/api/segments")).json();
+  const response = await page.request.get("/api/segments");
+  const segments: { id: number; site_a: string; site_b: string }[] = await response.json();
   const segment = segments.find((each) => SEGMENTS.measured.test(`${each.site_a} - ${each.site_b}`))!;
   const loss = await (await page.request.get(`/api/loss/segments/${segment.id}`)).json();
   const core = loss.cores[0] as { core_number: number; history: unknown[] };

@@ -21,10 +21,23 @@ def build(db):
         w[u] = one(db, "INSERT INTO users (username, display_name, role) VALUES (:u,:u,:r) RETURNING id", u=u, r=role)
     a, b, c, d = (one(db, "INSERT INTO sites (name, kind) VALUES (:n,'site') RETURNING id", n=n) for n in "ABCD")
     w["s1"], w["s2"], w["s3"] = (
-        one(db, "INSERT INTO segments (site_a_id, site_b_id, survey_cores) VALUES (:a,:b,:n) RETURNING id", a=x, b=y, n=n)
-        for x, y, n in [(a, b, 6), (b, c, 4), (c, d, None)])
-    w["c1"] = {n: one(db, "INSERT INTO cores (segment_id, number) VALUES (:s,:n) RETURNING id", s=w["s1"], n=n) for n in range(1, 7)}
-    w["c2"] = {n: one(db, "INSERT INTO cores (segment_id, number) VALUES (:s,:n) RETURNING id", s=w["s2"], n=n) for n in range(1, 5)}
+        one(
+            db,
+            "INSERT INTO segments (site_a_id, site_b_id, survey_cores) VALUES (:a,:b,:n) RETURNING id",
+            a=x,
+            b=y,
+            n=n,
+        )
+        for x, y, n in [(a, b, 6), (b, c, 4), (c, d, None)]
+    )
+    w["c1"] = {
+        n: one(db, "INSERT INTO cores (segment_id, number) VALUES (:s,:n) RETURNING id", s=w["s1"], n=n)
+        for n in range(1, 7)
+    }
+    w["c2"] = {
+        n: one(db, "INSERT INTO cores (segment_id, number) VALUES (:s,:n) RETURNING id", s=w["s2"], n=n)
+        for n in range(1, 5)
+    }
     w["c3"] = one(db, "INSERT INTO cores (segment_id, number) VALUES (:s, 1) RETURNING id", s=w["s3"])
     w["cust"] = one(db, "INSERT INTO customers (name) VALUES ('Acme') RETURNING id")
     w["cust2"] = one(db, "INSERT INTO customers (name) VALUES ('Beta') RETURNING id")
@@ -53,13 +66,24 @@ def status(db, core):
 
 
 def event_types(db, rid):
-    return list(db.execute(text("SELECT type FROM reservation_events WHERE reservation_id = :r ORDER BY id"), {"r": rid}).scalars())
+    return list(
+        db.execute(
+            text("SELECT type FROM reservation_events WHERE reservation_id = :r ORDER BY id"), {"r": rid}
+        ).scalars()
+    )
 
 
 def count_only(db, w, n, segment="s2", planner="planner1"):
     """What an Excel import makes: approved, n cores wanted, no cores, no holds."""
-    rid = one(db, "INSERT INTO reservations (customer_id, planner_id, imported, unassigned_cores, unassigned_segment_id) "
-                  "VALUES (:c,:u,true,:n,:s) RETURNING id", c=w["cust2"], u=w[planner], n=n, s=w[segment])
+    rid = one(
+        db,
+        "INSERT INTO reservations (customer_id, planner_id, imported, unassigned_cores, unassigned_segment_id) "
+        "VALUES (:c,:u,true,:n,:s) RETURNING id",
+        c=w["cust2"],
+        u=w[planner],
+        n=n,
+        s=w[segment],
+    )
     for kind, who in (("requested", planner), ("approved", "admin1")):
         db.execute(text("INSERT INTO reservation_events (reservation_id, type, user_id) VALUES (:r,:t,:u)"),
                    {"r": rid, "t": kind, "u": w[who]})
@@ -142,7 +166,12 @@ def test_002_approve_then_reject_with_reason(client, w, db):
     assert status(db, w["c1"][2]) == "Available"
     mine = client.get("/api/reservations", params={"mine": True, "status": "rejected"}, headers=H("planner1")).json()
     assert [(r["id"], r["last_reason"]) for r in mine] == [(rid2, "Needed for another customer")]
-    assert [r["id"] for r in client.get("/api/reservations", params={"mine": True, "status": "pending"}, headers=H("planner1")).json()] == []
+    assert [
+        r["id"]
+        for r in client.get(
+            "/api/reservations", params={"mine": True, "status": "pending"}, headers=H("planner1")
+        ).json()
+    ] == []
     assert act(client, rid, "approve").status_code == 409  # already approved
     assert act(client, rid2, "approve").status_code == 409  # rejected is final
     assert act(client, rid2, "approve", user="planner1").status_code == 403
@@ -197,9 +226,17 @@ def test_004_partial_release_of_route_reservation(client, w, db):
     assert one(db, "SELECT count(*) FROM reservation_cores WHERE reservation_id = :r", r=rid) == 3  # nothing deleted
     assert event_types(db, rid) == ["requested", "approved", "release_requested", "release_declined",
                                     "release_requested", "released"]
-    per_event = db.execute(text("SELECT e.type, array_agg(rc.core_id ORDER BY rc.core_id) FROM release_cores rc "
-                                "JOIN reservation_events e ON e.id = rc.event_id GROUP BY e.id, e.type ORDER BY e.id")).all()
-    assert per_event == [("release_requested", sorted(s1c)), ("release_requested", sorted(s1c)), ("released", sorted(s1c))]
+    per_event = db.execute(
+        text(
+            "SELECT e.type, array_agg(rc.core_id ORDER BY rc.core_id) FROM release_cores rc "
+            "JOIN reservation_events e ON e.id = rc.event_id GROUP BY e.id, e.type ORDER BY e.id"
+        )
+    ).all()
+    assert per_event == [
+        ("release_requested", sorted(s1c)),
+        ("release_requested", sorted(s1c)),
+        ("released", sorted(s1c)),
+    ]
     assert [(c["core_id"], c["held"]) for c in r["cores"] if c["segment_id"] == w["s1"]] == [(c, False) for c in s1c]
 
     r = act(client, rid, "release", cores=s2c).json()  # releasing the rest ends it
@@ -220,11 +257,22 @@ def test_release_must_name_held_cores(client, w):
 # ---------- TEST-005 ----------
 
 def old_reservation(db, w, months, imported=False, planned_date=None):
-    rid = one(db, "INSERT INTO reservations (customer_id, planner_id, imported, planned_date) VALUES (:c,:u,:i,:d) RETURNING id",
-              c=w["cust"], u=w["planner1"], i=imported, d=planned_date)
+    rid = one(
+        db,
+        "INSERT INTO reservations (customer_id, planner_id, imported, planned_date) VALUES (:c,:u,:i,:d) RETURNING id",
+        c=w["cust"],
+        u=w["planner1"],
+        i=imported,
+        d=planned_date,
+    )
     for kind, who in (("requested", "planner1"), ("approved", "admin1")):
-        db.execute(text("INSERT INTO reservation_events (reservation_id, type, user_id, created_at) "
-                        "VALUES (:r,:t,:u, now() - make_interval(months => :m))"), {"r": rid, "t": kind, "u": w[who], "m": months})
+        db.execute(
+            text(
+                "INSERT INTO reservation_events (reservation_id, type, user_id, created_at) "
+                "VALUES (:r,:t,:u, now() - make_interval(months => :m))"
+            ),
+            {"r": rid, "t": kind, "u": w[who], "m": months},
+        )
     return rid
 
 
@@ -269,7 +317,9 @@ def test_006_admin_can_approve_their_own_request(client, w, db):
     rid = book(client, w, [w["c1"][1]], user="admin1").json()["id"]
     r = act(client, rid, "approve", user="admin1")
     assert r.status_code == 200 and r.json()["status"] == "approved"
-    ev = db.execute(text("SELECT type, user_id FROM reservation_events WHERE reservation_id = :r ORDER BY id"), {"r": rid}).all()
+    ev = db.execute(
+        text("SELECT type, user_id FROM reservation_events WHERE reservation_id = :r ORDER BY id"), {"r": rid}
+    ).all()
     assert [e[0] for e in ev] == ["requested", "approved"] and ev[0][1] == ev[1][1]  # both events name the same admin
 
 
@@ -278,13 +328,16 @@ def test_006_correction_rules(client, w, db):
     assert act(client, rid, "correct", reason="x", planned_date="2027-01-01").status_code == 409  # pending
     act(client, rid, "approve")
     assert act(client, rid, "correct", reason="typo").status_code == 422  # nothing to change
-    assert act(client, rid, "correct", reason="swap", cores=[w["c1"][2]]).status_code == 422  # cores are never corrected
+    # cores are never corrected
+    assert act(client, rid, "correct", reason="swap", cores=[w["c1"][2]]).status_code == 422
     assert act(client, rid, "correct", reason="typo", planned_date="2027-01-01", user="planner1").status_code == 403
 
     r = act(client, rid, "correct", reason="Customer renamed", customer_id=w["cust2"], planned_date="2027-01-01").json()
     assert (r["customer"], r["planned_date"], r["status"]) == ("Beta", "2027-01-01", "approved")
     # the original values stay in the reservation row and the history; the grid shows the corrected ones
-    assert db.execute(text("SELECT customer_id, planned_date::text FROM reservations WHERE id = :r"), {"r": rid}).one() == (w["cust"], "2026-12-01")
+    assert db.execute(
+        text("SELECT customer_id, planned_date::text FROM reservations WHERE id = :r"), {"r": rid}
+    ).one() == (w["cust"], "2026-12-01")
     assert event_types(db, rid) == ["requested", "approved", "corrected"]
     assert one(db, "SELECT reason FROM reservation_events WHERE type = 'corrected'") == "Customer renamed"
     core = segment(client, w["s1"])["cores"][0]
@@ -305,7 +358,9 @@ def test_006_correction_rules(client, w, db):
 def test_my_reservations_list(client, w):
     mine = book(client, w, [w["c1"][1]]).json()["id"]
     book(client, w, [w["c1"][2]], user="planner2")
-    assert [r["id"] for r in client.get("/api/reservations", params={"mine": True}, headers=H("planner1")).json()] == [mine]
+    assert [r["id"] for r in client.get("/api/reservations", params={"mine": True}, headers=H("planner1")).json()] == [
+        mine
+    ]
     assert len(client.get("/api/reservations", headers=H("planner1")).json()) == 1  # planners never see others
     assert len(client.get("/api/reservations", headers=H("admin1")).json()) == 2
     assert client.get("/api/reservations", params={"status": "bogus"}, headers=H("admin1")).status_code == 422
@@ -335,7 +390,8 @@ def test_count_only_limits_booking(client, w, db):
 
 def test_assign_reduces_remaining_and_creates_holds(client, w, db):
     rid = count_only(db, w, 3)
-    assert act(client, rid, "assign", cores=[w["c2"][1], w["c2"][2], w["c2"][3], w["c2"][4]]).status_code == 409  # > remaining
+    # > remaining
+    assert act(client, rid, "assign", cores=[w["c2"][1], w["c2"][2], w["c2"][3], w["c2"][4]]).status_code == 409
     assert act(client, rid, "assign", cores=[w["c1"][1]]).status_code == 422  # wrong segment
     assert act(client, rid, "assign", user="planner1", cores=[w["c2"][1]]).status_code == 403
     assert act(client, rid, "assign", cores=[]).status_code == 422
@@ -345,7 +401,8 @@ def test_assign_reduces_remaining_and_creates_holds(client, w, db):
     assert one(db, "SELECT count(*) FROM core_holds WHERE reservation_id = :r", r=rid) == 2
     assert event_types(db, rid) == ["requested", "approved", "assigned"]
     s2 = next(x for x in client.get("/api/segments", headers=H("planner1")).json() if x["id"] == w["s2"])
-    assert (s2["free_cores"], s2["unassigned_reserved"], s2["free_to_reserve"]) == (2, 1, 1)  # promise kept, not exceeded
+    # promise kept, not exceeded
+    assert (s2["free_cores"], s2["unassigned_reserved"], s2["free_to_reserve"]) == (2, 1, 1)
     assert act(client, rid, "assign", cores=[w["c2"][1]]).status_code == 409  # already held
     assert act(client, rid, "assign", cores=[w["c2"][3], w["c2"][4]]).status_code == 409  # only 1 remaining
     assert act(client, rid, "assign", cores=[w["c2"][3]]).json()["remaining_unassigned"] == 0
@@ -360,11 +417,22 @@ def test_assign_conflict_with_taken_core(client, w, db):
 
 def test_release_of_count_only_frees_its_count(client, w, db):
     rid = count_only(db, w, 3)
-    assert next(x for x in client.get("/api/segments", headers=H("planner1")).json() if x["id"] == w["s2"])["free_to_reserve"] == 1
+    assert (
+        next(x for x in client.get("/api/segments", headers=H("planner1")).json() if x["id"] == w["s2"])[
+            "free_to_reserve"
+        ]
+        == 1
+    )
     r = act(client, rid, "release", cores=[]).json()
     assert r["status"] == "ended" and r["remaining_unassigned"] == 0
-    assert next(x for x in client.get("/api/segments", headers=H("planner1")).json() if x["id"] == w["s2"])["free_to_reserve"] == 4
-    assert one(db, "SELECT count(*) FROM reservations WHERE id = :r AND unassigned_cores = 3", r=rid) == 1  # nothing rewritten
+    assert (
+        next(x for x in client.get("/api/segments", headers=H("planner1")).json() if x["id"] == w["s2"])[
+            "free_to_reserve"
+        ]
+        == 4
+    )
+    # nothing rewritten
+    assert one(db, "SELECT count(*) FROM reservations WHERE id = :r AND unassigned_cores = 3", r=rid) == 1
 
     other = count_only(db, w, 2)  # partly assigned, then every held core released: the rest of the count goes too
     act(client, other, "assign", cores=[w["c2"][1]])
@@ -374,7 +442,11 @@ def test_release_of_count_only_frees_its_count(client, w, db):
 
 def test_count_only_reservation_in_lists(client, w, db):
     rid = count_only(db, w, 3)
-    r = next(x for x in client.get("/api/reservations", params={"mine": True}, headers=H("planner1")).json() if x["id"] == rid)
+    r = next(
+        x
+        for x in client.get("/api/reservations", params={"mine": True}, headers=H("planner1")).json()
+        if x["id"] == rid
+    )
     assert (r["status"], r["cores"], r["remaining_unassigned"]) == ("approved", [], 3)
     assert r["unassigned_segment"] == "B - C"
 
@@ -388,7 +460,10 @@ def test_core_holder_endpoint_and_segment_stale(client, w, db):
     assert r.json()["segment_id"] == w["s1"] and r.json()["number"] == 1 and r.json()["segment_name"] == "A - B"
     rid = book(client, w, [held]).json()["id"]
     mine = client.get(f"/api/cores/{held}", headers=H("planner1")).json()["holder"]
-    assert mine["is_mine"] is True and mine["state"] == "requested" and mine["customer"] == "Acme" and mine["stale"] is False
+    assert mine["is_mine"] is True
+    assert mine["state"] == "requested"
+    assert mine["customer"] == "Acme"
+    assert mine["stale"] is False
     assert mine["age_days"] == 0
     other = client.get(f"/api/cores/{held}", headers=H("planner2")).json()["holder"]
     assert other["is_mine"] is False and other["customer"] == "Acme" and other["reservation_id"] == rid
@@ -402,7 +477,9 @@ def test_core_holder_endpoint_and_segment_stale(client, w, db):
     h = client.get(f"/api/cores/{old}", headers=H("planner2")).json()["holder"]
     assert h["stale"] is True and h["stale_since"] is not None
     rows = {c["id"]: c for c in segment(client, w["s1"])["cores"]}
-    assert rows[old]["stale"] is True and rows[old]["reservation_id"] == orid and rows[old]["stale_since"] == h["stale_since"]
+    assert rows[old]["stale"] is True
+    assert rows[old]["reservation_id"] == orid
+    assert rows[old]["stale_since"] == h["stale_since"]
     assert rows[held]["stale"] is False and rows[held]["reservation_id"] == rid
     assert rows[free]["reservation_id"] is None and rows[free]["stale"] is False
     # hidden core (above survey_cores) and unknown core

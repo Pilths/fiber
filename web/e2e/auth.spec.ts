@@ -45,7 +45,8 @@ test("new user: temporary password, forced change, deactivate blocks, activate r
   await signIn(admin, "admin1");
   await (await account(admin)).getByRole("menuitem", { name: "Users" }).click();
   await expect(admin).toHaveURL(/#users$/);
-  await expect(userRow(admin, "admin1").getByRole("button", { name: /^Deactivate/ })).toHaveCount(0); // not on your own row
+  // not on your own row
+  await expect(userRow(admin, "admin1").getByRole("button", { name: /^Deactivate/ })).toHaveCount(0);
   await admin.getByRole("button", { name: "Add user" }).click();
   const form = admin.getByRole("form", { name: "Add user" });
   await form.getByLabel("Username").fill("admin1");

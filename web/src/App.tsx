@@ -1,42 +1,24 @@
 import { useState } from "react";
-import { api } from "@/api/client";
 import { ChangePassword, Login } from "@/components/Auth";
-import { EditSiteDialog, EditSegmentDialog, type SegmentFocus } from "@/components/AdminEdit";
+import { EditSiteDialog, EditSegmentDialog } from "@/components/AdminEdit";
 import { AssignDialog } from "@/components/AssignDialog";
-import { CoreDrawer } from "@/components/CoreDrawer";
-import { MapFilters } from "@/components/FindCard";
+import { CoreDrawerForSegment } from "@/components/CoreDrawer";
 import type { SearchResult } from "@/components/GlobalSearch";
 import { Header } from "@/components/Header";
-import { CoresTable, SegmentDiagram } from "@/components/NetworkDetail";
-import { CustomerChip } from "@/components/MapOverlay";
-import { MapFilterPanel } from "@/components/MapPanels";
-import { NetworkMap } from "@/components/NetworkMap";
-import { Approvals, MyReservations } from "@/components/Reservations";
+import { InventoryView } from "@/components/InventoryView";
+import { Approvals } from "@/components/reservations/Approvals";
+import { MyReservations } from "@/components/reservations/MyReservations";
 import { ReserveBox } from "@/components/ReserveBox";
-import { RouteSearch } from "@/components/RoutePlanner";
 import { Upload } from "@/components/Upload";
 import { Users } from "@/components/Users";
-import { inFilter, segmentName } from "@/lib/status";
 import { useAuthGate, type Me } from "@/lib/useAuthGate";
-import { useCustomerHighlight, type CustomerHighlight } from "@/lib/useCustomerHighlight";
+import { useCustomerHighlight } from "@/lib/useCustomerHighlight";
 import { useDashboardView } from "@/lib/useDashboardView";
-import { useInventory, type Detail, type Inventory } from "@/lib/useInventory";
-import { useNetworkMap } from "@/lib/useNetworkMap";
+import { adminActions, useEditDialogs } from "@/lib/useEditDialogs";
+import { useInventory, type Inventory } from "@/lib/useInventory";
 import type { RouteLeg } from "@/lib/useReserveBox";
 
-// The map row ends one gutter above the window: 100vh minus the 60px header, main's 24px top padding and a
-// 16px gutter. The floor keeps the Site A to B panel usable on short windows, the ceiling stops tall ones stretching.
-const MAP_CARD_CLASS = "card col-span-8 flex min-h-[clamp(600px,calc(100vh-100px),1000px)] flex-col p-3";
 const ERROR_CLASS = "rounded-md border border-red bg-red-bg px-4 py-2 font-semibold text-red";
-const SENT_CLASS =
-  "mb-3 flex items-center gap-3 rounded-md border border-green-bd bg-green-bg px-3 py-2 " +
-  "text-body font-semibold text-green";
-
-type AdminActions = {
-  onEditSegment: (focus?: SegmentFocus) => void;
-  onEditSite: (end: "a" | "b") => void;
-};
-type Assignable = Detail["unassigned"][number];
 
 export default function App() {
   const auth = useAuthGate();
@@ -58,34 +40,6 @@ export default function App() {
     );
   }
   return <Dashboard me={auth.me} onSignOut={auth.signOut} onChangePassword={auth.openChangePassword} />;
-}
-
-// Edit dialogs opened from Inventory (admins only).
-function useEditDialogs() {
-  const [editSegment, setEditSegment] = useState<{ focus?: SegmentFocus } | null>(null);
-  const [editSite, setEditSite] = useState<number | null>(null);
-  const [assign, setAssign] = useState<Assignable | null>(null);
-  return { editSegment, setEditSegment, editSite, setEditSite, assign, setAssign };
-}
-
-function adminActions(
-  me: Me,
-  inventory: Inventory,
-  dialogs: ReturnType<typeof useEditDialogs>,
-): AdminActions | null {
-  const segmentId = inventory.segmentId;
-  if (me.role !== "admin" || segmentId == null) {
-    return null;
-  }
-  const onEditSite = async (end: "a" | "b") => {
-    try {
-      const segment = await api.get("/api/admin/segments/{sid}", { path: { sid: segmentId } });
-      dialogs.setEditSite(end === "a" ? segment.site_a_id : segment.site_b_id);
-    } catch {
-      inventory.setError("Could not load the segment.");
-    }
-  };
-  return { onEditSegment: (focus?: SegmentFocus) => dialogs.setEditSegment({ focus }), onEditSite };
 }
 
 function routeLegs(inventory: Inventory): RouteLeg[] {
@@ -187,175 +141,6 @@ function Dashboard({ me, onSignOut, onChangePassword }: DashboardProps) {
       {dialogs.editSite != null && (
         <EditSiteDialog siteId={dialogs.editSite} onClose={() => dialogs.setEditSite(null)}
           onSaved={changed} />
-      )}
-    </div>
-  );
-}
-
-function CoreDrawerForSegment({ inventory, detail, coreId, me, onChanged }: {
-  inventory: Inventory;
-  detail: Detail;
-  coreId: number;
-  me: Me;
-  onChanged: () => void;
-}) {
-  const core = detail.cores.find((each) => each.id === coreId)!;
-  const segmentLoss = inventory.segmentLoss;
-  const coreLoss = segmentLoss?.cores.find((row) => row.core_id === coreId) ?? null;
-  const calculated = coreLoss?.calculated_db ?? segmentLoss?.calculated_db ?? null;
-  return (
-    <CoreDrawer key={coreId} core={core} segment={segmentName(detail)} ends={[detail.site_a, detail.site_b]}
-      me={me}
-      onClose={() => inventory.setDrawerCore(null)} onChanged={onChanged} loss={coreLoss} calc={calculated} />
-  );
-}
-
-// Customer mode selects all the customer's segments (plus a segment opened from the map) and fits to them.
-function mapSelection(inventory: Inventory, customer: CustomerHighlight | null) {
-  const found = inventory.found;
-  if (found) {
-    return { selectedIds: inventory.mapIds, routeKey: `found-${found.ids.join(",")}` };
-  }
-  if (!customer) {
-    return { selectedIds: inventory.mapIds, routeKey: null };
-  }
-  const selectedIds = [...new Set([...customer.used.keys(), ...inventory.mapIds])];
-  return { selectedIds, routeKey: `customer-${customer.id}` };
-}
-
-function InventoryView(props: {
-  me: Me;
-  inventory: Inventory;
-  admin: AdminActions | null;
-  version: number;
-  onAssign: (hold: Assignable) => void;
-  customer: CustomerHighlight | null;
-  onClearCustomer: () => void;
-  onPickRequest: (requestId: number | null) => void;
-  clusterFocus: { name: string } | null;
-  onClusterFocused: () => void;
-}) {
-  const { me, inventory, admin, version, onAssign, customer, onClearCustomer, onPickRequest } = props;
-  const { optionIds, detail, segmentId } = inventory;
-  const { selectedIds, routeKey } = mapSelection(inventory, customer);
-  const clearMap = () => {
-    inventory.clearSelection();
-    onClearCustomer();
-  };
-  // The map state lives here so the map filters can sit in the Site A to B panel.
-  const map = useNetworkMap({
-    selectedIds,
-    routeKey,
-    version,
-    onSelectSegment: inventory.pickOnMap,
-    onClear: clearMap,
-    focusCluster: props.clusterFocus,
-    onFocused: props.onClusterFocused,
-  });
-  const tools = customer && (
-    <CustomerChip customer={customer} onPickRequest={onPickRequest} onClear={onClearCustomer} />
-  );
-  const region = (
-    <MapFilters segments={inventory.segments} filter={inventory.filter} onFilter={inventory.changeFilter} />
-  );
-  return (
-    <main className="grid grid-cols-12 gap-4 px-6 pt-6 pb-4">
-      <section className={MAP_CARD_CLASS} aria-label="Network map" aria-describedby="map-instr">
-        {/* ponytail: site clicks do nothing on the view-only map; wire them to Site A/B if planners ask */}
-        <NetworkMap state={map} onSite={() => {}} onClear={clearMap}
-          customer={customer} onEmptyClick={customer ? clearMap : undefined}
-          visible={(properties) => {
-            if (optionIds) {
-              return optionIds.has(properties.segment_id);
-            }
-            return inFilter(properties, inventory.filter);
-          }}
-          tools={tools} />
-      </section>
-      {/* The panel fills the map card's height (absolute, scrolls inside),
-          so the map alone sets the row height. */}
-      <div className="relative col-span-4 min-w-0">
-        <RouteSearch planner={inventory.planner} filters={<MapFilterPanel state={map} region={region} />} />
-      </div>
-      {segmentId != null && !detail && (
-        <p className="card empty col-span-12 text-center text-body text-muted-foreground">
-          Loading segment...
-        </p>
-      )}
-      {detail && (
-        <SegmentPanel me={me} inventory={inventory} detail={detail} admin={admin} onAssign={onAssign} />
-      )}
-    </main>
-  );
-}
-
-function SegmentPanel({ me, inventory, detail, admin, onAssign }: {
-  me: Me;
-  inventory: Inventory;
-  detail: Detail;
-  admin: AdminActions | null;
-  onAssign: (hold: Assignable) => void;
-}) {
-  const segmentId = inventory.segmentId;
-  const onRoute = inventory.onRoute;
-  return (
-    <div className="col-span-12 space-y-4 aria-busy:pointer-events-none aria-busy:opacity-60"
-      aria-busy={detail.id !== segmentId}>
-      <SegmentDiagram segments={inventory.segments} found={inventory.found} d={detail}
-        selectedId={segmentId ?? detail.id} onPick={(id) => inventory.open(id)} onSite={admin?.onEditSite} />
-      {/* Actions sit in their own row under the diagram, one fixed width so they line up. */}
-      {(onRoute || admin) && (
-        <div className="flex justify-end gap-3 *:w-52 *:justify-center" data-testid="segment-actions">
-          {onRoute && (
-            <button type="button" className="btn btn-p" disabled={onRoute.insufficient}
-              onClick={() => inventory.setReserving(true)}>
-              Reserve on this route
-            </button>
-          )}
-          {admin && detail.fiber_cut && (
-            <button type="button" className="btn" onClick={() => admin.onEditSegment("restore")}>
-              Restore
-            </button>
-          )}
-          {admin && (
-            <button type="button" className="btn" onClick={() => admin.onEditSegment()}>Edit segment</button>
-          )}
-        </div>
-      )}
-      <section id="cores" className="card scroll-mt-4" aria-labelledby="cores-h">
-        <div className="card-h items-center"><h2 id="cores-h">Cores</h2></div>
-        {inventory.sent != null && <Sent id={inventory.sent} onClose={() => inventory.setSent(null)} />}
-        {detail.survey_cores == null ? (
-          <NotSurveyed detail={detail} admin={admin} />
-        ) : (
-          <CoresTable key={`${detail.id}-${inventory.focusCoreId}`} d={detail}
-            focusCoreId={inventory.focusCoreId}
-            flash={inventory.sent} onOpen={(core) => inventory.setDrawerCore(core.id)}
-            onAssign={me.role === "admin" ? onAssign : null} />
-        )}
-      </section>
-    </div>
-  );
-}
-
-// Closable success box above the Cores table after a request.
-function Sent({ id, onClose }: { id: number; onClose: () => void }) {
-  return (
-    <div role="status" className={SENT_CLASS} data-testid="request-sent">
-      <span className="flex-1">Request #{id} sent. Waiting for admin approval.</span>
-      <button type="button" className="btn btn-sm px-2.5" aria-label="Close" onClick={onClose}>×</button>
-    </div>
-  );
-}
-
-function NotSurveyed({ detail, admin }: { detail: Detail; admin: AdminActions | null }) {
-  return (
-    <div role="status" data-testid="capacity" className="flex items-center gap-3 text-body">
-      <p>Not verified, cannot be booked. Total cores {detail.cable_size}.</p>
-      {admin && (
-        <button type="button" className="btn btn-sm" onClick={() => admin.onEditSegment("survey")}>
-          Enter verified cores
-        </button>
       )}
     </div>
   );
