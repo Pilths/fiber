@@ -6,6 +6,7 @@ from alembic.config import Config
 from alembic.script import ScriptDirectory
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
@@ -79,3 +80,11 @@ def ready(db: Annotated[Session, Depends(get_db)]) -> JSONResponse:
 @app.exception_handler(PasswordChangeRequired)
 def password_change_required(request: Request, exc: PasswordChangeRequired) -> JSONResponse:
     return JSONResponse({"detail": "Password change required", "code": "password_change_required"}, 403)
+
+
+# The production image copies the built web app here; in development the folder is absent and Vite
+# serves the pages. Mounted last so every /api route above wins over it.
+STATIC_DIR = _API_DIR / "static"
+
+if STATIC_DIR.is_dir():
+    app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="web")

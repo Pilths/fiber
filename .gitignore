@@ -46,3 +46,6 @@ backups/
 
 # graphify output (local map of the code)
 graphify-out/
+
+# Built web app, copied in by the production image only
+api/static/
