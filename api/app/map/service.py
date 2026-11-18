@@ -52,7 +52,9 @@ ORDER BY cluster
 
 
 def _ok(x: float | None, y: float | None) -> bool:
-    return x is not None and y is not None and math.isfinite(x) and math.isfinite(y) and -180 <= x <= 180 and -90 <= y <= 90
+    if x is None or y is None:
+        return False
+    return math.isfinite(x) and math.isfinite(y) and -180 <= x <= 180 and -90 <= y <= 90
 
 
 def _chip(free: int, surveyed: bool) -> str:
@@ -98,7 +100,8 @@ def map_segments(db: Session) -> dict[str, Any]:
     shaped: dict[int, tuple[int, list[list[float]]]] = {}
     for seg in db.execute(text(ROUTE_SQL)).mappings():
         ids = [i for i in seg["segment_ids"] if i in geo]
-        if len(ids) != len(seg["segment_ids"]) or not all(_ok(geo[i]["ax"], geo[i]["ay"]) and _ok(geo[i]["bx"], geo[i]["by"]) for i in ids):
+        all_found = len(ids) == len(seg["segment_ids"])
+        if not all_found or not all(_ok(geo[i]["ax"], geo[i]["ay"]) and _ok(geo[i]["bx"], geo[i]["by"]) for i in ids):
             continue
         for sid, coords in _shaped_parts(json.loads(seg["geom"])["coordinates"], [geo[i] for i in ids]).items():
             shaped[sid] = (seg["id"], coords)
@@ -107,7 +110,8 @@ def map_segments(db: Session) -> dict[str, Any]:
         g, name = geo[s["id"]], f"{s['site_a']} - {s['site_b']}"
         bad = [n for n, x, y in ((g["an"], g["ax"], g["ay"]), (g["bn"], g["bx"], g["by"])) if not _ok(x, y)]
         if bad:
-            not_drawn.append({"segment_id": s["id"], "name": name, "reason": "no valid coordinates for " + ", ".join(bad)})
+            reason = "no valid coordinates for " + ", ".join(bad)
+            not_drawn.append({"segment_id": s["id"], "name": name, "reason": reason})
             continue
         seg_id, coords = shaped.get(s["id"], (None, None))
         surveyed = s["survey_cores"] is not None
@@ -126,8 +130,10 @@ def map_segments(db: Session) -> dict[str, Any]:
 def map_sites(db: Session) -> dict[str, Any]:
     feats, not_drawn = [], []
     for r in db.execute(text(SITE_SQL)).mappings():
-        props = {"site_id": r["id"], "name": r["name"], "kind": r["kind"], "lrd_site_id": r["lrd_site_id"], "region": r["region"],
-                 "cluster": r["cluster"]}
+        props = {
+            "site_id": r["id"], "name": r["name"], "kind": r["kind"], "lrd_site_id": r["lrd_site_id"],
+            "region": r["region"], "cluster": r["cluster"],
+        }
         x, y = r["x"], r["y"]
         if not _ok(x, y):
             if r["kind"] == "data_center" and _ok(r["lx"], r["ly"]):

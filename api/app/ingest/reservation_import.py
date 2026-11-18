@@ -38,7 +38,10 @@ def add_cores(db: Any, segment_id: int, upto: int) -> int:
 
 
 def ensure_segment(db: Any, counts: dict[str, int], a: int, b: int, p: dict[str, Any]) -> tuple[int, int]:
-    """Find the segment for a site pair or create it (surveyed cores 1..N, ports filled in later). Returns (id, site_a_id)."""
+    """Find the segment for a site pair or create it (verified cores 1..N, ports filled in later).
+
+    Returns (id, site_a_id).
+    """
     segment = find_segment(db, a, b)
     if segment:
         return segment
@@ -61,12 +64,20 @@ def port(db: Any, counts: dict[str, int], label: str, site_id: int) -> int:
 
 def place_reservation(db: Any, counts: dict[str, int], p: dict[str, Any], site_ids: dict[str, int],
                       creator_id: int, approver_id: int) -> int:
-    """Insert an approved reservation (events requested + approved) for a parsed Ready row. Count-only: cores are assigned later by an admin."""
+    """Insert an approved reservation (events requested + approved) for a parsed Ready row.
+
+    Count-only: cores are assigned later by an admin.
+    """
     a, b = site_ids[p["site_a"]], site_ids[p["site_b"]]
     segment_id, _ = ensure_segment(db, counts, a, b, p)
     cust = one(db, "SELECT id FROM customers WHERE lower(name) = lower(:n)", n=p["customer"])
     if cust is None:
-        cust = one(db, "INSERT INTO customers (name, created_by) VALUES (:n, :u) RETURNING id", n=p["customer"], u=creator_id)
+        cust = one(
+            db,
+            "INSERT INTO customers (name, created_by) VALUES (:n, :u) RETURNING id",
+            n=p["customer"],
+            u=creator_id,
+        )
         counts["customers"] = counts.get("customers", 0) + 1
     res = one(db, "INSERT INTO reservations (customer_id, planner_id, planned_date, imported, group_label, additional, "
                   "cv_ready_date, contractor, remark, srf_id, port_info_raw, monitoring_code, fiber_monitored, "

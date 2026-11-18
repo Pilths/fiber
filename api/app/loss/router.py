@@ -30,7 +30,10 @@ def coverage(db: DB) -> Coverage:
 
 
 @router.get("/route")
-def route(db: DB, segment_ids: Annotated[str, Query(description="Comma-separated segment ids, in route order")]) -> RouteLoss:
+def route(
+    db: DB,
+    segment_ids: Annotated[str, Query(description="Comma-separated segment ids, in route order")],
+) -> RouteLoss:
     try:
         ids = [int(x) for x in segment_ids.split(",") if x.strip()]
     except ValueError:

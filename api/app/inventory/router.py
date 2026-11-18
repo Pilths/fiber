@@ -59,8 +59,15 @@ def customer_usage(db: DB, customer_id: int) -> CustomerUsage:
 
 
 @router.post("/customers")
-def create_customer(db: DB, user: Annotated[CurrentUser, Depends(get_current_user)], body: CustomerCreate) -> CustomerResult:
-    """Existing name (any case): returned as is. Similar names (>= 0.4) need confirm_new=true before a new one is created."""
+def create_customer(
+    db: DB,
+    user: Annotated[CurrentUser, Depends(get_current_user)],
+    body: CustomerCreate,
+) -> CustomerResult:
+    """Existing name (any case): returned as is.
+
+    Similar names (>= 0.4) need confirm_new=true before a new one is created.
+    """
     name = " ".join(body.name.split())
     if not name:
         raise HTTPException(422, "Customer name is required")

@@ -21,26 +21,49 @@ function Shell({ title, children }: { title: string; children: React.ReactNode }
   );
 }
 
-const Field = ({ label, ...p }: { label: string } & React.InputHTMLAttributes<HTMLInputElement>) => (
+const Field = ({ label, ...inputProps }: { label: string } & React.InputHTMLAttributes<HTMLInputElement>) => (
   <label className="mb-4 block">
     <span className="lbl mb-1 block text-body! text-foreground!">{label}</span>
-    <input className="field" required {...p} />
+    <input className="field" required {...inputProps} />
   </label>
 );
 
-const Alert = ({ text }: { text: string | null }) =>
-  text ? <p role="alert" className="mb-4 rounded-md border border-red bg-red-bg px-3 py-2 text-body font-semibold text-red">{text}</p> : null;
+function Alert({ text }: { text: string | null }) {
+  if (!text) {
+    return null;
+  }
+  return (
+    <p role="alert" className="mb-4 rounded-md border border-red bg-red-bg px-3 py-2 text-body font-semibold text-red">
+      {text}
+    </p>
+  );
+}
+
+// The first rule the new password breaks, or null when it is fine.
+function passwordProblem(current: string, next: string, again: string) {
+  if (next.length < MIN) {
+    return `New password must be at least ${MIN} characters`;
+  }
+  if (next !== again) {
+    return "The new passwords do not match";
+  }
+  if (next === current) {
+    return "New password must differ from the current one";
+  }
+  return null;
+}
 
 export function Login({ onSignedIn }: { onSignedIn: (me: Me) => void }) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const submit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const f = new FormData(e.currentTarget);
+  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
     setBusy(true);
     setError(null);
     try {
-      onSignedIn(await api.post("/api/auth/login", { body: { username: String(f.get("username")), password: String(f.get("password")) } }));
+      const body = { username: String(form.get("username")), password: String(form.get("password")) };
+      onSignedIn(await api.post("/api/auth/login", { body }));
     } catch (err) {
       setError(errorText(err, "Could not sign in. Try again.")); // the API says only "Wrong username or password"
       setBusy(false);
@@ -50,9 +73,12 @@ export function Login({ onSignedIn }: { onSignedIn: (me: Me) => void }) {
     <Shell title="Sign in">
       <form onSubmit={submit}>
         <Alert text={error} />
-        <Field label="Username" name="username" autoComplete="username" autoFocus autoCapitalize="none" spellCheck={false} />
+        <Field label="Username" name="username" autoComplete="username" autoFocus autoCapitalize="none"
+          spellCheck={false} />
         <Field label="Password" name="password" type="password" autoComplete="current-password" />
-        <button type="submit" className="btn btn-p mt-2 w-full" disabled={busy}>{busy ? "Signing in…" : "Sign in"}</button>
+        <button type="submit" className="btn btn-p mt-2 w-full" disabled={busy}>
+          {busy ? "Signing in…" : "Sign in"}
+        </button>
       </form>
     </Shell>
   );
@@ -63,18 +89,18 @@ export function ChangePassword({ me, forced, onDone, onSignOut, onCancel }: {
 }) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const submit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const f = new FormData(e.currentTarget);
-    const [cur, next, again] = ["current", "new", "confirm"].map((k) => String(f.get(k)));
-    const bad = next.length < MIN ? `New password must be at least ${MIN} characters`
-      : next !== again ? "The new passwords do not match"
-      : next === cur ? "New password must differ from the current one" : null;
-    setError(bad);
-    if (bad) return;
+  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const [current, next, again] = ["current", "new", "confirm"].map((name) => String(form.get(name)));
+    const problem = passwordProblem(current, next, again);
+    setError(problem);
+    if (problem) {
+      return;
+    }
     setBusy(true);
     try {
-      await api.post("/api/auth/change-password", { body: { current_password: cur, new_password: next } });
+      await api.post("/api/auth/change-password", { body: { current_password: current, new_password: next } });
       onDone();
     } catch (err) {
       setError(errorText(err, "Could not change the password. Try again."));
@@ -84,15 +110,24 @@ export function ChangePassword({ me, forced, onDone, onSignOut, onCancel }: {
   const link = "font-semibold text-blue underline-offset-2 hover:underline";
   return (
     <Shell title="Change password">
-      {forced && <p className="mb-4 text-body text-muted-foreground">Signed in as <b className="font-semibold text-foreground">{me.username}</b>. Choose a new password before you continue.</p>}
+      {forced && (
+        <p className="mb-4 text-body text-muted-foreground">
+          Signed in as <b className="font-semibold text-foreground">{me.username}</b>. Choose a new password before you
+          continue.
+        </p>
+      )}
       <form onSubmit={submit}>
         <Alert text={error} />
         <input type="text" name="username" autoComplete="username" value={me.username} readOnly hidden />
         <Field label="Current password" name="current" type="password" autoComplete="current-password" autoFocus />
         <Field label="New password" name="new" type="password" autoComplete="new-password" aria-describedby="pw-hint" />
-        <p id="pw-hint" className="-mt-3 mb-4 text-xs text-muted-foreground">At least {MIN} characters, different from the current one.</p>
+        <p id="pw-hint" className="-mt-3 mb-4 text-xs text-muted-foreground">
+          At least {MIN} characters, different from the current one.
+        </p>
         <Field label="Confirm new password" name="confirm" type="password" autoComplete="new-password" />
-        <button type="submit" className="btn btn-p mt-2 w-full" disabled={busy}>{busy ? "Changing…" : "Change password"}</button>
+        <button type="submit" className="btn btn-p mt-2 w-full" disabled={busy}>
+          {busy ? "Changing…" : "Change password"}
+        </button>
       </form>
       <p className="mt-5 text-center text-body">
         {forced

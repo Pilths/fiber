@@ -127,8 +127,11 @@ def rows(db: DB, upload_id: int, group: Group, page: Annotated[int, Query(ge=1)]
     p = {"u": upload_id, "g": group}
     cond = "upload_id = :u AND payload->>'group' = :g"
     total = db.execute(text(f"SELECT count(*) FROM upload_rows WHERE {cond}"), p).scalar_one()
-    q = db.execute(text(f"SELECT id, row_number, sheet, status, reason, raw, warnings, payload FROM upload_rows WHERE {cond} "
-                        "ORDER BY row_number NULLS LAST, id LIMIT :l OFFSET :o"), {**p, "l": page_size, "o": (page - 1) * page_size}).mappings()
+    select_rows = (
+        f"SELECT id, row_number, sheet, status, reason, raw, warnings, payload FROM upload_rows WHERE {cond} "
+        "ORDER BY row_number NULLS LAST, id LIMIT :l OFFSET :o"
+    )
+    q = db.execute(text(select_rows), {**p, "l": page_size, "o": (page - 1) * page_size}).mappings()
     items = [RowOut(id=r["id"], row_number=r["row_number"], sheet_name=r["sheet"], group=group, status=r["status"],
                     reason=r["reason"], raw=r["raw"], warnings=r["warnings"], data=r["payload"]) for r in q]
     return RowsOut(total=total, page=page, page_size=page_size, items=items)

@@ -1,6 +1,7 @@
 """Environment switches that decide how safe the running API is."""
 import logging
 import os
+import sys
 
 logger = logging.getLogger("app.environment")
 
@@ -23,6 +24,12 @@ def cookie_secure() -> bool:
     if explicit is not None:
         return explicit == "1"
     return app_env() == "production"
+
+
+def require_development(script_name: str) -> None:
+    """Exit with a message unless APP_ENV=development. Dev seed scripts call this first."""
+    if app_env() != "development":
+        sys.exit(f"{script_name} runs only when APP_ENV=development")
 
 
 def unsafe_settings() -> list[str]:
