@@ -58,7 +58,7 @@ Still open from the risk review: no TLS proxy in `docker-compose.yml`, container
 
 This is also the data for roadmap item 14: the slow-request lines show whether the map endpoints need work.
 
-### 3, 5 to 11. Done 18 and 19 November 2026 (branch `dev`, synced to `main`)
+### 3, 5 to 13, 16, 17. Done 18 and 19 November 2026 (branch `dev`, synced to `main`)
 
 | # | Change | Commit |
 |---|---|---|
@@ -70,6 +70,10 @@ This is also the data for roadmap item 14: the slow-request lines show whether t
 | 9 | Production stack on `main`: db and api only, web built in a Node stage and served by FastAPI, no reload or source mounts, non-root user, `restart: unless-stopped`. No TLS reverse proxy (owner decision, 18 Nov): plain HTTP with `COOKIE_SECURE=0`. | `c25db35`, `ac5245e` on `main` |
 | 10 | Reservation workbook confirm locks its segments with `create()`'s lock (id order) and re-checks Free under it; a row that no longer fits is skipped. `lock_timeout` 5 s in `_lock`, `create()` and every upload apply; 55P03 and 40P01 answer 409. | `db47cd9` |
 | 11 | Race tests: two `assign`, workbook confirm against `create()` in both orders, lock timeout. 8 race tests, stable on repeated runs. | `db47cd9` |
+| 12 | Every environment variable is read through a function in `environment.py`; no other module reads `os.environ` | `c1b8fc7` |
+| 13 | `segment_kml` reads its segment and that segment's routes only, not the whole map | `c1b8fc7` |
+| 16 | A successful login deletes expired `sessions` rows | `c1b8fc7` |
+| 17 | `docs/architecture.md` matches the code: planned features marked, two compose setups, lock timeout, throttle, logging, lint; pins checked | `c1b8fc7` |
 
 ## Immediate (1-2 weeks), still to do
 
@@ -79,12 +83,8 @@ Nothing left: all done (above).
 
 | # | Change | Benefit | Risk | Complexity | ROI |
 |---|---|---|---|---|---|
-| 12 | One settings object for env reads | Easier tests, one place for the guards | Low | S | Medium |
-| 13 | `segment_kml` reads one segment instead of building the whole map | Removes a known shortcut | Low | S | Medium |
 | 14 | Measure the map endpoints with the new slow-request log; cache only if needed | Avoids tuning on a guess | None | S | Medium |
 | 15 | Domain exceptions instead of `HTTPException` in services; move `admin_edits` SQL into services as files are touched | Services reusable from CLI and the future scheduler | Medium (many handlers, e2e covers them) | L | Medium |
-| 16 | Purge expired `sessions` on login | Stops table growth | Very low | S | Low |
-| 17 | Remove unbuilt features from `docs/architecture.md` or mark them planned | Accurate picture | None | S | Low-medium |
 
 ## Long term (6-12 months)
 
@@ -106,6 +106,6 @@ a repository or DDD layer; rate-limit infrastructure beyond item 8.
 
 ## Order of work
 
-1. Done: items 3, 5 to 11.
-2. Next small items: 12, 13, 16, 17.
+1. Done: items 3, 5 to 13, 16, 17.
+2. Next: 15 (domain exceptions) as files are touched; 20 (split reservation_upload.py).
 3. Hold 14 and 18 until timing data or a worker-count decision exists.
