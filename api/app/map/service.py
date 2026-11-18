@@ -19,10 +19,22 @@ SELECT s.id, s.site_a_id, s.site_b_id, ST_X(a.geom) AS ax, ST_Y(a.geom) AS ay, S
        a.name AS an, b.name AS bn
 FROM segments s JOIN sites a ON a.id = s.site_a_id JOIN sites b ON b.id = s.site_b_id
 """
+# One segment plus every segment of the routes it belongs to (a shaped line is cut over the whole route).
+SEGMENT_GEO_ONE_FILTER = """
+WHERE s.id = :segment_id OR s.id IN (
+    SELECT segment_id FROM route_segments WHERE route_id IN (
+        SELECT route_id FROM route_segments WHERE segment_id = :segment_id))
+"""
 ROUTE_SQL = """
 SELECT g.id, ST_AsGeoJSON(g.geom) AS geom, array_agg(gs.segment_id ORDER BY gs.position) AS segment_ids
 FROM routes g JOIN route_segments gs ON gs.route_id = g.id
 WHERE g.geom IS NOT NULL GROUP BY g.id ORDER BY g.id
+"""
+ROUTE_ONE_SQL = """
+SELECT g.id, ST_AsGeoJSON(g.geom) AS geom, array_agg(gs.segment_id ORDER BY gs.position) AS segment_ids
+FROM routes g JOIN route_segments gs ON gs.route_id = g.id
+WHERE g.geom IS NOT NULL AND g.id IN (SELECT route_id FROM route_segments WHERE segment_id = :segment_id)
+GROUP BY g.id ORDER BY g.id
 """
 SITE_SQL = """
 SELECT s.id, s.name, s.kind, s.lrd_site_id, s.details->>'region' AS region,
@@ -95,16 +107,21 @@ def _shaped_parts(line: list[list[float]], segments: list[dict[str, Any]]) -> di
     return out
 
 
-def map_segments(db: Session) -> dict[str, Any]:
-    geo = {r["id"]: dict(r) for r in db.execute(text(SEGMENT_GEO_SQL)).mappings()}
+def _shaped_lines(db: Session, geo: dict[int, dict[str, Any]], route_sql: str, params: dict[str, Any]):
     shaped: dict[int, tuple[int, list[list[float]]]] = {}
-    for seg in db.execute(text(ROUTE_SQL)).mappings():
+    for seg in db.execute(text(route_sql), params).mappings():
         ids = [i for i in seg["segment_ids"] if i in geo]
         all_found = len(ids) == len(seg["segment_ids"])
         if not all_found or not all(_ok(geo[i]["ax"], geo[i]["ay"]) and _ok(geo[i]["bx"], geo[i]["by"]) for i in ids):
             continue
         for sid, coords in _shaped_parts(json.loads(seg["geom"])["coordinates"], [geo[i] for i in ids]).items():
             shaped[sid] = (seg["id"], coords)
+    return shaped
+
+
+def map_segments(db: Session) -> dict[str, Any]:
+    geo = {r["id"]: dict(r) for r in db.execute(text(SEGMENT_GEO_SQL)).mappings()}
+    shaped = _shaped_lines(db, geo, ROUTE_SQL, {})
     feats, not_drawn = [], []
     for s in list_segments(db, None, None, None):
         g, name = geo[s["id"]], f"{s['site_a']} - {s['site_b']}"
@@ -176,12 +193,13 @@ def segment_kml(db: Session, segment_id: int) -> tuple[str, str] | None:
     sites = db.execute(text(SEGMENT_SITES_SQL), {"segment_id": segment_id}).mappings().first()
     if sites is None:
         return None
-    # ponytail: builds the whole map to pick one line; fine for a few hundred segments
-    features = map_segments(db)["features"]
-    feature = next((f for f in features if f["properties"]["segment_id"] == segment_id), None)
-    if feature is None:
+    params = {"segment_id": segment_id}
+    geo = {r["id"]: dict(r) for r in db.execute(text(SEGMENT_GEO_SQL + SEGMENT_GEO_ONE_FILTER), params).mappings()}
+    this = geo[segment_id]
+    if not (_ok(this["ax"], this["ay"]) and _ok(this["bx"], this["by"])):
         return None
-    coords = feature["geometry"]["coordinates"]
+    shaped = _shaped_lines(db, geo, ROUTE_ONE_SQL, params)
+    coords = shaped[segment_id][1] if segment_id in shaped else [[this["ax"], this["ay"]], [this["bx"], this["by"]]]
     name = f"{sites['site_a']} - {sites['site_b']}"
     line_text = " ".join(f"{lon},{lat},0" for lon, lat in coords)
     kml = (

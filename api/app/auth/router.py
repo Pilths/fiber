@@ -13,7 +13,7 @@ from pydantic import BaseModel
 from sqlalchemy import text
 
 from app.auth.deps import COOKIE, DB, CurrentUser, get_session_user, hash_token
-from app.environment import cookie_secure
+from app.environment import cookie_secure, session_hours
 
 logger = logging.getLogger("app.auth")
 router = APIRouter(prefix="/api")
@@ -36,6 +36,7 @@ SELECT_USER_FOR_LOGIN = """
     WHERE username = :username
 """
 INSERT_SESSION = "INSERT INTO sessions (id, user_id, expires_at) VALUES (:session_id, :user_id, :expires_at)"
+DELETE_EXPIRED_SESSIONS = "DELETE FROM sessions WHERE expires_at < now()"
 DELETE_SESSION = "DELETE FROM sessions WHERE id = :session_id"
 SELECT_PASSWORD_HASH = "SELECT password_hash FROM users WHERE id = :user_id"
 UPDATE_PASSWORD = "UPDATE users SET password_hash = :password_hash, must_change_password = false WHERE id = :user_id"
@@ -114,13 +115,14 @@ def login(db: DB, request: Request, response: Response, body: LoginBody) -> Curr
         raise BAD_LOGIN
     with _failed_logins_lock:
         _failed_logins.pop(user_key, None)
-    hours = float(os.environ.get("SESSION_HOURS", "12"))
+    hours = session_hours()
     token = secrets.token_urlsafe(32)
     session = {
         "session_id": hash_token(token),
         "user_id": row["id"],
         "expires_at": datetime.now(UTC) + timedelta(hours=hours),
     }
+    db.execute(text(DELETE_EXPIRED_SESSIONS))
     db.execute(text(INSERT_SESSION), session)
     db.commit()
     response.set_cookie(

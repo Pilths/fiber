@@ -1,11 +1,12 @@
 """Logging setup and one log line per request that matters."""
 import logging
-import os
 import time
 from collections.abc import Awaitable, Callable, Iterator
 from contextlib import contextmanager
 
 from fastapi import FastAPI, Request, Response
+
+from app.environment import log_level
 
 SLOW_REQUEST_SECONDS = 1.0
 QUIET_PATHS = ("/api/health",)
@@ -16,7 +17,7 @@ upload_logger = logging.getLogger("app.upload")
 
 def configure_logging() -> None:
     logging.basicConfig(
-        level=os.environ.get("LOG_LEVEL", "INFO"),
+        level=log_level(),
         format="%(asctime)s %(levelname)s %(name)s %(message)s",
     )
 
