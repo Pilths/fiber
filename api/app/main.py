@@ -1,3 +1,4 @@
+import logging
 from functools import lru_cache
 from pathlib import Path
 from typing import Annotated
@@ -8,6 +9,7 @@ from fastapi import Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
+from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
 
 from app.admin_edits import router as admin_edits_router
@@ -75,6 +77,19 @@ def ready(db: Annotated[Session, Depends(get_db)]) -> JSONResponse:
         {"status": "schema behind", "database": database_revision, "head": head},
         status_code=503,
     )
+
+
+LOCK_BUSY_SQLSTATES = {"55P03", "40P01"}  # lock_not_available, deadlock_detected
+BUSY_MESSAGE = "The data is busy with another change. Try again."
+logger = logging.getLogger("app.main")
+
+
+@app.exception_handler(DBAPIError)  # OperationalError is a subclass
+def database_error(request: Request, exc: DBAPIError) -> JSONResponse:
+    if getattr(exc.orig, "sqlstate", None) not in LOCK_BUSY_SQLSTATES:
+        raise exc
+    logger.info("lock wait gave up on %s %s: %s", request.method, request.url.path, exc.orig)
+    return JSONResponse({"detail": BUSY_MESSAGE}, status_code=409)
 
 
 @app.exception_handler(PasswordChangeRequired)

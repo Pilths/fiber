@@ -29,6 +29,7 @@ from app.ingest.reservation_import import (
 from app.ingest.site_master import load_protected
 from app.ingest.uploads import ApplyError, finish_upload, insert_upload, lock_staged_upload
 from app.inventory import service as inventory
+from app.reservations.service import lock_segments
 from app.routing.graph import invalidate as invalidate_routes
 
 REASON = "reservation upload"
@@ -347,6 +348,9 @@ def _set(row: Row, group: str, reason: str | None = None) -> None:
     row.status = {"needs_review": "needs_review", "rejected": "rejected"}.get(group, "ready")
 
 
+NO_ROOM_TEXT = "free to reserve on this segment"
+
+
 def _reservation_row(
     db: Session,
     row: Row,
@@ -388,7 +392,7 @@ def _reservation_row(
     new_cores = max(item.verified_cores - (item.db_verified_cores or 0), 0)
     free = already_free + new_cores - item.used
     if count > free:
-        _set(row, "needs_review", f"{count} cores requested but only {max(free, 0)} free to reserve on this segment")
+        _set(row, "needs_review", f"{count} cores requested but only {max(free, 0)} {NO_ROOM_TEXT}")
         return
     count_rows[identity] = row.row_number
     item.used += count
@@ -678,12 +682,17 @@ def _place_reservations(
     for row in evaluation.rows:
         if row.group == "conflicts":
             skipped.append({"row_number": row.row_number, "reason": row.reason})
+        elif row.group == "needs_review" and NO_ROOM_TEXT in (row.reason or ""):
+            skipped.append({"row_number": row.row_number, "reason": row.reason})
 
 
 def confirm(db: Session, admin_id: int, upload_id: int, excel_wins: list[dict[str, Any]]) -> dict[str, Any]:
     upload = lock_staged_upload(db, upload_id, "excel", "This upload was already confirmed")
     wins = _read_wins(db, upload_id, excel_wins)
     evaluation = evaluate(db, load_staged(db, upload_id), wins)
+    # Lock first, then decide again: Free is read under the same segment locks create() takes.
+    lock_segments(db, {item.segment_id for item in evaluation.segments.values() if item.segment_id})
+    evaluation = evaluate(db, load_staged(db, upload_id), wins)  # fresh rows: evaluate adds warnings to them
     _check_wins_are_protected(evaluation, wins)
     why = f"{REASON} {upload['filename']} #{upload_id}"
     counts: dict[str, int] = dict.fromkeys(COUNT_KEYS, 0)
