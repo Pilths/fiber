@@ -58,23 +58,27 @@ Still open from the risk review: no TLS proxy in `docker-compose.yml`, container
 
 This is also the data for roadmap item 14: the slow-request lines show whether the map endpoints need work.
 
+### 3, 5 to 11. Done 18 and 19 November 2026 (branch `dev`, synced to `main`)
+
+| # | Change | Commit |
+|---|---|---|
+| 3 | `scripts/backup-db.sh` (pg_dump to `backups/`, keeps 14, cron line in its header) and `scripts/restore-check.sh` (restore drill into a separate database). Copying `backups/` off the machine is still a manual step. | `7e4a349` |
+| 5 | `GET /api/ready` returns 503 when `alembic_version` is not the head; `/api/health` stays liveness | `7e4a349` |
+| 6 | Migration `0005`: indexes on 16 foreign-key columns (the 8 above plus `reservation_cores`, `release_cores`, `assign_cores` (core_id), `cores` (port_a_id, port_b_id), `reservation_events(user_id)`, `routes` (site_a_id, site_b_id)) | `7e4a349` |
+| 7 | Reservation workbook and segment list applies update segments in id order. Site master apply touches no segments. | `7e4a349` |
+| 8 | Login throttle: 5 failures per username, 20 per address, in 15 minutes, in process memory | `7e4a349` |
+| 9 | Production stack on `main`: db and api only, web built in a Node stage and served by FastAPI, no reload or source mounts, non-root user, `restart: unless-stopped`. No TLS reverse proxy (owner decision, 18 Nov): plain HTTP with `COOKIE_SECURE=0`. | `c25db35`, `ac5245e` on `main` |
+| 10 | Reservation workbook confirm locks its segments with `create()`'s lock (id order) and re-checks Free under it; a row that no longer fits is skipped. `lock_timeout` 5 s in `_lock`, `create()` and every upload apply; 55P03 and 40P01 answer 409. | `db47cd9` |
+| 11 | Race tests: two `assign`, workbook confirm against `create()` in both orders, lock timeout. 8 race tests, stable on repeated runs. | `db47cd9` |
+
 ## Immediate (1-2 weeks), still to do
 
-| # | Change | Benefit | Risk | Complexity | ROI |
-|---|---|---|---|---|---|
-| 3 | Scheduled `pg_dump` and a written restore drill | The database is the source of truth; this is the only protection against losing the volume | Low | S | Very high |
-| 5 | `/api/ready` that compares `alembic_version` to head; keep `/api/health` as liveness | Schema drift fails loudly | Low (keep compose on liveness) | S | High |
-| 6 | Migration `0005`: `core_holds(reservation_id)`, `upload_rows(upload_id)`, `reservations(customer_id)`, `(planner_id)`, `(unassigned_segment_id)`, `segments(site_a_id)`, `(site_b_id)`, `route_segments(segment_id)` | Removes scans in `reservation_state_v`, staging reads and map site query | Very low | S | Medium |
-| 7 | Sort segment updates by id in the apply loops (`reservation_upload.py`, `segment_list.py`, `site_master/apply.py`) | Removes a lock-order inversion against `create()` | Low | S | Medium |
-| 8 | Login throttle per username and address, in process memory | Closes unbounded password guessing | Low (resets on restart, per worker) | S | Medium-high |
+Nothing left: all done (above).
 
 ## Short term (1-3 months)
 
 | # | Change | Benefit | Risk | Complexity | ROI |
 |---|---|---|---|---|---|
-| 9 | Production compose profile: built static web, no `--reload`, no bind mounts, non-root `USER`, TLS reverse proxy | Deploy artifact matches production | Medium (must stay one compose family) | M | High |
-| 10 | Upload apply: re-check `free_to_reserve` under segment locks at apply time; `SET LOCAL lock_timeout`; map 40P01 and 55P03 to 409 | Closes the preview-to-apply race, bounds blocking | Medium | M | High |
-| 11 | More concurrency tests: two `assign`, import apply against `create()` | Locks in items 1 and 10 | Low | M | High |
 | 12 | One settings object for env reads | Easier tests, one place for the guards | Low | S | Medium |
 | 13 | `segment_kml` reads one segment instead of building the whole map | Removes a known shortcut | Low | S | Medium |
 | 14 | Measure the map endpoints with the new slow-request log; cache only if needed | Avoids tuning on a guess | None | S | Medium |
@@ -102,6 +106,6 @@ a repository or DDD layer; rate-limit infrastructure beyond item 8.
 
 ## Order of work
 
-1. Items 3, 5 to 8 next (all small).
-2. Items 9 to 11 together, because the production profile needs the concurrency tests.
+1. Done: items 3, 5 to 11.
+2. Next small items: 12, 13, 16, 17.
 3. Hold 14 and 18 until timing data or a worker-count decision exists.
