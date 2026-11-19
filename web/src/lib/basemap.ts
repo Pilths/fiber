@@ -100,7 +100,7 @@ export async function basemapInstalled(): Promise<{ tiles: boolean; glyphs: bool
 
 export function createBasemap(container: HTMLElement, center: [number, number], zoom: number, glyphs: boolean) {
   return new MlMap({
-    container, style: style(glyphs), center, zoom, minZoom: 4, maxZoom: 18, // tiles stop at 14; MapLibre overzooms them
+    container, style: style(glyphs), center, zoom, minZoom: 4, maxZoom: 18, fadeDuration: 0, // tiles stop at 14; MapLibre overzooms them
     maxBounds: [[95, -4], [124, 12]],
     dragRotate: false, pitchWithRotate: false, touchPitch: false, keyboard: false,
     attributionControl: { compact: true },

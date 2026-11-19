@@ -91,7 +91,7 @@
 
 @layer base {
   * { @apply border-border; }
-  html { background: var(--ground); @apply font-sans; }
+  html { overflow-y: scroll; background: var(--ground); @apply font-sans; }
   body {
     min-width: 1200px; background: var(--ground); color: var(--ink);
     font-size: 14px; line-height: 1.45; font-variant-numeric: tabular-nums; -webkit-font-smoothing: antialiased;
