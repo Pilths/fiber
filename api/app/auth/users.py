@@ -11,8 +11,8 @@ INSERT_USER = """
     RETURNING id
 """
 INSERT_USER_EDIT = """
-    INSERT INTO data_edits (entity, entity_id, field, old_value, new_value, reason, user_id)
-    VALUES ('user', :user_id, :field, :old_value, :new_value, :reason, :edited_by)
+    INSERT INTO data_edits (entity, entity_id, field, old_value, new_value, remarks, user_id)
+    VALUES ('user', :user_id, :field, :old_value, :new_value, :remarks, :edited_by)
 """
 
 
@@ -48,14 +48,14 @@ def log_user_edit(
     field: str,
     old_value: str | None,
     new_value: str,
-    reason: str,
+    remarks: str | None,
 ) -> None:
     params = {
         "user_id": user_id,
         "field": field,
         "old_value": old_value,
         "new_value": new_value,
-        "reason": reason,
+        "remarks": remarks,
         "edited_by": edited_by,
     }
     db.execute(text(INSERT_USER_EDIT), params)

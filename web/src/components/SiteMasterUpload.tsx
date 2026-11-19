@@ -20,7 +20,8 @@ import {
   type SiteMasterUploadState,
   type Uploads,
 } from "@/lib/useSiteMasterUpload";
-import { cell, field, when } from "@/lib/utils";
+import { formatDateTime } from "@/lib/format";
+import { cell, field } from "@/lib/utils";
 
 const SHEET_LABEL = "Site Location";
 const GROUPS: GroupInfo<Group>[] = [
@@ -62,7 +63,7 @@ function FileStatus({ file, isCurrent }: { file: FileInfo; isCurrent: boolean })
 }
 
 function FileLine({ file, isCurrent }: { file: FileInfo; isCurrent: boolean }) {
-  const uploaded = `${when(file.uploaded_at)} · ${file.uploaded_by}`;
+  const uploaded = `${formatDateTime(file.uploaded_at)} · ${file.uploaded_by}`;
   return (
     <tr data-testid={isCurrent ? "sm-current" : undefined}>
       <td className={`truncate ${isCurrent ? "font-semibold" : ""}`} title={file.filename}>{file.filename}</td>
@@ -232,7 +233,7 @@ function SheetPanel({ uploadId, sheet, override, onOverride, children }: {
   );
 }
 
-// The footer under a sheet's preview: the override reason and the Apply button.
+// The footer under a sheet's preview: the override remarks and the Apply button.
 function SheetFooter({ upload, sheet }: { upload: SiteMasterUploadState; sheet: Sheet }) {
   // the red note already says it will not be applied
   if (!sheet.found || (sheet.blocked && !sheet.needs_override)) {
@@ -243,8 +244,8 @@ function SheetFooter({ upload, sheet }: { upload: SiteMasterUploadState; sheet: 
   return (
     <div className="mt-4 flex flex-wrap items-end gap-4 border-t pt-4">
       {upload.overriding(sheet) && (
-        <label className="w-[420px]"><span className="lbl mb-1 block text-body! text-foreground!">Reason for the override (required)</span>
-          <input className="field" value={upload.reason} onChange={(e) => upload.setReason(e.target.value)} />
+        <label className="w-[420px]"><span className="lbl mb-1 block text-body! text-foreground!">Remarks (optional)</span>
+          <input className="field" value={upload.remarks} onChange={(e) => upload.setRemarks(e.target.value)} />
         </label>
       )}
       <button type="button" className="btn btn-p" disabled={!!why} aria-describedby={whyId}

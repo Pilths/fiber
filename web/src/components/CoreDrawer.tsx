@@ -7,7 +7,8 @@ import { MeasurementDialog } from "@/components/MeasurementDialog";
 import { PortsDialog } from "@/components/PortsDialog";
 import { Dialog } from "@/components/upload-parts";
 import { LossDeviation } from "@/lib/lossLevel";
-import { db, EVENT_WORD, segmentName, STATUS, statusLabel, when } from "@/lib/status";
+import { db, EVENT_WORD, segmentName, STATUS, statusLabel } from "@/lib/status";
+import { formatDateTime } from "@/lib/format";
 import type { Detail, Inventory } from "@/lib/useInventory";
 
 type Core = components["schemas"]["CoreDetail"];
@@ -279,8 +280,8 @@ function HistoryList({ items, admin }: { items: Item[] | null; admin: boolean })
           {item.reservation_id != null && (
             <span className="text-muted-foreground"> (reservation #{item.reservation_id})</span>
           )}
-          <span className="block text-muted-foreground">{when(item.at)}</span>
-          {item.reason && <span className="block">Reason: {item.reason}</span>}
+          <span className="block text-muted-foreground">{formatDateTime(item.at)}</span>
+          {item.remarks && <span className="block">Remarks: {item.remarks}</span>}
         </li>
       ))}
     </ol>

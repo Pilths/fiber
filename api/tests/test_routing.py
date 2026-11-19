@@ -145,7 +145,7 @@ def test_graph_invalidated_after_segment_edit(client, g, db):
     before = routes(client, g, n=1).json()["options"][0]
     assert before["total_km"] == 6
     r = client.post(
-        f"/api/admin/segments/{g['BD']}", json={"distance_km": 50, "reason": "re-measured"}, headers=H("admin1")
+        f"/api/admin/segments/{g['BD']}", json={"distance_km": 50, "remarks": "re-measured"}, headers=H("admin1")
     )
     assert r.status_code == 200, r.text
     after = routes(client, g, n=1).json()["options"][0]

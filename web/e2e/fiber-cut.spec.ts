@@ -48,7 +48,7 @@ test("fiber cut: Cut chip on a dashed red line; planner has no Restore", async (
   await d.screenshot({ path: "e2e/screenshots/diagram-cut.png" });
 });
 
-test("fiber cut: admin Restore opens the segment dialog unticked with focus on the reason", async ({ page }) => {
+test("fiber cut: admin Restore opens the segment dialog unticked with focus on the remarks", async ({ page }) => {
   await mock(page, { fiber_cut: true, free_to_reserve: 0 });
   let posted: unknown = null;
   await page.route(/\/api\/admin\/segments\/\d+$/, (route) => {
@@ -62,16 +62,16 @@ test("fiber cut: admin Restore opens the segment dialog unticked with focus on t
   await pick(page);
   await actions(page).getByRole("button", { name: "Restore" }).click();
   const dlg = page.getByRole("dialog", { name: /^Edit segment/ });
-  const reason = dlg.getByLabel("Reason (optional)");
-  await expect(reason).toBeFocused();
+  const remarks = dlg.getByLabel("Remarks (optional)");
+  await expect(remarks).toBeFocused();
   await expect(dlg.getByRole("checkbox", { name: /Fiber cut/ })).not.toBeChecked();
-  await reason.fill("E2E: repaired");
+  await remarks.fill("E2E: repaired");
   await dlg.getByRole("button", { name: "Save" }).click();
   await expect(dlg).toBeHidden();
-  expect(posted).toEqual({ reason: "E2E: repaired", fiber_cut: false });
+  expect(posted).toEqual({ remarks: "E2E: repaired", fiber_cut: false });
 });
 
-test("Edit segment: ticking Fiber cut sends fiber_cut true with the reason", async ({ page }) => {
+test("Edit segment: ticking Fiber cut sends fiber_cut true with the remarks", async ({ page }) => {
   await mock(page, { fiber_cut: false });
   let posted: unknown = null;
   await page.route(/\/api\/admin\/segments\/\d+$/, (route) => {
@@ -88,8 +88,8 @@ test("Edit segment: ticking Fiber cut sends fiber_cut true with the reason", asy
   const box = dlg.getByRole("checkbox", { name: /Fiber cut/ });
   await expect(box).not.toBeChecked();
   await box.check();
-  await dlg.getByLabel("Reason (optional)").fill("E2E: cable cut at km 4");
+  await dlg.getByLabel("Remarks (optional)").fill("E2E: cable cut at km 4");
   await dlg.getByRole("button", { name: "Save" }).click();
   await expect(dlg).toBeHidden();
-  expect(posted).toEqual({ reason: "E2E: cable cut at km 4", fiber_cut: true });
+  expect(posted).toEqual({ remarks: "E2E: cable cut at km 4", fiber_cut: true });
 });

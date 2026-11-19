@@ -2,6 +2,7 @@ import { useState, type FormEvent, type ReactNode } from "react";
 import { Icon } from "@/components/Icon";
 import { db, health } from "@/lib/status";
 import type { Endpoint, RouteOption, RoutePlanner, RouteSegment, Sort } from "@/lib/useRoutePlanner";
+import { formatKm } from "@/lib/format";
 
 const LINK_CLASS = "cursor-pointer text-body font-semibold text-blue hover:underline";
 const SORT_CHOICES: readonly (readonly [Sort, string])[] = [
@@ -16,10 +17,6 @@ const OPTION_CLASS =
   "flex w-full items-start gap-2.5 rounded-md border border-line px-3 py-2.5 text-left text-body " +
   "hover:bg-ground focus-visible:-outline-offset-3 aria-pressed:border-blue aria-pressed:bg-blue-bg";
 const RADIO_DOT_CLASS = "mt-[3px] grid size-4 flex-none place-items-center rounded-full border-2 bg-white";
-
-function formatKm(km: number): string {
-  return `${Number(km.toFixed(1))}`;
-}
 
 function totalKm(option: RouteOption): string {
   const plus = option.distance_incomplete ? "+" : "";

@@ -9,7 +9,7 @@ from app.reservations.schemas import (
     CoreIds,
     CorrectBody,
     NeedsReviewItem,
-    ReasonBody,
+    RemarksBody,
     ReservationCreate,
     ReservationOut,
     Status,
@@ -70,8 +70,8 @@ def approve(db: DB, admin: Admin, rid: int) -> ReservationOut:
 
 
 @router.post("/reservations/{rid}/reject")
-def reject(db: DB, admin: Admin, rid: int, body: ReasonBody) -> ReservationOut:
-    return service.reject(db, admin, rid, body.reason)
+def reject(db: DB, admin: Admin, rid: int, body: RemarksBody) -> ReservationOut:
+    return service.reject(db, admin, rid, body.remarks)
 
 
 @router.post("/reservations/{rid}/release")
@@ -80,13 +80,13 @@ def release(db: DB, admin: Admin, rid: int, body: CoreIds) -> ReservationOut:
 
 
 @router.post("/reservations/{rid}/decline-release")
-def decline_release(db: DB, admin: Admin, rid: int, body: ReasonBody) -> ReservationOut:
-    return service.decline_release(db, admin, rid, body.reason)
+def decline_release(db: DB, admin: Admin, rid: int, body: RemarksBody) -> ReservationOut:
+    return service.decline_release(db, admin, rid, body.remarks)
 
 
 @router.post("/reservations/{rid}/correct")
 def correct(db: DB, admin: Admin, rid: int, body: CorrectBody) -> ReservationOut:
-    return service.correct(db, admin, rid, body.reason, body.customer_id, body.planned_date, body.cores)
+    return service.correct(db, admin, rid, body.remarks, body.customer_id, body.planned_date, body.cores)
 
 
 @router.post("/reservations/{rid}/assign")

@@ -11,7 +11,7 @@ from app.errors import NotFound, Invalid, ServiceError
 from app.admin_edits.history import HISTORY_SHOWN, Edited, HistoryRow, bool_text, history, log_edits
 from app.auth.deps import DB, Admin
 from app.ingest import checks
-from app.reservations.schemas import Reason
+from app.reservations.schemas import Remarks
 from app.reservations.service import conflict
 
 router = APIRouter()
@@ -46,7 +46,7 @@ SITE_FOR_UPDATE_SQL = SITE_SQL + " FOR UPDATE"
 
 
 class SiteBody(BaseModel):
-    reason: Reason = ""
+    remarks: Remarks = ""
     name: str | None = None
     lat: float | None = None
     lon: float | None = None
@@ -170,7 +170,7 @@ def edit_site(db: DB, admin: Admin, sid: int, body: SiteBody) -> Edited:
     if not edits:
         raise ServiceError(400, "nothing changed")
     try:
-        done = log_edits(db, admin, "site", sid, edits, body.reason)
+        done = log_edits(db, admin, "site", sid, edits, body.remarks)
         db.commit()
     except IntegrityError:
         db.rollback()

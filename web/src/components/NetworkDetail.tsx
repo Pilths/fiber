@@ -3,6 +3,7 @@ import type { components } from "@/api/schema";
 import { Icon } from "@/components/Icon";
 import { FreeBadge } from "@/components/FindCard";
 import { segmentName } from "@/lib/status";
+import { formatKm } from "@/lib/format";
 
 type Detail = components["schemas"]["SegmentDetail"];
 type Segment = components["schemas"]["SegmentSummary"];
@@ -52,7 +53,7 @@ function distanceText(km: number): string {
   if (!km) {
     return "-";
   }
-  return `${Number(km.toFixed(1))} km`;
+  return `${formatKm(km)} km`;
 }
 
 // Route (or the one selected segment) as a horizontal chain: site, segment, site ...

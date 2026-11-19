@@ -155,17 +155,17 @@ def test_cannot_book_non_available_core(client, w, db):
 
 # ---------- TEST-002 ----------
 
-def test_002_approve_then_reject_with_reason(client, w, db):
+def test_002_approve_then_reject_with_remarks(client, w, db):
     rid = book(client, w, [w["c1"][1]]).json()["id"]
     assert status(db, w["c1"][1]) == "Requested"
     assert act(client, rid, "approve").json()["status"] == "approved"
     assert status(db, w["c1"][1]) == "Reserved"
 
     rid2 = book(client, w, [w["c1"][2]]).json()["id"]
-    assert act(client, rid2, "reject", reason="Needed for another customer").status_code == 200
+    assert act(client, rid2, "reject", remarks="Needed for another customer").status_code == 200
     assert status(db, w["c1"][2]) == "Available"
     mine = client.get("/api/reservations", params={"mine": True, "status": "rejected"}, headers=H("planner1")).json()
-    assert [(r["id"], r["last_reason"]) for r in mine] == [(rid2, "Needed for another customer")]
+    assert [(r["id"], r["last_remarks"]) for r in mine] == [(rid2, "Needed for another customer")]
     assert [
         r["id"]
         for r in client.get(
@@ -215,9 +215,9 @@ def test_004_partial_release_of_route_reservation(client, w, db):
     assert {x["id"] for x in client.get("/api/approvals", headers=H("admin1")).json()} == {rid}
     assert status(db, s1c[0]) == "Reserved"  # still Reserved until an admin releases
 
-    r = act(client, rid, "decline-release", reason="Customer confirmed the order").json()
-    assert r["awaiting"] is None and r["last_reason"] == "Customer confirmed the order"  # planner sees why
-    assert act(client, rid, "decline-release", reason="again").status_code == 409  # nothing waiting
+    r = act(client, rid, "decline-release", remarks="Customer confirmed the order").json()
+    assert r["awaiting"] is None and r["last_remarks"] == "Customer confirmed the order"  # planner sees why
+    assert act(client, rid, "decline-release", remarks="again").status_code == 409  # nothing waiting
 
     assert act(client, rid, "request-release", user="planner1", cores=s1c).status_code == 200
     r = act(client, rid, "release", cores=s1c).json()
@@ -294,9 +294,9 @@ def test_005_stale_keep_and_undated_import(client, w, db):
 
     undated = old_reservation(db, w, 5, imported=True)  # import date = its approved event
     assert review(client) == [("stale", undated)]
-    r = act(client, undated, "correct", reason="typo", planned_date="2027-01-01")
+    r = act(client, undated, "correct", remarks="typo", planned_date="2027-01-01")
     assert r.status_code == 409  # its date cannot be corrected
-    assert act(client, undated, "correct", reason="rename", customer_id=w["cust2"]).status_code == 200  # customer can
+    assert act(client, undated, "correct", remarks="rename", customer_id=w["cust2"]).status_code == 200  # customer can
 
     dated = old_reservation(db, w, 0, imported=True, planned_date="2020-01-01")  # reserved date starts the clock
     assert ("stale", dated) in review(client)
@@ -305,7 +305,7 @@ def test_005_stale_keep_and_undated_import(client, w, db):
 def test_old_core_status_edit_is_not_in_needs_review(client, w, db):
     rid = book(client, w, [w["c1"][1]]).json()["id"]
     act(client, rid, "approve")
-    db.execute(text("INSERT INTO data_edits (entity, entity_id, field, new_value, reason, user_id) "
+    db.execute(text("INSERT INTO data_edits (entity, entity_id, field, new_value, remarks, user_id) "
                     "VALUES ('core', :c, 'status', 'Faulty', 'OTDR', :u)"), {"c": w["c1"][1], "u": w["admin1"]})
     assert client.get("/api/needs-review", headers=H("planner1")).json() == []
     assert "faulty_held" not in client.get("/openapi.json").text
@@ -325,34 +325,34 @@ def test_006_admin_can_approve_their_own_request(client, w, db):
 
 def test_006_correction_rules(client, w, db):
     rid = book(client, w, [w["c1"][1]], planned_date="2026-12-01").json()["id"]
-    assert act(client, rid, "correct", reason="x", planned_date="2027-01-01").status_code == 409  # pending
+    assert act(client, rid, "correct", remarks="x", planned_date="2027-01-01").status_code == 409  # pending
     act(client, rid, "approve")
-    assert act(client, rid, "correct", reason="typo").status_code == 422  # nothing to change
+    assert act(client, rid, "correct", remarks="typo").status_code == 422  # nothing to change
     # cores are never corrected
-    assert act(client, rid, "correct", reason="swap", cores=[w["c1"][2]]).status_code == 422
-    assert act(client, rid, "correct", reason="typo", planned_date="2027-01-01", user="planner1").status_code == 403
+    assert act(client, rid, "correct", remarks="swap", cores=[w["c1"][2]]).status_code == 422
+    assert act(client, rid, "correct", remarks="typo", planned_date="2027-01-01", user="planner1").status_code == 403
 
-    r = act(client, rid, "correct", reason="Customer renamed", customer_id=w["cust2"], planned_date="2027-01-01").json()
+    r = act(client, rid, "correct", remarks="renamed", customer_id=w["cust2"], planned_date="2027-01-01").json()
     assert (r["customer"], r["planned_date"], r["status"]) == ("Beta", "2027-01-01", "approved")
     # the original values stay in the reservation row and the history; the grid shows the corrected ones
     assert db.execute(
         text("SELECT customer_id, planned_date::text FROM reservations WHERE id = :r"), {"r": rid}
     ).one() == (w["cust"], "2026-12-01")
     assert event_types(db, rid) == ["requested", "approved", "corrected"]
-    assert one(db, "SELECT reason FROM reservation_events WHERE type = 'corrected'") == "Customer renamed"
+    assert one(db, "SELECT remarks FROM reservation_events WHERE type = 'corrected'") == "renamed"
     core = segment(client, w["s1"])["cores"][0]
     assert (core["customer"], core["planned_date"]) == ("Beta", "2027-01-01")
-    assert act(client, rid, "correct", reason="date only", planned_date="2027-02-02").json()["customer"] == "Beta"
+    assert act(client, rid, "correct", remarks="date only", planned_date="2027-02-02").json()["customer"] == "Beta"
 
     rejected = book(client, w, [w["c1"][3]]).json()["id"]
-    act(client, rejected, "reject", reason="no")
+    act(client, rejected, "reject", remarks="no")
     withdrawn = book(client, w, [w["c1"][3]]).json()["id"]
     act(client, withdrawn, "withdraw", user="planner1")
     ended = book(client, w, [w["c1"][4]]).json()["id"]
     act(client, ended, "approve")
     act(client, ended, "release", cores=[w["c1"][4]])
     for other in (rejected, withdrawn, ended):
-        assert act(client, other, "correct", reason="x", planned_date="2027-01-01").status_code == 409
+        assert act(client, other, "correct", remarks="x", planned_date="2027-01-01").status_code == 409
 
 
 def test_my_reservations_list(client, w):

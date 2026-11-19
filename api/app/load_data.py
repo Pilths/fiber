@@ -51,7 +51,7 @@ SELECT_SEGMENT_BY_NAMES = """
 """
 SELECT_CABLE_SIZE_EDIT = """
     SELECT 1 FROM data_edits
-    WHERE entity = 'segment' AND entity_id = :i AND field = 'cable_size' AND reason NOT LIKE :r
+    WHERE entity = 'segment' AND entity_id = :i AND field = 'cable_size' AND COALESCE(remarks, '') NOT LIKE :r
 """
 SELECT_UPLOAD_PROBLEMS = """
     SELECT sheet, row_number, reason FROM upload_rows
@@ -64,7 +64,7 @@ SITES = ["site_name", "latitude_in_decimal", "longitude_in_decimal", "region", "
 SEGMENTS = ["Link", "Distance", "Route", "Section", "Verified cores", "Total cores"]
 RESERVATIONS = ["Region", "Nodes", "No of core requested", "Fiber core requestor", "Fiber core request date",
                 "Expected CV Ready", "Contractor", "Remark", "SRF", "Port Info", "Fiber monitored Y/N/WIP"]
-REASON = "data file load"
+REMARKS = "data file load"
 CLUSTER_NOTE = "Optional. Cluster name. Sites with the same cluster are drawn together on the map."
 
 
@@ -140,16 +140,16 @@ def survey_counts(db: Session, admin_id: int, path: str, filename: str) -> tuple
                     f"Segments row {n} {link}: dashboard already has {seg[field]} verified cores, file says {v}; kept"
                 )
                 continue
-            edit_params = {"i": seg["id"], "r": REASON + "%"}
+            edit_params = {"i": seg["id"], "r": REMARKS + "%"}
             if field == "cable_size" and db.execute(text(SELECT_CABLE_SIZE_EDIT), edit_params).first():
                 continue  # edited in the dashboard
             if field == "survey_cores":
                 add_cores(db, seg["id"], v)  # a new segment has no core rows yet
             db.execute(text(f"UPDATE segments SET {field} = :v WHERE id = :i"), {"v": v, "i": seg["id"]})
-            db.execute(text("INSERT INTO data_edits (entity, entity_id, field, old_value, new_value, reason, user_id) "
+            db.execute(text("INSERT INTO data_edits (entity, entity_id, field, old_value, new_value, remarks, user_id) "
                             "VALUES ('segment', :i, :f, :o, :n, :r, :u)"),
                        {"i": seg["id"], "f": field, "o": None if seg[field] is None else str(seg[field]), "n": str(v),
-                        "r": f"{REASON} {filename}", "u": admin_id})
+                        "r": f"{REMARKS} {filename}", "u": admin_id})
             done += 1
     db.commit()
     return done, notes

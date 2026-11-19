@@ -72,10 +72,8 @@ test("site master preview: counts, 10% drop override", async ({ page }) => {
   await expect(apply).toBeDisabled();
   await expect(sites).toContainText("Tick Override to apply this sheet.");
   await sites.getByLabel(/^Override/).check();
-  await expect(apply).toBeDisabled();
-  await expect(sites).toContainText("Enter a reason for the override.");
-  await sites.getByLabel("Reason for the override (required)").fill("E2E: smaller test file");
-  await expect(apply).toBeEnabled();
+  await expect(apply).toBeEnabled(); // remarks are optional
+  await sites.getByLabel("Remarks (optional)").fill("E2E: smaller test file");
   await sites.getByLabel(/^Override/).uncheck();
   await sites.getByRole("button", { name: "Added 1" }).click();
   await page.evaluate(() => scrollTo(0, 0));
@@ -115,14 +113,14 @@ test("site master apply: DC List sheet ignored, result shown, preview survives a
   await expect(page.getByTestId("sheet-dcs")).toHaveCount(0);
   await expect(page.getByTestId("sm-preview")).not.toContainText("DC List");
   await sites.getByLabel(/^Override/).check();
-  await sites.getByLabel("Reason for the override (required)").fill("E2E: smaller test file");
+  await sites.getByLabel("Remarks (optional)").fill("E2E: smaller test file");
 
   // Switching the top tab keeps the staged preview and its choices.
   await nav(page).getByRole("button", { name: "Inventory" }).click();
   await expect(page.getByTestId("sm-preview")).toBeHidden();
   await nav(page).getByRole("button", { name: "Upload" }).click();
   await expect(sites.getByLabel(/^Override/)).toBeChecked();
-  await expect(sites.getByLabel("Reason for the override (required)")).toHaveValue("E2E: smaller test file");
+  await expect(sites.getByLabel("Remarks (optional)")).toHaveValue("E2E: smaller test file");
 
   // The dev site list must stay as seeded, so the apply call is mocked; the request body is checked.
   const bodies: unknown[] = [];
@@ -142,7 +140,7 @@ test("site master apply: DC List sheet ignored, result shown, preview survives a
   await expect(result).not.toContainText("DC List");
   await expect(result).toContainText("E2E warning");
   await expect(page.getByTestId("sm-preview")).toHaveCount(0);
-  expect(bodies).toEqual([{ sheets: ["sites"], override_drop: { sites: true }, reason: "E2E: smaller test file" }]);
+  expect(bodies).toEqual([{ sheets: ["sites"], override_drop: { sites: true }, remarks: "E2E: smaller test file" }]);
 });
 
 const SL_HEAD = ["Link", "Distance", "Route", "Section", "Type"];
@@ -322,16 +320,14 @@ test("reservation workbook: preview, confirm, re-upload shows Already imported",
   expect((await page.request.post(`/api/reservations/${r!.id}/release`, { data: { cores: [] } })).ok()).toBe(true);
 });
 
-test("close reservation import needs a reason, then shows the closed state (close call mocked)", async ({ page }) => {
+test("close reservation import with optional remarks, then shows the closed state (close call mocked)", async ({ page }) => {
   await openUpload(page, "Reservations (Excel)");
   const sw = page.getByTestId("import-switch");
   await expect(sw).toContainText("Import open");
   await sw.getByRole("button", { name: "Close reservation import…" }).click();
   const dialog = page.getByRole("dialog", { name: "Close reservation import?" });
-  await expect(dialog.getByLabel("Reason (required)")).toBeFocused();
-  await dialog.getByRole("button", { name: "Close import" }).click();
-  await expect(dialog.getByRole("alert")).toHaveText("Enter a reason for closing the import.");
-  await dialog.getByLabel("Reason (required)").fill("E2E: dashboard is now the source of truth");
+  await expect(dialog.getByLabel("Remarks (optional)")).toBeFocused();
+  await dialog.getByLabel("Remarks (optional)").fill("E2E: dashboard is now the source of truth");
   await page.evaluate(() => scrollTo(0, 0));
   await page.screenshot({ path: "e2e/screenshots/upload-close-dialog.png" });
 
@@ -339,11 +335,11 @@ test("close reservation import needs a reason, then shows the closed state (clos
   let posted: unknown = null;
   await page.route("**/api/admin/reservation-import/close", async (route) => {
     posted = route.request().postDataJSON();
-    const reason = "E2E: dashboard is now the source of truth";
-    await route.fulfill({ json: { closed: true, closed_at: "2026-10-26T02:00:00Z", closed_by: "admin1", reason } });
+    const remarks = "E2E: dashboard is now the source of truth";
+    await route.fulfill({ json: { closed: true, closed_at: "2026-10-26T02:00:00Z", closed_by: "admin1", remarks } });
   });
   await dialog.getByRole("button", { name: "Close import" }).click();
-  expect(posted).toEqual({ reason: "E2E: dashboard is now the source of truth" });
+  expect(posted).toEqual({ remarks: "E2E: dashboard is now the source of truth" });
   await expect(dialog).toHaveCount(0);
   await expect(sw)
     .toContainText("Reservation import closed on 26 Oct 2026, 10:00 by admin1: E2E: dashboard is now the source of truth");

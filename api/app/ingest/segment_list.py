@@ -18,12 +18,12 @@ from sqlalchemy.orm import Session
 from app.admin_edits.history import log_edits_for_user
 from app.ingest.checks import blank, clean, split_nodes
 from app.ingest.excel import _json
-from app.ingest.reservation_upload import REASON as RESERVATION_REASON
+from app.ingest.reservation_upload import REMARKS as RESERVATION_REMARKS
 from app.ingest.site_master import hkey, load_protected
 from app.ingest.uploads import ApplyError, finish_upload, insert_upload, lock_staged_upload
 from app.routing.graph import invalidate as invalidate_routes
 
-UPLOAD_REASON = "segment list upload"
+UPLOAD_REMARKS = "segment list upload"
 ALIASES = {
     "link": "link",
     "links": "link",
@@ -234,7 +234,7 @@ def evaluate(db: Session, parsed: Parsed) -> list[Item]:
     sites = {row.name: row for row in db.execute(text(SELECT_SITES_BY_NAME), {"names": sorted(names)})}
     segment_rows = db.execute(text(SELECT_SEGMENTS)).mappings()
     segments = {frozenset((row["site_a_id"], row["site_b_id"])): row for row in segment_rows}
-    protected = load_protected(db, "segment", (UPLOAD_REASON, RESERVATION_REASON))
+    protected = load_protected(db, "segment", (UPLOAD_REMARKS, RESERVATION_REMARKS))
     pairs = Counter(_pair_key(item) for item in parsed.items if item.parsed["a"])
     for item in parsed.items:
         reasons = _problems(item, pairs, parsed.items, sites)
@@ -354,7 +354,7 @@ def apply_upload(db: Session, admin_id: int, upload_id: int) -> dict[str, Any]:
     if blocked:
         raise ApplyError(409, f"Nothing can be applied: {blocked}")
     items = evaluate(db, parsed)
-    why = f"{UPLOAD_REASON} {upload['filename']} #{upload_id}"
+    why = f"{UPLOAD_REMARKS} {upload['filename']} #{upload_id}"
     counts = {"created": 0, "changed": 0, "protected_kept": 0, "skipped": 0}
     warnings: list[str] = []
     with db.begin_nested():  # all or nothing

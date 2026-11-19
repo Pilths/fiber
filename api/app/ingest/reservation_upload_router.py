@@ -30,7 +30,7 @@ class ConfirmIn(BaseModel):
 
 
 class CloseIn(BaseModel):
-    reason: str
+    remarks: str = ""
 
 
 class WarningOut(BaseModel):
@@ -91,7 +91,7 @@ class ImportStateOut(BaseModel):
     closed: bool
     closed_at: datetime | None
     closed_by: str | None
-    reason: str | None
+    remarks: str | None
 
 
 def _fail(e: ru.ApplyError) -> HTTPException:
@@ -155,6 +155,6 @@ def import_state(db: DB) -> ImportStateOut:
 @router.post("/reservation-import/close")
 def close(db: DB, admin: Admin, body: CloseIn) -> ImportStateOut:
     try:
-        return ImportStateOut(**ru.close_import(db, admin.id, body.reason))
+        return ImportStateOut(**ru.close_import(db, admin.id, body.remarks))
     except ru.ApplyError as e:
         raise _fail(e) from e

@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { api } from "@/api/client";
 import type { components } from "@/api/schema";
-import { EVENT_WORD, when } from "@/lib/status";
-import { plural } from "@/lib/utils";
+import { formatDateTime, plural } from "@/lib/format";
+import { EVENT_WORD } from "@/lib/status";
 
 type Event = components["schemas"]["EventOut"];
 
@@ -18,11 +18,11 @@ function EventLine({ event }: { event: Event }) {
   return (
     <li className="py-1">
       <span className="font-semibold">{EVENT_WORD[event.type] ?? event.type}</span> by {event.user}
-      <span className="text-muted-foreground">, {when(event.at)}</span>
+      <span className="text-muted-foreground">, {formatDateTime(event.at)}</span>
       {event.cores.length > 0 && <span>; cores {event.cores.map((core) => core.number).join(", ")}</span>}
       {event.unassigned_change != null && <span>; {countChangeText(event.unassigned_change)}</span>}
       {(event.customer || event.planned_date) && <span>; now {nowParts.join(", ")}</span>}
-      {event.reason && <span className="block text-muted-foreground">Reason: {event.reason}</span>}
+      {event.remarks && <span className="block text-muted-foreground">Remarks: {event.remarks}</span>}
     </li>
   );
 }

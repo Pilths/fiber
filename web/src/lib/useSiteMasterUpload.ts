@@ -22,7 +22,7 @@ export function useSiteMasterUpload() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [override, setOverride] = useState(false);
-  const [reason, setReason] = useState("");
+  const [remarks, setRemarks] = useState("");
   const [confirmingSheet, setConfirming] = useState<Sheet | null>(null);
   const [result, setResult] = useState<Applied | null>(null);
   const [addOnly, setAddOnly] = useState(false);
@@ -40,7 +40,7 @@ export function useSiteMasterUpload() {
     setStaged(null);
     setConfirming(null);
     setOverride(false);
-    setReason("");
+    setRemarks("");
   };
 
   const pick = async (file: File) => {
@@ -66,9 +66,6 @@ export function useSiteMasterUpload() {
     if (!willApply(sheet, override)) {
       return "Tick Override to apply this sheet.";
     }
-    if (overriding(sheet) && !reason.trim()) {
-      return "Enter a reason for the override.";
-    }
     return null;
   };
 
@@ -76,7 +73,7 @@ export function useSiteMasterUpload() {
     return {
       sheets: [sheet.kind],
       override_drop: { sites: override },
-      reason: overriding(sheet) ? reason.trim() : null,
+      remarks: overriding(sheet) ? remarks.trim() : "",
     };
   };
 
@@ -114,7 +111,7 @@ export function useSiteMasterUpload() {
     busy,
     error,
     override,
-    reason,
+    remarks,
     result,
     addOnly,
     setAddOnly,
@@ -127,7 +124,7 @@ export function useSiteMasterUpload() {
     apply,
     discard,
     setOverride,
-    setReason,
+    setRemarks,
   };
 }
 

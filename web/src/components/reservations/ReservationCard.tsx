@@ -2,7 +2,7 @@ import { inputCls } from "@/lib/status";
 import { ReservationHistory } from "@/components/reservations/ReservationHistory";
 import { ReservationSummary } from "@/components/reservations/ReservationSummary";
 import {
-  lastReasonLabel, type Me, type Mode, type Reservation, useReservationAction,
+  lastRemarksLabel, type Me, type Mode, type Reservation, useReservationAction,
 } from "@/components/reservations/reservation";
 
 // Status is always text (and a symbol), never colour alone.
@@ -45,10 +45,10 @@ function CardButtons({ reservation, me, action, held }: {
 }) {
   const { mode, busy, run } = action;
   if (mode) {
-    const needsReason = mode === "reject" || mode === "decline-release";
+    const asksRemarks = mode === "reject" || mode === "decline-release";
     const nothingPicked = mode === "request-release" && held.length > 0 && action.pick.size === 0;
     const confirm = () => {
-      run(mode, needsReason ? { reason: action.reason.trim() } : { cores: [...action.pick] });
+      run(mode, asksRemarks ? { remarks: action.remarks.trim() } : { cores: [...action.pick] });
     };
     return (
       <>
@@ -92,9 +92,9 @@ export function ReservationCard({ reservation, me, onChanged }: {
   reservation: Reservation; me: Me; onChanged: () => void;
 }) {
   const action = useReservationAction(reservation.id, onChanged);
-  const { mode, reason, setReason, message } = action;
+  const { mode, remarks, setRemarks, message } = action;
   const held = reservation.cores.filter((core) => core.held);
-  const needsReason = mode === "reject" || mode === "decline-release";
+  const asksRemarks = mode === "reject" || mode === "decline-release";
   const toggle = (coreId: number) => {
     action.setPick((old) => {
       const next = new Set(old);
@@ -123,18 +123,18 @@ export function ReservationCard({ reservation, me, onChanged }: {
         <p className="text-sm font-medium">{awaitingText(reservation)} for {reservation.age_days} days.</p>
       )}
       {reservation.stale && <p className="text-sm font-medium">Stale: no approval or keep for over 3 months.</p>}
-      {reservation.last_reason && (
+      {reservation.last_remarks && (
         <p className="text-sm font-medium" role="note">
-          {lastReasonLabel(reservation)}: {reservation.last_reason}
+          {lastRemarksLabel(reservation)}: {reservation.last_remarks}
         </p>
       )}
       <ReservationSummary reservation={reservation} variant="card" />
 
       {mode === "request-release" && <ReleasePicker held={held} pick={action.pick} onToggle={toggle} />}
-      {needsReason && (
-        <label className="block text-sm font-medium">Reason (optional)
-          <input className={`${inputCls} mt-1 block w-full`} value={reason}
-            onChange={(event) => setReason(event.target.value)} />
+      {asksRemarks && (
+        <label className="block text-sm font-medium">Remarks (optional)
+          <input className={`${inputCls} mt-1 block w-full`} value={remarks}
+            onChange={(event) => setRemarks(event.target.value)} />
         </label>
       )}
       {message && <p role="alert" className="text-sm font-medium text-destructive">{message}</p>}

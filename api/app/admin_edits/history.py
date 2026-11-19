@@ -1,6 +1,6 @@
 """Shared admin-edit helpers: the data_edits log, history rows, and the GET /history route.
 
-Every changed field is its own data_edits row (old, new, reason, user). Field names match what the upload
+Every changed field is its own data_edits row (old, new, remarks, user). Field names match what the upload
 modules compare for protection.
 """
 from typing import Any, Literal
@@ -11,21 +11,20 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.auth.deps import DB, CurrentUser
-from app.reservations.schemas import NO_REASON
 
 router = APIRouter()
 Entity = Literal["core", "segment", "site"]
 HISTORY_SHOWN = 10  # history rows returned with an item, newest first
 
 HISTORY_SQL = """
-SELECT d.field, d.old_value, d.new_value, d.reason, d.user_id, u.display_name AS "user", d.created_at AS at
+SELECT d.field, d.old_value, d.new_value, d.remarks, d.user_id, u.display_name AS "user", d.created_at AS at
 FROM data_edits d JOIN users u ON u.id = d.user_id
 WHERE d.entity = :entity AND d.entity_id = :entity_id
 ORDER BY d.created_at DESC, d.id DESC LIMIT :limit
 """
 INSERT_EDIT_SQL = """
-INSERT INTO data_edits (entity, entity_id, field, old_value, new_value, reason, user_id)
-VALUES (:entity, :entity_id, :field, :old_value, :new_value, :reason, :user_id)
+INSERT INTO data_edits (entity, entity_id, field, old_value, new_value, remarks, user_id)
+VALUES (:entity, :entity_id, :field, :old_value, :new_value, :remarks, :user_id)
 """
 
 
@@ -33,7 +32,7 @@ class HistoryRow(BaseModel):
     field: str
     old_value: str | None
     new_value: str | None
-    reason: str
+    remarks: str
     user_id: int
     user: str
     at: Any
@@ -58,12 +57,12 @@ def _text_or_none(value: Any) -> str | None:
 
 
 def log_edits(db: Session, user: CurrentUser, entity: str, entity_id: int, edits: list[tuple[str, Any, Any]],
-              reason: str) -> list[str]:
-    return log_edits_for_user(db, user.id, entity, entity_id, edits, reason)
+              remarks: str) -> list[str]:
+    return log_edits_for_user(db, user.id, entity, entity_id, edits, remarks)
 
 
 def log_edits_for_user(db: Session, user_id: int, entity: str, entity_id: int, edits: list[tuple[str, Any, Any]],
-                       reason: str) -> list[str]:
+                       remarks: str) -> list[str]:
     for field_name, old, new in edits:
         params = {
             "entity": entity,
@@ -71,7 +70,7 @@ def log_edits_for_user(db: Session, user_id: int, entity: str, entity_id: int, e
             "field": field_name,
             "old_value": _text_or_none(old),
             "new_value": _text_or_none(new),
-            "reason": reason or NO_REASON,
+            "remarks": remarks or None,
             "user_id": user_id,
         }
         db.execute(text(INSERT_EDIT_SQL), params)

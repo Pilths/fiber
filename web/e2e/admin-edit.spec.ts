@@ -72,17 +72,17 @@ test("taken-cores table tags stale cores", async ({ page }) => {
   await expect(row).toContainText(/Stale: no keep for over 3 months since /);
 });
 
-test("admin edits segment distance with a reason; the diagram follows; then reverts", async ({ page }) => {
+test("admin edits segment distance with remarks; the diagram follows; then reverts", async ({ page }) => {
   await signIn(page, "admin1");
   await pick(page, CJBJ);
   const km = page.getByTestId("segment-diagram").getByRole("button", { name: /^Segment / });
   await expect(km).toContainText("18.2 km");
 
-  const edit = async (value: string, reason: string) => {
+  const edit = async (value: string, remarks: string) => {
     await editSegment(page).click();
     const dlg = page.getByRole("dialog", { name: /^Edit segment/ });
     await dlg.getByLabel("Distance (km)").fill(value);
-    await dlg.getByLabel("Reason (optional)").fill(reason);
+    await dlg.getByLabel("Remarks (optional)").fill(remarks);
     return dlg;
   };
   let dlg = await edit("18.3", "E2E: re-measured route");
@@ -98,7 +98,7 @@ test("admin edits segment distance with a reason; the diagram follows; then reve
   await expect(km).toContainText("18.2 km");
   await editSegment(page).click();
   await page.getByRole("dialog", { name: /^Edit segment/ }).getByText(/^History/).click();
-  await expect(page.getByTestId("edit-history").getByRole("listitem").first()).toContainText("Reason: E2E: revert");
+  await expect(page.getByTestId("edit-history").getByRole("listitem").first()).toContainText("Remarks: E2E: revert");
 });
 
 test("lowering the verified core count below taken cores is refused in plain words", async ({ page }) => {
@@ -107,7 +107,7 @@ test("lowering the verified core count below taken cores is refused in plain wor
   await editSegment(page).click();
   const dlg = page.getByRole("dialog", { name: /^Edit segment/ });
   await dlg.getByLabel("Verified cores").fill("1");
-  await dlg.getByLabel("Reason (optional)").fill("E2E: should be refused");
+  await dlg.getByLabel("Remarks (optional)").fill("E2E: should be refused");
   await dlg.getByRole("button", { name: "Save" }).click();
   await expect(dlg.getByRole("alert"))
     .toContainText(/^Cores 2, .* are allocated or have history and cannot be removed/);
@@ -244,7 +244,7 @@ test("paste ports: a quoted multi-line Excel cell is one core with the canonical
   await expect(paste).toBeHidden();
 });
 
-test("admin opens a site from the segment diagram: fields, reason required, history", async ({ page }) => {
+test("admin opens a site from the segment diagram: fields, deactivation refused, history", async ({ page }) => {
   await signIn(page, "admin1");
   await pick(page, KLCJ);
   await page.getByRole("button", { name: "Edit site DEV Cyberjaya DC" }).click();
@@ -253,7 +253,7 @@ test("admin opens a site from the segment diagram: fields, reason required, hist
   await expect(dlg.getByLabel("Latitude")).toHaveValue("2.9213");
   await dlg.getByLabel("Active").uncheck();
   await expect(dlg).toContainText("A site used by a segment cannot be deactivated");
-  await dlg.getByLabel("Reason (optional)").fill("E2E: try to deactivate");
+  await dlg.getByLabel("Remarks (optional)").fill("E2E: try to deactivate");
   await dlg.getByRole("button", { name: "Save" }).click();
   await expect(dlg.getByRole("alert").first()).toContainText("used by a segment");
   await dlg.getByText(/^History/).click();

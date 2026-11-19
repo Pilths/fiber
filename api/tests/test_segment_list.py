@@ -124,7 +124,7 @@ def test_history_rows_written(client, admin, sites, db):
     apply(client, uid)
     h = db.execute(
         text(
-            "SELECT field, old_value, new_value, reason, user_id FROM data_edits "
+            "SELECT field, old_value, new_value, remarks, user_id FROM data_edits "
             "WHERE entity = 'segment' AND entity_id = :i ORDER BY field"
         ),
         {"i": sid},
@@ -184,7 +184,7 @@ def test_blank_cells_never_clear(client, admin, sites, db):
 
 def test_protected_field_kept(client, admin, sites, db):
     sid = seed_segment(db, "AAAA", "BBBB", "5.000")
-    db.execute(text("INSERT INTO data_edits (entity, entity_id, field, old_value, new_value, reason, user_id) "
+    db.execute(text("INSERT INTO data_edits (entity, entity_id, field, old_value, new_value, remarks, user_id) "
                     "VALUES ('segment', :i, 'distance_km', '4', '5', 'surveyed', :u)"), {"i": sid, "u": admin})
     uid = post(client, workbook([row("AAAA-BBBB", 9)])).json()["upload_id"]
     it = rows(client, uid, "changed")["items"][0]

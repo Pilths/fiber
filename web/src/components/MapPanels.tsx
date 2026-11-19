@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
-import { plural, ROUTE_LAYERS, SITE_LAYERS, trunkRoutesOf } from "@/lib/mapLayers";
+import { plural } from "@/lib/format";
+import { ROUTE_LAYERS, SITE_LAYERS, trunkRoutesOf } from "@/lib/mapLayers";
 import type { NetworkMapState } from "@/lib/useNetworkMap";
 
 // The network map's toolbar and not-drawn list, and the map filters shown at the foot of the Site A to B panel.

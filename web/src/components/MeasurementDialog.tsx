@@ -2,17 +2,13 @@ import { useState } from "react";
 import { api, errorText } from "@/api/client";
 import type { components } from "@/api/schema";
 import { Dialog } from "@/components/upload-parts";
+import { todayIso } from "@/lib/format";
 
 type Core = components["schemas"]["CoreDetail"];
 type FieldErrors = { loss?: string; testedOn?: string };
 
 const LABEL = "lbl mb-1 block text-body! text-foreground!";
 const MAX_LOSS_DB = 100;
-
-// Dates are compared as YYYY-MM-DD strings in the Kuala Lumpur day, the same day the API checks against.
-function todayInKualaLumpur(): string {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kuala_Lumpur" }).format(new Date());
-}
 
 function checkFields(lossText: string, testedOn: string, today: string): FieldErrors {
   const errors: FieldErrors = {};
@@ -31,7 +27,8 @@ function checkFields(lossText: string, testedOn: string, today: string): FieldEr
 }
 
 function useMeasurementForm(core: Core, onSaved: () => void, onClose: () => void) {
-  const today = todayInKualaLumpur();
+  // Compared as YYYY-MM-DD strings in the Kuala Lumpur day, the same day the API checks against.
+  const today = todayIso();
   const [lossText, setLossText] = useState("");
   const [testedOn, setTestedOn] = useState(today);
   const [testMethod, setTestMethod] = useState("");
@@ -78,7 +75,7 @@ function FieldError({ id, text }: { id: string; text?: string }) {
   return <p id={id} className="mt-1 text-body font-semibold text-red">{text}</p>;
 }
 
-// A Measured loss test typed by hand from the field team's report. No reason field (owner decision).
+// A Measured loss test typed by hand from the field team's report. No remarks field (owner decision).
 export function MeasurementDialog({ core, onClose, onSaved }: { core: Core; onClose: () => void; onSaved: () => void }) {
   const form = useMeasurementForm(core, onSaved, onClose);
   const title = `Measured loss test for core ${core.number}`;

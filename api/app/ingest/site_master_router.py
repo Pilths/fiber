@@ -32,7 +32,7 @@ class SheetOut(BaseModel):
     blocked: bool
     block_reasons: list[str]
     counts: Counts
-    needs_override: bool  # blocked only by the row-count check; apply with override_drop + reason
+    needs_override: bool  # blocked only by the row-count check; apply with override_drop
 
 
 class UploadOut(BaseModel):
@@ -93,7 +93,7 @@ class ApplyIn(BaseModel):
     # apply only these sheets; None applies every sheet that can be applied
     sheets: list[Literal["sites"]] | None = None
     override_drop: OverrideIn = OverrideIn()
-    reason: str | None = None
+    remarks: str | None = None
 
 
 class ApplyOut(BaseModel):
@@ -138,7 +138,7 @@ def rows(
 @router.post("/uploads/{upload_id}/apply")
 def apply(db: DB, admin: Admin, upload_id: int, body: ApplyIn) -> ApplyOut:
     with logged_apply("site_master", upload_id, admin.id):
-        return ApplyOut(**sm.apply_upload(db, admin.id, upload_id, body.override_drop.model_dump(), body.reason,
+        return ApplyOut(**sm.apply_upload(db, admin.id, upload_id, body.override_drop.model_dump(), body.remarks,
                                           body.sheets))
 
 

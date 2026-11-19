@@ -13,7 +13,7 @@ from app.auth.deps import DB, Admin
 from app.ingest import checks
 from app.ingest.reservation_import import add_cores
 from app.link_type import ROUTE_TYPE_SQL
-from app.reservations.schemas import Reason
+from app.reservations.schemas import Remarks
 from app.reservations.service import conflict
 from app.routing.graph import invalidate as invalidate_routes
 
@@ -62,7 +62,7 @@ SET_SEGMENT_SITES_SQL = "UPDATE segments SET site_a_id = :site_a, site_b_id = :s
 
 
 class SegmentBody(BaseModel):
-    reason: Reason = ""
+    remarks: Remarks = ""
     distance_km: Decimal | None = Field(None, ge=0, max_digits=10, decimal_places=3)
     region: str | None = None
     site_a_id: int | None = None
@@ -163,7 +163,7 @@ def edit_segment(db: DB, admin: Admin, sid: int, body: SegmentBody) -> Edited:
     old = db.execute(text(LOCK_SEGMENT_ROW_SQL), {"segment_id": sid}).mappings().first()
     if old is None:
         raise NotFound("Segment not found")
-    new: dict[str, Any] = body.model_dump(exclude_none=True, exclude={"reason"})
+    new: dict[str, Any] = body.model_dump(exclude_none=True, exclude={"remarks"})
     if "region" in new:
         region, error = checks.map_region(new["region"])
         if error:
@@ -188,7 +188,7 @@ def edit_segment(db: DB, admin: Admin, sid: int, body: SegmentBody) -> Edited:
         # one statement: a swap passes the differ check only as a pair
         db.execute(text(SET_SEGMENT_SITES_SQL), {"site_a": site_a, "site_b": site_b, "segment_id": sid})
     edits = [_logged_change(name, old[name], value) for name, value in changes.items()]
-    done = log_edits(db, admin, "segment", sid, edits, body.reason)
+    done = log_edits(db, admin, "segment", sid, edits, body.remarks)
     db.commit()
     invalidate_routes()  # distance, site or fiber cut change alters the routing graph
     return Edited(id=sid, changed=done, history=history(db, "segment", sid, HISTORY_SHOWN))

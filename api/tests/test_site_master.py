@@ -152,8 +152,7 @@ def test_ten_percent_drop_blocks_until_override(client, admin, db):
     assert s["blocked"] and s["needs_override"] and "fewer" in s["block_reasons"][0]
     uid = r.json()["upload_id"]
     assert apply(client, uid).status_code == 409
-    assert apply(client, uid, override_drop={"sites": True}).status_code == 422  # reason required
-    ok = apply(client, uid, override_drop={"sites": True}, reason="S009 was decommissioned")
+    ok = apply(client, uid, override_drop={"sites": True})  # remarks are optional
     assert ok.status_code == 200 and ok.json()["sheets"]["sites"]["deactivated"] == 1
     assert count(db, "SELECT active FROM sites WHERE name = 'S009'") is False
     assert count(db, "SELECT count(*) FROM data_edits WHERE entity = 'upload' AND field = 'override_drop'") == 1
@@ -168,7 +167,7 @@ def test_empty_sheet_blocks_and_cannot_be_overridden(client, admin, db):
     r = post(client, workbook([]))
     s = sheets(r)["sites"]
     assert s["blocked"] and not s["needs_override"] and "empty" in s["block_reasons"][0]
-    assert apply(client, r.json()["upload_id"], override_drop={"sites": True}, reason="x").status_code == 409
+    assert apply(client, r.json()["upload_id"], override_drop={"sites": True}, remarks="x").status_code == 409
     assert count(db) == 0
 
 
@@ -191,7 +190,7 @@ def test_missing_headers_block_not_overridable(client, admin):
     r = post(client, workbook([site("AAAA")], site_head=["SITE_NAME", "LAT", "LONG", "REGION", "X"]))
     s = sheets(r)["sites"]
     assert not s["found"] and s["blocked"] and not s["needs_override"]
-    assert apply(client, r.json()["upload_id"], override_drop={"sites": True}, reason="x").status_code == 409
+    assert apply(client, r.json()["upload_id"], override_drop={"sites": True}, remarks="x").status_code == 409
 
 
 def test_dc_list_sheet_is_ignored(client, admin, db):
@@ -244,7 +243,7 @@ def test_apply_updates_with_history_and_deactivates_missing(client, admin, db):
     assert count(db, "SELECT active FROM sites WHERE name = 'BACK'") is True
     # an upload never touches region
     assert count(db, "SELECT details->>'region' FROM sites WHERE name = 'AAAA'") == "Central"
-    edits = db.execute(text("SELECT field, old_value, new_value, reason FROM data_edits WHERE entity = 'site' "
+    edits = db.execute(text("SELECT field, old_value, new_value, remarks FROM data_edits WHERE entity = 'site' "
                             "AND entity_id = (SELECT id FROM sites WHERE name = 'AAAA') ORDER BY field")).all()
     assert [e[0] for e in edits] == ["details.SITE_TYPE", "location"]
     assert all(e[3] == f"site master upload master-oct.xlsx #{uid}" for e in edits)
@@ -262,7 +261,7 @@ def test_missing_site_in_use_stays_active_with_warning(client, admin, db):
     r = post(client, workbook([site("AAAA")], None))
     uid = r.json()["upload_id"]
     assert row_of(client, uid, "sites", "missing", "BBBB")["in_use"] is True
-    res = apply(client, uid, override_drop={"sites": True}, reason="test").json()
+    res = apply(client, uid, override_drop={"sites": True}, remarks="test").json()
     assert res["sheets"]["sites"]["kept_active"] == 2 and res["sheets"]["sites"]["deactivated"] == 0
     assert any("BBBB" in w for w in res["warnings"])
     assert count(db, "SELECT count(*) FROM sites WHERE active") == 3
@@ -271,7 +270,7 @@ def test_missing_site_in_use_stays_active_with_warning(client, admin, db):
 def test_dashboard_edited_field_is_protected(client, admin, db):
     seed_sites(db, ["AAAA"])
     sid = count(db, "SELECT id FROM sites WHERE name = 'AAAA'")
-    db.execute(text("INSERT INTO data_edits (entity, entity_id, field, old_value, new_value, reason, user_id) "
+    db.execute(text("INSERT INTO data_edits (entity, entity_id, field, old_value, new_value, remarks, user_id) "
                     "VALUES ('site', :i, 'location', 'a', 'b', 'surveyed on site', :u)"), {"i": sid, "u": admin})
     r = post(client, workbook([site("AAAA", 3.5, 101.9, "North", "Pole")], None))
     uid = r.json()["upload_id"]
@@ -400,7 +399,7 @@ def test_dashboard_edited_kind_is_protected(client, admin, db):
     apply(client, post(client, typed_workbook(("AAAA", "TOC"))).json()["upload_id"])
     db.execute(
         text(
-            "INSERT INTO data_edits (entity, entity_id, field, old_value, new_value, reason, user_id) "
+            "INSERT INTO data_edits (entity, entity_id, field, old_value, new_value, remarks, user_id) "
             "SELECT 'site', id, 'kind', 'site', 'toc', 'fixed by hand', :u FROM sites WHERE name = 'AAAA'"
         ),
         {"u": admin},

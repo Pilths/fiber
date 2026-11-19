@@ -96,7 +96,9 @@ test("map loads with no request leaving the app origin; chips, sites, layers and
     await expect(page.getByRole("checkbox", { name: type, exact: true })).toBeChecked();
   }
   // Site layers: hiding TOC removes the TOC marker, showing it brings it back
-  const toc = map(page).getByRole("button", { name: /DEV Bukit Jalil TOC/ }); // its marker, or the badge it shares
+  const tocName = /DEV Bukit Jalil TOC/;
+  // its marker, or the badge it shares
+  const toc = map(page).getByRole("img", { name: tocName }).or(map(page).getByRole("button", { name: tocName }));
   await expect(toc).toBeVisible();
   await page.getByRole("checkbox", { name: "TOC", exact: true }).uncheck();
   await expect(toc).toHaveCount(0);
@@ -390,14 +392,14 @@ test("clusters: label with site count zoomed out, outline and sites zoomed in, a
   expect(labelBox.width).toBeLessThanOrEqual(24);
   expect(labelBox.height).toBeLessThanOrEqual(24);
   await expect(klMarkerOrBadge).toHaveCount(0);
-  await expect(map(page).getByRole("button", { name: /^Site DEV Ipoh Exchange,/ })).toBeVisible();
+  await expect(map(page).getByRole("img", { name: /^Site DEV Ipoh Exchange,/ })).toBeVisible();
   await settle(page);
   await page.screenshot({ path: "e2e/screenshots/map-cluster-out.png" });
   // The label zooms to the cluster: the label goes, the outline and each member site show.
   await label.click();
   await expect(label).toHaveCount(0);
   for (const name of members) {
-    await expect(map(page).getByRole("button", { name: new RegExp(`^Site ${name},`) })).toBeVisible();
+    await expect(map(page).getByRole("img", { name: new RegExp(`^Site ${name},`) })).toBeVisible();
   }
   await expect(map(page).locator(`[data-testid=map-sector][data-cluster="${CLUSTER}"]`)).toHaveCount(1);
   await expect(map(page).getByTestId("map-site").locator(".shape.dc").first()).toHaveCSS("width", "12px");
@@ -427,7 +429,7 @@ test("picking a cluster in the top bar search zooms the map to it", async ({ pag
   await expect(label).toHaveCount(0);
   await expect(map(page).locator(`[data-testid=map-sector][data-cluster="${CLUSTER}"]`)).toHaveCount(1);
   for (const name of members) {
-    await expect(map(page).getByRole("button", { name: new RegExp(`^Site ${name},`) })).toBeVisible();
+    await expect(map(page).getByRole("img", { name: new RegExp(`^Site ${name},`) })).toBeVisible();
   }
 });
 
@@ -436,11 +438,11 @@ test("picking a cluster in the top bar search zooms the map to it", async ({ pag
 type SiteEdit = { lat: number; lon: number };
 
 async function moveSite(page: Page, siteId: number, place: SiteEdit) {
-  const response = await page.request.post(`/api/admin/sites/${siteId}`, { data: { ...place, reason: "e2e crowd" } });
+  const response = await page.request.post(`/api/admin/sites/${siteId}`, { data: { ...place, remarks: "e2e crowd" } });
   expect([200, 400]).toContain(response.status());
 }
 
-test("crowded sites: a badge zooms in; at max zoom the crowd spreads into a named list reached by Tab", async ({ page }) => {
+test("crowded sites: a badge zooms in; at max zoom the crowd spreads into a named list with leader lines", async ({ page }) => {
   await signIn(page, "admin1");
   const sites = await mapSites(page);
   const idOf = (name: string) => sites.features.find((site) => site.properties.name === name)!.properties.site_id;
@@ -467,10 +469,8 @@ test("crowded sites: a badge zooms in; at max zoom the crowd spreads into a name
     await expect(spread).toHaveCount(2);
     const names = await spread.locator(".code").allTextContents();
     expect(names.sort()).toEqual(["DEV Bukit Jalil TOC", "DEV Tanjung Malim Hut"]);
+    await expect(map(page).getByTestId("leader-lines").locator("line")).toHaveCount(2);
     const first = spread.first();
-    await first.focus();
-    await page.keyboard.press("Tab");
-    await expect(spread.nth(1)).toBeFocused();
     const box = (await first.boundingBox())!;
     const clip = { x: box.x - 80, y: box.y - 50, width: 360, height: 140 };
     await page.screenshot({ path: "e2e/screenshots/map-crowd-spread.png", clip });

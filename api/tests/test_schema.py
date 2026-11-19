@@ -29,7 +29,7 @@ def test_append_only(db, ids, table, op):
                 "reservation_events": "INSERT INTO reservation_events (reservation_id, type, user_id) "
                 "VALUES (:res,'requested',:user)",
                 "measurements": "INSERT INTO measurements (segment_id, loss_db) VALUES (:segment, 1.5)",
-                "data_edits": "INSERT INTO data_edits (entity, entity_id, field, reason, user_id) "
+                "data_edits": "INSERT INTO data_edits (entity, entity_id, field, remarks, user_id) "
                 "VALUES ('core',1,'f','r',:user)",
             }[table]
         ),
@@ -56,9 +56,10 @@ def test_append_only_reservation_tables(db, ids, table, col, op):
 
 
 def correction(db, i, kind, **p):
-    db.execute(text("INSERT INTO reservation_events (reservation_id, type, user_id, reason, customer_id, planned_date) "
-                    "VALUES (:res,:k,:user,:reason,:customer_id,:planned_date)"),
-               {**i, "k": kind, "reason": None, "customer_id": None, "planned_date": None, **p})
+    db.execute(text("INSERT INTO reservation_events "
+                    "(reservation_id, type, user_id, remarks, customer_id, planned_date) "
+                    "VALUES (:res,:k,:user,:remarks,:customer_id,:planned_date)"),
+               {**i, "k": kind, "remarks": None, "customer_id": None, "planned_date": None, **p})
 
 
 def test_customer_on_non_corrected_fails(db, ids):
@@ -69,16 +70,15 @@ def test_customer_on_non_corrected_fails(db, ids):
 
 def test_corrected_without_change_fails(db, ids):
     with pytest.raises(IntegrityError):
-        correction(db, ids, "corrected", reason="typo")
+        correction(db, ids, "corrected", remarks="typo")
 
 
-def test_corrected_without_reason_fails(db, ids):
-    with pytest.raises(IntegrityError):
-        correction(db, ids, "corrected", reason="  ", planned_date="2026-12-01")
+def test_corrected_without_remarks_is_fine(db, ids):
+    correction(db, ids, "corrected", planned_date="2026-12-01")
 
 
 def test_corrected_inserts(db, ids):
-    correction(db, ids, "corrected", reason="moved", planned_date="2026-12-01")
+    correction(db, ids, "corrected", remarks="moved", planned_date="2026-12-01")
 
 
 def test_duplicate_release_core_fails(db, ids):
@@ -113,10 +113,21 @@ def test_reversed_segment_fails(db, ids):
         db.execute(text("INSERT INTO segments (site_a_id, site_b_id) VALUES (:b,:a)"), ids)
 
 
-def test_blank_reason_fails(db, ids):
-    with pytest.raises(IntegrityError):
-        db.execute(text("INSERT INTO data_edits (entity, entity_id, field, reason, user_id) "
-                        "VALUES ('core',1,'status','  ',:user)"), ids)
+def test_data_edit_without_remarks_is_fine(db, ids):
+    db.execute(text("INSERT INTO data_edits (entity, entity_id, field, user_id) "
+                    "VALUES ('core',1,'status',:user)"), ids)
+
+
+APPEND_ONLY_TABLES = {"assign_cores", "data_edits", "measurements", "release_cores", "reservation_cores",
+                      "reservation_events", "reservations"}
+
+
+def test_append_only_triggers_exist_on_every_insert_only_table(db):
+    rows = db.execute(text(
+        "SELECT c.relname FROM pg_trigger t JOIN pg_class c ON c.oid = t.tgrelid "
+        "WHERE NOT t.tgisinternal AND t.tgname LIKE '%\\_append\\_only'"
+    )).scalars().all()
+    assert set(rows) == APPEND_ONLY_TABLES
 
 
 def status(db, core):
@@ -129,7 +140,7 @@ def event(db, i, kind):
 
 
 def edit(db, i, value):
-    db.execute(text("INSERT INTO data_edits (entity, entity_id, field, new_value, reason, user_id) "
+    db.execute(text("INSERT INTO data_edits (entity, entity_id, field, new_value, remarks, user_id) "
                     "VALUES ('core',:core,'status',:v,'r',:user)"), {**i, "v": value})
 
 

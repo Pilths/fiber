@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { Icon, type IconName } from "@/components/Icon";
-import { plural } from "@/lib/utils";
+import { plural } from "@/lib/format";
 
 // Shared pieces of the upload flows (site master, segment list and Reservation workbook).
 

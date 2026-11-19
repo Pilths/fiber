@@ -54,7 +54,7 @@ test("new user: temporary password, forced change, deactivate blocks, activate r
   await expect(form.getByRole("alert")).toContainText("Username already exists");
   await form.getByLabel("Username").fill(name);
   await form.getByLabel("Display name").fill("E2E Planner");
-  await form.getByLabel("Reason (optional)").fill("e2e test");
+  await form.getByLabel("Remarks (optional)").fill("e2e test");
   await form.getByRole("button", { name: "Create" }).click();
   const box = admin.getByRole("region", { name: "Temporary password" });
   await expect(box).toContainText("Shown once. Give it to the user; they must change it at first sign-in.");
@@ -94,7 +94,7 @@ test("new user: temporary password, forced change, deactivate blocks, activate r
   await userRow(admin, name).getByRole("button", { name: `Deactivate ${name}` }).click();
   const dlg = admin.getByRole("dialog", { name: `Deactivate ${name}?` });
   await expect(dlg).toContainText("They are signed out and cannot sign in until activated.");
-  await dlg.getByLabel("Reason (optional)").fill("e2e test");
+  await dlg.getByLabel("Remarks (optional)").fill("e2e test");
   await dlg.getByRole("button", { name: "Deactivate" }).click();
   await expect(userRow(admin, name)).toContainText("Deactivated");
   await user.reload();

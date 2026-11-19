@@ -3,9 +3,8 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field, StringConstraints
 
-# Reasons are optional (owner decision, 5 Nov 2026); a blank one is stored as NO_REASON where the database needs text.
-Reason = Annotated[str, StringConstraints(strip_whitespace=True)]
-NO_REASON = "no reason given"
+# Remarks are optional (owner decision, 5 Nov 2026); a blank one is stored as NULL.
+Remarks = Annotated[str, StringConstraints(strip_whitespace=True)]
 Status = Literal["pending", "rejected", "withdrawn", "approved", "ended"]
 
 
@@ -20,12 +19,12 @@ class CoreIds(BaseModel):
     cores: list[int] = Field(default_factory=list)
 
 
-class ReasonBody(BaseModel):
-    reason: Reason = ""
+class RemarksBody(BaseModel):
+    remarks: Remarks = ""
 
 
 class CorrectBody(BaseModel):
-    reason: Reason = ""
+    remarks: Remarks = ""
     customer_id: int | None = None
     planned_date: date | None = None
     cores: list[int] | None = None  # always refused: cores are released and requested again
@@ -49,7 +48,7 @@ class ReservationOut(BaseModel):
     status: Status
     last_event: str | None
     last_event_at: datetime | None
-    last_reason: str | None  # rejection or declined-release reason
+    last_remarks: str | None  # rejection or declined-release remarks
     awaiting: Literal["approval", "release"] | None  # what an admin has to decide
     age_days: int  # days since the last event (Asia/Kuala_Lumpur dates)
     stale: bool

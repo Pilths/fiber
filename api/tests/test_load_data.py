@@ -35,7 +35,7 @@ def test_loads_sites_segments_and_counts_then_reruns_cleanly(db, monkeypatch, tm
                              "(SELECT count(*) FROM cores c WHERE c.segment_id = s.id) FROM segments s").all()
     assert [(str(d), sc, cs, n) for d, sc, cs, n in seg] == [("32.500", 24, 144, 24)]
     # survey count
-    assert db.exec_driver_sql("SELECT count(*) FROM data_edits WHERE reason LIKE 'data file load%%'").scalar() == 1
+    assert db.exec_driver_sql("SELECT count(*) FROM data_edits WHERE remarks LIKE 'data file load%%'").scalar() == 1
     # second run with a different survey count keeps the first one
     segs[0][4] = 48
     assert run(monkeypatch, db, tmp_path, sites, segs[:1]) == 0

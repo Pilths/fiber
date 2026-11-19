@@ -8,7 +8,7 @@ from app.ingest.checks import clean
 
 BLANKS = {"", "tba", "n/a", "na", "-", "tbc"}
 DROP_LIMIT = (9, 10)  # a sheet with file rows * 10 <= database rows * 9 (10% or more fewer) is blocked
-UPLOAD_REASON = "site master upload"
+UPLOAD_REMARKS = "site master upload"
 LOCATION_FIELDS = {"location", "geom", "lat", "lon", "latitude", "longitude"}
 SHEETS = {  # kind: (required header keys, expected-headers text, entity, own header keys)
     "sites": (

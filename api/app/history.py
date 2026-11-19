@@ -26,7 +26,7 @@ SELECT_CORE_LINKS = """
     ORDER BY c.segment_id, c.number
 """
 SELECT_EVENTS = """
-    SELECT e.id, e.reservation_id, e.type, e.user_id, u.display_name AS "user", e.created_at AS at, e.reason,
+    SELECT e.id, e.reservation_id, e.type, e.user_id, u.display_name AS "user", e.created_at AS at, e.remarks,
            cu.name AS customer, e.planned_date, r.unassigned_cores
     FROM reservation_events e
     JOIN users u ON u.id = e.user_id
@@ -46,7 +46,7 @@ SELECT_RESERVATION_OWNER = "SELECT planner_id FROM reservations WHERE id = :rese
 SELECT_CORE_EXISTS = "SELECT 1 FROM cores WHERE id = :core_id"
 SELECT_RESERVATIONS_OF_CORE = "SELECT reservation_id FROM reservation_cores WHERE core_id = :core_id"
 SELECT_CORE_DATA_EDITS = """
-    SELECT d.id, d.created_at AS at, d.field, d.old_value, d.new_value, d.reason, u.display_name AS "user"
+    SELECT d.id, d.created_at AS at, d.field, d.old_value, d.new_value, d.remarks, u.display_name AS "user"
     FROM data_edits d
     JOIN users u ON u.id = d.user_id
     WHERE d.entity = 'core' AND d.entity_id = :core_id
@@ -66,7 +66,7 @@ class EventOut(BaseModel):
     user_id: int
     user: str
     at: datetime
-    reason: str | None
+    remarks: str | None
     customer: str | None  # corrected events only
     planned_date: date | None  # corrected events only
     cores: list[CoreRef]  # cores this event covers (empty for reservation-wide events)
@@ -78,7 +78,7 @@ class CoreHistoryItem(BaseModel):
     kind: str  # "reservation_event" | "data_edit"
     type: str  # event type, or the edited field ("status")
     user: str
-    reason: str | None
+    remarks: str | None
     reservation_id: int | None
     old_value: str | None
     new_value: str | None
@@ -170,7 +170,7 @@ def _reservation_event_items(
                 kind="reservation_event",
                 type=event.type,
                 user=event.user,
-                reason=event.reason,
+                remarks=event.remarks,
                 reservation_id=reservation_id,
                 old_value=None,
                 new_value=None,
@@ -188,7 +188,7 @@ def _data_edit_items(db: Session, core_id: int) -> list[tuple[Any, int, CoreHist
             kind="data_edit",
             type=row["field"],
             user=row["user"],
-            reason=row["reason"],
+            remarks=row["remarks"],
             reservation_id=None,
             old_value=row["old_value"],
             new_value=row["new_value"],

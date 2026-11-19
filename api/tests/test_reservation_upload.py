@@ -196,7 +196,7 @@ def test_missing_rows_untouched_and_protected_fields(client, db, admin):
     sid = n(db, "SELECT s.id FROM segments s JOIN sites a ON a.id = s.site_a_id WHERE a.name = 'AABB'")
     boss = n(db, "SELECT id FROM users WHERE username = 'boss'")
     db.execute(text("UPDATE segments SET distance_km = 9 WHERE id = :i"), {"i": sid})
-    db.execute(text("INSERT INTO data_edits (entity, entity_id, field, old_value, new_value, reason, user_id) "
+    db.execute(text("INSERT INTO data_edits (entity, entity_id, field, old_value, new_value, remarks, user_id) "
                     "VALUES ('segment', :i, 'distance_km', '3', '9', 'surveyed again', :u)"), {"i": sid, "u": boss})
     res_before = db.execute(text("SELECT * FROM reservations ORDER BY id")).all()
     # second file lacks BBCC-CCDD, differs on distance (protected) and region (not protected)
@@ -212,7 +212,7 @@ def test_missing_rows_untouched_and_protected_fields(client, db, admin):
     confirm(client, uid)
     assert n(db, f"SELECT distance_km FROM segments WHERE id = {sid}") == 9
     assert n(db, f"SELECT region FROM segments WHERE id = {sid}") == "North"
-    assert n(db, "SELECT reason FROM data_edits WHERE entity = 'segment' AND field = 'region'").startswith(
+    assert n(db, "SELECT remarks FROM data_edits WHERE entity = 'segment' AND field = 'region'").startswith(
         "reservation upload res.xlsx #"
     )
     # missing segment untouched
@@ -229,7 +229,7 @@ def test_missing_rows_untouched_and_protected_fields(client, db, admin):
         n(
             db,
             "SELECT count(*) FROM data_edits "
-            "WHERE entity = 'segment' AND field = 'distance_km' AND reason LIKE 'reservation upload%'",
+            "WHERE entity = 'segment' AND field = 'distance_km' AND remarks LIKE 'reservation upload%'",
         )
         == 1
     )
@@ -261,13 +261,12 @@ def test_core_status_column_is_ignored_and_raw_cell_kept(client, db, admin):
 
 def test_switch_closed(client, db, admin):
     assert client.get(SWITCH, headers=ADMIN).json()["closed"] is False
-    assert client.post(f"{SWITCH}/close", json={"reason": " "}, headers=ADMIN).status_code == 422
     j = up(client, workbook(row(), row("BBCC-CCDD", who="Beta"))).json()  # staged while open
-    r = client.post(f"{SWITCH}/close", json={"reason": "dashboard is the source now"}, headers=ADMIN)
+    r = client.post(f"{SWITCH}/close", json={"remarks": "dashboard is the source now"}, headers=ADMIN)
     assert r.status_code == 200 and r.json()["closed"] and r.json()["closed_by"] == "boss"
-    assert client.post(f"{SWITCH}/close", json={"reason": "again"}, headers=ADMIN).status_code == 409
+    assert client.post(f"{SWITCH}/close", json={"remarks": "again"}, headers=ADMIN).status_code == 409
     st = client.get(SWITCH, headers=ADMIN).json()
-    assert st["closed"] and st["reason"] == "dashboard is the source now" and st["closed_at"]
+    assert st["closed"] and st["remarks"] == "dashboard is the source now" and st["closed_at"]
     assert (
         n(
             db,
@@ -295,7 +294,7 @@ def test_planner_forbidden(client, db, admin):
                         ("get", SWITCH), ("post", f"{SWITCH}/close")]:
         assert (
             getattr(client, method)(
-                url, headers=P, **({"json": {"reason": "x"}} if method == "post" else {})
+                url, headers=P, **({"json": {"remarks": "x"}} if method == "post" else {})
             ).status_code
             == 403
         ), url

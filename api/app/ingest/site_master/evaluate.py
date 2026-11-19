@@ -10,7 +10,7 @@ from app.ingest.site_master.model import (
     DROP_LIMIT,
     LOCATION_FIELDS,
     SHEETS,
-    UPLOAD_REASON,
+    UPLOAD_REMARKS,
     DbSite,
     Item,
     ParsedSheet,
@@ -25,7 +25,7 @@ FROM sites s
 """
 PROTECTED_SQL = (
     "SELECT entity_id, field FROM data_edits "
-    "WHERE entity = :entity AND NOT (reason LIKE ANY (CAST(:prefixes AS text[])))"
+    "WHERE entity = :entity AND NOT (COALESCE(remarks, '') LIKE ANY (CAST(:prefixes AS text[])))"
 )
 USED_SITE_IDS_SQL = """
 SELECT DISTINCT site_id FROM (
@@ -210,7 +210,7 @@ def used_site_ids(db: Session, ids: list[int]) -> set[int]:
 
 def evaluate(db: Session, parsed: dict[str, ParsedSheet], add_only: bool = False) -> dict[str, SheetResult]:
     snapshot = load_snapshot(db)
-    protected = load_protected(db, "site", (UPLOAD_REASON,))
+    protected = load_protected(db, "site", (UPLOAD_REMARKS,))
     out = {"sites": _eval_sheet("sites", parsed["sites"], snapshot, protected, add_only)}
     for result in out.values():
         result.in_use = used_site_ids(db, [missing.id for missing in result.missing])

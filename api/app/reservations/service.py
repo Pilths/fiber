@@ -16,7 +16,7 @@ from app.errors import NotFound, Conflict, Forbidden, Invalid, ServiceError
 from app.auth.deps import CurrentUser
 from app.db import set_lock_timeout
 from app.inventory import service as inventory
-from app.reservations.schemas import NO_REASON, NeedsReviewItem, ReservationOut
+from app.reservations.schemas import NeedsReviewItem, ReservationOut
 
 TZ = "'Asia/Kuala_Lumpur'"
 
@@ -25,7 +25,7 @@ TZ = "'Asia/Kuala_Lumpur'"
 RES_SQL = f"""
 SELECT r.id, COALESCE(cc.customer_id, r.customer_id) AS customer_id, cu.name AS customer,
   r.planner_id, pu.display_name AS planner, COALESCE(cd.planned_date, r.planned_date) AS planned_date,
-  st.status, st.last_event, st.last_event_at, st.last_reason, st.is_stale AS stale,
+  st.status, st.last_event, st.last_event_at, st.last_remarks, st.is_stale AS stale,
   COALESCE((now() AT TIME ZONE {TZ})::date - (st.last_event_at AT TIME ZONE {TZ})::date, 0) AS age_days,
   r.unassigned_cores, COALESCE(un.remaining, 0) AS remaining_unassigned, r.unassigned_segment_id,
   (SELECT a.name || ' - ' || b.name FROM segments s
@@ -96,8 +96,8 @@ WHERE r.id = :id
 """
 
 INSERT_EVENT_SQL = """
-INSERT INTO reservation_events (reservation_id, type, user_id, reason, customer_id, planned_date)
-VALUES (:reservation_id, :type, :user_id, :reason, :customer_id, :planned_date) RETURNING id
+INSERT INTO reservation_events (reservation_id, type, user_id, remarks, customer_id, planned_date)
+VALUES (:reservation_id, :type, :user_id, :remarks, :customer_id, :planned_date) RETURNING id
 """
 
 LOCK_SEGMENTS_SQL = "SELECT id FROM segments WHERE id = ANY(CAST(:ids AS bigint[])) ORDER BY id FOR UPDATE"
@@ -235,13 +235,13 @@ def _lock(db: Session, reservation_id: int) -> dict[str, Any]:
     return dict(row)
 
 
-def _event(db: Session, reservation_id: int, kind: str, user: CurrentUser, reason: str | None = None,
+def _event(db: Session, reservation_id: int, kind: str, user: CurrentUser, remarks: str | None = None,
            customer_id: int | None = None, planned_date: date | None = None) -> int:
     params = {
         "reservation_id": reservation_id,
         "type": kind,
         "user_id": user.id,
-        "reason": reason,
+        "remarks": remarks,
         "customer_id": customer_id,
         "planned_date": planned_date,
     }
@@ -425,10 +425,10 @@ def approve(db: Session, user: CurrentUser, reservation_id: int) -> ReservationO
     return get(db, reservation_id)
 
 
-def reject(db: Session, user: CurrentUser, reservation_id: int, reason: str) -> ReservationOut:
+def reject(db: Session, user: CurrentUser, reservation_id: int, remarks: str) -> ReservationOut:
     row = _lock(db, reservation_id)
     _require(row, "pending")
-    _event(db, reservation_id, "rejected", user, reason or None)
+    _event(db, reservation_id, "rejected", user, remarks or None)
     db.execute(text(DELETE_HOLDS_SQL), {"reservation_id": reservation_id})
     db.commit()
     return get(db, reservation_id)
@@ -446,17 +446,17 @@ def release(db: Session, user: CurrentUser, reservation_id: int, core_ids: list[
     return get(db, reservation_id)
 
 
-def decline_release(db: Session, user: CurrentUser, reservation_id: int, reason: str) -> ReservationOut:
+def decline_release(db: Session, user: CurrentUser, reservation_id: int, remarks: str) -> ReservationOut:
     row = _lock(db, reservation_id)
     _require(row, "approved")
     if row["last_event"] != "release_requested":
         raise conflict("No release request is waiting.")
-    _event(db, reservation_id, "release_declined", user, reason or None)
+    _event(db, reservation_id, "release_declined", user, remarks or None)
     db.commit()
     return get(db, reservation_id)
 
 
-def correct(db: Session, user: CurrentUser, reservation_id: int, reason: str, customer_id: int | None,
+def correct(db: Session, user: CurrentUser, reservation_id: int, remarks: str, customer_id: int | None,
             planned_date: date | None, cores: list[int] | None) -> ReservationOut:
     if cores is not None:
         raise Invalid("Cores cannot be corrected. Release them and request again.")
@@ -468,7 +468,7 @@ def correct(db: Session, user: CurrentUser, reservation_id: int, reason: str, cu
         raise conflict("The date of an undated imported reservation cannot be corrected.")
     if customer_id is not None and not _customer_exists(db, customer_id):
         raise Invalid("Unknown customer")
-    _event(db, reservation_id, "corrected", user, reason or NO_REASON, customer_id, planned_date)
+    _event(db, reservation_id, "corrected", user, remarks or None, customer_id, planned_date)
     db.commit()
     return get(db, reservation_id)
 
