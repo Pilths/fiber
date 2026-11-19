@@ -11,7 +11,7 @@ import {
   type ImportState,
   type ReservationPreview,
 } from "@/lib/useReservationUpload";
-import { plural, when } from "@/lib/utils";
+import { formatDate, formatDateTime, plural } from "@/lib/format";
 
 type Row = components["schemas"]["app__ingest__reservation_upload_router__RowOut"];
 type Group = Row["group"];
@@ -72,15 +72,6 @@ function Pill({ group }: { group: Group }) {
   return <span className={`inline-flex items-center gap-1.5 ${TEXT[info.cls]}`}><Icon name={info.icon} />{info.word}</span>;
 }
 
-const DATE = new Intl.DateTimeFormat("en-GB", { timeZone: "UTC", day: "numeric", month: "short", year: "numeric" });
-
-function formatDate(value: string | null): string {
-  if (!value) {
-    return "—";
-  }
-  return DATE.format(new Date(value));
-}
-
 // One end's labels, a range shown as "first … last".
 function portRange(labels: string[]): string {
   if (labels.length > 1) {
@@ -114,7 +105,7 @@ function useUploadRows(uploadId: number, firstGroup: Group) {
 
 function ImportSwitch({ state, onClosed }: { state: ImportState | null; onClosed: (state: ImportState) => void }) {
   const [open, setOpen] = useState(false);
-  const [reason, setReason] = useState("");
+  const [remarks, setRemarks] = useState("");
   const [error, setError] = useState<string | null>(null);
   if (!state) {
     return null;
@@ -123,24 +114,20 @@ function ImportSwitch({ state, onClosed }: { state: ImportState | null; onClosed
     return (
       <p data-testid="import-switch" role="status" className="text-body">
         <span className="inline-flex items-center gap-1.5 font-semibold text-amber">
-          <Icon name="lo" />Reservation import closed on {when(state.closed_at)} by {state.closed_by}: {state.reason}
+          <Icon name="lo" />Reservation import closed on {formatDateTime(state.closed_at)} by {state.closed_by}{state.remarks && `: ${state.remarks}`}
         </span>
       </p>
     );
   }
   const openDialog = () => {
     setOpen(true);
-    setReason("");
+    setRemarks("");
     setError(null);
   };
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!reason.trim()) {
-      setError("Enter a reason for closing the import.");
-      return;
-    }
     try {
-      onClosed(await api.post("/api/admin/reservation-import/close", { body: { reason: reason.trim() } }));
+      onClosed(await api.post("/api/admin/reservation-import/close", { body: { remarks: remarks.trim() } }));
       setOpen(false);
     } catch (caught) {
       setError(errorText(caught, "Could not close the import. Try again."));
@@ -163,9 +150,9 @@ function ImportSwitch({ state, onClosed }: { state: ImportState | null; onClosed
               </p>
             )}
             <label className="mt-4 block">
-              <span className="lbl mb-1 block text-body! text-foreground!">Reason (required)</span>
-              <textarea className="field h-20! py-2" value={reason} onChange={(e) => setReason(e.target.value)} autoFocus
-                aria-invalid={!!error && !reason.trim()} />
+              <span className="lbl mb-1 block text-body! text-foreground!">Remarks (optional)</span>
+              <textarea className="field h-20! py-2" value={remarks} onChange={(e) => setRemarks(e.target.value)}
+                autoFocus />
             </label>
             <div className="mt-5 flex justify-end gap-2">
               <button type="button" className="btn" onClick={() => setOpen(false)}>Cancel</button>

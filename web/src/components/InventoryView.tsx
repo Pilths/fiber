@@ -73,8 +73,7 @@ export function InventoryView(props: {
   return (
     <main className="grid grid-cols-12 gap-4 px-6 pt-6 pb-4">
       <section className={MAP_CARD_CLASS} aria-label="Network map" aria-describedby="map-instr">
-        {/* ponytail: site clicks do nothing on the view-only map; wire them to Site A/B if planners ask */}
-        <NetworkMap state={map} onSite={() => {}} onClear={clearMap}
+        <NetworkMap state={map} onClear={clearMap}
           customer={customer} onEmptyClick={customer ? clearMap : undefined}
           visible={visible}
           tools={tools} />

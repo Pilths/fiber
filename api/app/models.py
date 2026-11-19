@@ -223,8 +223,7 @@ class ReservationEvent(Base):
         _in("type", EVENT_TYPES, "reservation_events_type_ck"),
         CheckConstraint("type = 'corrected' OR (customer_id IS NULL AND planned_date IS NULL)",
                         name="reservation_events_correction_ck"),
-        CheckConstraint("type <> 'corrected' OR ((customer_id IS NOT NULL OR planned_date IS NOT NULL) "
-                        "AND length(trim(coalesce(reason, ''))) > 0)",
+        CheckConstraint("type <> 'corrected' OR customer_id IS NOT NULL OR planned_date IS NOT NULL",
                         name="reservation_events_corrected_ck"),
         Index("reservation_events_res_created_ix", "reservation_id", "created_at"),
     )
@@ -232,7 +231,7 @@ class ReservationEvent(Base):
     reservation_id: Mapped[int] = _fk("reservations")
     type: Mapped[str] = mapped_column(Text)
     user_id: Mapped[int] = _fk("users")
-    reason: Mapped[str | None] = mapped_column(Text)
+    remarks: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = _created()
     customer_id: Mapped[int | None] = _fk("customers", True)
     planned_date: Mapped[date | None] = mapped_column(Date)
@@ -326,7 +325,6 @@ class Measurement(Base):
 class DataEdit(Base):
     __tablename__ = "data_edits"
     __table_args__ = (
-        CheckConstraint("length(trim(reason)) > 0", name="data_edits_reason_ck"),
         Index("data_edits_entity_ix", "entity", "entity_id", "field", "created_at"),
     )
     id: Mapped[int] = _id()
@@ -335,7 +333,7 @@ class DataEdit(Base):
     field: Mapped[str] = mapped_column(Text)
     old_value: Mapped[str | None] = mapped_column(Text)
     new_value: Mapped[str | None] = mapped_column(Text)
-    reason: Mapped[str] = mapped_column(Text)
+    remarks: Mapped[str | None] = mapped_column(Text)
     user_id: Mapped[int] = _fk("users")
     created_at: Mapped[datetime] = _created()
 

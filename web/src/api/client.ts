@@ -183,7 +183,7 @@ export const api = {
 // One call site for every reservation action (the reservation cards and the core detail drawer).
 // The generated client types each body; one cast keeps this a single function for seven actions.
 export type Action = "approve" | "reject" | "withdraw" | "keep" | "request-release" | "release" | "decline-release";
-type ActionBody = { reason?: string; cores?: number[] };
+type ActionBody = { remarks?: string; cores?: number[] };
 type UntypedPost = (url: string, options: { path: { rid: number }; body?: unknown }) => Promise<unknown>;
 export const resAction = (rid: number, action: Action, body?: ActionBody) => {
   const post = api.post as unknown as UntypedPost;

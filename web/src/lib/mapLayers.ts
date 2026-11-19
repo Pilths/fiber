@@ -117,7 +117,3 @@ export function chipText(segment: SegmentProps): string {
   return "–";
 }
 
-// Map labels write plain digits (no thousands separator), unlike plural() in utils.
-export function plural(count: number, word: string): string {
-  return `${count} ${word}${count === 1 ? "" : "s"}`;
-}

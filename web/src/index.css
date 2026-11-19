@@ -198,9 +198,9 @@
 /* Customer mode: used cores, a neutral pill, not a health colour */
 .mchip.used { border-color: var(--border); background: var(--raised); color: var(--ink); }
 .mchip.on { border-width: 2px; padding: 0 8px; z-index: 6; }
-.mchip:focus-visible, .msite:focus-visible { outline-offset: 3px; z-index: 7; }
+.mchip:focus-visible { outline-offset: 3px; z-index: 7; }
 .mname { position: absolute; left: 50%; bottom: calc(100% + 5px); transform: translateX(-50%); padding: 0 8px; border-radius: 3px; background: #fff; color: var(--blue); font-size: 12px; line-height: 18px; font-weight: 700; white-space: nowrap; pointer-events: none; }
-.msite { position: absolute; z-index: 4; transform: translate(-50%, -50%); width: 24px; height: 24px; display: grid; place-items: center; border: 0; border-radius: 50%; background: none; cursor: pointer; padding: 0; }
+.msite { position: absolute; z-index: 4; transform: translate(-50%, -50%); width: 24px; height: 24px; display: grid; place-items: center; border: 0; border-radius: 50%; background: none; padding: 0; }
 .msite .shape { display: block; }
 .msite .shape.dc { width: 12px; height: 12px; background: var(--ink); border: 1px solid #fff; outline: 1px solid var(--ink); }
 .msite .shape.toc { width: 14px; height: 12px; background: var(--ink); clip-path: polygon(50% 0, 100% 100%, 0 100%); }

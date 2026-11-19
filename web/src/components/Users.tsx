@@ -2,15 +2,12 @@ import { useCallback, useEffect, useState } from "react";
 import { api, errorText } from "@/api/client";
 import type { components } from "@/api/schema";
 import { Dialog } from "@/components/upload-parts";
+import { formatDate } from "@/lib/format";
 
 type Me = components["schemas"]["CurrentUser"];
 type User = components["schemas"]["UserOut"];
 type Temp = components["schemas"]["UserWithPassword"];
 
-const DAY_FORMAT = new Intl.DateTimeFormat("en-GB", {
-  timeZone: "Asia/Kuala_Lumpur", day: "numeric", month: "short", year: "numeric",
-});
-const created = (iso: string) => DAY_FORMAT.format(new Date(iso));
 const ROLE = { admin: "Admin", planner: "Planner" } as Record<string, string>;
 const ERROR_BOX = "rounded-md border border-red bg-red-bg px-3 py-2 text-body font-semibold text-red";
 const lbl = "lbl mb-1 block text-body! text-foreground!";
@@ -54,7 +51,7 @@ function AddUser({ onCreated, onCancel }: { onCreated: (temp: Temp) => void; onC
         username: text("username"),
         display_name: text("display_name") || null,
         role: text("role") as "planner" | "admin",
-        reason: text("reason"),
+        remarks: text("remarks"),
       };
       onCreated(await api.post("/api/admin/users", { body }));
     } catch (err) {
@@ -81,8 +78,8 @@ function AddUser({ onCreated, onCancel }: { onCreated: (temp: Temp) => void; onC
           </select>
         </label>
         <label>
-          <span className={lbl}>Reason (optional)</span>
-          <input name="reason" className="field" autoComplete="off" />
+          <span className={lbl}>Remarks (optional)</span>
+          <input name="remarks" className="field" autoComplete="off" />
         </label>
       </div>
       <div className="mt-3 flex gap-2">
@@ -94,11 +91,11 @@ function AddUser({ onCreated, onCancel }: { onCreated: (temp: Temp) => void; onC
 }
 
 function ConfirmDeactivate({ user, onDone, onCancel }: { user: User; onDone: () => void; onCancel: () => void }) {
-  const [reason, setReason] = useState("");
+  const [remarks, setRemarks] = useState("");
   const [error, setError] = useState<string | null>(null);
   const deactivate = async () => {
     try {
-      await api.post("/api/admin/users/{user_id}/deactivate", { path: { user_id: user.id }, body: { reason } });
+      await api.post("/api/admin/users/{user_id}/deactivate", { path: { user_id: user.id }, body: { remarks } });
       onDone();
     } catch (err) {
       setError(errorText(err, "Could not deactivate. Try again."));
@@ -108,8 +105,8 @@ function ConfirmDeactivate({ user, onDone, onCancel }: { user: User; onDone: () 
     <Dialog title={`Deactivate ${user.username}?`} onClose={onCancel} cls="m-auto w-[440px]">
       <p className="mt-1 text-body text-muted-foreground">They are signed out and cannot sign in until activated.</p>
       {error && <p role="alert" className={`mt-3 ${ERROR_BOX}`}>{error}</p>}
-      <label className="mt-4 block"><span className={lbl}>Reason (optional)</span>
-        <input className="field" value={reason} onChange={(event) => setReason(event.target.value)} autoFocus />
+      <label className="mt-4 block"><span className={lbl}>Remarks (optional)</span>
+        <input className="field" value={remarks} onChange={(event) => setRemarks(event.target.value)} autoFocus />
       </label>
       <div className="mt-5 flex justify-end gap-2">
         <button type="button" className="btn" onClick={onCancel}>Cancel</button>
@@ -159,7 +156,7 @@ function UserRow(props: UserRowProps) {
           {user.must_change_password && user.active && <span className="pill h-amber">Must change password</span>}
         </span>
       </td>
-      <td className="whitespace-nowrap">{created(user.created_at)}</td>
+      <td className="whitespace-nowrap">{formatDate(user.created_at)}</td>
       <td>
         <span className="flex justify-end gap-2">
           <button type="button" className="btn btn-sm" onClick={() => onAct(user, "reset-password")}

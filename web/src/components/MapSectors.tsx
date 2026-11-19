@@ -1,7 +1,7 @@
 import { clusterColour, clusterFade, clustersOf, sectorRings, type SectorFeature } from "@/lib/mapClusters";
 import type { SectorLabel } from "@/lib/clusterLayout";
 import { project, type Bounds, type Point } from "@/lib/mapGeometry";
-import { plural } from "@/lib/mapLayers";
+import { plural } from "@/lib/format";
 import type { NetworkMapState } from "@/lib/useNetworkMap";
 
 // Cluster outlines under the route lines (a light fill that fades to a thin outline as the zoom passes the fade

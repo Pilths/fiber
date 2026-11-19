@@ -1,4 +1,4 @@
-import { plural } from "@/lib/utils";
+import { plural } from "@/lib/format";
 import { groupCores, type Reservation } from "@/components/reservations/reservation";
 
 function coreNumbers(cores: Reservation["cores"]) {

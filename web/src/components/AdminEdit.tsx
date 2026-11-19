@@ -3,7 +3,7 @@ import { api } from "@/api/client";
 import type { components } from "@/api/schema";
 import { PastePortsDialog } from "@/components/PastePortsDialog";
 import { Dialog } from "@/components/upload-parts";
-import { when } from "@/lib/status";
+import { formatDateTime } from "@/lib/format";
 import { type SegmentFocus, type Site, useEditSegment, useEditSite } from "@/lib/useAdminEdit";
 
 export type { SegmentFocus };
@@ -18,7 +18,7 @@ const FIELD: Record<string, string> = {
 };
 const lbl = "lbl mb-1 block text-body! text-foreground!";
 
-// Latest edits of one item, newest first: who, when, field old -> new, reason.
+// Latest edits of one item, newest first: who, when, field old -> new, remarks.
 export function EditHistory({ rows }: { rows: Row[] }) {
   return (
     <details className="mt-4 border-t pt-3 text-body" data-testid="edit-history">
@@ -31,8 +31,8 @@ export function EditHistory({ rows }: { rows: Row[] }) {
             <li key={i} className="border-b border-rule py-1.5 last:border-b-0">
               <span className="font-semibold">{FIELD[row.field] ?? row.field}</span>: {row.old_value ?? "blank"}{" "}
               <span aria-label="became">→</span> {row.new_value ?? "blank"}
-              <span className="block text-muted-foreground">{row.user}, {when(String(row.at))}</span>
-              <span className="block">Reason: {row.reason}</span>
+              <span className="block text-muted-foreground">{row.user}, {formatDateTime(String(row.at))}</span>
+              {row.remarks && <span className="block">Remarks: {row.remarks}</span>}
             </li>
           ))}
         </ol>
@@ -41,11 +41,11 @@ export function EditHistory({ rows }: { rows: Row[] }) {
   );
 }
 
-function Reason({ value, onChange, autoFocus }: {
+function Remarks({ value, onChange, autoFocus }: {
   value: string; onChange: (value: string) => void; autoFocus?: boolean;
 }) {
   return (
-    <label className="col-span-2 block"><span className={lbl}>Reason (optional)</span>
+    <label className="col-span-2 block"><span className={lbl}>Remarks (optional)</span>
       <input className="field" autoFocus={autoFocus} value={value} onChange={(event) => onChange(event.target.value)} />
     </label>
   );
@@ -124,7 +124,7 @@ type SegmentDialogProps = { segmentId: number; focus?: SegmentFocus; onClose: ()
 export function EditSegmentDialog({ segmentId, focus, onClose, onSaved }: SegmentDialogProps) {
   const {
     segment, form, siteA, setSiteA, siteB, setSiteB, error, busy, pasting, setPasting, surveyInput,
-    setField, setCut, setReason, copyTotalCores, portsApplied, submit,
+    setField, setCut, setRemarks, copyTotalCores, portsApplied, submit,
   } = useEditSegment(segmentId, focus, onClose, onSaved);
   const pasteButton = (
     <button type="button" className="btn mr-auto" onClick={() => setPasting(true)}>Paste ports</button>
@@ -162,7 +162,7 @@ export function EditSegmentDialog({ segmentId, focus, onClose, onSaved }: Segmen
                 onChange={(event) => setCut(event.target.checked)} />
               <span className="font-semibold">Fiber cut</span>
             </label>
-            <Reason value={form.reason} onChange={setReason} autoFocus={focus === "restore"} />
+            <Remarks value={form.remarks} onChange={setRemarks} autoFocus={focus === "restore"} />
           </div>
           <Buttons busy={busy} onClose={onClose} left={pasteButton} />
           <EditHistory rows={segment.history} />
@@ -213,7 +213,7 @@ export function EditSiteDialog({ siteId, onClose, onSaved }: {
                 </b>
               )}
             </p>
-            <Reason value={form.reason} onChange={edit.setReason} />
+            <Remarks value={form.remarks} onChange={edit.setRemarks} />
           </div>
           <Buttons busy={edit.busy} onClose={onClose} />
           <EditHistory rows={site.history} />

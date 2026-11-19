@@ -18,7 +18,7 @@ from app.ingest.site_master.evaluate import (
 from app.ingest.site_master.model import (
     APPLY_COUNTERS,
     SHEETS,
-    UPLOAD_REASON,
+    UPLOAD_REMARKS,
     DbSite,
     Item,
     SheetResult,
@@ -45,8 +45,8 @@ SITE_MASTER_UPLOAD_SQL = """
 SELECT id, filename, status, summary FROM uploads WHERE id = :upload_id AND kind = 'site_master'
 """
 INSERT_OVERRIDE_EDIT_SQL = """
-INSERT INTO data_edits (entity, entity_id, field, old_value, new_value, reason, user_id)
-VALUES ('upload', :upload_id, 'override_drop', NULL, :sheet, :reason, :user_id)
+INSERT INTO data_edits (entity, entity_id, field, old_value, new_value, remarks, user_id)
+VALUES ('upload', :upload_id, 'override_drop', NULL, :sheet, :remarks, :user_id)
 """
 FINISH_UPLOAD_SQL = """
 UPDATE uploads SET status = :status,
@@ -126,7 +126,7 @@ def _deactivated_site(missing: DbSite) -> dict[str, Any]:
     return values
 
 
-def _write_sites(db: Session, admin_id: int, reason: str, inserts: list[dict[str, Any]],
+def _write_sites(db: Session, admin_id: int, remarks: str, inserts: list[dict[str, Any]],
                  updates: list[dict[str, Any]], edits: list[tuple]) -> None:
     if inserts:
         db.execute(text(INSERT_SITE_SQL), inserts)
@@ -134,14 +134,14 @@ def _write_sites(db: Session, admin_id: int, reason: str, inserts: list[dict[str
         db.execute(text(UPDATE_SITE_SQL), updates)
     for site_id, field_name, old, new in edits:
         site_edit = [(field_name, _edit_text(old), _edit_text(new))]
-        log_edits_for_user(db, admin_id, "site", site_id, site_edit, reason)
+        log_edits_for_user(db, admin_id, "site", site_id, site_edit, remarks)
 
 
 def apply_sheet(
     db: Session,
     admin_id: int,
     result: SheetResult,
-    reason: str,
+    remarks: str,
     warnings: list[str],
     protected: dict[int, set[str]],
     snapshot: dict[str, DbSite],
@@ -179,20 +179,17 @@ def apply_sheet(
             edits.append((missing.id, "active", True, False))
             out["deactivated"] += 1
 
-    _write_sites(db, admin_id, reason, inserts, updates, edits)
+    _write_sites(db, admin_id, remarks, inserts, updates, edits)
     out["added"] = len(inserts)
     return out
 
 
-def _check_request(upload: Any, override: dict[str, bool], reason: str | None, only: Sequence[str] | None,
-                   done: set[str]) -> None:
+def _check_request(upload: Any, only: Sequence[str] | None, done: set[str]) -> None:
     if upload["status"] != "staged" and not only:
         raise ApplyError(409, "This upload was already applied")
     again = [kind for kind in (only or ()) if kind in done]
     if again:
         raise ApplyError(409, f"{', '.join(again)} was already applied from this upload")
-    if any(override.values()) and not (reason or "").strip():
-        raise ApplyError(422, "A reason is required to override the row-count check")
 
 
 def _nothing_to_apply(results: dict[str, SheetResult]) -> ApplyError:
@@ -218,7 +215,7 @@ def _sheet_outcomes(results: dict[str, SheetResult], applied_now: dict[str, dict
 
 
 def _applied_record(admin_id: int, sheets: dict[str, Any], earlier: dict[str, Any], warnings: list[str],
-                    override: dict[str, bool], reason: str | None) -> dict[str, Any]:
+                    override: dict[str, bool], remarks: str | None) -> dict[str, Any]:
     earlier_override = earlier.get("override_drop") or {}
     override_drop = {kind: bool(override.get(kind)) or bool(earlier_override.get(kind)) for kind in SHEETS}
     return {
@@ -227,11 +224,11 @@ def _applied_record(admin_id: int, sheets: dict[str, Any], earlier: dict[str, An
         "sheets": sheets,
         "warnings": earlier.get("warnings", []) + warnings,
         "override_drop": override_drop,
-        "override_reason": reason or earlier.get("override_reason"),
+        "override_remarks": remarks or earlier.get("override_remarks"),
     }
 
 
-def apply_upload(db: Session, admin_id: int, upload_id: int, override: dict[str, bool], reason: str | None,
+def apply_upload(db: Session, admin_id: int, upload_id: int, override: dict[str, bool], remarks: str | None,
                  only: Sequence[str] | None = None) -> dict[str, Any]:
     """Apply the named sheets (all when only is None).
 
@@ -244,7 +241,7 @@ def apply_upload(db: Session, admin_id: int, upload_id: int, override: dict[str,
     earlier = upload["summary"].get("applied") or {}
     before = earlier.get("sheets", {})
     done = {kind for kind, sheet in before.items() if sheet.get("applied")}
-    _check_request(upload, override, reason, only, done)
+    _check_request(upload, only, done)
 
     staged = load_staged(db, upload_id, upload["summary"])
     results = evaluate(db, staged, bool(upload["summary"].get("add_only")))
@@ -255,23 +252,23 @@ def apply_upload(db: Session, admin_id: int, upload_id: int, override: dict[str,
     if not todo:
         raise _nothing_to_apply(results)
 
-    why = f"{UPLOAD_REASON} {upload['filename']} #{upload_id}"
+    why = f"{UPLOAD_REMARKS} {upload['filename']} #{upload_id}"
     snapshot = load_snapshot(db)
-    protected = load_protected(db, "site", (UPLOAD_REASON,))
+    protected = load_protected(db, "site", (UPLOAD_REMARKS,))
     warnings: list[str] = []
     applied_now: dict[str, dict[str, int]] = {}
     with db.begin_nested():  # all or nothing
         for kind in todo:
             applied_now[kind] = apply_sheet(db, admin_id, results[kind], why, warnings, protected, snapshot)
         sheets = _sheet_outcomes(results, applied_now, before, done)
-        applied = _applied_record(admin_id, sheets, earlier, warnings, override, reason)
+        applied = _applied_record(admin_id, sheets, earlier, warnings, override, remarks)
         left = [kind for kind in SHEETS if not sheets[kind]["applied"] and _can_apply(results[kind], True)]
         for kind, override_on in override.items():
             if override_on and kind in applied_now:
                 override_params = {
                     "upload_id": upload_id,
                     "sheet": kind,
-                    "reason": (reason or "").strip(),
+                    "remarks": (remarks or "").strip() or None,
                     "user_id": admin_id,
                 }
                 db.execute(text(INSERT_OVERRIDE_EDIT_SQL), override_params)

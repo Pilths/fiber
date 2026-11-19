@@ -32,7 +32,7 @@ from app.inventory import service as inventory
 from app.reservations.service import lock_segments
 from app.routing.graph import invalidate as invalidate_routes
 
-REASON = "reservation upload"
+REMARKS = "reservation upload"
 SEGMENT_FIELDS = ("region", "distance_km", "survey_cores")
 GROUPS = (
     "new", "changed", "unchanged", "missing", "reservations", "conflicts", "already_imported", "ignored",
@@ -54,7 +54,7 @@ SEGMENT_GROUPS = ("new", "changed", "unchanged", "missing")
 RESERVATION_ENTITY_GROUPS = ("reservations", "conflicts", "already_imported", "ignored")
 
 SELECT_IMPORT_CLOSED = """
-    SELECT d.created_at, d.reason, u.username
+    SELECT d.created_at, d.remarks, u.username
     FROM data_edits d
     JOIN users u ON u.id = d.user_id
     WHERE d.entity = 'system'
@@ -138,18 +138,16 @@ def update_segment_field_sql(field_name: str) -> str:
 def import_state(db: Session) -> dict[str, Any]:
     row = db.execute(text(SELECT_IMPORT_CLOSED)).first()
     if row is None:
-        return {"closed": False, "closed_at": None, "closed_by": None, "reason": None}
-    return {"closed": True, "closed_at": row[0], "closed_by": row[2], "reason": row[1]}
+        return {"closed": False, "closed_at": None, "closed_by": None, "remarks": None}
+    return {"closed": True, "closed_at": row[0], "closed_by": row[2], "remarks": row[1]}
 
 
-def close_import(db: Session, admin_id: int, reason: str) -> dict[str, Any]:
-    if not (reason or "").strip():
-        raise ApplyError(422, "A reason is required")
+def close_import(db: Session, admin_id: int, remarks: str) -> dict[str, Any]:
     # Two simultaneous closes: the second sees the first.
     db.execute(text(LOCK_IMPORT_SWITCH))
     if import_state(db)["closed"]:
         raise ApplyError(409, "Reservation import is already closed")
-    log_edits_for_user(db, admin_id, "system", 0, [("reservation_import", "open", "closed")], reason.strip())
+    log_edits_for_user(db, admin_id, "system", 0, [("reservation_import", "open", "closed")], remarks.strip())
     db.commit()
     return import_state(db)
 
@@ -309,7 +307,7 @@ def _segment_items(
         item = segments.setdefault(key, new_item)
         row.extra["segment_key"] = key
         _add_row_to_segment_item(row, item)
-    protected = load_protected(db, "segment", (REASON,))
+    protected = load_protected(db, "segment", (REMARKS,))
     for item in segments.values():
         found = find_segment(db, sites[item.site_a], sites[item.site_b])
         if found is None:
@@ -694,7 +692,7 @@ def confirm(db: Session, admin_id: int, upload_id: int, excel_wins: list[dict[st
     lock_segments(db, {item.segment_id for item in evaluation.segments.values() if item.segment_id})
     evaluation = evaluate(db, load_staged(db, upload_id), wins)  # fresh rows: evaluate adds warnings to them
     _check_wins_are_protected(evaluation, wins)
-    why = f"{REASON} {upload['filename']} #{upload_id}"
+    why = f"{REMARKS} {upload['filename']} #{upload_id}"
     counts: dict[str, int] = dict.fromkeys(COUNT_KEYS, 0)
     skipped: list[dict[str, Any]] = []
     site_names = sorted({name for item in evaluation.segments.values() for name in (item.site_a, item.site_b)})

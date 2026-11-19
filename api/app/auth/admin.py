@@ -28,11 +28,11 @@ class UserCreate(BaseModel):
     username: str
     role: Literal["planner", "admin"]
     display_name: str | None = None
-    reason: str = "admin action"
+    remarks: str = ""
 
 
-class ReasonBody(BaseModel):
-    reason: str = "admin action"
+class RemarksBody(BaseModel):
+    remarks: str = ""
 
 
 class UserWithPassword(UserOut):
@@ -54,8 +54,10 @@ def _get(db: Session, user_id: int) -> dict:
     return dict(row)
 
 
-def _log(db: Session, admin: CurrentUser, user_id: int, field: str, old: str | None, new: str, reason: str) -> None:
-    log_user_edit(db, user_id, admin.id, field, old, new, reason.strip() or "admin action")
+def _log(
+    db: Session, admin: CurrentUser, user_id: int, field: str, old: str | None, new: str, remarks: str
+) -> None:
+    log_user_edit(db, user_id, admin.id, field, old, new, remarks.strip() or None)
 
 
 @router.get("")
@@ -74,39 +76,39 @@ def create_user(db: DB, admin: Admin, body: UserCreate) -> UserWithPassword:
         user_id = create_user_account(db, username, display_name, body.role, password, must_change_password=True)
     except UsernameTaken as error:
         raise Conflict("Username already exists") from error
-    _log(db, admin, user_id, "account", None, f"created as {body.role}", body.reason)
+    _log(db, admin, user_id, "account", None, f"created as {body.role}", body.remarks)
     db.commit()
     return UserWithPassword(**_get(db, user_id), temporary_password=password)
 
 
 @router.post("/{user_id}/reset-password")
-def reset_password(db: DB, admin: Admin, user_id: int, body: ReasonBody | None = None) -> UserWithPassword:
+def reset_password(db: DB, admin: Admin, user_id: int, body: RemarksBody | None = None) -> UserWithPassword:
     _get(db, user_id)
     password = temp_password()
     db.execute(text(UPDATE_PASSWORD), {"password_hash": ph.hash(password), "user_id": user_id})
     db.execute(text(DELETE_SESSIONS), {"user_id": user_id})
-    _log(db, admin, user_id, "password", None, "reset", (body or ReasonBody()).reason)
+    _log(db, admin, user_id, "password", None, "reset", (body or RemarksBody()).remarks)
     db.commit()
     return UserWithPassword(**_get(db, user_id), temporary_password=password)
 
 
-def _set_active(db: Session, admin: CurrentUser, user_id: int, active: bool, reason: str) -> UserOut:
+def _set_active(db: Session, admin: CurrentUser, user_id: int, active: bool, remarks: str) -> UserOut:
     old = _get(db, user_id)
     db.execute(text(UPDATE_ACTIVE), {"active": active, "user_id": user_id})
     if not active:
         db.execute(text(DELETE_SESSIONS), {"user_id": user_id})
-    _log(db, admin, user_id, "active", str(old["active"]).lower(), str(active).lower(), reason)
+    _log(db, admin, user_id, "active", str(old["active"]).lower(), str(active).lower(), remarks)
     db.commit()
     return UserOut(**_get(db, user_id))
 
 
 @router.post("/{user_id}/deactivate")
-def deactivate(db: DB, admin: Admin, user_id: int, body: ReasonBody | None = None) -> UserOut:
+def deactivate(db: DB, admin: Admin, user_id: int, body: RemarksBody | None = None) -> UserOut:
     if user_id == admin.id:
         raise Conflict("You cannot deactivate your own account")
-    return _set_active(db, admin, user_id, False, (body or ReasonBody()).reason)
+    return _set_active(db, admin, user_id, False, (body or RemarksBody()).remarks)
 
 
 @router.post("/{user_id}/activate")
-def activate(db: DB, admin: Admin, user_id: int, body: ReasonBody | None = None) -> UserOut:
-    return _set_active(db, admin, user_id, True, (body or ReasonBody()).reason)
+def activate(db: DB, admin: Admin, user_id: int, body: RemarksBody | None = None) -> UserOut:
+    return _set_active(db, admin, user_id, True, (body or RemarksBody()).remarks)

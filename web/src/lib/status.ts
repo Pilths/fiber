@@ -54,18 +54,6 @@ export const inputCls =
 export type LossDetail = components["schemas"]["SegmentLossDetail"];
 export const db = (decibels: number) => `${decibels.toFixed(2)} dB`;
 
-// Date and time in Asia/Kuala_Lumpur, e.g. "26 Oct 2026, 14:05".
-const DATE_TIME = new Intl.DateTimeFormat("en-GB", {
-  timeZone: "Asia/Kuala_Lumpur",
-  day: "numeric",
-  month: "short",
-  year: "numeric",
-  hour: "2-digit",
-  minute: "2-digit",
-  hourCycle: "h23",
-});
-export const when = (iso: string) => DATE_TIME.format(new Date(iso));
-
 // Reservation event types in plain words ("Approved by DEV admin1").
 export const EVENT_WORD: Record<string, string> = {
   requested: "Requested",

@@ -1,6 +1,7 @@
 import { health } from "@/lib/status";
 import { linePath, type DrawnLine } from "@/lib/mapGeometry";
-import { chipText, LINE_COLOR, LINE_WIDTH, lineKind, plural } from "@/lib/mapLayers";
+import { chipText, LINE_COLOR, LINE_WIDTH, lineKind } from "@/lib/mapLayers";
+import { plural } from "@/lib/format";
 import { requestOptionText, type CustomerHighlight } from "@/lib/useCustomerHighlight";
 
 // The network map overlay: segment lines and free-cores chips (site markers: MapSites.tsx).

@@ -1144,8 +1144,8 @@ export interface components {
              *     }
              */
             override_drop: components["schemas"]["OverrideIn"];
-            /** Reason */
-            reason?: string | null;
+            /** Remarks */
+            remarks?: string | null;
         };
         /** Bell */
         Bell: {
@@ -1221,8 +1221,11 @@ export interface components {
         };
         /** CloseIn */
         CloseIn: {
-            /** Reason */
-            reason: string;
+            /**
+             * Remarks
+             * @default
+             */
+            remarks: string;
         };
         /** ConfirmIn */
         ConfirmIn: {
@@ -1295,8 +1298,8 @@ export interface components {
             type: string;
             /** User */
             user: string;
-            /** Reason */
-            reason: string | null;
+            /** Remarks */
+            remarks: string | null;
             /** Reservation Id */
             reservation_id: number | null;
             /** Old Value */
@@ -1370,10 +1373,10 @@ export interface components {
             /** Port B */
             port_b?: string | null;
             /**
-             * Reason
+             * Remarks
              * @default
              */
-            reason: string;
+            remarks: string;
         };
         /** CoreRef */
         CoreRef: {
@@ -1387,10 +1390,10 @@ export interface components {
         /** CorrectBody */
         CorrectBody: {
             /**
-             * Reason
+             * Remarks
              * @default
              */
-            reason: string;
+            remarks: string;
             /** Customer Id */
             customer_id?: number | null;
             /** Planned Date */
@@ -1505,8 +1508,8 @@ export interface components {
              * Format: date-time
              */
             at: string;
-            /** Reason */
-            reason: string | null;
+            /** Remarks */
+            remarks: string | null;
             /** Customer */
             customer: string | null;
             /** Planned Date */
@@ -1529,8 +1532,8 @@ export interface components {
             old_value: string | null;
             /** New Value */
             new_value: string | null;
-            /** Reason */
-            reason: string;
+            /** Remarks */
+            remarks: string;
             /** User Id */
             user_id: number;
             /** User */
@@ -1573,8 +1576,8 @@ export interface components {
             closed_at: string | null;
             /** Closed By */
             closed_by: string | null;
-            /** Reason */
-            reason: string | null;
+            /** Remarks */
+            remarks: string | null;
         };
         /** KmzApplyOut */
         KmzApplyOut: {
@@ -1822,6 +1825,14 @@ export interface components {
             /** Confirmed At */
             confirmed_at: string | null;
         };
+        /** RemarksBody */
+        RemarksBody: {
+            /**
+             * Remarks
+             * @default
+             */
+            remarks: string;
+        };
         /** ResCore */
         ResCore: {
             /** Core Id */
@@ -1869,8 +1880,8 @@ export interface components {
             last_event: string | null;
             /** Last Event At */
             last_event_at: string | null;
-            /** Last Reason */
-            last_reason: string | null;
+            /** Last Remarks */
+            last_remarks: string | null;
             /** Awaiting */
             awaiting: ("approval" | "release") | null;
             /** Age Days */
@@ -1983,10 +1994,10 @@ export interface components {
         /** SegmentBody */
         SegmentBody: {
             /**
-             * Reason
+             * Remarks
              * @default
              */
-            reason: string;
+            remarks: string;
             /** Distance Km */
             distance_km?: number | string | null;
             /** Region */
@@ -2262,10 +2273,10 @@ export interface components {
         /** SiteBody */
         SiteBody: {
             /**
-             * Reason
+             * Remarks
              * @default
              */
-            reason: string;
+            remarks: string;
             /** Name */
             name?: string | null;
             /** Lat */
@@ -2381,10 +2392,10 @@ export interface components {
             /** Display Name */
             display_name?: string | null;
             /**
-             * Reason
-             * @default admin action
+             * Remarks
+             * @default
              */
-            reason: string;
+            remarks: string;
         };
         /** UserOut */
         UserOut: {
@@ -2459,14 +2470,6 @@ export interface components {
              * @enum {string}
              */
             field: "region" | "distance_km" | "survey_cores";
-        };
-        /** ReasonBody */
-        app__auth__admin__ReasonBody: {
-            /**
-             * Reason
-             * @default admin action
-             */
-            reason: string;
         };
         /** RowOut */
         app__ingest__reservation_upload_router__RowOut: {
@@ -2649,14 +2652,6 @@ export interface components {
              * @default false
              */
             add_only: boolean;
-        };
-        /** ReasonBody */
-        app__reservations__schemas__ReasonBody: {
-            /**
-             * Reason
-             * @default
-             */
-            reason: string;
         };
     };
     responses: never;
@@ -2882,7 +2877,7 @@ export interface operations {
         };
         requestBody?: {
             content: {
-                "application/json": components["schemas"]["app__auth__admin__ReasonBody"] | null;
+                "application/json": components["schemas"]["RemarksBody"] | null;
             };
         };
         responses: {
@@ -2921,7 +2916,7 @@ export interface operations {
         };
         requestBody?: {
             content: {
-                "application/json": components["schemas"]["app__auth__admin__ReasonBody"] | null;
+                "application/json": components["schemas"]["RemarksBody"] | null;
             };
         };
         responses: {
@@ -2960,7 +2955,7 @@ export interface operations {
         };
         requestBody?: {
             content: {
-                "application/json": components["schemas"]["app__auth__admin__ReasonBody"] | null;
+                "application/json": components["schemas"]["RemarksBody"] | null;
             };
         };
         responses: {
@@ -3565,7 +3560,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["app__reservations__schemas__ReasonBody"];
+                "application/json": components["schemas"]["RemarksBody"];
             };
         };
         responses: {
@@ -3643,7 +3638,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["app__reservations__schemas__ReasonBody"];
+                "application/json": components["schemas"]["RemarksBody"];
             };
         };
         responses: {

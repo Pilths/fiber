@@ -39,7 +39,6 @@ type NetworkMapProps = {
   state: NetworkMapState;
   tools?: ReactNode; // extra toolbar controls (the customer chip)
   visible: (segment: SegmentProps) => boolean;
-  onSite: (name: string) => void;
   onClear: () => void;
   customer?: CustomerHighlight | null; // customer mode: its chips show used cores
   onEmptyClick?: () => void;
@@ -79,7 +78,7 @@ function chipUsage(customer: CustomerHighlight | null | undefined, segmentId: nu
 }
 
 export function NetworkMap(props: NetworkMapProps) {
-  const { state, visible, onSite, onClear, tools, customer } = props;
+  const { state, visible, onClear, tools, customer } = props;
   const emptyClick = useEmptyMapClick(state.box, state.glBox, props.onEmptyClick);
   const { box, glBox, onPointerDown, onPointerMove, onPointerUp } = state;
   const { camera, size } = state;
@@ -112,7 +111,7 @@ export function NetworkMap(props: NetworkMapProps) {
   return (
     <div className="flex flex-1 flex-col">
       <p id="map-instr" className="sr-only">
-        Chips show free to reserve. Tab to a chip or site and press Enter to select; Esc clears the selection.
+        Chips show free to reserve. Tab to a chip and press Enter to select; Esc clears the selection.
       </p>
       <div ref={box} data-testid="network-map" data-mode={mapMode(state.base)}
         className={`relative flex-1 overflow-hidden bg-map select-none ${state.full ? "" : FRAMED_CLASS}`}
@@ -125,7 +124,7 @@ export function NetworkMap(props: NetworkMapProps) {
             <SectorShapes state={state} sectors={sectors} />
             <MapLines lines={lines} onSelect={state.selectSegment} />
             <SectorLabels labels={labels} clusters={clusters} onZoom={state.zoomToBounds} />
-            <SiteMarkers state={state} layout={layout} nameShown={nameShown} onSite={onSite} />
+            <SiteMarkers state={state} layout={layout} nameShown={nameShown} />
             {lines.filter((line) => line.show).map((line) => (
               <SegmentChip key={line.segment.segment_id} line={line}
                 shown={chipShown.has(line.segment.segment_id)} usage={chipUsage(customer, line.segment.segment_id)}

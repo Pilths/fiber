@@ -6,7 +6,7 @@ type SegmentEdit = components["schemas"]["SegmentEdit"];
 type SiteEdit = components["schemas"]["SiteEdit"];
 export type Site = { id: number; name: string };
 
-// "restore": opened from the Fiber cut banner, box unticked and focus on the reason.
+// "restore": opened from the Fiber cut banner, box unticked and focus on the remarks.
 export type SegmentFocus = "survey" | "restore";
 
 type InputEvent = React.ChangeEvent<HTMLInputElement | HTMLSelectElement>;
@@ -34,7 +34,7 @@ function segmentForm(segment: SegmentEdit, focus?: SegmentFocus) {
     region: segment.region ?? "",
     survey: optionalText(segment.survey_cores),
     cable: String(segment.cable_size),
-    reason: "",
+    remarks: "",
     cut: focus !== "restore" && segment.fiber_cut,
   };
 }
@@ -43,7 +43,7 @@ type SegmentForm = ReturnType<typeof segmentForm>;
 
 // Only changed fields are sent.
 function segmentChanges(segment: SegmentEdit, form: SegmentForm, siteA: Site, siteB: Site) {
-  const body: components["schemas"]["SegmentBody"] = { reason: form.reason.trim() };
+  const body: components["schemas"]["SegmentBody"] = { remarks: form.remarks.trim() };
   const distanceChanged = segment.distance_km == null || Number(form.distance) !== Number(segment.distance_km);
   if (form.distance !== "" && distanceChanged) {
     body.distance_km = form.distance;
@@ -95,7 +95,7 @@ function useSave(onClose: () => void, onSaved: () => void) {
 export function useEditSegment(segmentId: number, focus: SegmentFocus | undefined, onClose: () => void,
   onSaved: () => void) {
   const [segment, setSegment] = useState<SegmentEdit | null>(null);
-  const [form, setForm] = useState({ distance: "", region: "", survey: "", cable: "", reason: "", cut: false });
+  const [form, setForm] = useState({ distance: "", region: "", survey: "", cable: "", remarks: "", cut: false });
   const [siteA, setSiteA] = useState<Site | null>(null);
   const [siteB, setSiteB] = useState<Site | null>(null);
   const [pasting, setPasting] = useState(false);
@@ -137,8 +137,8 @@ export function useEditSegment(segmentId: number, focus: SegmentFocus | undefine
   const setCut = (cut: boolean) => {
     setForm((old) => ({ ...old, cut }));
   };
-  const setReason = (reason: string) => {
-    setForm((old) => ({ ...old, reason }));
+  const setRemarks = (remarks: string) => {
+    setForm((old) => ({ ...old, remarks }));
   };
   const copyTotalCores = () => {
     setForm((old) => ({ ...old, survey: old.cable }));
@@ -159,7 +159,7 @@ export function useEditSegment(segmentId: number, focus: SegmentFocus | undefine
 
   return {
     segment, form, siteA, setSiteA, siteB, setSiteB, error, busy, pasting, setPasting, surveyInput,
-    setField, setCut, setReason, copyTotalCores, portsApplied, submit,
+    setField, setCut, setRemarks, copyTotalCores, portsApplied, submit,
   };
 }
 
@@ -170,14 +170,14 @@ function siteForm(site: SiteEdit) {
     lon: optionalText(site.lon),
     region: site.region ?? "",
     active: site.active,
-    reason: "",
+    remarks: "",
   };
 }
 
 type SiteForm = ReturnType<typeof siteForm>;
 
 function siteChanges(site: SiteEdit, form: SiteForm) {
-  const body: components["schemas"]["SiteBody"] = { reason: form.reason.trim() };
+  const body: components["schemas"]["SiteBody"] = { remarks: form.remarks.trim() };
   if (form.name.trim() !== site.name) {
     body.name = form.name;
   }
@@ -198,7 +198,7 @@ function siteChanges(site: SiteEdit, form: SiteForm) {
 
 export function useEditSite(siteId: number, onClose: () => void, onSaved: () => void) {
   const [site, setSite] = useState<SiteEdit | null>(null);
-  const [form, setForm] = useState({ name: "", lat: "", lon: "", region: "", active: true, reason: "" });
+  const [form, setForm] = useState({ name: "", lat: "", lon: "", region: "", active: true, remarks: "" });
   const { error, setError, busy, save } = useSave(onClose, onSaved);
 
   useEffect(() => {
@@ -227,8 +227,8 @@ export function useEditSite(siteId: number, onClose: () => void, onSaved: () => 
   const setActive = (active: boolean) => {
     setForm((old) => ({ ...old, active }));
   };
-  const setReason = (reason: string) => {
-    setForm((old) => ({ ...old, reason }));
+  const setRemarks = (remarks: string) => {
+    setForm((old) => ({ ...old, remarks }));
   };
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -239,5 +239,5 @@ export function useEditSite(siteId: number, onClose: () => void, onSaved: () => 
     await save(body, () => api.post("/api/admin/sites/{sid}", { path: { sid: siteId }, body }));
   };
 
-  return { site, form, error, busy, setField, setActive, setReason, submit };
+  return { site, form, error, busy, setField, setActive, setRemarks, submit };
 }

@@ -5,19 +5,9 @@ import { useLoad } from "@/lib/useLoad";
 import { ReservationHistory } from "@/components/reservations/ReservationHistory";
 import { ReservationSummary } from "@/components/reservations/ReservationSummary";
 import {
-  groupCores, lastReasonLabel, type Me, type Mode, type Reservation, useReservationAction,
+  groupCores, lastRemarksLabel, type Me, type Mode, type Reservation, useReservationAction,
 } from "@/components/reservations/reservation";
-
-const DAY_FORMAT = new Intl.DateTimeFormat("en-GB", {
-  timeZone: "Asia/Kuala_Lumpur", day: "numeric", month: "short", year: "numeric",
-});
-
-function day(iso: string | null) {
-  if (!iso) {
-    return "—";
-  }
-  return DAY_FORMAT.format(new Date(iso));
-}
+import { formatDate } from "@/lib/format";
 
 // Segment or route of a request: one segment name, or the first segment and how many more (all of them in the
 // details row).
@@ -30,7 +20,7 @@ function segmentText(reservation: Reservation) {
 }
 
 // Approvals (admin): one table of waiting requests, oldest first. Approve / Reject (or Release / Decline for a release
-// request) sit at the right of each row; Reject and Decline open the row to ask for a reason. The chevron opens the
+// request) sit at the right of each row; Reject and Decline open the row to ask for remarks. The chevron opens the
 // row for its cores, notes and history.
 export function Approvals({ me, onChanged }: { me: Me; onChanged: () => void }) {
   const { data, error, reload } = useLoad(() => api.get("/api/approvals"));
@@ -100,19 +90,19 @@ function RowButtons({ reservation, action, onAsk }: {
   );
 }
 
-function ReasonForm({ action }: { action: Action }) {
-  const { mode, reason, setReason, busy, run } = action;
+function RemarksForm({ action }: { action: Action }) {
+  const { mode, remarks, setRemarks, busy, run } = action;
   if (!mode) {
     return null;
   }
   const submit = (event: React.FormEvent) => {
     event.preventDefault();
-    run(mode, { reason: reason.trim() });
+    run(mode, { remarks: remarks.trim() });
   };
   return (
     <form className="flex items-end gap-2 pt-1" onSubmit={submit}>
-      <label className="w-[420px] font-medium">Reason (optional)
-        <input className="field mt-1 bg-white" value={reason} onChange={(event) => setReason(event.target.value)}
+      <label className="w-[420px] font-medium">Remarks (optional)
+        <input className="field mt-1 bg-white" value={remarks} onChange={(event) => setRemarks(event.target.value)}
           autoFocus />
       </label>
       <button type="submit" className="btn btn-p" disabled={busy}>
@@ -132,8 +122,8 @@ function ApprovalDetails({ reservation, action }: { reservation: Reservation; ac
         {" "}{reservation.age_days} days ago.{reservation.stale && " Stale: no approval or keep for over 3 months."}
       </p>
       <ReservationSummary reservation={reservation} variant="row" />
-      {reservation.last_reason && <p role="note">{lastReasonLabel(reservation)}: {reservation.last_reason}</p>}
-      <ReasonForm action={action} />
+      {reservation.last_remarks && <p role="note">{lastRemarksLabel(reservation)}: {reservation.last_remarks}</p>}
+      <RemarksForm action={action} />
       {message && <p role="alert" className="font-medium text-destructive">{message}</p>}
       <ReservationHistory key={reservation.last_event_at ?? ""} reservationId={reservation.id} />
     </div>
@@ -151,7 +141,7 @@ function ApprovalRow({ reservation, onChanged }: { reservation: Reservation; onC
   const allSegments = groupCores(reservation).map(([segment]) => segment).join(", ");
   const ask = (mode: Mode) => {
     action.setMode(mode);
-    action.setReason("");
+    action.setRemarks("");
     action.setMessage(null);
     setOpen(true);
   };
@@ -167,7 +157,7 @@ function ApprovalRow({ reservation, onChanged }: { reservation: Reservation; onC
           </button>
         </td>
         <td>
-          {day(reservation.last_event_at)} <span className="text-muted-foreground">· {reservation.age_days} d</span>
+          {formatDate(reservation.last_event_at)} <span className="text-muted-foreground">· {reservation.age_days} d</span>
         </td>
         <td>{release ? "Release" : "New"}</td>
         <td>{reservation.planner}</td>

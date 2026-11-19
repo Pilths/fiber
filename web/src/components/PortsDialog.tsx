@@ -55,7 +55,7 @@ function endValue(end: PortEnd, oldLabel: string | null): string | null | undefi
 }
 
 function changedPorts(core: Core, endA: PortEnd, endB: PortEnd): PortsBody | null {
-  const body: PortsBody = { reason: "" };
+  const body: PortsBody = { remarks: "" };
   const portA = endValue(endA, core.port_a ?? null);
   const portB = endValue(endB, core.port_b ?? null);
   if (portA !== undefined) {

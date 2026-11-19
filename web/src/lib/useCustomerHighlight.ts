@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { api } from "@/api/client";
 import type { components } from "@/api/schema";
-import { plural } from "@/lib/mapLayers";
+import { formatShortDate, plural } from "@/lib/format";
 
 // Customer mode on the map: a customer picked in the header search highlights only its segments,
 // and their chips show the cores it uses (Reserved + In service) instead of free cores.
@@ -23,12 +23,6 @@ function usedBySegment(segments: { segment_id: number; used_cores: number }[]): 
   return new Map(segments.map((segment) => [segment.segment_id, segment.used_cores]));
 }
 
-// "12 Mar" for a calendar date, in the app's display time zone.
-function shortDate(isoDate: string): string {
-  const format = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Kuala_Lumpur", day: "numeric", month: "short" });
-  return format.format(new Date(`${isoDate}T12:00:00+08:00`));
-}
-
 export function requestName(request: CustomerRequest): string {
   return request.srf_id ?? `Request #${request.reservation_id}`;
 }
@@ -37,7 +31,7 @@ export function requestName(request: CustomerRequest): string {
 export function requestOptionText(request: CustomerRequest): string {
   const parts = [requestName(request), plural(request.used_cores, "core")];
   if (request.planned_date) {
-    parts.push(shortDate(request.planned_date));
+    parts.push(formatShortDate(request.planned_date));
   }
   return parts.join(" · ");
 }

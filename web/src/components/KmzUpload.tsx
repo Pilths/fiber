@@ -2,20 +2,13 @@ import { KmzFolderTree } from "@/components/KmzFolderTree";
 import { FilePick, Note } from "@/components/upload-parts";
 import { ConfirmDialog, PreviewCard } from "@/components/upload-preview";
 import { useKmzUpload, type KmzStaged } from "@/lib/useKmzUpload";
-import { plural } from "@/lib/utils";
+import { formatKm, plural } from "@/lib/format";
 
 type Staged = KmzStaged;
 type Shaped = Staged["shaped"][number];
 type Skipped = Staged["skipped"][number];
 
 const KMZ = { accept: ".kmz,application/vnd.google-earth.kmz", button: "Choose .kmz file" };
-
-function formatKm(km: number | null | undefined): string {
-  if (km == null) {
-    return "—";
-  }
-  return km.toFixed(2);
-}
 
 function ShapedTable({ rows }: { rows: Shaped[] }) {
   return (

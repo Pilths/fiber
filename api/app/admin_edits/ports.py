@@ -14,13 +14,21 @@ from app.ingest.reservation_import import port
 from app.inventory import service as inventory
 from app.inventory.schemas import CoreHolderDetail
 from app.port_label import LABEL_HELP, normalize_port_label
-from app.reservations.schemas import Reason
+from app.reservations.schemas import Remarks
 
 router = APIRouter()
 
 CORE_PORTS_SQL = """
 SELECT c.segment_id, c.port_a_id, c.port_b_id, s.site_a_id, s.site_b_id
 FROM cores c JOIN segments s ON s.id = c.segment_id WHERE c.id = :core_id
+"""
+PORT_SITE_SQL = """
+SELECT p.site_id, a.name AS name_a, b.name AS name_b
+FROM ports p, cores c
+JOIN segments s ON s.id = c.segment_id
+JOIN sites a ON a.id = s.site_a_id
+JOIN sites b ON b.id = s.site_b_id
+WHERE p.id = :port_row_id AND c.id = :core_id
 """
 LOCK_SEGMENT_SQL = "SELECT id FROM segments WHERE id = :segment_id FOR UPDATE"
 PORT_LABEL_SQL = "SELECT port_id FROM ports WHERE id = :port_row_id"
@@ -60,7 +68,7 @@ class CorePortsBody(BaseModel):
     port_a: str | None = None
     # Label at the segment's second site.
     port_b: str | None = None
-    reason: Reason = ""
+    remarks: Remarks = ""
 
 
 def _port_label(db: Session, port_row_id: int | None) -> str | None:
@@ -85,6 +93,15 @@ def _canonical_label(typed: str | None) -> str | None:
     return label
 
 
+def _refuse_port_outside_segment(db: Session, port_row_id: int, label: str, core_id: int, site_id: int) -> None:
+    """A core's A port is at the segment's site A and its B port at site B; any other site is refused."""
+    port_site_id, name_a, name_b = db.execute(
+        text(PORT_SITE_SQL), {"port_row_id": port_row_id, "core_id": core_id}
+    ).one()
+    if port_site_id != site_id:
+        raise Invalid(f"Port {label} is not at {name_a} or {name_b}")
+
+
 def _refuse_label_on_other_core(db: Session, label: str, site_id: int, core_id: int) -> None:
     """A port label is one physical port per site, so only one core may hold it."""
     owners = _owners_by_label(db, site_id, [label]).get(label, [])
@@ -94,7 +111,7 @@ def _refuse_label_on_other_core(db: Session, label: str, site_id: int, core_id: 
 
 
 def _write_core_ports(
-    db: Session, user: CurrentUser, core_id: int, wanted: dict[str, str | None], reason: str,
+    db: Session, user: CurrentUser, core_id: int, wanted: dict[str, str | None], remarks: str,
     check_owners: bool = True,
 ) -> bool:
     """Set the wanted labels on one core (field name -> label, empty or None clears) and log each change.
@@ -119,12 +136,14 @@ def _write_core_ports(
         else:
             if check_owners:
                 _refuse_label_on_other_core(db, label, site_id, core_id)
-            new_port_ids[field_name] = _port_for_site(db, label, site_id)
+            port_row_id = _port_for_site(db, label, site_id)
+            _refuse_port_outside_segment(db, port_row_id, label, core_id, site_id)
+            new_port_ids[field_name] = port_row_id
         edits.append((field_name, old, label))
     for field_name, port_row_id in new_port_ids.items():
         db.execute(text(SET_CORE_PORT_SQL[field_name]), {"port_row_id": port_row_id, "core_id": core_id})
     if edits:
-        log_edits(db, user, "core", core_id, edits, reason)
+        log_edits(db, user, "core", core_id, edits, remarks)
     return bool(edits)
 
 
@@ -135,7 +154,7 @@ def set_core_ports(db: DB, admin: Admin, core_id: int, body: CorePortsBody) -> C
         raise NotFound("Core not found")
     db.execute(text(LOCK_SEGMENT_SQL), {"segment_id": found[0]})
     wanted = {end: getattr(body, end) for end in PORT_ENDS if end in body.model_fields_set}
-    if _write_core_ports(db, admin, core_id, wanted, body.reason):
+    if _write_core_ports(db, admin, core_id, wanted, body.remarks):
         db.commit()
     core = inventory.get_core(db, core_id, admin.id)
     if core is None:
