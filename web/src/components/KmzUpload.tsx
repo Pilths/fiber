@@ -31,7 +31,7 @@ function ShapedTable({ rows }: { rows: Shaped[] }) {
         </thead>
         <tbody>
           {rows.map((row) => (
-            <tr key={row.segment_id}>
+            <tr key={`${row.segment_id ?? "title"}-${row.name}`}>
               <th scope="row" className="truncate font-semibold" title={row.name}>{row.name}</th>
               <td className="num">{formatKm(row.km)}</td>
               <td className="num">{formatKm(row.excel_km)}</td>
@@ -56,7 +56,7 @@ function SkippedTable({ rows }: { rows: Skipped[] }) {
         </thead>
         <tbody>
           {rows.map((row) => (
-            <tr key={row.segment_id}>
+            <tr key={`${row.segment_id ?? "title"}-${row.name}`}>
               <th scope="row" className="truncate font-semibold" title={row.name}>{row.name}</th>
               <td className="font-semibold text-amber">Needs review: {row.reason}</td>
             </tr>
@@ -69,12 +69,10 @@ function SkippedTable({ rows }: { rows: Skipped[] }) {
 
 function Preview({ staged, onApply, onDiscard }: { staged: Staged; onApply: () => void; onDiscard: () => void }) {
   const nothing = staged.shaped.length === 0;
-  const sites = staged.sites_attached.join(", ") || "none";
   return (
     <PreviewCard titleId="kmz-prev-title" testId="kmz-preview" filename={staged.filename} onDiscard={onDiscard}>
       <p className="text-body text-muted-foreground">
         {plural(staged.lines, "line")} in folder <b className="font-semibold text-foreground">“{staged.folder}”</b>.
-        Sites near the lines: <b className="font-semibold text-foreground">{sites}</b>
       </p>
       {staged.block_reason ? (
         <Note tone="red" role="alert" title="This file will not be applied">{staged.block_reason}</Note>
@@ -83,7 +81,7 @@ function Preview({ staged, onApply, onDiscard }: { staged: Staged; onApply: () =
           {staged.shaped.length > 0 && <ShapedTable rows={staged.shaped} />}
           {staged.skipped.length > 0 && <SkippedTable rows={staged.skipped} />}
           {nothing && staged.skipped.length === 0 && (
-            <p className="text-body text-muted-foreground">No segment has both its sites near these lines.</p>
+            <p className="text-body text-muted-foreground">No line title matches a segment.</p>
           )}
           <div className="flex flex-wrap items-center gap-4 border-t pt-4">
             <button type="button" className="btn btn-p" disabled={nothing} onClick={onApply}>Apply KMZ…</button>

@@ -33,7 +33,7 @@ class KmzShaped(BaseModel):
 
 
 class KmzSkipped(BaseModel):
-    segment_id: int
+    segment_id: int | None
     name: str
     reason: str
 
@@ -47,7 +47,6 @@ class KmzUploadOut(BaseModel):
     block_reason: str | None  # set when nothing can be applied
     shaped: list[KmzShaped]
     skipped: list[KmzSkipped]
-    sites_attached: list[str]
 
 
 class KmzFolder(BaseModel):
@@ -77,7 +76,6 @@ def preview_from(upload_id: int, summary: dict) -> KmzUploadOut:
         block_reason=summary["block_reason"],
         shaped=[KmzShaped(**item) for item in summary["shaped"]],
         skipped=[KmzSkipped(**item) for item in summary["skipped"]],
-        sites_attached=summary["sites_attached"],
     )
 
 
@@ -109,7 +107,7 @@ def upload(
             lines, folders_found = parse_lines(io.BytesIO(data), folder)
     except ValueError as error:
         raise HTTPException(422, f"Cannot read the KMZ: {error}") from error
-    result = {"shaped": [], "skipped": [], "sites_attached": []}
+    result = {"shaped": [], "skipped": []}
     block_reason = None
     if lines:
         result = compute_shapes(db, lines)
