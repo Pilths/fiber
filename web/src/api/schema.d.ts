@@ -1617,7 +1617,7 @@ export interface components {
         /** KmzSkipped */
         KmzSkipped: {
             /** Segment Id */
-            segment_id: number;
+            segment_id: number | null;
             /** Name */
             name: string;
             /** Reason */
@@ -1641,8 +1641,6 @@ export interface components {
             shaped: components["schemas"]["KmzShaped"][];
             /** Skipped */
             skipped: components["schemas"]["KmzSkipped"][];
-            /** Sites Attached */
-            sites_attached: string[];
         };
         /** LoginBody */
         LoginBody: {

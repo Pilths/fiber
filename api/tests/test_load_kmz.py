@@ -1,8 +1,8 @@
-"""KMZ line shapes: spurs end near the highway, an ex infra line must be ignored."""
+"""KMZ line shapes: lines are matched to segments by their title AAAA-BBBB."""
 import json
 import zipfile
 
-from app.load_kmz import run
+from app.load_kmz import compute_shapes, run
 from app.map.service import map_segments
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -10,14 +10,15 @@ from sqlalchemy.orm import Session
 EJH1 = (101.5, 3.0)
 RINI = (101.52, 3.035)
 OKID = (101.52, 3.065)
-HIGHWAY = [(101.5, 3.0 + 0.01 * i) for i in range(11)]  # runs on to lat 3.10, past the last junction
-SPUR_END_LON = 101.50018  # about 20 m east of the highway, between two highway vertices
+HIGHWAY = [(101.5, 3.0 + 0.01 * i) for i in range(11)]
+EJH1_TO_RINI = [EJH1, (101.5, 3.02), (101.51, 3.03), RINI]
+RINI_TO_OKID = [RINI, (101.53, 3.05), OKID]
 
 
-def line_xml(points):
+def line_xml(points, title="Untitled Path"):
     coordinates = " ".join(f"{lon},{lat},0" for lon, lat in points)
     return (
-        "<Placemark><name>Untitled Path</name><LineString>"
+        f"<Placemark><name>{title}</name><LineString>"
         f"<coordinates>{coordinates}</coordinates></LineString></Placemark>"
     )
 
@@ -26,22 +27,26 @@ def folder_xml(name, body):
     return f"<Folder><name>{name}</name>{body}</Folder>"
 
 
-def build_kmz(path):
-    points = "".join(
-        f"<Placemark><name>{n}</name><Point><coordinates>{x},{y},0</coordinates></Point></Placemark>"
-        for n, (x, y) in (("EJH1", EJH1), ("RINI", RINI), ("OKID", OKID))
-    )
-    spur_rini = [RINI, (101.51, RINI[1]), (SPUR_END_LON, RINI[1])]
-    spur_okid = [OKID, (101.51, OKID[1]), (SPUR_END_LON, OKID[1])]
-    folders = (
-        folder_xml("site", points)
-        + folder_xml("ex infra", line_xml([RINI, OKID]))
-        + folder_xml("Propose Route ", line_xml(HIGHWAY) + line_xml(spur_rini) + line_xml(spur_okid))
-        + folder_xml("distance", "")
-    )
+def write_kmz(path, folders):
     kml = f'<kml xmlns="http://www.opengis.net/kml/2.2"><Document>{folders}</Document></kml>'
     with zipfile.ZipFile(path, "w") as archive:
         archive.writestr("doc.kml", kml)
+
+
+def build_kmz(path):
+    """EJH1-RINI drawn backwards, RINI-OKID drawn in two pieces with a spaced lowercase title."""
+    middle = RINI_TO_OKID[1]
+    folders = (
+        folder_xml("ex infra", line_xml([RINI, OKID], "EJH1-OKID"))
+        + folder_xml(
+            "Propose Route ",
+            line_xml(EJH1_TO_RINI[::-1], "EJH1-RINI")
+            + line_xml([middle, OKID], "okid - rini")
+            + line_xml([RINI, middle], "RINI-OKID"),
+        )
+        + folder_xml("distance", "")
+    )
+    write_kmz(path, folders)
 
 
 def one(db, sql, **params):
@@ -70,11 +75,11 @@ def route_coords(db, segment_id):
     return json.loads(geojson)["coordinates"]
 
 
-def test_highway_and_spurs_shape_two_segments(db, tmp_path):
+def test_titles_shape_two_segments(db, tmp_path):
     one(db, "INSERT INTO users (username, display_name, role) VALUES ('admin1','a','admin') RETURNING id")
     ejh1, rini, okid = make_site(db, "EJH1", EJH1), make_site(db, "RINI", RINI), make_site(db, "OKID", OKID)
     first = make_segment(db, ejh1, rini)
-    second = make_segment(db, rini, okid)
+    second = make_segment(db, okid, rini)  # site A is OKID, the title says RINI first
     path = str(tmp_path / "test.kmz")
     build_kmz(path)
 
@@ -87,18 +92,35 @@ def test_highway_and_spurs_shape_two_segments(db, tmp_path):
     assert one(db, "SELECT count(*) FROM uploads WHERE kind = 'kmz' AND status = 'confirmed'") == 2
 
     shape_one = route_coords(db, first)
-    shape_two = route_coords(db, second)
-    assert shape_one[0] == list(EJH1)
+    assert shape_one[0] == list(EJH1)  # drawn RINI to EJH1, stored A to B
     assert shape_one[-1] == list(RINI)
-    assert shape_two[0] == list(RINI)
-    assert shape_two[-1] == list(OKID)
-    assert [101.5, 3.05] in shape_two  # via the highway, not the ex infra shortcut
-    for shape in (shape_one, shape_two):
-        assert max(lat for _, lat in shape) <= OKID[1]  # the highway extension is not drawn
+    shape_two = route_coords(db, second)
+    assert shape_two == [list(OKID), list(RINI_TO_OKID[1]), list(RINI)]  # two pieces joined, A is OKID
 
     features = {f["properties"]["segment_id"]: f for f in map_segments(session)["features"]}
     assert features[first]["properties"].get("shaped") is True
     assert features[second]["properties"].get("shaped") is True
+
+
+def test_bad_and_unknown_titles_are_skipped_with_reasons(db):
+    ejh1, rini = make_site(db, "EJH1", EJH1), make_site(db, "RINI", RINI)
+    segment = make_segment(db, ejh1, rini)
+    lines = [
+        ("Untitled Path", HIGHWAY),
+        ("Untitled Path", HIGHWAY),
+        ("", HIGHWAY),
+        ("EJH1-RINI-OKID", HIGHWAY),
+        ("ABCD-WXYZ", HIGHWAY),
+        (" ejh1 - rini ", EJH1_TO_RINI),
+    ]
+    result = compute_shapes(Session(bind=db), lines)
+    assert [item["segment_id"] for item in result["shaped"]] == [segment]
+    reasons = {item["name"]: item["reason"] for item in result["skipped"]}
+    assert reasons["Untitled Path"] == 'title "Untitled Path" is not a site pair like AAAA-BBBB (2 lines)'
+    assert reasons["(no title)"] == 'title "" is not a site pair like AAAA-BBBB'
+    assert reasons["EJH1-RINI-OKID"].startswith('title "EJH1-RINI-OKID"')
+    assert reasons["ABCD-WXYZ"] == "no segment ABCD-WXYZ in the dashboard"
+    assert "sites_attached" not in result
 
 
 def test_unknown_folder_and_user_fail(db, tmp_path, capsys):
@@ -113,10 +135,8 @@ def test_unknown_folder_and_user_fail(db, tmp_path, capsys):
 
 def test_file_without_folders_or_blank_folder_reads_every_line(tmp_path):
     from app.load_kmz import parse_lines
-    kml = f'<kml xmlns="http://www.opengis.net/kml/2.2"><Document>{line_xml(HIGHWAY)}</Document></kml>'
     path = tmp_path / "flat.kmz"
-    with zipfile.ZipFile(path, "w") as archive:
-        archive.writestr("doc.kml", kml)
+    write_kmz(path, line_xml(HIGHWAY))
     lines, folders = parse_lines(str(path), "propose route")
     assert len(lines) == 1 and folders == []
     build_kmz(str(tmp_path / "foldered.kmz"))

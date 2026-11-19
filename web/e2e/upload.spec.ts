@@ -356,7 +356,8 @@ test("planner does not see the Upload tab", async ({ page }) => {
   expect((await page.request.get("/api/admin/reservation-import")).status()).toBe(403);
 });
 
-// A KMZ shaped like the real files: site pins and an "ex infra" line are ignored, only "propose route" is read.
+// A KMZ shaped like the real files: site pins and an "ex infra" line are ignored, only "propose route" is read,
+// and the line is matched to its segment by its title.
 // The line runs from DEV Kuala Lumpur DC to DEV Cyberjaya DC with a bend. Preview is real; apply is mocked so the
 // dev road shape of that segment is not replaced.
 function kmz(folder: string) {
@@ -365,7 +366,7 @@ function kmz(folder: string) {
 <name>Asbuilt Cable E2E</name>
 <Folder><name>site</name><Placemark><name>KL</name><Point><coordinates>101.6869,3.139,0</coordinates></Point></Placemark></Folder>
 <Folder><name>ex infra</name><Placemark><LineString><coordinates>101.6869,3.139,0 101.65,2.9213,0</coordinates></LineString></Placemark></Folder>
-<Folder><name>${folder}</name><Placemark><name>Untitled Path</name><LineString><coordinates>${path}</coordinates></LineString></Placemark></Folder>
+<Folder><name>${folder}</name><Placemark><name>DEV Kuala Lumpur DC - DEV Cyberjaya DC</name><LineString><coordinates>${path}</coordinates></LineString></Placemark></Folder>
 </Folder></Document></kml>`;
   return { name: `e2e-${stamp}.kmz`, mimeType: "application/vnd.google-earth.kmz", buffer: zip([["doc.kml", kml]]) };
 }
