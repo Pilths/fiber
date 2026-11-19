@@ -17,6 +17,7 @@ from app.auth.admin import router as admin_users_router
 from app.auth.deps import PasswordChangeRequired
 from app.auth.router import router as auth_router
 from app.db import get_db
+from app.errors import ServiceError
 from app.environment import check_startup_environment
 from app.history import router as history_router
 from app.ingest.kmz_router import router as kmz_router
@@ -34,6 +35,13 @@ configure_logging()
 check_startup_environment()
 app = FastAPI(title="Fiber Dashboard API")
 add_request_log(app)
+
+
+@app.exception_handler(ServiceError)
+def service_error_response(request: Request, error: ServiceError) -> JSONResponse:
+    return JSONResponse({"detail": error.message}, status_code=error.status)
+
+
 app.include_router(auth_router)
 app.include_router(admin_users_router)
 app.include_router(inventory_router)

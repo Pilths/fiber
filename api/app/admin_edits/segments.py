@@ -2,11 +2,12 @@
 from decimal import Decimal
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.errors import NotFound, Invalid, ServiceError
 from app.admin_edits.history import HISTORY_SHOWN, Edited, HistoryRow, bool_text, history, log_edits
 from app.auth.deps import DB, Admin
 from app.ingest import checks
@@ -91,7 +92,7 @@ class SegmentEdit(BaseModel):
 def get_segment(db: DB, sid: int) -> SegmentEdit:
     row = db.execute(text(SEGMENT_SQL), {"segment_id": sid}).mappings().first()
     if row is None:
-        raise HTTPException(404, "Segment not found")
+        raise NotFound("Segment not found")
     return SegmentEdit(**row, history=history(db, "segment", sid, HISTORY_SHOWN))
 
 
@@ -134,10 +135,10 @@ def _has_active_reservations(db: Session, segment_id: int) -> bool:
 
 def _check_sites(db: Session, segment_id: int, site_a: int, site_b: int) -> None:
     if site_a == site_b:
-        raise HTTPException(422, "Site A and site B must differ")
+        raise Invalid("Site A and site B must differ")
     found = db.execute(text(COUNT_SITES_SQL), {"ids": [site_a, site_b]}).scalar_one()
     if found != 2:
-        raise HTTPException(422, "Unknown site")
+        raise Invalid("Unknown site")
     params = {"segment_id": segment_id, "site_a": site_a, "site_b": site_b}
     if db.execute(text(OTHER_SEGMENT_SQL), params).first():
         raise conflict("These two sites already have a segment.")
@@ -161,16 +162,16 @@ def _logged_change(field_name: str, old: Any, new: Any) -> tuple[str, Any, Any]:
 def edit_segment(db: DB, admin: Admin, sid: int, body: SegmentBody) -> Edited:
     old = db.execute(text(LOCK_SEGMENT_ROW_SQL), {"segment_id": sid}).mappings().first()
     if old is None:
-        raise HTTPException(404, "Segment not found")
+        raise NotFound("Segment not found")
     new: dict[str, Any] = body.model_dump(exclude_none=True, exclude={"reason"})
     if "region" in new:
         region, error = checks.map_region(new["region"])
         if error:
-            raise HTTPException(422, error)
+            raise Invalid(error)
         new["region"] = region
     changes = {name: value for name, value in new.items() if _differs(name, value, old[name])}
     if not changes:
-        raise HTTPException(400, "nothing changed")
+        raise ServiceError(400, "nothing changed")
     sites_change = "site_a_id" in changes or "site_b_id" in changes
     site_a = changes.get("site_a_id", old["site_a_id"])
     site_b = changes.get("site_b_id", old["site_b_id"])

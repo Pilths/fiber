@@ -2,10 +2,11 @@
 from datetime import date
 from decimal import Decimal
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 
+from app.errors import NotFound, Invalid, ServiceError
 from app.auth.deps import DB, Admin
 from app.loss import service as loss_service
 from app.loss.schemas import CoreLoss
@@ -42,14 +43,14 @@ class MeasurementBody(BaseModel):
 def add_core_measurement(db: DB, admin: Admin, core_id: int, body: MeasurementBody) -> CoreLoss:
     found = db.execute(text(CORE_SURVEY_SQL), {"core_id": core_id}).first()
     if found is None:
-        raise HTTPException(404, "Core not found")
+        raise NotFound("Core not found")
     segment_id, number, survey_cores, distance_km = found
     # Same rule as inventory: cores above the surveyed count are hidden. A segment with no count yet
     # still shows all its cores in inventory, so it is not refused here.
     if survey_cores is not None and number > survey_cores:
         raise conflict("This core is above the verified cores of the segment")
     if body.tested_on > db.execute(text(TODAY_KL_SQL)).scalar_one():
-        raise HTTPException(422, "Test date cannot be in the future")
+        raise Invalid("Test date cannot be in the future")
     db.execute(text(INSERT_MEASUREMENT_SQL), {
         "segment_id": segment_id,
         "core_id": core_id,
@@ -64,4 +65,4 @@ def add_core_measurement(db: DB, admin: Admin, core_id: int, body: MeasurementBo
     for entry in loss_service.core_losses(db, segment_id, calculated):
         if entry["core_id"] == core_id:
             return CoreLoss(**entry)
-    raise HTTPException(500, "Measurement was not saved")
+    raise ServiceError(500, "Measurement was not saved")

@@ -2,11 +2,12 @@
 from collections import Counter
 from typing import Any, Literal
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.errors import NotFound, Conflict, Invalid
 from app.admin_edits.history import log_edits
 from app.auth.deps import DB, Admin, CurrentUser
 from app.ingest.reservation_import import port
@@ -80,7 +81,7 @@ def _canonical_label(typed: str | None) -> str | None:
         return None
     label = normalize_port_label(text_value)
     if label is None:
-        raise HTTPException(422, f"{text_value} is not a port label. {LABEL_HELP}")
+        raise Invalid(f"{text_value} is not a port label. {LABEL_HELP}")
     return label
 
 
@@ -89,7 +90,7 @@ def _refuse_label_on_other_core(db: Session, label: str, site_id: int, core_id: 
     owners = _owners_by_label(db, site_id, [label]).get(label, [])
     for owner in owners:
         if owner["core_id"] != core_id:
-            raise HTTPException(409, f"{label} is on core {owner['number']} of {owner['segment']}")
+            raise Conflict(f"{label} is on core {owner['number']} of {owner['segment']}")
 
 
 def _write_core_ports(
@@ -131,14 +132,14 @@ def _write_core_ports(
 def set_core_ports(db: DB, admin: Admin, core_id: int, body: CorePortsBody) -> CoreHolderDetail:
     found = db.execute(text(CORE_PORTS_SQL), {"core_id": core_id}).first()
     if found is None:
-        raise HTTPException(404, "Core not found")
+        raise NotFound("Core not found")
     db.execute(text(LOCK_SEGMENT_SQL), {"segment_id": found[0]})
     wanted = {end: getattr(body, end) for end in PORT_ENDS if end in body.model_fields_set}
     if _write_core_ports(db, admin, core_id, wanted, body.reason):
         db.commit()
     core = inventory.get_core(db, core_id, admin.id)
     if core is None:
-        raise HTTPException(404, "Core not found")
+        raise NotFound("Core not found")
     return core
 
 
@@ -290,7 +291,7 @@ def _paste_preview(
     """Rows and counts for the paste, plus core number -> core id for applying."""
     segment = db.execute(text(PASTE_SEGMENT_SQL), {"segment_id": segment_id}).mappings().first()
     if segment is None:
-        raise HTTPException(404, "Segment not found")
+        raise NotFound("Segment not found")
     core_rows = db.execute(text(PASTE_CORES_SQL), {"segment_id": segment_id}).mappings()
     cores = {row["number"]: row for row in core_rows}
     pasted_by_end = {

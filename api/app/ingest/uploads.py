@@ -4,10 +4,10 @@ import logging
 from collections.abc import Callable
 from typing import Any
 
-from fastapi import HTTPException
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.errors import Invalid, NotFound, ServiceError
 from app.db import set_lock_timeout
 
 logger = logging.getLogger("app.upload")
@@ -26,10 +26,8 @@ WHERE id = :upload_id
 """
 
 
-class ApplyError(Exception):
-    def __init__(self, status: int, message: str):
-        self.status = status
-        self.message = message
+class ApplyError(ServiceError):
+    pass
 
 
 def insert_upload(db: Session, user_id: int, filename: str, kind: str, summary: dict[str, Any]) -> int:
@@ -55,7 +53,7 @@ def finish_upload(db: Session, upload_id: int, summary: dict[str, Any] | None = 
 
 def require_upload(db: Session, upload_id: int, kind: str) -> None:
     if not db.execute(text(UPLOAD_EXISTS_SQL), {"upload_id": upload_id, "kind": kind}).first():
-        raise HTTPException(404, "Upload not found")
+        raise NotFound("Upload not found")
 
 
 def parse_or_422(parse: Callable[..., Any], data: Any, show_value_error_text: bool = False) -> Any:
@@ -64,5 +62,5 @@ def parse_or_422(parse: Callable[..., Any], data: Any, show_value_error_text: bo
     except Exception as error:
         logger.exception("Cannot read the workbook")
         if show_value_error_text and isinstance(error, ValueError):
-            raise HTTPException(422, f"Cannot read the workbook: {error}") from error
-        raise HTTPException(422, f"Cannot read the workbook: {type(error).__name__}") from error
+            raise Invalid(f"Cannot read the workbook: {error}") from error
+        raise Invalid(f"Cannot read the workbook: {type(error).__name__}") from error

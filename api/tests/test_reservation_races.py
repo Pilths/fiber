@@ -15,7 +15,7 @@ from app.ingest.excel import parse_reservation_workbook
 from app.inventory import service as _inventory  # imported first: inventory and reservations import each other
 from app.reservations import service
 from app.main import BUSY_MESSAGE, app
-from fastapi import HTTPException
+from app.errors import ServiceError
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -64,8 +64,8 @@ def play_race(engine, hold, finish, loser_action):
             loser_pid.append(session.execute(text(BACKEND_PID_SQL)).scalar_one())
             try:
                 return 200, loser_action(session)
-            except HTTPException as error:
-                return error.status_code, None
+            except ServiceError as error:
+                return error.status, None
 
     with ThreadPoolExecutor(1) as pool, Session(engine) as winner:
         hold(winner)

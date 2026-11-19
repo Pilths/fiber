@@ -137,12 +137,9 @@ def rows(
 
 @router.post("/uploads/{upload_id}/apply")
 def apply(db: DB, admin: Admin, upload_id: int, body: ApplyIn) -> ApplyOut:
-    try:
-        with logged_apply("site_master", upload_id, admin.id):
-            return ApplyOut(**sm.apply_upload(db, admin.id, upload_id, body.override_drop.model_dump(), body.reason,
-                                              body.sheets))
-    except sm.ApplyError as e:
-        raise HTTPException(e.status, e.message) from e
+    with logged_apply("site_master", upload_id, admin.id):
+        return ApplyOut(**sm.apply_upload(db, admin.id, upload_id, body.override_drop.model_dump(), body.reason,
+                                          body.sheets))
 
 
 @router.get("/current")

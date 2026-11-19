@@ -143,8 +143,5 @@ def rows(
 
 @router.post("/uploads/{upload_id}/apply")
 def apply(db: DB, admin: Admin, upload_id: int) -> ApplyOut:
-    try:
-        with logged_apply("segment_list", upload_id, admin.id):
-            return ApplyOut(**sl.apply_upload(db, admin.id, upload_id))
-    except ApplyError as error:
-        raise HTTPException(error.status, error.message) from error
+    with logged_apply("segment_list", upload_id, admin.id):
+        return ApplyOut(**sl.apply_upload(db, admin.id, upload_id))
