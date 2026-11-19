@@ -8,10 +8,10 @@ from itertools import islice, pairwise
 from typing import Any
 
 import networkx as nx
-from fastapi import HTTPException
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.errors import Conflict, Invalid, ServiceError
 from app.inventory import service as inventory
 from app.loss import service as loss
 from app.routing.graph import get_graph
@@ -23,8 +23,8 @@ MAX_DETOUR = 1.5  # keep only paths up to this times the shortest path's weight
 MAX_SHARED = 0.5  # drop a path when more than this share of its km is on one already kept path (a near-copy)
 
 
-def _bad(field: str, msg: str) -> HTTPException:
-    return HTTPException(422, [{"loc": ["query", field], "msg": msg, "type": "value_error"}])
+def _bad(field: str, msg: str) -> ServiceError:
+    return Invalid([{"loc": ["query", field], "msg": msg, "type": "value_error"}])
 
 
 _LETTER = {"n": 0, "c": 1, "e": 2, "s": 3}  # north, central, east coast, south
@@ -150,14 +150,14 @@ def pick(db: Session, segment_ids: list[int], cores_needed: int) -> dict[str, An
     for sid in segment_ids:
         s = next(iter(inventory.list_segments(db, None, None, None, sid)), None)
         if s is None:
-            raise HTTPException(422, f"Unknown segment {sid}")
+            raise Invalid(f"Unknown segment {sid}")
         label = f"{s['site_a']} - {s['site_b']}"
         if s["survey_cores"] is None:
             message = f"{label} has no verified core count yet; it cannot be booked."
-            raise HTTPException(409, {"message": message, "segment_id": sid})
+            raise Conflict({"message": message, "segment_id": sid})
         if s["free_to_reserve"] < cores_needed:
             message = f"{label}: {cores_needed} needed but only {s['free_to_reserve']} free to reserve."
-            raise HTTPException(409, {"message": message, "segment_id": sid})
+            raise Conflict({"message": message, "segment_id": sid})
         rows = db.execute(text(
             "SELECT c.id AS core_id, c.number FROM cores c JOIN core_status_v v ON v.core_id = c.id "
             "WHERE c.segment_id = :s AND v.status = 'Available' AND c.number <= :n ORDER BY c.number LIMIT :k"),

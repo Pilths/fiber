@@ -1,11 +1,12 @@
 from datetime import datetime
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.errors import NotFound, Conflict, Invalid
 from app.auth.deps import DB, Admin, CurrentUser, require_admin
 from app.auth.router import ph, temp_password
 from app.auth.users import UsernameTaken, create_user_account, log_user_edit
@@ -49,7 +50,7 @@ DELETE_SESSIONS = "DELETE FROM sessions WHERE user_id = :user_id"
 def _get(db: Session, user_id: int) -> dict:
     row = db.execute(text(SELECT_USER), {"user_id": user_id}).mappings().first()
     if not row:
-        raise HTTPException(404, "User not found")
+        raise NotFound("User not found")
     return dict(row)
 
 
@@ -66,13 +67,13 @@ def list_users(db: DB) -> list[UserOut]:
 def create_user(db: DB, admin: Admin, body: UserCreate) -> UserWithPassword:
     username = body.username.strip()
     if not username:
-        raise HTTPException(422, "Username is required")
+        raise Invalid("Username is required")
     password = temp_password()
     display_name = (body.display_name or username).strip()
     try:
         user_id = create_user_account(db, username, display_name, body.role, password, must_change_password=True)
     except UsernameTaken as error:
-        raise HTTPException(409, "Username already exists") from error
+        raise Conflict("Username already exists") from error
     _log(db, admin, user_id, "account", None, f"created as {body.role}", body.reason)
     db.commit()
     return UserWithPassword(**_get(db, user_id), temporary_password=password)
@@ -102,7 +103,7 @@ def _set_active(db: Session, admin: CurrentUser, user_id: int, active: bool, rea
 @router.post("/{user_id}/deactivate")
 def deactivate(db: DB, admin: Admin, user_id: int, body: ReasonBody | None = None) -> UserOut:
     if user_id == admin.id:
-        raise HTTPException(409, "You cannot deactivate your own account")
+        raise Conflict("You cannot deactivate your own account")
     return _set_active(db, admin, user_id, False, (body or ReasonBody()).reason)
 
 

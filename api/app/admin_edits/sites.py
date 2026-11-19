@@ -1,12 +1,13 @@
 """Site list, get and edit."""
 from typing import Annotated, Any
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Query
 from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.errors import NotFound, Invalid, ServiceError
 from app.admin_edits.history import HISTORY_SHOWN, Edited, HistoryRow, bool_text, history, log_edits
 from app.auth.deps import DB, Admin
 from app.ingest import checks
@@ -77,7 +78,7 @@ def find_sites(db: DB, q: Annotated[str, Query(min_length=1)]) -> list[dict[str,
 def get_site(db: DB, sid: int) -> SiteEdit:
     row = db.execute(text(SITE_SQL), {"site_id": sid}).mappings().first()
     if row is None:
-        raise HTTPException(404, "Site not found")
+        raise NotFound("Site not found")
     return SiteEdit(**row, history=history(db, "site", sid, HISTORY_SHOWN))
 
 
@@ -88,7 +89,7 @@ def _edit_name(
         return
     name = " ".join(typed.split())
     if not name:
-        raise HTTPException(422, "Name cannot be blank")
+        raise Invalid("Name cannot be blank")
     if name == old["name"]:
         return
     if db.execute(text(NAME_TAKEN_SQL), {"name": name, "site_id": site_id}).first():
@@ -106,7 +107,7 @@ def _edit_location(
     lon = old["lon"] if body.lon is None else body.lon
     error = checks.check_coords(lat, lon)
     if error:
-        raise HTTPException(422, error)
+        raise Invalid(error)
     if (lat, lon) == (old["lat"], old["lon"]):
         return
     db.execute(text(SET_SITE_LOCATION_SQL), {"lat": lat, "lon": lon, "site_id": site_id})
@@ -123,7 +124,7 @@ def _edit_region(
         return
     region, error = checks.map_region(typed)
     if error:
-        raise HTTPException(422, error)
+        raise Invalid(error)
     if region == old["region"]:
         return
     db.execute(text(SET_SITE_REGION_SQL), {"region": region, "site_id": site_id})
@@ -159,7 +160,7 @@ def _edit_active(db: Session, site_id: int, active: bool | None, old: Any,
 def edit_site(db: DB, admin: Admin, sid: int, body: SiteBody) -> Edited:
     old = db.execute(text(SITE_FOR_UPDATE_SQL), {"site_id": sid}).mappings().first()
     if old is None:
-        raise HTTPException(404, "Site not found")
+        raise NotFound("Site not found")
     edits: list[tuple[str, Any, Any]] = []
     _edit_name(db, sid, body.name, old, edits)
     _edit_location(db, sid, body, old, edits)
@@ -167,7 +168,7 @@ def edit_site(db: DB, admin: Admin, sid: int, body: SiteBody) -> Edited:
     _edit_cluster(db, sid, body.cluster, old, edits)
     _edit_active(db, sid, body.active, old, edits)
     if not edits:
-        raise HTTPException(400, "nothing changed")
+        raise ServiceError(400, "nothing changed")
     try:
         done = log_edits(db, admin, "site", sid, edits, body.reason)
         db.commit()

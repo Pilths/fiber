@@ -6,11 +6,12 @@ On a core's history a planner gets only their own reservations' events, plus the
 from datetime import date, datetime
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.errors import NotFound, Forbidden, ServiceError
 from app.auth.deps import DB, CurrentUser, get_current_user
 
 router = APIRouter(prefix="/api", dependencies=[Depends(get_current_user)])
@@ -139,9 +140,9 @@ def events(db: Session, reservation_id: int) -> list[EventOut]:
 def _visible(db: Session, user: CurrentUser, reservation_id: int) -> None:
     owner = db.execute(text(SELECT_RESERVATION_OWNER), {"reservation_id": reservation_id}).scalar()
     if owner is None:
-        raise HTTPException(404, "Reservation not found")
+        raise NotFound("Reservation not found")
     if owner != user.id and user.role != "admin":
-        raise HTTPException(403, "Only the planner who made the request can see its history")
+        raise Forbidden("Only the planner who made the request can see its history")
 
 
 @router.get("/reservations/{reservation_id}/history")
@@ -159,7 +160,7 @@ def _reservation_event_items(
     for (reservation_id,) in db.execute(text(SELECT_RESERVATIONS_OF_CORE), {"core_id": core_id}):
         try:
             _visible(db, user, reservation_id)
-        except HTTPException:
+        except ServiceError:
             continue
         for event in events(db, reservation_id):
             if event.cores and core_id not in {core.core_id for core in event.cores}:
@@ -200,7 +201,7 @@ def _data_edit_items(db: Session, core_id: int) -> list[tuple[Any, int, CoreHist
 @router.get("/cores/{core_id}/history")
 def core_history(db: DB, user: User, core_id: int) -> list[CoreHistoryItem]:
     if not db.execute(text(SELECT_CORE_EXISTS), {"core_id": core_id}).first():
-        raise HTTPException(404, "Core not found")
+        raise NotFound("Core not found")
     items = _reservation_event_items(db, user, core_id) + _data_edit_items(db, core_id)
     items.sort(key=lambda entry: (entry[0], entry[2].kind, entry[1]), reverse=True)
     return [item for _, _, item in items]

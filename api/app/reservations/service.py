@@ -8,11 +8,11 @@ Atomic blocks use savepoints (begin_nested) so a refusal never rolls back more t
 from datetime import date
 from typing import Any
 
-from fastapi import HTTPException
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.errors import NotFound, Conflict, Forbidden, Invalid, ServiceError
 from app.auth.deps import CurrentUser
 from app.db import set_lock_timeout
 from app.inventory import service as inventory
@@ -137,8 +137,8 @@ INSERT_RELEASE_CORE_SQL = "INSERT INTO release_cores (event_id, core_id) VALUES 
 INSERT_ASSIGN_CORE_SQL = "INSERT INTO assign_cores (event_id, core_id) VALUES (:event_id, :core_id)"
 
 
-def conflict(message: str, **extra: Any) -> HTTPException:
-    return HTTPException(409, {"message": message, **extra})
+def conflict(message: str, **extra: Any) -> ServiceError:
+    return Conflict({"message": message, **extra})
 
 
 def _ids(db: Session, sql: str, **params: Any) -> list[int]:
@@ -181,7 +181,7 @@ def load(db: Session, where: str = "true", order: str = "r.id DESC", **params: A
 def get(db: Session, reservation_id: int) -> ReservationOut:
     found = load(db, "r.id = :id", id=reservation_id)
     if not found:
-        raise HTTPException(404, "Reservation not found")
+        raise NotFound("Reservation not found")
     return found[0]
 
 
@@ -230,7 +230,7 @@ def _lock(db: Session, reservation_id: int) -> dict[str, Any]:
     set_lock_timeout(db)
     locked = db.execute(text(LOCK_RESERVATION_SQL), {"id": reservation_id}).first()
     if locked is None:
-        raise HTTPException(404, "Reservation not found")
+        raise NotFound("Reservation not found")
     row = db.execute(text(READ_RESERVATION_SQL), {"id": reservation_id}).mappings().one()
     return dict(row)
 
@@ -255,7 +255,7 @@ def _require(row: dict[str, Any], *statuses: str) -> None:
 
 def _own_or_admin(row: dict[str, Any], user: CurrentUser) -> None:
     if row["planner_id"] != user.id and user.role != "admin":
-        raise HTTPException(403, "Only the planner who made the request can do this")
+        raise Forbidden("Only the planner who made the request can do this")
 
 
 def _customer_exists(db: Session, customer_id: int) -> bool:
@@ -301,7 +301,7 @@ def _record_cores(db: Session, sql: str, event_id: int, core_ids: list[int]) -> 
 def _check_segment(db: Session, segment_id: int, requested: int) -> None:
     segment = inventory.get_segment(db, segment_id)
     if segment is None:
-        raise HTTPException(404, "Segment not found")
+        raise NotFound("Segment not found")
     label = f"{segment.site_a} - {segment.site_b}"
     if segment.fiber_cut:
         raise conflict(f"{label} has a fiber cut and cannot be booked until an admin restores it.")
@@ -319,7 +319,7 @@ def _check_book(db: Session, core_ids: list[int]) -> list[dict[str, Any]]:
     """
     cores = _core_rows(db, core_ids)
     if len(cores) != len(core_ids):
-        raise HTTPException(422, "Unknown core id")
+        raise Invalid("Unknown core id")
     segment_ids = {core["segment_id"] for core in cores}
     lock_segments(db, segment_ids)
     cores = _core_rows(db, core_ids)  # statuses as of now, after the lock
@@ -340,7 +340,7 @@ def create(db: Session, user: CurrentUser, customer_id: int, planned_date: date 
     core_ids = sorted(set(core_ids))
     set_lock_timeout(db)
     if not _customer_exists(db, customer_id):
-        raise HTTPException(422, "Unknown customer")
+        raise Invalid("Unknown customer")
     _check_book(db, core_ids)
     params = {
         "customer_id": customer_id,
@@ -358,7 +358,7 @@ def create(db: Session, user: CurrentUser, customer_id: int, planned_date: date 
 def withdraw(db: Session, user: CurrentUser, reservation_id: int) -> ReservationOut:
     row = _lock(db, reservation_id)
     if row["planner_id"] != user.id:
-        raise HTTPException(403, "Only the planner who made the request can withdraw it")
+        raise Forbidden("Only the planner who made the request can withdraw it")
     _require(row, "pending")
     _event(db, reservation_id, "withdrawn", user)
     db.execute(text(DELETE_HOLDS_SQL), {"reservation_id": reservation_id})
@@ -384,7 +384,7 @@ def _held(db: Session, reservation_id: int, core_ids: list[int]) -> list[int]:
     held = _ids(db, HOLDS_OF_SQL, reservation_id=reservation_id, ids=ids)
     if len(held) != len(ids):
         not_held = sorted(set(ids) - set(held))
-        raise HTTPException(422, "Cores must belong to this reservation: " + ", ".join(map(str, not_held)))
+        raise Invalid("Cores must belong to this reservation: " + ", ".join(map(str, not_held)))
     return ids
 
 
@@ -396,7 +396,7 @@ def _cores_to_free(db: Session, reservation_id: int, core_ids: list[int]) -> lis
     if core_ids:
         return _held(db, reservation_id, core_ids)
     if db.execute(text(ANY_HOLD_SQL), {"reservation_id": reservation_id}).first():
-        raise HTTPException(422, "Name the cores to release")
+        raise Invalid("Name the cores to release")
     return []
 
 
@@ -459,15 +459,15 @@ def decline_release(db: Session, user: CurrentUser, reservation_id: int, reason:
 def correct(db: Session, user: CurrentUser, reservation_id: int, reason: str, customer_id: int | None,
             planned_date: date | None, cores: list[int] | None) -> ReservationOut:
     if cores is not None:
-        raise HTTPException(422, "Cores cannot be corrected. Release them and request again.")
+        raise Invalid("Cores cannot be corrected. Release them and request again.")
     if customer_id is None and planned_date is None:
-        raise HTTPException(422, "Give a customer or a planned date to correct")
+        raise Invalid("Give a customer or a planned date to correct")
     row = _lock(db, reservation_id)
     _require(row, "approved")
     if planned_date is not None and row["imported"] and row["planned_date"] is None:
         raise conflict("The date of an undated imported reservation cannot be corrected.")
     if customer_id is not None and not _customer_exists(db, customer_id):
-        raise HTTPException(422, "Unknown customer")
+        raise Invalid("Unknown customer")
     _event(db, reservation_id, "corrected", user, reason or NO_REASON, customer_id, planned_date)
     db.commit()
     return get(db, reservation_id)
@@ -479,13 +479,13 @@ def assign(db: Session, user: CurrentUser, reservation_id: int, core_ids: list[i
     row = _lock(db, reservation_id)
     _require(row, "approved")
     if not core_ids:
-        raise HTTPException(422, "Name at least one core")
+        raise Invalid("Name at least one core")
     if len(core_ids) > row["remaining"]:
         raise conflict(f"Only {row['remaining']} unassigned cores remain on this reservation.")
     segment_id = row["unassigned_segment_id"]
     cores = _core_rows(db, core_ids)
     if len(cores) != len(core_ids) or any(core["segment_id"] != segment_id for core in cores):
-        raise HTTPException(422, "Cores must belong to the reservation's segment")
+        raise Invalid("Cores must belong to the reservation's segment")
     lock_segments(db, {segment_id})
     taken = _not_bookable(_core_rows(db, core_ids))
     if taken:
