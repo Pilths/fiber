@@ -58,7 +58,7 @@ Still open from the risk review: no TLS proxy in `docker-compose.yml`, container
 
 This is also the data for roadmap item 14: the slow-request lines show whether the map endpoints need work.
 
-### 3, 5 to 13, 16, 17. Done 18 and 19 November 2026 (branch `dev`, synced to `main`)
+### 3, 5 to 13, 15 to 17. Done 18 and 19 November 2026 (branch `dev`, synced to `main`)
 
 | # | Change | Commit |
 |---|---|---|
@@ -74,6 +74,7 @@ This is also the data for roadmap item 14: the slow-request lines show whether t
 | 13 | `segment_kml` reads its segment and that segment's routes only, not the whole map | `c1b8fc7` |
 | 16 | A successful login deletes expired `sessions` rows | `c1b8fc7` |
 | 17 | `docs/architecture.md` matches the code: planned features marked, two compose setups, lock timeout, throttle, logging, lint; pins checked | `c1b8fc7` |
+| 15 | Services raise `ServiceError` (`api/app/errors.py`: NotFound, Conflict, Forbidden, Invalid) instead of `HTTPException`; one handler keeps the same JSON. `admin_edits` SQL not moved (only when those files are next touched). | `5f54c3a` |
 
 ## Immediate (1-2 weeks), still to do
 
@@ -84,7 +85,6 @@ Nothing left: all done (above).
 | # | Change | Benefit | Risk | Complexity | ROI |
 |---|---|---|---|---|---|
 | 14 | Measure the map endpoints with the new slow-request log; cache only if needed | Avoids tuning on a guess | None | S | Medium |
-| 15 | Domain exceptions instead of `HTTPException` in services; move `admin_edits` SQL into services as files are touched | Services reusable from CLI and the future scheduler | Medium (many handlers, e2e covers them) | L | Medium |
 
 ## Long term (6-12 months)
 
@@ -106,6 +106,6 @@ a repository or DDD layer; rate-limit infrastructure beyond item 8.
 
 ## Order of work
 
-1. Done: items 3, 5 to 13, 16, 17.
-2. Next: 15 (domain exceptions) as files are touched; 20 (split reservation_upload.py).
+1. Done: items 3, 5 to 13, 15 to 17.
+2. Next: 14 once production has real traffic; 20 (split reservation_upload.py) when that file next changes.
 3. Hold 14 and 18 until timing data or a worker-count decision exists.
