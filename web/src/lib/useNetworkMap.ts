@@ -1,3 +1,4 @@
+import { flushSync } from "react-dom";
 import { useCallback, useEffect, useRef, useState, type PointerEvent } from "react";
 import { CLUSTER_MAX_ZOOM, clusterName, FADE_TO } from "@/lib/mapClusters";
 import {
@@ -96,9 +97,12 @@ export function useNetworkMap(options: NetworkMapOptions) {
         map.current = created;
         // read by the e2e tests (layer checks); harmless otherwise
         (window as { fiberMap?: unknown }).fiberMap = created;
+        // flushSync: the SVG overlay must commit in the same frame as the GL canvas, else routes trail the map
         created.on("move", () => {
           const center = created.getCenter();
-          setCamera({ lng: center.lng, lat: center.lat, zoom: created.getZoom() });
+          flushSync(() => {
+            setCamera({ lng: center.lng, lat: center.lat, zoom: created.getZoom() });
+          });
         });
         created.on("error", (event) => {
           if (isPmtilesError(event)) {
