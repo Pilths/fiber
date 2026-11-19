@@ -115,8 +115,10 @@ export function makePlacer(reserved: number[][]) {
 // Drawing the network overlay: which lines to draw where, and which chips and names fit.
 
 const SITE_HALF = 12; // half the marker box, in px
-const NAME_BELOW = 17; // centre of a site name under its marker, in px
-const NAME_ZOOM = 11; // site names show from this zoom; the ends of the selection always do
+// Centre of the box checked for a site name, in px below the marker. The box starts where the marker's own box
+// ends: the drawn name begins 4px higher, in the marker's click margin, and checking that would hide every name.
+const NAME_BELOW = SITE_HALF + 9;
+const NAME_ZOOM = 8; // site names show from this zoom; the ends of the selection always do
 
 // Areas kept free of chips and names: the controls (top left) and the key (bottom left).
 function reservedAreas(height: number): number[][] {
