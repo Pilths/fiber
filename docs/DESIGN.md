@@ -1,5 +1,7 @@
 # Fiber Dashboard design
 
+Last verified: 2026-11-20, commit b4e4393
+
 The single place for how the UI looks and where information goes. Read it before any UI or mock work.
 Binding owner rules live in `CLAUDE.md` "UI rules"; this file does not repeat them.
 Mockups live on the `pictures` branch. The DESIGN.md files there (under `mockups/comparison/`) describe rejected themes. Do not use them.
@@ -24,7 +26,7 @@ Source of truth: `web/src/index.css`. Summary:
 - Colour only where it carries meaning: blue #1d5fbf (primary), green #1a7f4b (free 10 or more),
   amber #b45309 on #fff7ed (Requested, low 1 to 9 free, stale, warnings), red #b42318 on #fef3f2 (cut, zero free,
   errors), slate (In service), dark ink (Reserved).
-- Map: data center is a square, other site a diamond (circle in the current build). Line weight by route type:
+- Map: data center a square, TOC a triangle, trunk site a diamond (see section 3 for the current build). Line weight by route type:
   Trunk thick, Metro thin dashed. Each segment line carries a free-core number chip.
 
 ## 3. Information architecture (agreed 1 Nov 2026, mock "8 Final")
@@ -150,7 +152,7 @@ gets its own detail view (Overview, Racks, 3D). Global search: results grouped a
 
 ## 6. Open
 
-- Calculated loss formula: the owner provides it later. Ask for it before building loss in the website.
+- Calculated loss formula: built (see `CLAUDE.md` Domain rules).
 - Loss section: field tests carry type, date and team; a fuller loss view may come later. For now loss shows only
   as the two per-core values and in core details.
 - Empty Planner and SRF cells: blank, or "Not recorded".

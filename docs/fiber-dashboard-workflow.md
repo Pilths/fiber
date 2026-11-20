@@ -1,8 +1,10 @@
 # Fiber Dashboard: Build Workflow (PRD to Review)
 
+Last verified: 2026-11-20, commit b4e4393
+
 How to use this file: Claude (chat or Claude Code) reads it to know which step the project is on, which tool to use, and what the output of each step is. Update the status checklist at the bottom as steps finish.
 
-Constraints: 11 days from 20 October 2026, MVP by 31 October. Cut order from the PRD: email digest first, then the MapLibre basemap (plain SVG map of sites and straight segment lines as fallback), then segment and site editing. Core status editing stays. Mock designs were made in this project (`docs/mockups/comparison/`); on 26 October the owner chose the map page (`map/index.html`) as the one main page, with `v4/index.html` as the style source. The v6 mock is not built, but its listed features are taken (see the PRD, Design decisions). UI work goes to Opus 5.5 or Fable subagents. Keep the skill set small, because overlapping skills give conflicting instructions.
+Constraints: 11 days from 20 October 2026, MVP by 31 October. Cut order from the PRD: email digest first, then the MapLibre basemap (plain SVG map of sites and straight segment lines as fallback), then segment and site editing. Core status editing stays. Mock designs live on the `pictures` branch; on 26 October the owner chose the map page (`map/index.html`) as the one main page, with `v4/index.html` as the style source. The v6 mock is not built, but its listed features are taken (see the PRD, Design decisions). UI work goes to Opus 5.5 or Fable subagents. Keep the skill set small, because overlapping skills give conflicting instructions.
 
 ## Flowchart
 
@@ -54,7 +56,7 @@ FastAPI generates an OpenAPI spec for free, so the UI never needs a throwaway mo
 The order builds the last-to-be-cut items first.
 
 - Session 0: Docker Compose (PostGIS, FastAPI, Vite) and `CLAUDE.md`.
-- Session 1: Schema and Alembic. Reservations are insert-only events. Internal segment ID is the key. Measurements per core. `user_id` on every write. Edit history with reasons. Seed from the mock Excel.
+- Session 1: Schema and Alembic. Reservations are insert-only events. Internal segment ID is the key. Measurements per core. `user_id` on every write. Edit history with optional Remarks. Seed from the mock Excel.
 - Session 2: Search, segment and core endpoints. Generate the TypeScript client. A dev-only header stands in for the acting user.
 - Session 3: Segment list, Cores table and the reserve box. UI session, runs Step 7. Done; the page structure is reworked into the one-page map layout by TASK-073 to TASK-079 (Session 10).
 - Session 4: Approval flow: request, approve, reject, withdraw, release request. Action needed list and waiting counts. Also migration 0004 (total cores, count-only reservations, `assign` action) and the Free limit.
@@ -80,15 +82,15 @@ Checks the UI must pass:
 
 ## Agents (only these two)
 
-- Reviewer: read-only, fresh context, reviews the diff without the bias of having written it. File: `.claude/agents/reviewer.md`.
-- UI verifier: drives the app with Playwright and checks the Cores table against the PRD rules above. File: `.claude/agents/ui-verifier.md`.
+- Reviewer: read-only, fresh context, reviews the diff without the bias of having written it. Not created; `.claude/agents/` holds only `ai-slop-auditor.md`.
+- UI verifier: drives the app with Playwright and checks the Cores table against the PRD rules above. Not created.
 
 Do not create a separate agent per phase. Make an agent only when it needs a different context, different tools, or an independent opinion.
 
 ## Rules for CLAUDE.md
 
 - Reservations are insert-only events. An upload never changes a reservation.
-- Every write is attributable to a user, and every data edit needs a reason and is kept as history.
+- Every write is attributable to a user, and every data edit is kept as history (Remarks optional).
 - Nothing is deleted. Accounts are deactivated.
 - After the first import the dashboard database is the source of truth and the Excel is a feed. A field edited in the dashboard is protected from uploads.
 - Internal segment ID is the key. Cores have no circuit ID (dropped 11 Nov 2026: no data source).
@@ -99,19 +101,18 @@ Do not create a separate agent per phase. Make an agent only when it needs a dif
 
 - Requested cores are held, approval reserves them, rejection frees them with a visible reason. Pending requests never expire. A planner can withdraw their own request.
 - A reservation goes stale 3 months after approval. Keeping it restarts the clock. An undated import starts at the import date and the preview warns the admin.
-- A release request shows in Approvals and the bell count. Cores stay Reserved until an admin releases them. A declined release needs a reason.
+- A release request shows in Approvals and the bell count. Cores stay Reserved until an admin releases them. A declined release carries optional Remarks.
 - Accounts are deactivated, never deleted. Their pending requests stay in the admin queue and their digests go to all admins.
 - Login stays in the MVP and is built right after the approval flow.
-- Uploads match segments by the two sites (two sites have at most one segment), and ports by Port ID. Rows missing from a file are left untouched (except the site master, where a missing site is marked inactive, never deleted). Conflicts with a Requested or Reserved core go to Needs review.
+- Uploads match segments by the two sites (two sites have at most one segment); ports are never imported from Excel (count-only reservations). Rows missing from a file are left untouched (except the site master, where a missing site is marked inactive, never deleted). Conflicts with a Requested or Reserved core go to Needs review.
 - Loss coverage counts segments with a reading.
 - Layout is decided (26 October): one map page as the home, top bar navigation, no left sidebar, desktop only, light theme only. The PRD, Design decisions, holds the details.
-- Decided 26 October: loss shows per core (core details, reserve box); Users is in the account menu (admin only); KMZ shapes are not in the MVP map (straight lines plus one mock route with a drawn shape); no site master undo in the MVP (previous uploads kept); the site master is a separate workbook from the Reservation workbook.
+- Decided 26 October: loss shows per core (core details, reserve box); Users is in the account menu (admin only); KMZ shapes are now built (title `AAAA-BBBB`); no site master undo in the MVP (previous uploads kept); the site master is a separate workbook from the Reservation workbook.
 - Admins can edit fiber cut on a segment (cut or restore), segment details and site details. The daily job is an in-app scheduler (APScheduler) that records its last run.
 
 ## Still open
 
 - Whether two sites can have more than one segment of the same route type (to confirm with the data owners).
-- KMZ route name format, until real files are seen (real KMZ import is Later).
 - SMTP relay access.
 - Whether the UI rework (TASK-073 to TASK-075) moves earlier than Phase 11 (RISK-010); whether real rows have blank core assignments (run `app.load_data` on the real file; `excel_check` was removed 16 Nov 2026); how an upload may "modify" a reservation. Full list: `docs/plan.md`, section 9.
 
@@ -129,6 +130,6 @@ Do not create a separate agent per phase. Make an agent only when it needs a dif
 - [ ] Step 3: Risk spike (moved: map spike runs before Session 10)
 - [x] Step 4: Tickets (skipped by decision: task tables in `docs/plan.md` replace tickets)
 - [x] Step 5: CLAUDE.md and docs/PRD.md (21 October 2026)
-- [ ] Step 6: Build loop (sessions 0 to 11). Done: Session 0, Session 1 (seed waits for mock data), Session 2, Session 3 and Session 4 (24 October 2026). Next: Session 5. Decisions of 26 October added to the PRD, architecture and plan (UI, site master upload, Later / parked)
+- [ ] Step 6: Build loop (sessions 0 to 11). Done: Sessions 0 to 10 (login, loss, uploads incl. site master, segment list and KMZ, admin editing, routing, map page; status as of 20 November 2026, see `docs/architecture.md`). Not built: Session 11 (email digest and scheduler, waits for SMTP access). Left: TASK-062 (real data upload, the gate to ship), TASK-064 (manual width check and timed planner test). Hardening follows `docs/optimization-roadmap.md`.
 - [ ] Step 7: UI quality (per UI session)
 - [ ] Step 8: Review (per session)

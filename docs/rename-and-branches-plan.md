@@ -1,5 +1,7 @@
 # Plan: rename span to segment, and new branch model
 
+Last verified: 2026-11-20, commit b4e4393
+
 Owner decisions, 1 November 2026. Work through the steps in order, one step per session if tokens are short.
 Tick a step only after its test passes. Each session: read this file first, do the next unticked step, update it.
 
@@ -77,3 +79,9 @@ and the worktrees `/home/user1/project/fiber-pd` and `/home/user1/project/fiber-
 
 - [x] Ask the owner for the calculated-loss formula (per core) before building loss UI. Done: formula received 2 Nov, see CLAUDE.md.
 - Keep the current `SegmentDiagram` component's look (renamed from `SpanDiagram`).
+
+## Verified notes (2026-11-20)
+
+- The rename lives in `0001_baseline` (migrations were squashed); there is no `0014_rename_segment`.
+- Branches also include `assessment`. Worktrees now: fiber, fiber-assessment, fiber-main, fiber-pictures.
+- Test counts above (pytest 205, e2e 62) are historical.

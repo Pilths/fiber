@@ -8,6 +8,8 @@ status: 'Planned'
 tags: [feature, architecture, mvp]
 ---
 
+Last verified: 2026-11-20, commit b4e4393 (historical: see banner in the body; code has since moved on: loss formula, KMZ, Remarks, no `notify`, no `circuit_id`, no `docker-compose.prod.yml`)
+
 > Historical document: it uses the old words (span = today's segment, segment = today's route).
 
 

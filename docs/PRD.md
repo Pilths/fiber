@@ -1,6 +1,6 @@
 # Fiber Dashboard PRD
 
-Last updated: 10 November 2026
+Last verified: 2026-11-20, commit b4e4393
 
 ## 1. Executive Summary
 
@@ -51,7 +51,7 @@ To confirm against the mock files arriving 22 October 2026: KMZ lines are named 
 **User Personas**
 
 - **Planner:** finds free cores, requests reservations for customers, plans routes, and reviews stale reservations.
-- **Admin:** one of several admins in a tightly monitored enterprise; approves, rejects and releases reservations, uploads and updates Excel data (KMZ later), and manages access. Roles beyond planner and admin: TBD.
+- **Admin:** one of several admins in a tightly monitored enterprise; approves, rejects and releases reservations, uploads and updates Excel data (KMZ lines too), and manages access. Roles beyond planner and admin: TBD.
 
 **User Stories and Acceptance Criteria**
 
@@ -104,7 +104,7 @@ To confirm against the mock files arriving 22 October 2026: KMZ lines are named 
 5. As a planner, I want to pick two buildings and see route options, so that I can choose a route with enough free cores.
    - Routing runs over segments: each segment joins two sites, weighted by km. Routes stay as labels for display and as the KMZ line on the map.
    - The route planner ("Site A to B") takes From, To, Optimise for (Shortest distance or Most free cores; no "lowest loss" until loss data exists) and Cores needed per segment.
-   - Up to 3 route options are shown, each with its segments in order as building A to building B, with each segment's km and free cores, grouped under their route label where there is one. Each option shows total km, Calculated loss, and the fewest free cores on any segment of the path (the bottleneck, shown).
+   - Up to 5 route options are shown, each with its segments in order as building A to building B, with each segment's km and free cores, grouped under their route label where there is one. Each option shows total km, Calculated loss, and the fewest free cores on any segment of the path (the bottleneck, shown).
    - Options are ranked by the Optimise for choice: shortest km, or most free cores (the fewest free cores on any segment of the path, higher is better). Options without enough cores come last, and the best option carries a "Best match" tag.
    - The user must be able to see every option returned (as many as the network gives, up to 5), none hidden or cut off. A selected route shows as the 2D route ribbon (see Design decisions).
    - From and To list all sites, so any site can route to any site, including starting or ending a route inside a route.
@@ -121,9 +121,9 @@ To confirm against the mock files arriving 22 October 2026: KMZ lines are named 
    - Roles: planner and admin. Sign-in starts with local accounts; enterprise SSO is a later option. Admins create accounts and reset passwords; there is no self-signup, and a password change is forced at first login. Accounts are deactivated, never deleted: history keeps the user's name, their pending requests stay in the admin queue, and their stale digests go to all admins.
    - Stays in the MVP, because admin-only approval and release need sign-in, and it is built right after the approval flow so it is never the story left for last.
    - Admins get admin functions (Approvals and Upload as top tabs, Users) that planners never see, and can use every planner function too.. Users is reached from an admin-only item in the account menu (top right), which opens the users screen.
-8. As an admin, I want to upload Excel files, so that data updates without a developer. (KMZ upload is Later.)
+8. As an admin, I want to upload Excel files, so that data updates without a developer. (KMZ upload and a segment list upload (Link, Distance) are built.)
    - A separate admin area, outside the planner functions (the Upload tab).
-   - Python validates and cleans each file and reports rejected rows. Excel stays manually updated after go-live, so uploads repeat: a re-upload updates existing records and adds new ones without duplicates; segments are matched by their two sites, in either order (two sites have at most one segment), routes by their two end sites, and ports by Port ID.
+   - Python validates and cleans each file and reports rejected rows. Excel stays manually updated after go-live, so uploads repeat: a re-upload updates existing records and adds new ones without duplicates; segments are matched by their two sites, in either order (two sites have at most one segment), routes by their two end sites, and never import ports from Excel (every reservation row is a count-only reservation).
    - New measurements are appended to history, never overwritten. Reservations are imported from Excel only until the import is closed. The admin upload area has an optional one-time switch, "Close reservation import". Until it is closed, every upload imports its approved reservation rows whose cores are free; a row whose core is already held is skipped, so re-uploads never duplicate or change a reservation. Reservation rows appear as their own group in the preview, so the admin sees exactly which reservations will be imported before confirming. Closing needs a reason, is saved as a history record and cannot be reopened in the MVP. After it is closed, reservation rows in an uploaded Excel are ignored and listed as a warning in the preview, and new reservations are made only in the dashboard.
    - Every upload shows a validation report first; nothing is saved until the admin confirms.
    - **Site master upload (replace-file model).** The site master is its own workbook, separate from the Reservation workbook, and is uploaded on its own. It has two worksheets: the LRD sites sheet (site_name, latitude_in_decimal, longitude_in_decimal, region, optional Type (Trunk, DC, TOC), other columns) and the DC list sheet (header "DC Name / Link", LRD, lat, long, state, other columns). Every DC is also listed in the site list.
@@ -212,7 +212,7 @@ Files enter through the Admin page, the Python API validates and stores them, an
 
 | Layer | Choice |
 | --- | --- |
-| Frontend | React + TypeScript (Vite), Tailwind CSS, shadcn/ui, Recharts; Geist and Geist Mono fonts, self-hosted |
+| Frontend | React + TypeScript (Vite), Tailwind CSS; Geist and Geist Mono fonts, self-hosted |
 | Map | MapLibre GL JS with OpenStreetMap data, PMTiles extract capped at zoom 14, self-hosted glyphs, sprites and a light basemap, no external map API |
 | Backend | Python + FastAPI; also handles Excel and KMZ conversion and cleaning, routing with NetworkX, reservation rules and the daily reminder job |
 | Database | PostgreSQL with PostGIS |
@@ -223,14 +223,14 @@ Files enter through the Admin page, the Python API validates and stores them, an
 | Integration | Purpose | Status |
 | --- | --- | --- |
 | Excel exports from the source system | Sites (all with latitude and longitude), segments, routes, cores, ports, measurements; schema built from the column headers; after the first import a feed, not the source of truth | Sample workbook received 22 October 2026 (see Sample Excel workbook below); real data not yet available |
-| KMZ files | Route coordinates, one KMZ line per route, matched to Excel; join key TBD | Later. The MVP map uses straight lines plus one mock route with a drawn shape; real KMZ import and real files come later |
+| KMZ files | Route coordinates, one KMZ line per route, matched to Excel; join key TBD | Built: KMZ upload and `app.load_kmz` draw road-shaped lines, matched to segments by the title `AAAA-BBBB` |
 | SMTP relay | Daily stale-reservation email digest; email to admins on each new reservation request | Sender address must be registered under the company domain; access and registration TBD, and they decide whether email ships in the MVP |
-| Daily scheduler | Digest and stale checks | In-app scheduler (APScheduler) inside the FastAPI container; it records its last run, so a restart never sends the digest twice |
+| Daily scheduler | Digest and stale checks | Planned, not built: in-app scheduler (APScheduler) inside the FastAPI container; it records its last run, so a restart never sends the digest twice |
 | Authentication | Sign-in and roles | Local accounts first; enterprise SSO later |
 
 **Data Model Foundation**
 
-The planning side comes first: reservations, customers and planners as separate tables, with reservations as insert-only rows. Around it: sites (data centers and TOCs), segments with a route type derived from the kinds of their two end sites (Trunk, Metro, DC-DC, DC-TOC; never uploaded or edited) and region (North, Central, South, East Coast), routes (several segments end to end), cores, ports, and measurements kept as history. Site names are unique across all regions, and many sites can share a region. A site has an active flag: a site missing from a site master upload is marked inactive, never deleted. The four regions stay as they are; new values come by migration when real data shows them. Measurements also store test method and field team. Ports connect through cores to another site. The app assigns its own internal ID to every site, segment and route. Uploads match segments by the two sites, and ports by Port ID. Site is the general term for a site, a building or the equipment in it, and measurements are stored per core. Migration 0004 is part of Session 4 (Phase 5): `segments.cable_size` (default 144, info only), `reservations.unassigned_cores` (int, not null, default 0, set at insert) and the event type 'assigned'. After the first import the dashboard database is the source of truth and the Excel is a feed; fields edited in the dashboard are protected from later uploads, and every edit is kept as history with a reason.
+The planning side comes first: reservations, customers and planners as separate tables, with reservations as insert-only rows. Around it: sites (data centers and TOCs), segments with a route type derived from the kinds of their two end sites (Trunk, Metro, DC-DC, DC-TOC; never uploaded or edited) and region (North, Central, South, East Coast), routes (several segments end to end), cores, ports, and measurements kept as history. Site names are unique across all regions, and many sites can share a region. A site has an active flag: a site missing from a site master upload is marked inactive, never deleted. The four regions stay as they are; new values come by migration when real data shows them. Measurements also store test method and field team. Ports connect through cores to another site. The app assigns its own internal ID to every site, segment and route. Uploads match segments by the two sites, and ports by Port ID. Site is the general term for a site, a building or the equipment in it, and measurements are stored per core. The baseline migration `0001_baseline` holds `segments.cable_size` (default 144, info only), `reservations.unassigned_cores` (int, not null, default 0, set at insert) and the event type 'assigned'. After the first import the dashboard database is the source of truth and the Excel is a feed; fields edited in the dashboard are protected from later uploads, and every edit is kept as history with optional Remarks.
 
 **Sample Excel workbook**
 
@@ -303,14 +303,14 @@ All five MVP items are planned for 31 October 2026, about 11 days from this draf
 7. **Per-segment core override** on route reservations (changing the cores per segment).
 8. **Sites and data centres view**: a Sites switch in the segment list and a site detail view, plus map layers Services and Data centres (placeholders for DC internals and bandwidth); see `docs/DESIGN.md`, "Later".
 9. **Undo of a site master upload** (rollback to a previous upload). The MVP keeps previous uploads for comparison only.
-10. **Real KMZ import** and KMZ route shapes on the map in place of straight lines. The MVP proves the path with one mock route.
+10. ~~Real KMZ import~~ Built: KMZ route shapes are on the map (title `AAAA-BBBB`).
 11. **Optional Reservation workbook columns** Loss (dB) and Tested on (append a measurement). The parser reads them when present, but the real sheet has none; agree the names with the planners first.
 
 **Technical Risks**
 
 | Risk | Impact | Mitigation |
 | --- | --- | --- |
-| Data is uncleaned: free-text requestors, merged cells, region typos, malformed port ranges and bad coordinates in the sample workbook | Bad rows save silently, plot in the wrong place or create wrong reservations | Raw staging with a status per row (Ready, Needs review, Rejected), the `excel_check` command, and the same checks in the upload preview; nothing is guessed |
+| Data is uncleaned: free-text requestors, merged cells, region typos, malformed port ranges and bad coordinates in the sample workbook | Bad rows save silently, plot in the wrong place or create wrong reservations | Raw staging with a status per row (Ready, Needs review, Rejected), the same checks in the upload preview; nothing is guessed |
 | Five features in about 11 days, built with AI assistance by one person | MVP slips | Fixed cut order, starting with the email digest; build the UI (inventory and reservations) first, then the map, admin upload and email |
 | Login slips past the MVP | Reserved-by cannot be trusted; admin upload is open; admin-only approval and release cannot be enforced | Build minimal login right after the approval flow, with a dev-only header standing in for the user until then; if it still slips, protect the Admin page at network level and hold approvals until login lands |
 | Real data not yet available; the schema comes from Excel headers and the port data in the mock is not real; Excel stays manually updated after go-live | Matching on site pairs and Port IDs, or loss calculations break on first or later uploads | Upload validation report; test with a real export as soon as one is available; an upload never overwrites reservations made in the dashboard |

@@ -2,7 +2,7 @@
 
 # Cutting Claude Code token cost without cutting quality
 
-Researched 2026-10-31. Convention check: `docs/` is flat (PRD.md, architecture.md, plan.md, fiber-dashboard-workflow.md) with no research folder, so this note creates `docs/research/`.
+Researched 2026-10-31. Last verified: 2026-11-20, commit b4e4393. This note created `docs/research/`.
 
 Legend: **[S]** = sourced, URL or file path given inline. **[SYN]** = my own synthesis from the sources, not a quoted claim. **UNVERIFIED** = could not confirm from a primary source.
 
@@ -97,7 +97,7 @@ How it can hurt correctness [SYN, grounded in the above]:
 - Order-dependent instructions (migrations, destructive steps) are the case its own Auto-Clarity names.
 - Adobe paper, as cited by caveman's README: compressing the human's prompt into caveman-speak makes models answer longer and worse. So do not write your prompts or specs in caveman. UNVERIFIED (arXiv 2606.24083 not fetched).
 
-`/caveman-compress` on CLAUDE.md: claims about 46% smaller on five fixtures with headings, code, paths and URLs verified intact; keeps a `.original.md` backup; refuses code files. [S] README line 245, `.../skills/caveman-compress/SKILL.md`. Caution [SYN]: Anthropic says the lever for CLAUDE.md is deleting what Claude can already infer and staying under 200 lines. Your CLAUDE.md is 59 lines, so compression gains little and compressed rule text carries a small ambiguity risk. Also, an edit to CLAUDE.md does not apply until `/clear`, `/compact` or restart. [S] prompt-caching page.
+`/caveman-compress` on CLAUDE.md: claims about 46% smaller on five fixtures with headings, code, paths and URLs verified intact; keeps a `.original.md` backup; refuses code files. [S] README line 245, `.../skills/caveman-compress/SKILL.md`. Caution [SYN]: Anthropic says the lever for CLAUDE.md is deleting what Claude can already infer and staying under 200 lines. Your CLAUDE.md is about 100 lines, so compression gains little and compressed rule text carries a small ambiguity risk. Also, an edit to CLAUDE.md does not apply until `/clear`, `/compact` or restart. [S] prompt-caching page.
 
 cavecrew subagents: investigator (locate code), builder (1-2 file edits), reviewer (one line per finding). Their output is compressed so the main thread reads less. [S] agent descriptions in the Claude Code agent list; skill `caveman:cavecrew`. Use for locating code, not for architectural review where nuance matters [SYN].
 
@@ -213,7 +213,7 @@ Everything in this section is [SYN] unless a source is cited. Test it with `/usa
 
 - **rtk**: on. It targets the reading side, which is where the bill is. Know `rtk recall <hash>` and `rtk bypass <cmd>`; use them whenever output is part of the evidence (test failures, build errors, git diffs you must review).
 - **LSP plugins** (pyright, typescript): on; Anthropic documents fewer reads and automatic type-error feedback. [S]
-- **A short CLAUDE.md** (yours is 59 lines, fine). Put the exact test, lint and typecheck commands in it (already there).
+- **A short CLAUDE.md** (yours is about 100 lines, fine). Put the exact test, lint and typecheck commands in it (already there).
 - **Stop/PostToolUse hooks** for lint and typecheck, if you want them enforced rather than requested. [S]
 
 ### Per phase

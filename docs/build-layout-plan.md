@@ -1,5 +1,8 @@
 # Plan: build the agreed layout (DESIGN.md section 3)
 
+Last verified: 2026-11-20, commit b4e4393
+Historical: step A text below predates the final layout. `docs/DESIGN.md` section 3 is the current truth (button is "Reserve on this route" next to "Edit segment"; Cores table columns are in `web/src/components/CoresTable.tsx`).
+
 Owner go-ahead 2 November 2026. Source of truth: `docs/DESIGN.md` section 3 and the FigCraft mock
 `figcraft/fiber-planner-layouts.figcraft` page "8 Final" (branch `pictures`). One step per session if tokens are short.
 Each session: read this file, do the next unticked step, run its test, tick it, commit on `dev`.
