@@ -62,6 +62,7 @@ Read before working: `docs/PRD.md` (requirements), `docs/architecture.md` (desig
 ## Code style and docs upkeep
 
 - Coding standards: see `CODING_STANDARDS.md`. Architecture: see `docs/architecture.md`.
+- Review workflow (session order, skills used): see `docs/review-workflow.md`.
 - When a change alters structure or data flow, update `docs/architecture.md` and its Last verified line.
 - Update `docs/LEARNING.md` only when a change introduces or removes a concept, or changes the architecture or data flow. Edit the existing section rather than appending. Skip bug fixes, renames, small refactors and performance tweaks that use an already-documented concept.
 
