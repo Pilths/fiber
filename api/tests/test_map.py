@@ -12,7 +12,7 @@ def one(db, sql, **p):
     return db.execute(text(sql), p).scalar_one()
 
 
-def site(db, name, kind="site", xy=None, lrd=None, region=None, cluster=None):
+def site(db, name, kind="site", xy=None, lrd=None, region=None):
     g = "ST_SetSRID(ST_MakePoint(:x, :y), 4326)" if xy else "NULL"
     return one(
         db,
@@ -23,7 +23,7 @@ def site(db, name, kind="site", xy=None, lrd=None, region=None, cluster=None):
         x=xy[0] if xy else None,
         y=xy[1] if xy else None,
         l=lrd,
-        d=json.dumps({k: v for k, v in (("region", region), ("cluster", cluster)) if v}),
+        d=json.dumps({k: v for k, v in (("region", region),) if v}),
     )
 
 
@@ -44,7 +44,6 @@ def mkuser(db):
 def test_requires_sign_in(client):
     assert client.get("/api/map/segments").status_code == 401
     assert client.get("/api/map/sites").status_code == 401
-    assert client.get("/api/map/sectors").status_code == 401
 
 
 def test_segments_straight_chips_and_not_drawn(client, db):
@@ -106,7 +105,7 @@ def test_sites(client, db):
     by = {f["properties"]["name"]: f for f in r["features"]}
     assert set(by) == {"LRD1", "DC fallback", "DC own", "TOC", "Lonely"}
     assert by["DC fallback"]["properties"] == {"site_id": dc_fallback, "name": "DC fallback", "kind": "data_center",
-                                               "lrd_site_id": lrd, "region": "North", "cluster": None,
+                                               "lrd_site_id": lrd, "region": "North",
                                                "location_from_site": "LRD1"}
     assert by["DC fallback"]["geometry"]["coordinates"] == [101, 3]
     assert "location_from_site" not in by["DC own"]["properties"] and by["TOC"]["properties"]["kind"] == "toc"
@@ -142,37 +141,6 @@ def test_segment_kmz_download(client, db):
     assert "<name>EJH1 - RINI</name>" in kml
     assert "101.6,3.1,0 101.7,3.2,0" in kml
     assert client.get("/api/map/segments/999999/kmz", headers=H()).status_code == 404
-
-
-def test_sites_carry_cluster(client, db):
-    mkuser(db)
-    a, b = site(db, "A", xy=(101, 3), cluster="Klang"), site(db, "B", xy=(102, 3))
-    segment(db, a, b, 2)
-    by = {
-        f["properties"]["name"]: f["properties"] for f in client.get("/api/map/sites", headers=H()).json()["features"]
-    }
-    assert (by["A"]["cluster"], by["B"]["cluster"]) == ("Klang", None)
-
-
-def test_sectors(client, db):
-    mkuser(db)
-    site(db, "A", xy=(101.000, 3.000), cluster="Cluster")
-    site(db, "B", xy=(101.002, 3.000), cluster=" Cluster ")
-    gone = site(db, "C", xy=(101.001, 3.001), cluster="Cluster")
-    db.execute(text("UPDATE sites SET active = false WHERE id = :id"), {"id": gone})
-    site(db, "L", xy=(105, 3), cluster="Solo")
-    site(db, "N", xy=(101.5, 3))
-    other = site(db, "O", xy=(101.5, 3.1), cluster="Elsewhere")
-    segment(db, other, site(db, "P", xy=(101.9, 3.1)), 4)  # a segment never changes a sector
-    r = client.get("/api/map/sectors", headers=H()).json()
-    assert r["type"] == "FeatureCollection"
-    assert [f["properties"]["cluster"] for f in r["features"]] == ["Cluster"]
-    feature = r["features"][0]
-    assert feature["geometry"]["type"] == "Polygon"
-    assert feature["properties"]["site_count"] == 2
-    assert "free_cores" not in feature["properties"]
-    minx, miny, maxx, maxy = feature["properties"]["bbox"]
-    assert minx < 101.000 and maxx > 101.002 and miny < 3 < maxy
 
 
 def test_segment_kmz_without_coordinates_is_404(client, db):

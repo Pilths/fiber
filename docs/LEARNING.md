@@ -68,7 +68,7 @@ Each area has a `router.py` (the web address and input checks), a `service.py` (
 
 ### Map
 - What it does: draws the basemap, Site points, Segment lines and the route planner.
-- Key files: `web/src/components/NetworkMap.tsx`, `MapSites.tsx`, `MapOverlay.tsx`, `MapPanels.tsx`, `RoutePlanner.tsx`, `web/src/lib/basemap.ts`, `mapGeometry.ts`, `mapClusters.ts`, `useNetworkMap.ts`.
+- Key files: `web/src/components/NetworkMap.tsx`, `MapSites.tsx`, `MapOverlay.tsx`, `MapPanels.tsx`, `RoutePlanner.tsx`, `web/src/lib/basemap.ts`, `mapGeometry.ts`, `useNetworkMap.ts`.
 - Called by: `InventoryView.tsx`.
 
 ### Segment panel, diagram and Cores table

@@ -23,11 +23,6 @@ def sites(db: DB) -> dict[str, Any]:
     return service.map_sites(db)
 
 
-@router.get("/sectors")
-def sectors(db: DB) -> dict[str, Any]:
-    return service.map_sectors(db)
-
-
 def _zip_kml(kml: str) -> bytes:
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:

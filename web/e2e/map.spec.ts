@@ -1,10 +1,10 @@
 import { expect, test, type Page } from "@playwright/test";
 import { signIn } from "./helpers";
 
-// Map card (TASK-054, TASK-055). Dev seed + seed_dev_network: 22 segments with coordinates (3 inside the DEV clusters),
+// Map card (TASK-054, TASK-055). Dev seed + seed_dev_network: 22 segments with coordinates,
 // all road-shaped, 2 not drawn (Kuantan Hut).
 const DRAWN = 22;
-const SEGMENT = "DEV Kuala Lumpur DC - DEV Cyberjaya DC"; // in the dense KL cluster
+const SEGMENT = "DEV Kuala Lumpur DC - DEV Cyberjaya DC"; // in the dense KL area
 const FAR = "DEV Ipoh Exchange - DEV Teluk Intan Hut"; // long and N-S: its chip is never decluttered
 const map = (page: Page) => page.getByTestId("network-map");
 const chips = (page: Page) => map(page).getByTestId("map-chip");
@@ -53,17 +53,15 @@ const settle = async (page: Page) => {
 
 test.use({ viewport: { width: 1440, height: 900 } });
 
-// Site markers plus the sites inside count badges and under cluster labels (their count badge).
+// Site markers plus the sites inside count badges.
 async function drawnSiteCount(page: Page): Promise<number> {
   const markers = await map(page).getByTestId("map-site").count();
   const badgeTexts = await map(page).getByTestId("map-badge").allTextContents();
   const badged = badgeTexts.reduce((total, text) => total + Number(text), 0);
-  const clusterTexts = await map(page).locator("[data-testid=map-sector-label] .msector-n").allTextContents();
-  const underLabels = clusterTexts.reduce((total, text) => total + Number(text), 0);
-  return markers + badged + underLabels;
+  return markers + badged;
 }
 
-type MapSites = { features: { properties: { site_id: number; name: string; cluster?: string | null } }[] };
+type MapSites = { features: { properties: { site_id: number; name: string } }[] };
 const mapSites = async (page: Page): Promise<MapSites> => (await page.request.get("/api/map/sites")).json();
 
 test("map loads with no request leaving the app origin; chips, sites, layers and key", async ({ page }) => {
@@ -74,7 +72,7 @@ test("map loads with no request leaving the app origin; chips, sites, layers and
   await expect(chips(page)).toHaveCount(DRAWN); // in the DOM; chips that would overlap are hidden until zoomed in
   // after the first fit eases in
   await expect.poll(() => chips(page).filter({ visible: true }).count()).toBeGreaterThanOrEqual(2);
-  // Sites closer than 16px share a count badge and cluster sites sit under their label: together they cover every site.
+  // Sites closer than 16px share a count badge: together with the markers they cover every site.
   const siteTotal = (await mapSites(page)).features.length;
   await expect.poll(() => drawnSiteCount(page)).toBe(siteTotal);
   await expect(map(page).getByRole("button", { name: /DEV Kuala Lumpur DC/ }).first()).toBeVisible();
@@ -359,81 +357,7 @@ test("Region filter that leaves out the selected segment unselects it", async ({
   expect(page.url()).not.toContain("#segment=");
 });
 
-// Clusters from the DEV seed (seed_dev_network): read only, nothing is written.
-const CLUSTER = "DEV KL Cluster";
-
-test("clusters: label with site count zoomed out, outline and sites zoomed in, always drawn", async ({ page }) => {
-  // A cluster name is dropped where it would overlap a site. At 1440x900 the first fit of the DEV network puts
-  // both cluster names on sites; 60px shorter (the map's height before 16 Nov 2026) the KL name has room.
-  await page.setViewportSize({ width: 1440, height: 840 });
-  await signIn(page);
-  await mode(page);
-  const sectors: { features: { properties: Record<string, unknown> & { cluster: string; site_count: number } }[] } =
-    await (await page.request.get("/api/map/sectors")).json();
-  test.skip(!sectors.features.some((sector) => sector.properties.cluster === CLUSTER), "DEV clusters not seeded");
-  // Only a cluster of 2 or more sites has a sector, and it carries no free-core number.
-  for (const sector of sectors.features) {
-    expect(sector.properties.site_count).toBeGreaterThanOrEqual(2);
-    expect(sector.properties).not.toHaveProperty("free_cores");
-  }
-  const members = (await mapSites(page)).features
-    .filter((site) => site.properties.cluster === CLUSTER)
-    .map((site) => site.properties.name);
-  const label = map(page).getByRole("button", { name: new RegExp(`^Cluster ${CLUSTER}, ${members.length} sites:`) });
-  const klMarkerOrBadge = map(page).getByRole("button", { name: /^(Site |\d+ sites: .*)DEV Kuala Lumpur DC/ });
-  // Zoomed out: one label per cluster, a count badge with its name; the cluster's sites are under it,
-  // other sites are drawn.
-  await expect(map(page).getByTestId("map-sector-label")).toHaveCount(sectors.features.length);
-  await expect(label).toBeVisible();
-  await expect(label.locator(".msector-n")).toHaveText(String(members.length));
-  await expect(label.locator(".msector-name")).toHaveText(CLUSTER);
-  // Small: a count badge with the name as text beside it, not a box over the site names.
-  const labelBox = (await label.boundingBox())!;
-  expect(labelBox.width).toBeLessThanOrEqual(24);
-  expect(labelBox.height).toBeLessThanOrEqual(24);
-  await expect(klMarkerOrBadge).toHaveCount(0);
-  await expect(map(page).getByRole("img", { name: /^Site DEV Ipoh Exchange,/ })).toBeVisible();
-  await settle(page);
-  await page.screenshot({ path: "e2e/screenshots/map-cluster-out.png" });
-  // The label zooms to the cluster: the label goes, the outline and each member site show.
-  await label.click();
-  await expect(label).toHaveCount(0);
-  for (const name of members) {
-    await expect(map(page).getByRole("img", { name: new RegExp(`^Site ${name},`) })).toBeVisible();
-  }
-  await expect(map(page).locator(`[data-testid=map-sector][data-cluster="${CLUSTER}"]`)).toHaveCount(1);
-  await expect(map(page).getByTestId("map-site").locator(".shape.dc").first()).toHaveCSS("width", "12px");
-  await settle(page);
-  await page.screenshot({ path: "e2e/screenshots/map-cluster-in.png" });
-  // Clusters are always drawn: the filters have no per-cluster chip.
-  await expect(page.getByRole("button", { name: `Cluster ${CLUSTER}`, exact: true })).toHaveCount(0);
-});
-
-// The header search lists clusters under Clusters; picking one fits the map to the cluster.
-test("picking a cluster in the top bar search zooms the map to it", async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 840 });
-  await signIn(page);
-  await mode(page);
-  const members = (await mapSites(page)).features
-    .filter((site) => site.properties.cluster === CLUSTER)
-    .map((site) => site.properties.name);
-  test.skip(members.length < 2, "DEV clusters not seeded");
-  const label = map(page).getByRole("button", { name: new RegExp(`^Cluster ${CLUSTER}, `) });
-  await expect(label).toBeVisible();
-  await page.getByRole("combobox", { name: /^Find a segment/ }).fill("KL Clus");
-  const clusters = page.getByRole("group", { name: "Clusters" });
-  await expect(clusters).toBeVisible();
-  await clusters.getByRole("option", { name: CLUSTER }).click();
-  await expect(page.getByRole("listbox", { name: "Search results" })).toHaveCount(0);
-  // Zoomed in on the cluster: the label gives way to the outline and each member site.
-  await expect(label).toHaveCount(0);
-  await expect(map(page).locator(`[data-testid=map-sector][data-cluster="${CLUSTER}"]`)).toHaveCount(1);
-  for (const name of members) {
-    await expect(map(page).getByRole("img", { name: new RegExp(`^Site ${name},`) })).toBeVisible();
-  }
-});
-
-// Crowding: DEV Bukit Jalil TOC is moved to about 2 m from DEV Tanjung Malim Hut (no cluster), close enough to still
+// Crowding: DEV Bukit Jalil TOC is moved to about 2 m from DEV Tanjung Malim Hut, close enough to still
 // overlap at max zoom, for the test, then put back.
 type SiteEdit = { lat: number; lon: number };
 

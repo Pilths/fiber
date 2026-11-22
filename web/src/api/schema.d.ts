@@ -1062,23 +1062,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/map/sectors": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Sectors */
-        get: operations["sectors_api_map_sectors_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/map/segments/{segment_id}/kmz": {
         parameters: {
             query?: never;
@@ -1981,7 +1964,7 @@ export interface components {
              * Type
              * @enum {string}
              */
-            type: "customer" | "segment" | "cluster" | "core";
+            type: "customer" | "segment" | "core";
             /** Label */
             label: string;
             /** Segment Id */
@@ -2285,8 +2268,6 @@ export interface components {
             lon?: number | null;
             /** Region */
             region?: string | null;
-            /** Cluster */
-            cluster?: string | null;
             /** Active */
             active?: boolean | null;
         };
@@ -2304,8 +2285,6 @@ export interface components {
             lon: number | null;
             /** Region */
             region: string | null;
-            /** Cluster */
-            cluster: string | null;
             /** Active */
             active: boolean;
             /** History */
@@ -5027,41 +5006,6 @@ export interface operations {
         };
     };
     sites_api_map_sites_get: {
-        parameters: {
-            query?: never;
-            header?: {
-                "x-dev-user"?: string | null;
-            };
-            path?: never;
-            cookie?: {
-                fiber_session?: string | null;
-            };
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    sectors_api_map_sectors_get: {
         parameters: {
             query?: never;
             header?: {

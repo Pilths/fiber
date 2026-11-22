@@ -38,28 +38,11 @@ GROUP BY g.id ORDER BY g.id
 """
 SITE_SQL = """
 SELECT s.id, s.name, s.kind, s.lrd_site_id, s.details->>'region' AS region,
-       s.details->>'cluster' AS cluster,
        ST_X(s.geom) AS x, ST_Y(s.geom) AS y, l.name AS lname, ST_X(l.geom) AS lx, ST_Y(l.geom) AS ly,
        EXISTS (SELECT 1 FROM segments p WHERE p.site_a_id = s.id OR p.site_b_id = s.id) AS has_segment
 FROM sites s LEFT JOIN sites l ON l.id = s.lrd_site_id
 WHERE s.active
 ORDER BY s.id
-"""
-# A sector is one cluster: the buffered hull of the sites that share a cluster name (2 or more, with a point).
-SECTOR_SQL = """
-WITH cluster_group AS (
-    SELECT btrim(details->>'cluster') AS cluster,
-           count(*) AS site_count,
-           ST_Buffer(ST_ConvexHull(ST_Collect(geom))::geography, 150)::geometry AS geom
-    FROM sites
-    WHERE active AND geom IS NOT NULL AND btrim(coalesce(details->>'cluster', '')) <> ''
-    GROUP BY btrim(details->>'cluster')
-    HAVING count(*) >= 2
-)
-SELECT cluster, site_count, ST_AsGeoJSON(geom) AS geom,
-       ST_XMin(geom) AS minx, ST_YMin(geom) AS miny, ST_XMax(geom) AS maxx, ST_YMax(geom) AS maxy
-FROM cluster_group
-ORDER BY cluster
 """
 
 
@@ -149,7 +132,7 @@ def map_sites(db: Session) -> dict[str, Any]:
     for r in db.execute(text(SITE_SQL)).mappings():
         props = {
             "site_id": r["id"], "name": r["name"], "kind": r["kind"], "lrd_site_id": r["lrd_site_id"],
-            "region": r["region"], "cluster": r["cluster"],
+            "region": r["region"],
         }
         x, y = r["x"], r["y"]
         if not _ok(x, y):
@@ -162,18 +145,6 @@ def map_sites(db: Session) -> dict[str, Any]:
                 continue
         feats.append({"type": "Feature", "properties": props, "geometry": {"type": "Point", "coordinates": [x, y]}})
     return {"type": "FeatureCollection", "features": feats, "not_drawn": not_drawn}
-
-
-def map_sectors(db: Session) -> dict[str, Any]:
-    features = []
-    for row in db.execute(text(SECTOR_SQL)).mappings():
-        properties = {
-            "cluster": row["cluster"],
-            "site_count": row["site_count"],
-            "bbox": [row["minx"], row["miny"], row["maxx"], row["maxy"]],
-        }
-        features.append({"type": "Feature", "properties": properties, "geometry": json.loads(row["geom"])})
-    return {"type": "FeatureCollection", "features": features}
 
 
 SEGMENT_SITES_SQL = """

@@ -513,15 +513,6 @@ def test_fiber_cut_needs_review_and_existing_actions_not_blocked(client, w, db):
 
 
 
-def test_site_cluster_trimmed_set_and_cleared(client, w, db):
-    a = one(db, "SELECT id FROM sites WHERE name = 'A'")
-    assert post(client, f"sites/{a}", cluster="  North  Klang ", remarks="x").json()["changed"] == ["cluster"]
-    assert one(db, f"SELECT details->>'cluster' FROM sites WHERE id = {a}") == "North Klang"
-    assert post(client, f"sites/{a}", cluster="North Klang", remarks="x").status_code == 400  # unchanged
-    assert post(client, f"sites/{a}", cluster=" ", remarks="x").json()["changed"] == ["cluster"]
-    assert one(db, f"SELECT details->>'cluster' FROM sites WHERE id = {a}") is None
-
-
 # ---------- a core's ports belong to its segment's end sites ----------
 
 def _port_at_other_site(db, w):

@@ -18,7 +18,7 @@ router = APIRouter()
 
 SITE_SQL = """
 SELECT id, name, kind, ST_Y(geom) AS lat, ST_X(geom) AS lon,
-       details->>'region' AS region, details->>'cluster' AS cluster, active
+       details->>'region' AS region, active
 FROM sites WHERE id = :site_id
 """
 FIND_SITES_SQL = "SELECT id, name FROM sites WHERE name ILIKE '%' || :q || '%' ORDER BY name LIMIT 20"
@@ -34,12 +34,6 @@ UPDATE sites
 SET details = jsonb_set(coalesce(details, '{}'::jsonb), '{region}', to_jsonb(CAST(:region AS text)))
 WHERE id = :site_id
 """
-SET_SITE_CLUSTER_SQL = """
-UPDATE sites
-SET details = jsonb_set(coalesce(details, '{}'::jsonb), '{cluster}', to_jsonb(CAST(:cluster AS text)))
-WHERE id = :site_id
-"""
-CLEAR_SITE_CLUSTER_SQL = "UPDATE sites SET details = details - 'cluster' WHERE id = :site_id"
 SITE_IN_SEGMENT_SQL = "SELECT 1 FROM segments WHERE site_a_id = :site_id OR site_b_id = :site_id LIMIT 1"
 SET_SITE_ACTIVE_SQL = "UPDATE sites SET active = :active WHERE id = :site_id"
 SITE_FOR_UPDATE_SQL = SITE_SQL + " FOR UPDATE"
@@ -51,7 +45,6 @@ class SiteBody(BaseModel):
     lat: float | None = None
     lon: float | None = None
     region: str | None = None
-    cluster: str | None = None  # blank text clears it
     active: bool | None = None  # no other endpoint deactivates a site
 
 
@@ -62,7 +55,6 @@ class SiteEdit(BaseModel):
     lat: float | None
     lon: float | None
     region: str | None
-    cluster: str | None
     active: bool
     history: list[HistoryRow]
 
@@ -131,21 +123,6 @@ def _edit_region(
     edits.append(("region", old["region"], region))
 
 
-def _edit_cluster(
-    db: Session, site_id: int, typed: str | None, old: Any, edits: list[tuple[str, Any, Any]]
-) -> None:
-    if typed is None:
-        return
-    cluster = " ".join(typed.split()) or None
-    if cluster == old["cluster"]:
-        return
-    if cluster is None:
-        db.execute(text(CLEAR_SITE_CLUSTER_SQL), {"site_id": site_id})
-    else:
-        db.execute(text(SET_SITE_CLUSTER_SQL), {"cluster": cluster, "site_id": site_id})
-    edits.append(("cluster", old["cluster"], cluster))
-
-
 def _edit_active(db: Session, site_id: int, active: bool | None, old: Any,
                  edits: list[tuple[str, Any, Any]]) -> None:
     if active is None or active == old["active"]:
@@ -165,7 +142,6 @@ def edit_site(db: DB, admin: Admin, sid: int, body: SiteBody) -> Edited:
     _edit_name(db, sid, body.name, old, edits)
     _edit_location(db, sid, body, old, edits)
     _edit_region(db, sid, body.region, old, edits)
-    _edit_cluster(db, sid, body.cluster, old, edits)
     _edit_active(db, sid, body.active, old, edits)
     if not edits:
         raise ServiceError(400, "nothing changed")

@@ -1,6 +1,6 @@
 # Fiber Dashboard: Epic Architecture Specification
 
-Last verified: 2026-11-20, commit b4e4393. Matches the code on `dev`. Features not built yet are marked "Planned, not built".
+Last verified: 2026-11-22, commit 52cc077. Matches the code on `dev`. Features not built yet are marked "Planned, not built".
 
 Source: `docs/PRD.md` (26 October 2026). Where this document and the PRD disagree, the PRD wins.
 

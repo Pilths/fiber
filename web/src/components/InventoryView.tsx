@@ -37,8 +37,6 @@ export function InventoryView(props: {
   customer: CustomerHighlight | null;
   onClearCustomer: () => void;
   onPickRequest: (requestId: number | null) => void;
-  clusterFocus: { name: string } | null;
-  onClusterFocused: () => void;
 }) {
   const { me, inventory, admin, version, onAssign, customer, onClearCustomer, onPickRequest } = props;
   const { optionIds, detail, segmentId } = inventory;
@@ -54,8 +52,6 @@ export function InventoryView(props: {
     version,
     onSelectSegment: inventory.pickOnMap,
     onClear: clearMap,
-    focusCluster: props.clusterFocus,
-    onFocused: props.onClusterFocused,
   });
   // A route's options show only their segments; otherwise the Region filter decides.
   const visible = (properties: { segment_id: number; region: string | null }) => {

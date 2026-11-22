@@ -6,8 +6,8 @@ import { useCloseOnOutsideClick } from "@/lib/useCloseOnOutsideClick";
 export type SearchResult = components["schemas"]["SearchResult"];
 type Result = SearchResult;
 
-const GROUPS: Result["type"][] = ["customer", "segment", "cluster", "core"];
-const GROUP_LABEL = { customer: "Customers", segment: "Segments", cluster: "Clusters", core: "Cores" };
+const GROUPS: Result["type"][] = ["customer", "segment", "core"];
+const GROUP_LABEL = { customer: "Customers", segment: "Segments", core: "Cores" };
 const SEARCH_LABEL = "Find a segment, site, customer or core";
 const SEARCH_DELAY_MS = 200;
 
@@ -17,9 +17,9 @@ const LIST_CLASS =
 const OPTION_CLASS = "flex min-h-10 cursor-pointer items-center px-4 py-1.5 aria-disabled:cursor-not-allowed";
 const MUTED_LINE_CLASS = "px-4 py-2 text-body text-muted-foreground";
 
-// A cluster opens on the map; any other result needs a segment to open.
+// A result needs a segment to open.
 function pickable(result: Result): boolean {
-  return result.type === "cluster" || result.segment_id != null;
+  return result.segment_id != null;
 }
 
 // Results come from GET /api/search, grouped in GROUPS order. Typing waits SEARCH_DELAY_MS before asking.

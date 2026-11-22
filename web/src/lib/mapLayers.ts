@@ -25,7 +25,6 @@ export type SiteProps = {
   lrd_site_id: number | null;
   region: string | null;
   location_from_site?: string;
-  cluster?: string | null;
 };
 export type SegmentFeature = { properties: SegmentProps; geometry: { coordinates: Point[] } };
 export type SiteFeature = { properties: SiteProps; geometry: { coordinates: Point } };

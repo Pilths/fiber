@@ -40,7 +40,7 @@ async function openUpload(page: Page, tab: UploadTab) {
   await page.getByRole("tab", { name: tab }).click();
 }
 
-// Missing 17: the 12 DEV sites plus the 5 DEV data centres (2 plus 3 cluster DCs), which belong to the Sites sheet.
+// Missing 17: the 12 DEV sites plus the 5 DEV data centres (2 plus 3 extra DEV DCs), which belong to the Sites sheet.
 test("site master preview: counts, 10% drop override", async ({ page }) => {
   await openUpload(page, "Sites (Excel)");
   await page.getByLabel("Upload a site master workbook").setInputFiles(file(`e2e-sites-${stamp}.xlsx`, [
