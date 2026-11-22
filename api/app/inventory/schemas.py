@@ -34,6 +34,7 @@ class SegmentSummary(BaseModel):
     unassigned_reserved: int  # cores reserved by count only, ports not assigned yet
     free_to_reserve: int  # free_cores - unassigned_reserved (0 when not surveyed or cut)
     fiber_cut: bool  # whole cable out; cannot be booked or routed until an admin restores it
+    health: Literal["free", "full", "cut", "not_verified"]
 
 
 class CoreDetail(BaseModel):

@@ -487,7 +487,7 @@ def test_fiber_cut_refuses_booking_single_and_route(client, w, db):
     cut(client, w["s2"])
     r = book(client, w, [w["c2"][1]])
     assert r.status_code == 409
-    assert r.json()["detail"]["message"] == "B - C has a fiber cut and cannot be booked until an admin restores it."
+    assert r.json()["detail"]["message"] == "Fiber cut on B - C."
     assert book(client, w, [w["c1"][1], w["c2"][1]]).status_code == 409  # route request touching it
     assert one(db, "SELECT count(*) FROM reservations") == 0
     assert book(client, w, [w["c1"][1]]).status_code in (200, 201)  # other segments still book
@@ -548,3 +548,16 @@ def test_core_ports_land_at_their_own_end_site(client, w, db):
         "JOIN segments s ON s.id = c.segment_id JOIN ports pa ON pa.id = c.port_a_id "
         "JOIN ports pb ON pb.id = c.port_b_id WHERE c.id = :c"), {"c": c}).scalar_one()
     assert sites is True
+
+
+def test_raise_verified_count_after_lowering_ignores_hidden_core_history(client, w, db):
+    s = w["s1"]  # 6 cores
+    assert post(client, f"segments/{s}", survey_cores=3, remarks="lower").status_code == 200
+    # core 6 is hidden now; its old edit must not block raising to 5
+    core_6 = one(db, "SELECT id FROM cores WHERE segment_id = :s AND number = 6", s=s)
+    db.execute(text("INSERT INTO data_edits (entity, entity_id, field, new_value, remarks, user_id) "
+                    "VALUES ('core', :c, 'status', 'Faulty', 'old', :u)"), {"c": core_6, "u": w["admin1"]})
+    r = post(client, f"segments/{s}", survey_cores=5, remarks="raise")
+    assert r.status_code == 200
+    detail = client.get(f"/api/segments/{s}", headers=H("planner1")).json()
+    assert [c["number"] for c in detail["cores"]] == [1, 2, 3, 4, 5]

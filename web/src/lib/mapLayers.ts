@@ -1,4 +1,5 @@
 import type { Point } from "@/lib/mapGeometry";
+import type { SegmentHealth } from "@/lib/status";
 
 export type SegmentProps = {
   segment_id: number;
@@ -12,9 +13,7 @@ export type SegmentProps = {
   site_b_kind: string;
   distance_km: string | null;
   free_to_reserve: number;
-  surveyed: boolean;
-  chip: "ok" | "low" | "full" | "not_surveyed";
-  fiber_cut?: boolean;
+  health: SegmentHealth;
   route_id: number | null;
   shaped?: boolean;
 };
@@ -105,14 +104,14 @@ export function siteLook(kind: string): { shape: string; word: string } {
   return { shape: "st", word: "trunk site" };
 }
 
-// Chip text: the free-core number only; a cut segment reads 0, not surveyed a dash.
+// Chip text: the free-core number only; a cut segment reads 0, not verified a dash.
 export function chipText(segment: SegmentProps): string {
-  if (segment.fiber_cut) {
+  if (segment.health === "cut") {
     return "0";
   }
-  if (segment.surveyed) {
-    return String(segment.free_to_reserve);
+  if (segment.health === "not_verified") {
+    return "–";
   }
-  return "–";
+  return String(segment.free_to_reserve);
 }
 

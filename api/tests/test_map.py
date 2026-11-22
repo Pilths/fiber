@@ -58,7 +58,7 @@ def test_segments_straight_chips_and_not_drawn(client, db):
     lost = segment(db, e, nogeo, 4)
     r = client.get("/api/map/segments", headers=H()).json()
     by = {f["properties"]["segment_id"]: f for f in r["features"]}
-    assert [by[i]["properties"]["chip"] for i in (ok, low, full, ns)] == ["ok", "low", "full", "not_surveyed"]
+    assert [by[i]["properties"]["health"] for i in (ok, low, full, ns)] == ["free", "free", "full", "not_verified"]
     assert by[low]["properties"]["free_to_reserve"] == 7 and by[ns]["properties"]["surveyed"] is False
     assert by[ok]["geometry"]["coordinates"] == [[101, 3], [102, 3]] and "shaped" not in by[ok]["properties"]
     assert by[ok]["properties"]["route_id"] is None
@@ -121,8 +121,8 @@ def test_segments_expose_fiber_cut_as_full(client, db):
         f["properties"]["segment_id"]: f["properties"]
         for f in client.get("/api/map/segments", headers=H()).json()["features"]
     }
-    assert (by[ok]["fiber_cut"], by[ok]["chip"]) == (False, "ok")
-    assert (by[cut]["fiber_cut"], by[cut]["chip"], by[cut]["free_to_reserve"]) == (True, "full", 0)
+    assert (by[ok]["fiber_cut"], by[ok]["health"]) == (False, "free")
+    assert (by[cut]["fiber_cut"], by[cut]["health"], by[cut]["free_to_reserve"]) == (True, "cut", 0)
 
 
 def test_segment_kmz_download(client, db):

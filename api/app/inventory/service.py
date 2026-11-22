@@ -17,6 +17,7 @@ from app.inventory.schemas import (
     SegmentUsage,
     UnassignedHold,
 )
+from app.inventory.capacity import free_to_reserve, health
 from app.link_type import ROUTE_TYPE_SQL
 from app.reservations.service import TZ
 
@@ -245,15 +246,11 @@ WHERE c.number = :num ORDER BY c.segment_id LIMIT :n
 
 def _summary(row: dict[str, Any]) -> dict[str, Any]:
     free = row["status_mix"].get("Available", 0)
-    surveyed = row["survey_cores"] is not None
     not_surveyed = None
-    if surveyed:
+    if row["survey_cores"] is not None:
         not_surveyed = row["cable_size"] - row["survey_cores"]
-    # a cut or unsurveyed segment cannot be booked
-    free_to_reserve = 0
-    if surveyed and not row["fiber_cut"]:
-        free_to_reserve = max(free - row["unassigned_reserved"], 0)
-    return {**row, "free_cores": free, "not_surveyed": not_surveyed, "free_to_reserve": free_to_reserve}
+    return {**row, "free_cores": free, "not_surveyed": not_surveyed,
+            "free_to_reserve": free_to_reserve(row), "health": health(row)}
 
 
 def list_segments(db: Session, region: str | None, route_type: str | None, query: str | None,

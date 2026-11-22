@@ -133,6 +133,7 @@
   .h-amber { color: var(--amber); background: var(--amber-bg); border-color: var(--amber-bd); }
   .h-red { color: var(--red); background: var(--red-bg); border-color: var(--red-bd); }
   .h-blue { color: var(--blue); background: var(--blue-bg); border-color: var(--blue-bd); }
+  .h-plain { color: var(--ink); background: #fff; border-color: var(--line); }
   .h-ns { color: var(--muted-ink); background: #fff; border: 1px dashed var(--ns); font-weight: 500; }
 
   .chip { height: 32px; padding: 0 12px; border: 1px solid var(--line); border-radius: 6px; background: #fff; font-size: 13px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; }
@@ -190,7 +191,7 @@
 .lrow input { width: 14px; height: 14px; accent-color: var(--blue); flex: none; }
 .lrow input[aria-disabled="true"] { cursor: not-allowed; }
 .mchip { position: absolute; z-index: 5; transform: translate(-50%, -50%); display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 9px; border-radius: 999px; border: 1px solid; font-size: 12px; line-height: 1; font-weight: 700; white-space: nowrap; cursor: pointer; }
-.mchip.h-green { border-color: var(--green); } .mchip.h-amber { border-color: var(--amber); } .mchip.h-red { border-color: var(--red); }
+.mchip.h-red { border-color: var(--red); }
 .mchip.h-ns { font-weight: 500; }
 /* Customer mode: used cores, a neutral pill, not a health colour */
 .mchip.used { border-color: var(--border); background: var(--raised); color: var(--ink); }

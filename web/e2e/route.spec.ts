@@ -78,7 +78,7 @@ test("too many cores: the free pill turns red with a symbol, Reserve on this rou
   const short = options(page).first().getByTestId("route-short");
   await expect(short).toContainText(/\d+ free/);
   await expect(short).toHaveClass(/h-red/);
-  await expect(short.locator(".sr-only")).toHaveText(/^, (not enough for 200|DEV .+ not verified)$/);
+  await expect(short.locator(".sr-only")).toHaveText(/^, (not enough for 200|DEV .+ (not verified|cut))$/);
   await expect(short.locator('svg[data-icon="fl"]')).toHaveCount(1); // symbol, not colour alone
   await expect(options(page).first()).not.toContainText("Best match");
   await expect(reserveRoute(page)).toBeDisabled();

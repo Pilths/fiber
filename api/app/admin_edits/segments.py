@@ -11,6 +11,7 @@ from app.errors import NotFound, Invalid, ServiceError
 from app.admin_edits.history import HISTORY_SHOWN, Edited, HistoryRow, bool_text, history, log_edits
 from app.auth.deps import DB, Admin
 from app.ingest import checks
+from app.inventory.capacity import check_count_only_holds_fit
 from app.ingest.reservation_import import add_cores
 from app.link_type import ROUTE_TYPE_SQL
 from app.reservations.schemas import Remarks
@@ -31,20 +32,13 @@ HIGHEST_CORE_SQL = "SELECT coalesce(max(number), 0) FROM cores WHERE segment_id 
 # Cores above the new count that must stay: taken, ever reserved, edited, or carrying ports
 BLOCKING_CORES_SQL = """
 SELECT c.id, c.number FROM cores c JOIN core_status_v v ON v.core_id = c.id
-WHERE c.segment_id = :segment_id AND c.number > :new_count AND (
+WHERE c.segment_id = :segment_id AND c.number > :new_count AND c.number <= :current_count AND (
   v.status <> 'Available'
   OR EXISTS (SELECT 1 FROM reservation_cores rc WHERE rc.core_id = c.id)
   OR EXISTS (SELECT 1 FROM data_edits d WHERE d.entity = 'core' AND d.entity_id = c.id)
   OR c.port_a_id IS NOT NULL OR c.port_b_id IS NOT NULL
 )
 ORDER BY c.number
-"""
-FREE_AFTER_SQL = """
-SELECT count(*) FROM cores c JOIN core_status_v v ON v.core_id = c.id
-WHERE c.segment_id = :segment_id AND c.number <= :new_count AND v.status = 'Available'
-"""
-RESERVED_BY_COUNT_SQL = """
-SELECT coalesce(sum(remaining), 0) FROM reservation_unassigned_v WHERE segment_id = :segment_id
 """
 COUNT_SITES_SQL = "SELECT count(*) FROM sites WHERE id = ANY(CAST(:ids AS bigint[]))"
 OTHER_SEGMENT_SQL = """
@@ -96,15 +90,13 @@ def get_segment(db: DB, sid: int) -> SegmentEdit:
     return SegmentEdit(**row, history=history(db, "segment", sid, HISTORY_SHOWN))
 
 
-def _resize(db: Session, segment_id: int, new_count: int) -> None:
-    highest = db.execute(text(HIGHEST_CORE_SQL), {"segment_id": segment_id}).scalar_one()
-    if new_count > highest:
-        # numbers up to `highest` already exist and simply become surveyed again
-        add_cores(db, segment_id, new_count)
+def _set_verified_cores(db: Session, segment_id: int, current: int | None, new_count: int) -> None:
+    if current is None or new_count >= current:
+        highest = db.execute(text(HIGHEST_CORE_SQL), {"segment_id": segment_id}).scalar_one()
+        if new_count > highest:
+            add_cores(db, segment_id, new_count)
         return
-    if new_count == highest:
-        return
-    params = {"segment_id": segment_id, "new_count": new_count}
+    params = {"segment_id": segment_id, "new_count": new_count, "current_count": current}
     blocking = db.execute(text(BLOCKING_CORES_SQL), params).all()
     if blocking:
         numbers = [number for _, number in blocking]
@@ -116,13 +108,7 @@ def _resize(db: Session, segment_id: int, new_count: int) -> None:
             blocking_core_numbers=numbers,
             blocking_core_ids=core_ids,
         )
-    free_after = db.execute(text(FREE_AFTER_SQL), params).scalar_one()
-    reserved = db.execute(text(RESERVED_BY_COUNT_SQL), {"segment_id": segment_id}).scalar_one()
-    if free_after < reserved:
-        raise conflict(
-            f"Cannot lower to {new_count}: {reserved} cores are reserved by count only "
-            f"and only {free_after} would stay Available."
-        )
+    check_count_only_holds_fit(db, segment_id, new_count)
     # rows above the new count stay (nothing is deleted); the inventory and booking queries hide them
 
 
@@ -178,7 +164,7 @@ def edit_segment(db: DB, admin: Admin, sid: int, body: SegmentBody) -> Edited:
     if sites_change:
         _check_sites(db, sid, site_a, site_b)
     if "survey_cores" in changes:
-        _resize(db, sid, changes["survey_cores"])
+        _set_verified_cores(db, sid, old["survey_cores"], changes["survey_cores"])
     for field_name, value in changes.items():
         if field_name in SITE_FIELDS:
             continue

@@ -2036,6 +2036,11 @@ export interface components {
             free_to_reserve: number;
             /** Fiber Cut */
             fiber_cut: boolean;
+            /**
+             * Health
+             * @enum {string}
+             */
+            health: "free" | "full" | "cut" | "not_verified";
             /** Cores */
             cores: components["schemas"]["CoreDetail"][];
             /**
@@ -2207,6 +2212,11 @@ export interface components {
             free_to_reserve: number;
             /** Fiber Cut */
             fiber_cut: boolean;
+            /**
+             * Health
+             * @enum {string}
+             */
+            health: "free" | "full" | "cut" | "not_verified";
         };
         /** SegmentUsage */
         SegmentUsage: {

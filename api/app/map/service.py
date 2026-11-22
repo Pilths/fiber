@@ -52,10 +52,6 @@ def _ok(x: float | None, y: float | None) -> bool:
     return math.isfinite(x) and math.isfinite(y) and -180 <= x <= 180 and -90 <= y <= 90
 
 
-def _chip(free: int, surveyed: bool) -> str:
-    return "not_surveyed" if not surveyed else "ok" if free >= 10 else "low" if free >= 1 else "full"
-
-
 def _shaped_parts(line: list[list[float]], segments: list[dict[str, Any]]) -> dict[int, list[list[float]]]:
     """Cut `line` at the vertex closest to each junction site; {segment_id: coords oriented site A -> site B}."""
     if len(segments) < 1 or len(line) < 2:
@@ -119,7 +115,7 @@ def map_segments(db: Session) -> dict[str, Any]:
                  "route_type": s["route_type"], "route": s["route"], "region": s["region"],
                  "site_a_kind": s["site_a_kind"], "site_b_kind": s["site_b_kind"], "distance_km": s["distance_km"],
                  "free_to_reserve": s["free_to_reserve"], "surveyed": surveyed, "fiber_cut": s["fiber_cut"],
-                 "chip": _chip(s["free_to_reserve"], surveyed), "route_id": seg_id}
+                 "health": s["health"], "route_id": seg_id}
         if coords:
             props["shaped"] = True
         feats.append({"type": "Feature", "properties": props, "geometry": {
