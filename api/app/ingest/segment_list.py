@@ -15,9 +15,9 @@ import openpyxl
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app.admin_edits.history import log_edits_for_user
 from app.ingest.checks import blank, clean, split_nodes
 from app.ingest.excel import _json
+from app.ingest.segment_fields import write_segment_field
 from app.ingest.site_master import hkey, load_protected
 from app.ingest.uploads import ApplyError, finish_upload, insert_upload, lock_staged_upload
 from app.routing.graph import invalidate as invalidate_routes
@@ -51,12 +51,6 @@ INSERT_SEGMENT = """
     INSERT INTO segments (site_a_id, site_b_id, distance_km, route, section)
     VALUES (:site_a_id, :site_b_id, CAST(:distance AS numeric), :route, :section)
 """
-
-
-def update_segment_field_sql(field_name: str) -> str:
-    # field_name is one of FIELDS, never text from the file.
-    column_type = "numeric" if field_name == "distance_km" else "text"
-    return f"UPDATE segments SET {field_name} = CAST(:value AS {column_type}) WHERE id = :segment_id"
 
 
 @dataclass
@@ -342,10 +336,9 @@ def _update_segment(
     db: Session, admin_id: int, upload_id: int, item: Item, changes: list[dict[str, Any]], why: str
 ) -> None:
     for change in changes:
-        params = {"value": change["new"], "segment_id": item.db_id}
-        db.execute(text(update_segment_field_sql(change["field"])), params)
-        edit = [(change["field"], change["old"], change["new"])]
-        log_edits_for_user(db, admin_id, "segment", item.db_id, edit, why, upload_id)  # type: ignore[arg-type]
+        write_segment_field(
+            db, admin_id, upload_id, item.db_id, change["field"], change["old"], change["new"], why  # type: ignore[arg-type]
+        )
 
 
 def apply_upload(db: Session, admin_id: int, upload_id: int) -> dict[str, Any]:

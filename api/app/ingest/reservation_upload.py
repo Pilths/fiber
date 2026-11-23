@@ -26,6 +26,7 @@ from app.ingest.reservation_import import (
     find_segment,
     place_reservation,
 )
+from app.ingest.segment_fields import write_segment_field
 from app.ingest.site_master import load_protected
 from app.ingest.uploads import ApplyError, finish_upload, insert_upload, lock_staged_upload
 from app.inventory import service as inventory
@@ -126,11 +127,6 @@ INSERT_MEASUREMENT = """
 COUNT_KEYS = (
     "segments", "cores", "ports", "customers", "reservations", "segment_updates", "measurements",
 )
-
-
-def update_segment_field_sql(field_name: str) -> str:
-    # field_name comes from SEGMENT_FIELDS only, never from the file.
-    return f"UPDATE segments SET {field_name} = :value WHERE id = :segment_id"
 
 
 # ---- the one-time switch --------------------------------------------------------------------------------------
@@ -644,10 +640,11 @@ def _apply_segment_changes(
     for change in item.changes:
         if not change["applied"]:
             continue
-        params = {"value": change["new"], "segment_id": segment_id}
-        db.execute(text(update_segment_field_sql(change["field"])), params)
-        edit = [(change["field"], change["old"], change["new"])]
-        log_edits_for_user(db, admin_id, "segment", segment_id, edit, why, upload_id)
+        written = write_segment_field(
+            db, admin_id, upload_id, segment_id, change["field"], change["old"], change["new"], why
+        )
+        if not written:
+            continue
         if change["field"] == "survey_cores":
             counts["cores"] += add_cores(db, segment_id, change["new"])
         counts["segment_updates"] += 1
