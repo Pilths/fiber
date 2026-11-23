@@ -26,11 +26,12 @@ from app.ingest.reservation_import import (
     find_segment,
     place_reservation,
 )
+from app.ingest.pipeline import apply_staged_upload, insert_staged_rows, load_staged_rows
+from app.ingest.segment_fields import write_segment_field
 from app.ingest.site_master import load_protected
-from app.ingest.uploads import ApplyError, finish_upload, insert_upload, lock_staged_upload
+from app.ingest.uploads import ApplyError, insert_upload
 from app.inventory import service as inventory
 from app.reservations.service import lock_segments
-from app.routing.graph import invalidate as invalidate_routes
 
 REMARKS = "reservation upload"
 SEGMENT_FIELDS = ("region", "distance_km", "survey_cores")
@@ -100,17 +101,6 @@ SELECT_ALL_SEGMENT_KEYS = """
     JOIN sites b ON b.id = s.site_b_id
     ORDER BY s.id
 """
-INSERT_UPLOAD_ROWS = """
-    INSERT INTO upload_rows (upload_id, row_group, entity, payload, warnings, sheet, row_number, status, reason, raw)
-    VALUES (:upload_id, :row_group, :entity, CAST(:payload AS jsonb), CAST(:warnings AS jsonb), :sheet, :row_number,
-            :status, :reason, CAST(:raw AS jsonb))
-"""
-SELECT_STAGED_ROWS = """
-    SELECT id, row_number, sheet, raw, payload
-    FROM upload_rows
-    WHERE upload_id = :upload_id AND entity <> 'segment'
-    ORDER BY row_number
-"""
 SELECT_STAGED_SEGMENT_KEYS = """
     SELECT id, payload->>'key'
     FROM upload_rows
@@ -126,11 +116,6 @@ INSERT_MEASUREMENT = """
 COUNT_KEYS = (
     "segments", "cores", "ports", "customers", "reservations", "segment_updates", "measurements",
 )
-
-
-def update_segment_field_sql(field_name: str) -> str:
-    # field_name comes from SEGMENT_FIELDS only, never from the file.
-    return f"UPDATE segments SET {field_name} = :value WHERE id = :segment_id"
 
 
 # ---- the one-time switch --------------------------------------------------------------------------------------
@@ -307,7 +292,7 @@ def _segment_items(
         item = segments.setdefault(key, new_item)
         row.extra["segment_key"] = key
         _add_row_to_segment_item(row, item)
-    protected = load_protected(db, "segment", (REMARKS,))
+    protected = load_protected(db, "segment")
     for item in segments.values():
         found = find_segment(db, sites[item.site_a], sites[item.site_b])
         if found is None:
@@ -579,8 +564,7 @@ def stage(db: Session, admin_id: int, filename: str, results: list[RowResult], i
         staged.append(_staged_segment(upload_id, item, first_row_of_segment[item.key]))
     for missing in evaluation.missing:
         staged.append(_staged_missing(upload_id, missing))
-    if staged:
-        db.execute(text(INSERT_UPLOAD_ROWS), staged)
+    insert_staged_rows(db, staged)
     db.commit()
     return {"upload_id": upload_id, "filename": filename, "status": "staged", **summary}
 
@@ -595,7 +579,7 @@ def _unjson(parsed: dict[str, Any]) -> dict[str, Any]:
 
 def load_staged(db: Session, upload_id: int) -> list[Row]:
     rows = []
-    for staged in db.execute(text(SELECT_STAGED_ROWS), {"upload_id": upload_id}).mappings():
+    for staged in load_staged_rows(db, upload_id, "entity <> 'segment'", "row_number"):
         payload = staged["payload"]
         rows.append(Row(
             staged["row_number"],
@@ -644,9 +628,11 @@ def _apply_segment_changes(
     for change in item.changes:
         if not change["applied"]:
             continue
-        params = {"value": change["new"], "segment_id": segment_id}
-        db.execute(text(update_segment_field_sql(change["field"])), params)
-        log_edits_for_user(db, admin_id, "segment", segment_id, [(change["field"], change["old"], change["new"])], why)
+        written = write_segment_field(
+            db, admin_id, upload_id, segment_id, change["field"], change["old"], change["new"], why
+        )
+        if not written:
+            continue
         if change["field"] == "survey_cores":
             counts["cores"] += add_cores(db, segment_id, change["new"])
         counts["segment_updates"] += 1
@@ -685,19 +671,24 @@ def _place_reservations(
 
 
 def confirm(db: Session, admin_id: int, upload_id: int, excel_wins: list[dict[str, Any]]) -> dict[str, Any]:
-    upload = lock_staged_upload(db, upload_id, "excel", "This upload was already confirmed")
-    wins = _read_wins(db, upload_id, excel_wins)
-    evaluation = evaluate(db, load_staged(db, upload_id), wins)
-    # Lock first, then decide again: Free is read under the same segment locks create() takes.
-    lock_segments(db, {item.segment_id for item in evaluation.segments.values() if item.segment_id})
-    evaluation = evaluate(db, load_staged(db, upload_id), wins)  # fresh rows: evaluate adds warnings to them
-    _check_wins_are_protected(evaluation, wins)
-    why = f"{REMARKS} {upload['filename']} #{upload_id}"
-    counts: dict[str, int] = dict.fromkeys(COUNT_KEYS, 0)
-    skipped: list[dict[str, Any]] = []
-    site_names = sorted({name for item in evaluation.segments.values() for name in (item.site_a, item.site_b)})
-    sites = dict(db.execute(text(SELECT_SITE_IDS_BY_NAME), {"names": site_names}).all())
-    with db.begin_nested():  # all or nothing
+    def evaluate_staged(upload: dict[str, Any]) -> tuple[Eval, set[tuple[str, str]]]:
+        wins = _read_wins(db, upload_id, excel_wins)
+        evaluation = evaluate(db, load_staged(db, upload_id), wins)
+        # Lock first, then decide again: Free is read under the same segment locks create() takes.
+        lock_segments(db, {item.segment_id for item in evaluation.segments.values() if item.segment_id})
+        evaluation = evaluate(db, load_staged(db, upload_id), wins)  # fresh rows: evaluate adds warnings to them
+        _check_wins_are_protected(evaluation, wins)
+        return evaluation, wins
+
+    def write_all(
+        upload: dict[str, Any], evaluated: tuple[Eval, set[tuple[str, str]]]
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
+        evaluation, wins = evaluated
+        why = f"{REMARKS} {upload['filename']} #{upload_id}"
+        counts: dict[str, int] = dict.fromkeys(COUNT_KEYS, 0)
+        skipped: list[dict[str, Any]] = []
+        site_names = sorted({name for item in evaluation.segments.values() for name in (item.site_a, item.site_b)})
+        sites = dict(db.execute(text(SELECT_SITE_IDS_BY_NAME), {"names": site_names}).all())
         # Same order as reservation create(), which locks segments by id; new segments (no id yet) go last.
         for item in sorted(evaluation.segments.values(), key=_segment_id_order):
             if item.group == "new":
@@ -714,13 +705,14 @@ def confirm(db: Session, admin_id: int, upload_id: int, excel_wins: list[dict[st
             "excel_wins": [list(win) for win in sorted(wins)],
             "ignored_reservation_rows": ignored_rows,
         }
-        finish_upload(db, upload_id, dict(upload["summary"], applied=applied))
-    db.commit()
-    invalidate_routes()  # new segments or distances
-    return {
-        "upload_id": upload_id,
-        "counts": counts,
-        "skipped": skipped,
-        "warnings": evaluation.warnings,
-        "ignored_reservation_rows": evaluation.counts()["ignored"],
-    }
+        response = {
+            "upload_id": upload_id,
+            "counts": counts,
+            "skipped": skipped,
+            "warnings": evaluation.warnings,
+            "ignored_reservation_rows": ignored_rows,
+        }
+        return applied, response
+
+    message = "This upload was already confirmed"
+    return apply_staged_upload(db, upload_id, "excel", message, evaluate_staged, write_all)

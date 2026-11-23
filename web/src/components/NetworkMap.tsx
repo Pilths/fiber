@@ -1,12 +1,10 @@
 import { useRef, type ReactNode, type RefObject } from "react";
-import { sectorClusters, sectorLabels, siteLayout } from "@/lib/clusterLayout";
-import { clustersOf } from "@/lib/mapClusters";
 import { declutter, drawnLines } from "@/lib/mapGeometry";
 import type { SegmentProps } from "@/lib/mapLayers";
+import { siteLayout } from "@/lib/siteLayout";
 import type { Basemap, NetworkMapState } from "@/lib/useNetworkMap";
 import { MapLines, SegmentChip, type ChipUsage } from "@/components/MapOverlay";
 import { MapControls, NotDrawn } from "@/components/MapPanels";
-import { SectorLabels, SectorShapes } from "@/components/MapSectors";
 import { SiteMarkers } from "@/components/MapSites";
 import { requestName, type CustomerHighlight } from "@/lib/useCustomerHighlight";
 
@@ -85,12 +83,8 @@ export function NetworkMap(props: NetworkMapProps) {
   const showOverlay = camera != null && size.w > 0;
   const lines = drawnLines(state, visible);
   const layout = siteLayout(state);
-  const labels = sectorLabels(state, layout);
-  const sectored = sectorClusters(state);
-  const clusters = clustersOf(state.data.sectors?.features ?? []);
-  const sectors = (state.data.sectors?.features ?? []).filter((sector) => sectored.has(sector.properties.cluster));
   const usedIds = new Set(customer?.used.keys());
-  const { chipShown, nameShown } = declutter(state, lines, layout, labels, usedIds);
+  const { chipShown, nameShown } = declutter(state, lines, layout, usedIds);
   let note = NOTE[state.base];
   if (state.data.failed) {
     note = "Could not load the map data. Search and lists still work.";
@@ -121,9 +115,7 @@ export function NetworkMap(props: NetworkMapProps) {
         <div ref={glBox} style={{ position: "absolute", inset: 0 }} aria-hidden="true" />
         {showOverlay && (
           <>
-            <SectorShapes state={state} sectors={sectors} />
             <MapLines lines={lines} onSelect={state.selectSegment} />
-            <SectorLabels labels={labels} clusters={clusters} onZoom={state.zoomToBounds} />
             <SiteMarkers state={state} layout={layout} nameShown={nameShown} />
             {lines.filter((line) => line.show).map((line) => (
               <SegmentChip key={line.segment.segment_id} line={line}

@@ -1,17 +1,15 @@
 import { flushSync } from "react-dom";
 import { useCallback, useEffect, useRef, useState, type PointerEvent } from "react";
-import { CLUSTER_MAX_ZOOM, clusterName, FADE_TO } from "@/lib/mapClusters";
 import {
   boundsOf,
   fitView,
   MAX_ZOOM,
   MIN_ZOOM,
   panned,
-  type Bounds,
   type Camera,
   type Point,
 } from "@/lib/mapGeometry";
-import { useClusterLayer, useFullscreen, useMapData, useMapSize } from "@/lib/mapHooks";
+import { useFullscreen, useMapData, useMapSize } from "@/lib/mapHooks";
 import {
   ALL_ROUTES,
   ALL_SITES,
@@ -47,14 +45,11 @@ export type NetworkMapOptions = {
   version: number;
   onSelectSegment: (id: number) => void;
   onClear: () => void;
-  // a cluster picked in the header search, fitted once the map is ready, then onFocused
-  focusCluster: { name: string } | null;
-  onFocused: () => void;
 };
 
 // Network map state: data, camera (MapLibre or own), basemap mode, layers, fitting and dragging.
 export function useNetworkMap(options: NetworkMapOptions) {
-  const { selectedIds, routeKey, version, onSelectSegment, onClear, focusCluster, onFocused } = options;
+  const { selectedIds, routeKey, version, onSelectSegment, onClear } = options;
   const box = useRef<HTMLDivElement>(null);
   const glBox = useRef<HTMLDivElement>(null);
   const map = useRef<import("maplibre-gl").Map | null>(null);
@@ -67,7 +62,6 @@ export function useNetworkMap(options: NetworkMapOptions) {
   const fullscreen = useFullscreen(box);
   const data = useMapData(version);
   const size = useMapSize(box, setCamera);
-  const clusters = useClusterLayer(camera);
 
   const cameraRef = useRef(camera);
   useEffect(() => {
@@ -149,26 +143,6 @@ export function useNetworkMap(options: NetworkMapOptions) {
     go({ ...centred, zoom });
   };
 
-  // A cluster label: fit the cluster, at least far enough in that its sites show and stand apart.
-  const zoomToBounds = (bounds: Bounds) => {
-    if (!size.w) {
-      return;
-    }
-    const fitted = fitView(bounds, size.w, size.h, 60, CLUSTER_MAX_ZOOM);
-    go({ ...fitted, zoom: Math.max(fitted.zoom, FADE_TO) });
-  };
-
-  // A cluster's sector, or the bounds of its sites when it is too small for one (a single site).
-  const clusterBounds = (cluster: string): Bounds | null => {
-    const sector = data.sectors?.features.find((feature) => feature.properties.cluster === cluster);
-    if (sector) {
-      return sector.properties.bbox;
-    }
-    const sites = data.sites?.features ?? [];
-    const members = sites.filter((feature) => clusterName(feature.properties.cluster) === cluster);
-    return boundsOf(members.map((feature) => feature.geometry.coordinates));
-  };
-
   const features = data.segments?.features ?? [];
   const selected = new Set(selectedIds);
 
@@ -241,19 +215,6 @@ export function useNetworkMap(options: NetworkMapOptions) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- follow a segment selected outside the map
   }, [selectionKey]);
 
-  // Runs after the first fit above, so the cluster wins over it when both happen at once.
-  useEffect(() => {
-    if (!focusCluster || !fitted.current) {
-      return;
-    }
-    const bounds = clusterBounds(focusCluster.name);
-    if (bounds) {
-      zoomToBounds(bounds);
-    }
-    onFocused();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- a new pick, or the map becoming ready for it
-  }, [focusCluster, data.segments, size, base]);
-
   // SVG mode camera: drag to pan.
   const drag = useRef<{ x: number; y: number; start: Camera } | null>(null);
   const onPointerDown = (event: PointerEvent) => {
@@ -291,10 +252,8 @@ export function useNetworkMap(options: NetworkMapOptions) {
     siteLayers,
     setSiteLayers,
     ...fullscreen,
-    ...clusters,
     zoomBy,
     zoomAt,
-    zoomToBounds,
     fitSelection,
     selectSegment,
     onPointerDown,

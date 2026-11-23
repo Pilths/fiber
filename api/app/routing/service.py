@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.errors import Conflict, Invalid, ServiceError
 from app.inventory import service as inventory
+from app.inventory.capacity import check_booking
 from app.loss import service as loss
 from app.routing.graph import get_graph
 
@@ -114,6 +115,8 @@ def find_routes(db: Session, frm: int, to: int, cores_needed: int, sort: str) ->
                           "site_a": names[u], "site_b": names[v],
                           "km": None if s["distance_km"] is None else float(s["distance_km"]),
                           "free_to_reserve": s["free_to_reserve"], "surveyed": s["survey_cores"] is not None,
+                          "health": s["health"],
+                          "short": s["health"] != "free" or s["free_to_reserve"] < cores_needed,
                           "route_label": labels.get(sid), "measured": lo["measured_db"] is not None,
                           "_calc": lo["calculated_db"]})
         calc = [x.pop("_calc") for x in segments]
@@ -127,7 +130,7 @@ def find_routes(db: Session, frm: int, to: int, cores_needed: int, sort: str) ->
             "estimated_db": None if None in calc else round(float(sum(calc)), 2),
             "fewest_free": fewest, "bottleneck_segment_id": bottleneck["segment_id"],
             "measured_segments": sum(x["measured"] for x in segments), "total_segments": len(segments),
-            "insufficient": fewest < cores_needed or not all(x["surveyed"] for x in segments), "best_match": False})
+            "insufficient": any(x["short"] for x in segments), "best_match": False})
     key = (lambda o: (o["insufficient"], o["_weight"])) if sort == "km" else \
           (lambda o: (o["insufficient"], -o["fewest_free"], o["_weight"]))
     options.sort(key=key)  # stable: ties keep the shortest-path order
@@ -151,13 +154,8 @@ def pick(db: Session, segment_ids: list[int], cores_needed: int) -> dict[str, An
         s = next(iter(inventory.list_segments(db, None, None, None, sid)), None)
         if s is None:
             raise Invalid(f"Unknown segment {sid}")
+        check_booking(s, cores_needed, segment_id=sid)
         label = f"{s['site_a']} - {s['site_b']}"
-        if s["survey_cores"] is None:
-            message = f"{label} has no verified core count yet; it cannot be booked."
-            raise Conflict({"message": message, "segment_id": sid})
-        if s["free_to_reserve"] < cores_needed:
-            message = f"{label}: {cores_needed} needed but only {s['free_to_reserve']} free to reserve."
-            raise Conflict({"message": message, "segment_id": sid})
         rows = db.execute(text(
             "SELECT c.id AS core_id, c.number FROM cores c JOIN core_status_v v ON v.core_id = c.id "
             "WHERE c.segment_id = :s AND v.status = 'Available' AND c.number <= :n ORDER BY c.number LIMIT :k"),

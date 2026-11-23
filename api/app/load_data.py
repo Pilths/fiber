@@ -25,14 +25,15 @@ Sheet "Reservation" (its own file; load sites and segments first): Region (optio
 Safe to run again: sites missing from the file are left alone, fields edited in the dashboard are kept,
 and a verified core count is only filled in where the segment has none yet.
 """
+import json
 import sys
 from typing import Any
 
 import openpyxl
-from openpyxl.comments import Comment
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.admin_edits.history import log_edits_for_user
 from app.db import engine
 from app.ingest import reservation_upload as ru
 from app.ingest import segment_list as sl
@@ -51,7 +52,12 @@ SELECT_SEGMENT_BY_NAMES = """
 """
 SELECT_CABLE_SIZE_EDIT = """
     SELECT 1 FROM data_edits
-    WHERE entity = 'segment' AND entity_id = :i AND field = 'cable_size' AND COALESCE(remarks, '') NOT LIKE :r
+    WHERE entity = 'segment' AND entity_id = :i AND field = 'cable_size' AND upload_id IS NULL
+"""
+INSERT_DATA_FILE_UPLOAD = """
+    INSERT INTO uploads (user_id, filename, kind, status, summary, confirmed_at)
+    VALUES (:user_id, :filename, 'data_file', 'confirmed', CAST(:summary AS jsonb), now())
+    RETURNING id
 """
 SELECT_UPLOAD_PROBLEMS = """
     SELECT sheet, row_number, reason FROM upload_rows
@@ -60,12 +66,11 @@ SELECT_UPLOAD_PROBLEMS = """
 """
 SELECT_ACTIVE_ADMIN = "SELECT id FROM users WHERE username = :u AND role = 'admin' AND active"
 
-SITES = ["site_name", "latitude_in_decimal", "longitude_in_decimal", "region", "Type", "cluster"]
+SITES = ["site_name", "latitude_in_decimal", "longitude_in_decimal", "region", "Type"]
 SEGMENTS = ["Link", "Distance", "Route", "Section", "Verified cores", "Total cores"]
 RESERVATIONS = ["Region", "Nodes", "No of core requested", "Fiber core requestor", "Fiber core request date",
                 "Expected CV Ready", "Contractor", "Remark", "SRF", "Port Info", "Fiber monitored Y/N/WIP"]
 REMARKS = "data file load"
-CLUSTER_NOTE = "Optional. Cluster name. Sites with the same cluster are drawn together on the map."
 
 
 def template(path: str) -> None:
@@ -73,7 +78,6 @@ def template(path: str) -> None:
     ws = wb.active
     ws.title = "Sites"  # type: ignore[union-attr]
     ws.append(SITES)  # type: ignore[union-attr]
-    ws.cell(row=1, column=SITES.index("cluster") + 1).comment = Comment(CLUSTER_NOTE, "Fiber Dashboard")  # type: ignore[union-attr]
     wb.create_sheet("Segments").append(SEGMENTS)
     wb.save(path)
     print(f"Blank file written to {path}")
@@ -105,7 +109,9 @@ def _cell(row: tuple[Any, ...], columns: dict[str, int], key: str) -> Any:
     return clean(row[columns[key]])
 
 
-def survey_counts(db: Session, admin_id: int, path: str, filename: str) -> tuple[int, list[str]]:
+def survey_counts(
+    db: Session, admin_id: int, path: str, filename: str, upload_id: int
+) -> tuple[int, list[str]]:
     """Fill segments.survey_cores / cable_size from the Segments sheet where the dashboard has no value yet."""
     wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
     ws = next((w for w in wb.worksheets if w.title.strip().lower() == "segments"), None)
@@ -140,16 +146,13 @@ def survey_counts(db: Session, admin_id: int, path: str, filename: str) -> tuple
                     f"Segments row {n} {link}: dashboard already has {seg[field]} verified cores, file says {v}; kept"
                 )
                 continue
-            edit_params = {"i": seg["id"], "r": REMARKS + "%"}
-            if field == "cable_size" and db.execute(text(SELECT_CABLE_SIZE_EDIT), edit_params).first():
+            if field == "cable_size" and db.execute(text(SELECT_CABLE_SIZE_EDIT), {"i": seg["id"]}).first():
                 continue  # edited in the dashboard
             if field == "survey_cores":
                 add_cores(db, seg["id"], v)  # a new segment has no core rows yet
             db.execute(text(f"UPDATE segments SET {field} = :v WHERE id = :i"), {"v": v, "i": seg["id"]})
-            db.execute(text("INSERT INTO data_edits (entity, entity_id, field, old_value, new_value, remarks, user_id) "
-                            "VALUES ('segment', :i, :f, :o, :n, :r, :u)"),
-                       {"i": seg["id"], "f": field, "o": None if seg[field] is None else str(seg[field]), "n": str(v),
-                        "r": f"{REMARKS} {filename}", "u": admin_id})
+            edit = [(field, seg[field], v)]
+            log_edits_for_user(db, admin_id, "segment", seg["id"], edit, f"{REMARKS} {filename}", upload_id)
             done += 1
     db.commit()
     return done, notes
@@ -203,6 +206,10 @@ def load(db: Session, admin: str, path: str) -> int:
         print(f"{admin} is not an active admin. Make one with: python -m app.create_admin {admin}")
         return 1
     name = path.rsplit("/", 1)[-1]
+    # One uploads row per run: the edits written directly below point at it, so they do not protect fields.
+    upload_params = {"user_id": admin_id, "filename": name, "summary": json.dumps({"loaded_by": admin})}
+    data_file_upload_id = db.execute(text(INSERT_DATA_FILE_UPLOAD), upload_params).scalar_one()
+    db.commit()
     with open(path, "rb") as f:
         parsed = sm.parse_workbook(f)
     if parsed["sites"].found:
@@ -229,7 +236,7 @@ def load(db: Session, admin: str, path: str) -> int:
             print(f"Segments not loaded: {e.message}")
         for p in problems(db, up["upload_id"]):
             print("  needs review:", p)
-    done, notes = survey_counts(db, admin_id, path, name)
+    done, notes = survey_counts(db, admin_id, path, name, data_file_upload_id)
     invalidate_routes()
     print(f"Verified core counts: {done} set")
     for x in notes:

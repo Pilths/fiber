@@ -28,7 +28,7 @@ function MapLine({ line, onSelect }: { line: DrawnLine; onSelect: (id: number) =
   const path = linePath(line.points);
   const kind = lineKind(segment.route_type);
   const width = (LINE_WIDTH[kind] ?? 4) + (selected ? 3 : 0);
-  const dotted = segment.chip === "not_surveyed" && !selected;
+  const dotted = segment.health === "not_verified" && !selected;
   let dash: string | undefined;
   if (dotted) {
     dash = "1 7";
@@ -90,14 +90,10 @@ function chipLook(segment: DrawnLine["segment"], usage: ChipUsage | null) {
     }
     return { label, cls: "used", text: String(usage.used) };
   }
-  const status = health({
-    survey_cores: segment.surveyed ? 1 : null,
-    free_to_reserve: segment.free_to_reserve,
-    fiber_cut: segment.fiber_cut,
-  });
-  let freeText = "not verified";
-  if (segment.surveyed) {
-    freeText = `${segment.free_to_reserve} free to reserve, ${status.word}`;
+  const status = health(segment);
+  let freeText = status.word;
+  if (segment.health === "free") {
+    freeText = `${segment.free_to_reserve} free to reserve`;
   }
   const label = `Segment ${segment.name}, ${segment.route_type ?? "no route type"}, ${freeText}`;
   return { label, cls: status.cls, text: chipText(segment) };

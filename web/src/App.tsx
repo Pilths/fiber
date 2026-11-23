@@ -66,18 +66,12 @@ function Dashboard({ me, onSignOut, onChangePassword }: DashboardProps) {
   const isAdmin = me.role === "admin";
   const { view, refreshBell } = dashboard;
   const { detail, segmentId } = inventory;
-  const [clusterFocus, setClusterFocus] = useState<{ name: string } | null>(null);
 
   const changed = () => {
     setVersion((current) => current + 1);
     refreshBell();
   };
   const onPick = (result: SearchResult) => {
-    if (result.type === "cluster") {
-      dashboard.setView("map");
-      setClusterFocus({ name: result.label });
-      return;
-    }
     if (result.segment_id == null) {
       return;
     }
@@ -114,8 +108,7 @@ function Dashboard({ me, onSignOut, onChangePassword }: DashboardProps) {
       {view === "map" && (
         <InventoryView me={me} inventory={inventory} admin={admin} version={version}
           onAssign={dialogs.setAssign} customer={customerMode.customer} onClearCustomer={customerMode.clear}
-          onPickRequest={customerMode.pickRequest} clusterFocus={clusterFocus}
-          onClusterFocused={() => setClusterFocus(null)} />
+          onPickRequest={customerMode.pickRequest} />
       )}
       {detail && drawn && (
         <CoreDrawerForSegment inventory={inventory} detail={detail} coreId={drawn.id} me={me}

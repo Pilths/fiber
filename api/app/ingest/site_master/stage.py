@@ -2,22 +2,12 @@
 import json
 from typing import Any
 
-from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.ingest.site_master.evaluate import evaluate
 from app.ingest.site_master.model import GROUP_COL, SHEETS, DbSite, Item, ParsedSheet, SheetResult
+from app.ingest.pipeline import insert_staged_rows, load_staged_rows
 from app.ingest.uploads import insert_upload
-
-INSERT_UPLOAD_ROW_SQL = """
-INSERT INTO upload_rows (upload_id, row_group, entity, payload, sheet, row_number, status, reason, raw)
-VALUES (:upload_id, :row_group, :entity, CAST(:payload AS jsonb), :sheet, :row_number, :status, :reason,
-        CAST(:raw AS jsonb))
-"""
-STAGED_ROWS_SQL = """
-SELECT id, entity, row_number, raw, payload FROM upload_rows
-WHERE upload_id = :upload_id AND entity = 'site' AND row_group <> 'missing' ORDER BY id
-"""
 
 
 def _payload(item: Item) -> dict[str, Any]:
@@ -82,8 +72,7 @@ def stage(db: Session, admin_id: int, filename: str, parsed: dict[str, ParsedShe
             row_params.append(_row_params(upload_id, entity, result.sheet_name, item))
         for missing in result.missing:
             row_params.append(_missing_params(upload_id, entity, result, missing))
-    if row_params:
-        db.execute(text(INSERT_UPLOAD_ROW_SQL), row_params)
+    insert_staged_rows(db, row_params)
     db.commit()
     return {"upload_id": upload_id, "filename": filename, **summary}
 
@@ -94,7 +83,7 @@ def load_staged(db: Session, upload_id: int, summary: dict[str, Any]) -> dict[st
         if sheet["kind"] in SHEETS:  # an old upload may list a DC List sheet; it is no longer applied
             out[sheet["kind"]] = ParsedSheet(sheet["kind"], sheet["sheet_name"], [], sheet["found"])
     kind_by_entity = {spec[2]: kind for kind, spec in SHEETS.items()}
-    for row in db.execute(text(STAGED_ROWS_SQL), {"upload_id": upload_id}).mappings():
+    for row in load_staged_rows(db, upload_id, "entity = 'site' AND row_group <> 'missing'"):
         item = Item(row["row_number"], row["raw"] or {}, row["payload"]["parsed"], id=row["id"])
         out[kind_by_entity[row["entity"]]].items.append(item)
     return out

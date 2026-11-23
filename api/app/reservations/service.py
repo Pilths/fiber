@@ -16,6 +16,7 @@ from app.errors import NotFound, Conflict, Forbidden, Invalid, ServiceError
 from app.auth.deps import CurrentUser
 from app.db import set_lock_timeout
 from app.inventory import service as inventory
+from app.inventory.capacity import check_booking
 from app.reservations.schemas import NeedsReviewItem, ReservationOut
 
 TZ = "'Asia/Kuala_Lumpur'"
@@ -299,17 +300,10 @@ def _record_cores(db: Session, sql: str, event_id: int, core_ids: list[int]) -> 
 
 
 def _check_segment(db: Session, segment_id: int, requested: int) -> None:
-    segment = inventory.get_segment(db, segment_id)
+    segment = next(iter(inventory.list_segments(db, None, None, None, segment_id)), None)
     if segment is None:
         raise NotFound("Segment not found")
-    label = f"{segment.site_a} - {segment.site_b}"
-    if segment.fiber_cut:
-        raise conflict(f"{label} has a fiber cut and cannot be booked until an admin restores it.")
-    if segment.survey_cores is None:
-        raise conflict(f"{label} has no verified core count yet; it cannot be booked.")
-    if requested > segment.free_to_reserve:
-        raise conflict(f"{label}: {requested} requested but only {segment.free_to_reserve} free to reserve "
-                       f"({segment.unassigned_reserved} reserved by count only).")
+    check_booking(segment, requested)
 
 
 def _check_book(db: Session, core_ids: list[int]) -> list[dict[str, Any]]:

@@ -23,8 +23,8 @@ WHERE d.entity = :entity AND d.entity_id = :entity_id
 ORDER BY d.created_at DESC, d.id DESC LIMIT :limit
 """
 INSERT_EDIT_SQL = """
-INSERT INTO data_edits (entity, entity_id, field, old_value, new_value, remarks, user_id)
-VALUES (:entity, :entity_id, :field, :old_value, :new_value, :remarks, :user_id)
+INSERT INTO data_edits (entity, entity_id, field, old_value, new_value, remarks, user_id, upload_id)
+VALUES (:entity, :entity_id, :field, :old_value, :new_value, :remarks, :user_id, :upload_id)
 """
 
 
@@ -62,7 +62,8 @@ def log_edits(db: Session, user: CurrentUser, entity: str, entity_id: int, edits
 
 
 def log_edits_for_user(db: Session, user_id: int, entity: str, entity_id: int, edits: list[tuple[str, Any, Any]],
-                       remarks: str) -> list[str]:
+                       remarks: str, upload_id: int | None = None) -> list[str]:
+    """upload_id is set by uploads and load_data. A dashboard edit leaves it empty, which protects the field."""
     for field_name, old, new in edits:
         params = {
             "entity": entity,
@@ -72,6 +73,7 @@ def log_edits_for_user(db: Session, user_id: int, entity: str, entity_id: int, e
             "new_value": _text_or_none(new),
             "remarks": remarks or None,
             "user_id": user_id,
+            "upload_id": upload_id,
         }
         db.execute(text(INSERT_EDIT_SQL), params)
     return [field_name for field_name, _, _ in edits]

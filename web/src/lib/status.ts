@@ -13,26 +13,22 @@ export const STATUS: Record<CoreStatus, { icon: IconName; cls: string; tone: str
 // The API and the data keep "In use"; the screens say "In service".
 export const statusLabel = (status: string) => (status === "In use" ? "In service" : status);
 
-type Health = { cls: string; icon: IconName; word: string; value: string };
-type HealthInput = { survey_cores: number | null; free_to_reserve: number; fiber_cut?: boolean };
+export type SegmentHealth = components["schemas"]["SegmentSummary"]["health"];
+type Health = { cls: string; word: string; value: string };
 
-// Free-to-reserve health: red "Cut" when the cable is cut, green 10+, amber 1-9, red 0 (full),
-// grey dashed when not verified.
-export function health(segment: HealthInput): Health {
-  if (segment.fiber_cut) {
-    return { cls: "h-red", icon: "fl", word: "Cut", value: "0 cut" };
+// Free-to-reserve health, decided by the API: a free count is a plain number, 0 is red "Full", a cut cable
+// red "Cut", not verified grey dashed. `word` is for screen readers, `value` is what shows.
+export function health(segment: { health: SegmentHealth; free_to_reserve: number }): Health {
+  if (segment.health === "cut") {
+    return { cls: "h-red", word: "Cut", value: "Cut" };
   }
-  if (segment.survey_cores == null) {
-    return { cls: "h-ns", icon: "ns", word: "Not verified", value: "not verified" };
+  if (segment.health === "not_verified") {
+    return { cls: "h-ns", word: "Not verified", value: "Not verified" };
   }
-  const free = segment.free_to_reserve;
-  if (free >= 10) {
-    return { cls: "h-green", icon: "ch", word: "Healthy", value: String(free) };
+  if (segment.health === "full") {
+    return { cls: "h-red", word: "Full", value: "Full" };
   }
-  if (free > 0) {
-    return { cls: "h-amber", icon: "lo", word: "Low", value: String(free) };
-  }
-  return { cls: "h-red", icon: "fl", word: "Full", value: "0 full" };
+  return { cls: "h-plain", word: "free to reserve", value: String(segment.free_to_reserve) };
 }
 
 // Map filter (Region) lives in the Dashboard; q stays "" now that the header search finds segments.

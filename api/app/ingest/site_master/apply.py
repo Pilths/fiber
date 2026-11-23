@@ -45,8 +45,8 @@ SITE_MASTER_UPLOAD_SQL = """
 SELECT id, filename, status, summary FROM uploads WHERE id = :upload_id AND kind = 'site_master'
 """
 INSERT_OVERRIDE_EDIT_SQL = """
-INSERT INTO data_edits (entity, entity_id, field, old_value, new_value, remarks, user_id)
-VALUES ('upload', :upload_id, 'override_drop', NULL, :sheet, :remarks, :user_id)
+INSERT INTO data_edits (entity, entity_id, field, old_value, new_value, remarks, user_id, upload_id)
+VALUES ('upload', :upload_id, 'override_drop', NULL, :sheet, :remarks, :user_id, :upload_id)
 """
 FINISH_UPLOAD_SQL = """
 UPDATE uploads SET status = :status,
@@ -126,7 +126,7 @@ def _deactivated_site(missing: DbSite) -> dict[str, Any]:
     return values
 
 
-def _write_sites(db: Session, admin_id: int, remarks: str, inserts: list[dict[str, Any]],
+def _write_sites(db: Session, admin_id: int, remarks: str, upload_id: int, inserts: list[dict[str, Any]],
                  updates: list[dict[str, Any]], edits: list[tuple]) -> None:
     if inserts:
         db.execute(text(INSERT_SITE_SQL), inserts)
@@ -134,7 +134,7 @@ def _write_sites(db: Session, admin_id: int, remarks: str, inserts: list[dict[st
         db.execute(text(UPDATE_SITE_SQL), updates)
     for site_id, field_name, old, new in edits:
         site_edit = [(field_name, _edit_text(old), _edit_text(new))]
-        log_edits_for_user(db, admin_id, "site", site_id, site_edit, remarks)
+        log_edits_for_user(db, admin_id, "site", site_id, site_edit, remarks, upload_id)
 
 
 def apply_sheet(
@@ -142,6 +142,7 @@ def apply_sheet(
     admin_id: int,
     result: SheetResult,
     remarks: str,
+    upload_id: int,
     warnings: list[str],
     protected: dict[int, set[str]],
     snapshot: dict[str, DbSite],
@@ -179,7 +180,7 @@ def apply_sheet(
             edits.append((missing.id, "active", True, False))
             out["deactivated"] += 1
 
-    _write_sites(db, admin_id, remarks, inserts, updates, edits)
+    _write_sites(db, admin_id, remarks, upload_id, inserts, updates, edits)
     out["added"] = len(inserts)
     return out
 
@@ -254,12 +255,12 @@ def apply_upload(db: Session, admin_id: int, upload_id: int, override: dict[str,
 
     why = f"{UPLOAD_REMARKS} {upload['filename']} #{upload_id}"
     snapshot = load_snapshot(db)
-    protected = load_protected(db, "site", (UPLOAD_REMARKS,))
+    protected = load_protected(db, "site")
     warnings: list[str] = []
     applied_now: dict[str, dict[str, int]] = {}
     with db.begin_nested():  # all or nothing
         for kind in todo:
-            applied_now[kind] = apply_sheet(db, admin_id, results[kind], why, warnings, protected, snapshot)
+            applied_now[kind] = apply_sheet(db, admin_id, results[kind], why, upload_id, warnings, protected, snapshot)
         sheets = _sheet_outcomes(results, applied_now, before, done)
         applied = _applied_record(admin_id, sheets, earlier, warnings, override, remarks)
         left = [kind for kind in SHEETS if not sheets[kind]["applied"] and _can_apply(results[kind], True)]

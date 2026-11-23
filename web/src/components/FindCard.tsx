@@ -7,7 +7,7 @@ export function FreeBadge({ s }: { s: Parameters<typeof health>[0] }) {
   const h = health(s);
   return (
     <span className={`pill min-w-11 justify-center ${h.cls}`}>
-      {h.value}<span className="sr-only">{s.survey_cores == null ? "" : ` free to reserve, ${h.word}`}</span>
+      {h.value}{s.health === "free" && <span className="sr-only"> free to reserve</span>}
     </span>
   );
 }

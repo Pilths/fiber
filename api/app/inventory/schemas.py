@@ -8,7 +8,7 @@ CoreStatus = Literal["Available", "Requested", "Reserved", "In use"]
 
 
 class SearchResult(BaseModel):
-    type: Literal["customer", "segment", "cluster", "core"]
+    type: Literal["customer", "segment", "core"]
     label: str
     segment_id: int | None = None
     core_id: int | None = None
@@ -34,6 +34,7 @@ class SegmentSummary(BaseModel):
     unassigned_reserved: int  # cores reserved by count only, ports not assigned yet
     free_to_reserve: int  # free_cores - unassigned_reserved (0 when not surveyed or cut)
     fiber_cut: bool  # whole cable out; cannot be booked or routed until an admin restores it
+    health: Literal["free", "full", "cut", "not_verified"]
 
 
 class CoreDetail(BaseModel):

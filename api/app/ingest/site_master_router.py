@@ -10,6 +10,7 @@ from sqlalchemy import text
 from app.auth.deps import DB, Admin, require_admin
 from app.ingest import site_master as sm
 from app.ingest.upload_file import read_upload
+from app.ingest.pipeline import staged_rows_page
 from app.ingest.uploads import parse_or_422, require_upload
 from app.observability import logged_apply
 
@@ -121,17 +122,20 @@ def rows(
     page_size: Annotated[int, Query(ge=1, le=500)] = 100,
 ) -> RowsOut:
     require_upload(db, upload_id, "site_master")
-    where = {"u": upload_id, "e": sm.SHEETS[sheet][2], "g": sm.GROUP_COL[group]}
-    cond = "upload_id = :u AND entity = :e AND row_group = :g"
-    total = db.execute(text(f"SELECT count(*) FROM upload_rows WHERE {cond}"), where).scalar_one()
-    q = db.execute(text(f"SELECT id, row_number, sheet, status, reason, raw, payload FROM upload_rows WHERE {cond} "
-                        "ORDER BY row_number NULLS LAST, payload->>'key', id LIMIT :l OFFSET :o"),
-                   {**where, "l": page_size, "o": (page - 1) * page_size}).mappings()
+    total, found = staged_rows_page(
+        db,
+        upload_id,
+        "entity = :entity AND row_group = :row_group",
+        {"entity": sm.SHEETS[sheet][2], "row_group": sm.GROUP_COL[group]},
+        "row_number NULLS LAST, payload->>'key', id",
+        page,
+        page_size,
+    )
     items = [RowItem(id=r["id"], row_number=r["row_number"], sheet_name=r["sheet"], key=r["payload"]["key"],
                      group=group, status=r["status"], reason=r["reason"], raw=r["raw"],
                      parsed=r["payload"].get("parsed"), changes=r["payload"].get("changes", []),
                      edited_in_dashboard=r["payload"].get("edited_in_dashboard", False),
-                     db_id=r["payload"].get("db_id"), in_use=r["payload"].get("in_use")) for r in q]
+                     db_id=r["payload"].get("db_id"), in_use=r["payload"].get("in_use")) for r in found]
     return RowsOut(total=total, page=page, page_size=page_size, items=items)
 
 

@@ -1,6 +1,6 @@
 import { chipText, routeLayerOn, type SegmentProps } from "@/lib/mapLayers";
 import type { NetworkMapState } from "@/lib/useNetworkMap";
-import type { SectorLabel, SiteLayout } from "@/lib/clusterLayout";
+import type { SiteLayout } from "@/lib/siteLayout";
 
 // Web Mercator at 512 px tiles, the same as MapLibre, so the overlay lines up with the basemap.
 
@@ -168,7 +168,7 @@ function nameWidth(name: string): number {
   return 7.2 * name.length + 12;
 }
 
-// Declutter, greedy: site markers, badges and spread lists, then the selected chips, then sector labels, then the
+// Declutter, greedy: site markers, badges and spread lists, then the selected chips, then the
 // other chips, then site names. A chip or name that would overlap something already placed is hidden
 // (visibility: hidden) until the user zooms in. `pinned` (customer mode): chips that always show, over a marker if
 // need be, with no name above them.
@@ -176,7 +176,6 @@ export function declutter(
   state: NetworkMapState,
   lines: DrawnLine[],
   layout: SiteLayout,
-  labels: SectorLabel[],
   pinned: ReadonlySet<number> = new Set(),
 ) {
   const placer = makePlacer(reservedAreas(state.size.h));
@@ -202,9 +201,6 @@ export function declutter(
   };
   const shown = lines.filter((line) => line.show);
   shown.filter((line) => line.selected).forEach(placeChip);
-  for (const label of labels) {
-    placer.block(label.box);
-  }
   shown.filter((line) => !line.selected).forEach(placeChip);
   const nameShown = new Set<number>();
   const zoomedOut = (state.camera?.zoom ?? 0) < NAME_ZOOM;

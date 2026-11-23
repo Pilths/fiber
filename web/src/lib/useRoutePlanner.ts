@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { api, ApiError, errorText } from "@/api/client";
+import type { SegmentHealth } from "@/lib/status";
 
 // Site A to B on Inventory (TASK-051, TASK-076). The routes API returns plain dicts, so the shapes live here.
 export type Sort = "km" | "free_cores";
@@ -11,7 +12,8 @@ export type RouteSegment = {
   site_b: string;
   km: number | null;
   free_to_reserve: number;
-  surveyed: boolean;
+  health: SegmentHealth;
+  short: boolean; // not free, or fewer free to reserve than cores needed
   route_label: string | null;
   measured: boolean;
 };

@@ -1,4 +1,4 @@
-import type { PlacedSite, SiteBadge, SiteLayout, SiteSpread } from "@/lib/clusterLayout";
+import type { PlacedSite, SiteBadge, SiteLayout, SiteSpread } from "@/lib/siteLayout";
 import type { Point } from "@/lib/mapGeometry";
 import { plural } from "@/lib/format";
 import { siteLook, type SiteFeature } from "@/lib/mapLayers";
@@ -30,10 +30,10 @@ function SiteMarker({ site, feature, segmentCount, named }: SiteMarkerProps) {
   const look = siteLook(kind);
   const endNote = site.end ? ", end of the selection" : "";
   const label = `Site ${name}, ${look.word}, ${plural(segmentCount, "segment")}${endNote}`;
-  const style = { left: site.point[0], top: site.point[1], opacity: site.opacity };
+  const style = { left: site.point[0], top: site.point[1] };
   return (
     <span role="img" data-testid="map-site" data-site-id={site_id} data-end={site.end}
-      aria-label={label} className={markerClass(site)} style={style} inert={!site.active}>
+      aria-label={label} className={markerClass(site)} style={style}>
       <span className={`shape ${look.shape}`} />
       {(named || site.spread) && <span className="code" aria-hidden="true">{name}</span>}
     </span>
@@ -46,9 +46,9 @@ function CrowdBadge({ badge, names, onZoom }: CrowdBadgeProps) {
   const [x, y] = badge.crowd.center;
   const count = badge.crowd.members.length;
   return (
-    <button type="button" data-testid="map-badge" className="mbadge" inert={!badge.active}
+    <button type="button" data-testid="map-badge" className="mbadge"
       aria-label={`${count} sites: ${names.join(", ")}`}
-      style={{ left: x, top: y, opacity: badge.opacity }} onClick={() => onZoom(badge.crowd.center)}>
+      style={{ left: x, top: y }} onClick={() => onZoom(badge.crowd.center)}>
       {count}
     </button>
   );

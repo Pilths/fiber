@@ -3,16 +3,15 @@ import io
 from datetime import datetime
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, Query, UploadFile
 from pydantic import BaseModel
-from sqlalchemy import text
-from sqlalchemy.orm import Session
 
 from app.auth.deps import DB, Admin, require_admin
 from app.ingest import reservation_upload as ru
 from app.ingest.excel import parse_reservation_workbook
 from app.ingest.upload_file import read_upload
-from app.ingest.uploads import parse_or_422
+from app.ingest.pipeline import staged_rows_page
+from app.ingest.uploads import get_upload, parse_or_422
 from app.observability import logged_apply
 
 router = APIRouter(prefix="/api/admin", dependencies=[Depends(require_admin)])
@@ -94,18 +93,6 @@ class ImportStateOut(BaseModel):
     remarks: str | None
 
 
-def _fail(e: ru.ApplyError) -> HTTPException:
-    return HTTPException(e.status, e.message)
-
-
-def _get(db: Session, upload_id: int) -> dict[str, Any]:
-    row = db.execute(text("SELECT id, filename, status, summary, created_at, confirmed_at FROM uploads "
-                          "WHERE id = :i AND kind = 'excel'"), {"i": upload_id}).mappings().first()
-    if not row:
-        raise HTTPException(404, "Upload not found")
-    return dict(row)
-
-
 @router.post("/uploads", status_code=201)
 def upload(db: DB, admin: Admin, file: UploadFile) -> StagedOut:
     name, data = read_upload(file, ".xlsx")
@@ -115,7 +102,7 @@ def upload(db: DB, admin: Admin, file: UploadFile) -> StagedOut:
 
 @router.get("/uploads/{upload_id}")
 def preview(db: DB, upload_id: int) -> PreviewOut:
-    u = _get(db, upload_id)
+    u = get_upload(db, upload_id, "excel")
     return PreviewOut(upload_id=u["id"], filename=u["filename"], status=u["status"], created_at=u["created_at"],
                       confirmed_at=u["confirmed_at"], **u["summary"])
 
@@ -123,28 +110,20 @@ def preview(db: DB, upload_id: int) -> PreviewOut:
 @router.get("/uploads/{upload_id}/rows")
 def rows(db: DB, upload_id: int, group: Group, page: Annotated[int, Query(ge=1)] = 1,
          page_size: Annotated[int, Query(ge=1, le=500)] = 100) -> RowsOut:
-    _get(db, upload_id)
-    p = {"u": upload_id, "g": group}
-    cond = "upload_id = :u AND payload->>'group' = :g"
-    total = db.execute(text(f"SELECT count(*) FROM upload_rows WHERE {cond}"), p).scalar_one()
-    select_rows = (
-        f"SELECT id, row_number, sheet, status, reason, raw, warnings, payload FROM upload_rows WHERE {cond} "
-        "ORDER BY row_number NULLS LAST, id LIMIT :l OFFSET :o"
+    get_upload(db, upload_id, "excel")
+    total, found = staged_rows_page(
+        db, upload_id, "payload->>'group' = :group", {"group": group}, "row_number NULLS LAST, id", page, page_size
     )
-    q = db.execute(text(select_rows), {**p, "l": page_size, "o": (page - 1) * page_size}).mappings()
     items = [RowOut(id=r["id"], row_number=r["row_number"], sheet_name=r["sheet"], group=group, status=r["status"],
-                    reason=r["reason"], raw=r["raw"], warnings=r["warnings"], data=r["payload"]) for r in q]
+                    reason=r["reason"], raw=r["raw"], warnings=r["warnings"], data=r["payload"]) for r in found]
     return RowsOut(total=total, page=page, page_size=page_size, items=items)
 
 
 @router.post("/uploads/{upload_id}/confirm")
 def confirm(db: DB, admin: Admin, upload_id: int, body: ConfirmIn | None = None) -> ConfirmOut:
-    try:
-        with logged_apply("excel", upload_id, admin.id):
-            wins = [w.model_dump() for w in (body or ConfirmIn()).excel_wins]
-            return ConfirmOut(**ru.confirm(db, admin.id, upload_id, wins))
-    except ru.ApplyError as e:
-        raise _fail(e) from e
+    with logged_apply("excel", upload_id, admin.id):
+        wins = [w.model_dump() for w in (body or ConfirmIn()).excel_wins]
+        return ConfirmOut(**ru.confirm(db, admin.id, upload_id, wins))
 
 
 @router.get("/reservation-import")
@@ -154,7 +133,4 @@ def import_state(db: DB) -> ImportStateOut:
 
 @router.post("/reservation-import/close")
 def close(db: DB, admin: Admin, body: CloseIn) -> ImportStateOut:
-    try:
-        return ImportStateOut(**ru.close_import(db, admin.id, body.remarks))
-    except ru.ApplyError as e:
-        raise _fail(e) from e
+    return ImportStateOut(**ru.close_import(db, admin.id, body.remarks))

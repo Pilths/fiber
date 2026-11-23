@@ -2,27 +2,19 @@
 import io
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, Query, UploadFile
 from pydantic import BaseModel
-from sqlalchemy import text
 
 from app.auth.deps import DB, Admin, require_admin
 from app.ingest import segment_list as sl
 from app.ingest.upload_file import read_upload
-from app.ingest.uploads import ApplyError, parse_or_422, require_upload
+from app.ingest.pipeline import staged_rows_page
+from app.ingest.uploads import parse_or_422, require_upload
 from app.observability import logged_apply
 
 router = APIRouter(prefix="/api/admin/segment-list", dependencies=[Depends(require_admin)])
 Group = Literal["new", "changed", "unchanged", "problem"]
 
-COUNT_GROUP_ROWS = "SELECT count(*) FROM upload_rows WHERE upload_id = :upload_id AND row_group = :row_group"
-SELECT_GROUP_ROWS = """
-    SELECT id, row_number, sheet, status, reason, raw, payload
-    FROM upload_rows
-    WHERE upload_id = :upload_id AND row_group = :row_group
-    ORDER BY row_number, id
-    LIMIT :limit OFFSET :offset
-"""
 
 
 class Counts(BaseModel):
@@ -134,10 +126,10 @@ def rows(
     page_size: Annotated[int, Query(ge=1, le=500)] = 100,
 ) -> RowsOut:
     require_upload(db, upload_id, "segment_list")
-    where = {"upload_id": upload_id, "row_group": sl.GROUP_COL[group]}
-    total = db.execute(text(COUNT_GROUP_ROWS), where).scalar_one()
-    page_params = {**where, "limit": page_size, "offset": (page - 1) * page_size}
-    found = db.execute(text(SELECT_GROUP_ROWS), page_params).mappings()
+    where = "row_group = :row_group"
+    total, found = staged_rows_page(
+        db, upload_id, where, {"row_group": sl.GROUP_COL[group]}, "row_number, id", page, page_size
+    )
     return RowsOut(total=total, page=page, page_size=page_size, items=[_row_out(row, group) for row in found])
 
 

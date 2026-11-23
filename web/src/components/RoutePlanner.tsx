@@ -1,6 +1,6 @@
 import { useState, type FormEvent, type ReactNode } from "react";
 import { Icon } from "@/components/Icon";
-import { db, health } from "@/lib/status";
+import { db } from "@/lib/status";
 import type { Endpoint, RouteOption, RoutePlanner, RouteSegment, Sort } from "@/lib/useRoutePlanner";
 import { formatKm } from "@/lib/format";
 
@@ -23,14 +23,13 @@ function totalKm(option: RouteOption): string {
   return `${formatKm(option.total_km)}${plus}`;
 }
 
-function isShort(segment: RouteSegment, need: number): boolean {
-  return !segment.surveyed || segment.free_to_reserve < need;
-}
-
 // Screen-reader words after the lowest-free pill, so a short option is not shown by colour alone.
 function shortWords(segment: RouteSegment, need: number): string {
-  if (!segment.surveyed) {
+  if (segment.health === "not_verified") {
     return `, ${segment.name} not verified`;
+  }
+  if (segment.health === "cut") {
+    return `, ${segment.name} cut`;
   }
   return `, not enough for ${need}`;
 }
@@ -41,8 +40,7 @@ function FreePill({ option, short, need }: {
   need: number;
 }) {
   if (!short) {
-    const freeClass = health({ survey_cores: 1, free_to_reserve: option.fewest_free }).cls;
-    return <span className={`pill ${freeClass}`}>{option.fewest_free} free</span>;
+    return <span className="pill h-plain">{option.fewest_free} free</span>;
   }
   return (
     <span className="pill h-red" data-testid="route-short">
@@ -178,7 +176,7 @@ function OptionCard({ option, number, selected, need, onSelect }: {
   need: number;
   onSelect: () => void;
 }) {
-  const short = option.insufficient ? option.segments.find((segment) => isShort(segment, need)) : undefined;
+  const short = option.insufficient ? option.segments.find((segment) => segment.short) : undefined;
   const segmentWord = option.total_segments === 1 ? "segment" : "segments";
   const loss = option.estimated_db == null ? "-" : db(option.estimated_db);
   return (
