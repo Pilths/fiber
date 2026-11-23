@@ -107,6 +107,8 @@ def test_happy_path_new_changed_unchanged_and_apply(client, admin, sites, db):
         "protected_kept": 0,
         "skipped": 1,
         "warnings": [],
+        "blocked": 0,
+        "blocked_changes": [],
     }
     new = segment(db, "AAAA", "BBBB")
     assert (str(new["distance_km"]), new["route"], new["section"]) == ("10.500", "R1", "S1")

@@ -15,8 +15,9 @@ FIELD_TYPES = {
     "route": "text",
     "section": "text",
     "survey_cores": "integer",
+    "cable_size": "integer",
 }
-NUMBER_FIELDS = ("distance_km", "survey_cores")
+NUMBER_FIELDS = ("distance_km", "survey_cores", "cable_size")
 
 
 def same_value(field_name: str, old: Any, new: Any) -> bool:

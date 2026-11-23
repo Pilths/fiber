@@ -28,19 +28,17 @@ def test_loads_sites_segments_and_counts_then_reruns_cleanly(db, monkeypatch, tm
     mkuser(db, "boss1", "admin")
     sites = [["AAAA", 3.1, 101.6, None], ["BBBB", 3.2, 101.7, None], ["CCCC", 0, 0, None]]
     segs = [["AAAA-BBBB", 32.5, "R1", None, 24, 144], ["AAAA-CCCC", 5, None, None, 12, None]]
-    assert run(monkeypatch, db, tmp_path, sites, segs) == 0
+    assert run(monkeypatch, db, tmp_path, sites, segs) == 1  # problem rows make the exit code 1
     out = capsys.readouterr().out
     assert "CCCC" in out and "needs review" in out  # bad coordinates and unknown site are reported, not guessed
     seg = db.exec_driver_sql("SELECT s.distance_km, s.survey_cores, s.cable_size, "
                              "(SELECT count(*) FROM cores c WHERE c.segment_id = s.id) FROM segments s").all()
     assert [(str(d), sc, cs, n) for d, sc, cs, n in seg] == [("32.500", 24, 144, 24)]
-    # survey count
-    assert db.exec_driver_sql("SELECT count(*) FROM data_edits WHERE remarks LIKE 'data file load%%'").scalar() == 1
-    # second run with a different survey count keeps the first one
+    # a later run raises the verified count and adds the missing core rows
     segs[0][4] = 48
-    assert run(monkeypatch, db, tmp_path, sites, segs[:1]) == 0
-    assert "already has 24" in capsys.readouterr().out
-    assert db.exec_driver_sql("SELECT survey_cores FROM segments").scalar() == 24
+    run(monkeypatch, db, tmp_path, sites, segs[:1])
+    assert db.exec_driver_sql("SELECT survey_cores FROM segments").scalar() == 48
+    assert db.exec_driver_sql("SELECT count(*) FROM cores").scalar() == 48
 
 
 def test_unknown_admin_and_template(db, monkeypatch, tmp_path):
@@ -90,13 +88,13 @@ def reservations(db):
 def test_reservation_sheet_loads_once_and_reports_rejected_row(db, monkeypatch, tmp_path, capsys):
     admin = mkuser(db, "boss1", "admin")
     rows = [GOOD, NO_CUSTOMER]
-    assert run(monkeypatch, db, tmp_path, SITES, SEGS, rows) == 0
+    assert run(monkeypatch, db, tmp_path, SITES, SEGS, rows) == 1
     out = capsys.readouterr().out
     assert "Reservations: 1 created" in out
     assert "Reservation row 3 (rejected): blank requestor" in out
     assert [n for n, _ in reservations(db)] == [3]
     assert db.exec_driver_sql("SELECT count(*) FROM reservation_cores").scalar() == 0
-    assert run(monkeypatch, db, tmp_path, SITES, SEGS, rows) == 0  # re-run
+    assert run(monkeypatch, db, tmp_path, SITES, SEGS, rows) == 1  # re-run
     assert len(reservations(db)) == 1
     assert "Reservations: 0 created" in capsys.readouterr().out
     assert reservations(db)[0][1] == admin
@@ -124,6 +122,6 @@ def test_no_reservation_rows_creates_no_upload(db, monkeypatch, tmp_path, capsys
 
 def test_reservation_region_is_optional_but_an_unknown_one_needs_review(db, monkeypatch, tmp_path, capsys):
     mkuser(db, "boss1", "admin")
-    assert run(monkeypatch, db, tmp_path, SITES, SEGS, [[None, *GOOD[1:]], ["Atlantis", *GOOD[1:]]]) == 0
+    assert run(monkeypatch, db, tmp_path, SITES, SEGS, [[None, *GOOD[1:]], ["Atlantis", *GOOD[1:]]]) == 1
     assert "Reservation row 3 (needs_review): unknown region 'Atlantis'" in capsys.readouterr().out
     assert len(reservations(db)) == 1

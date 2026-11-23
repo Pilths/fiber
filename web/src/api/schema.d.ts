@@ -1185,7 +1185,7 @@ export interface components {
              * Field
              * @enum {string}
              */
-            field: "distance_km" | "route" | "section";
+            field: "distance_km" | "route" | "section" | "survey_cores" | "cable_size";
             /** Old */
             old: string | null;
             /** New */
@@ -1194,6 +1194,8 @@ export interface components {
             protected: boolean;
             /** Note */
             note?: string | null;
+            /** Blocked */
+            blocked?: string | null;
         };
         /** ChangePasswordBody */
         ChangePasswordBody: {
@@ -1709,6 +1711,10 @@ export interface components {
             route: string | null;
             /** Section */
             section: string | null;
+            /** Verified Cores */
+            verified_cores?: number | null;
+            /** Total Cores */
+            total_cores?: number | null;
         };
         /** PastePortCounts */
         PastePortCounts: {
@@ -2513,6 +2519,16 @@ export interface components {
             skipped: number;
             /** Warnings */
             warnings: string[];
+            /**
+             * Blocked
+             * @default 0
+             */
+            blocked: number;
+            /**
+             * Blocked Changes
+             * @default []
+             */
+            blocked_changes: string[];
         };
         /** Counts */
         app__ingest__segment_list_router__Counts: {

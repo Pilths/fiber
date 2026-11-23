@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 from app.ingest.checks import blank, clean, split_nodes
 from app.ingest.excel import _json
 from app.ingest.pipeline import apply_staged_upload, insert_staged_rows, load_staged_rows
+from app.ingest.reservation_import import add_cores
 from app.ingest.segment_fields import write_segment_field
 from app.ingest.site_master import hkey, load_protected
 from app.ingest.uploads import ApplyError, insert_upload
@@ -33,17 +34,30 @@ ALIASES = {
     "distancekm": "distance",
     "km": "distance",
     "route": "route",
+    "verifiedcores": "verified_cores",
+    "surveyedcores": "verified_cores",  # old header
+    "totalcores": "total_cores",
 }
 EXPECTED = "Link, Distance"
 GROUP_COL = {"new": "new", "changed": "changed", "unchanged": "unchanged", "problem": "needs_review"}
-FIELDS = ("distance_km", "route", "section")  # segment columns a row may change
+FIELDS = ("distance_km", "route", "section", "survey_cores", "cable_size")  # segment columns a row may change
+DEFAULT_CABLE_SIZE = 144  # segments.cable_size default, used for a new segment with no Total cores
 MAX_DISTANCE = Decimal("9999999.999")  # numeric(10,3)
 
 SELECT_SITES_BY_NAME = "SELECT id, name, active FROM sites WHERE name = ANY(:names)"
-SELECT_SEGMENTS = "SELECT id, site_a_id, site_b_id, distance_km, route, section FROM segments"
+# n_cores: same idea as the Reservation upload, the core rows that count as verified now.
+SELECT_SEGMENTS = """
+    SELECT id, site_a_id, site_b_id, distance_km, route, section, survey_cores, cable_size,
+           (SELECT count(*) FROM cores c
+            WHERE c.segment_id = segments.id
+              AND (segments.survey_cores IS NULL OR c.number <= segments.survey_cores)) AS n_cores
+    FROM segments
+"""
 INSERT_SEGMENT = """
-    INSERT INTO segments (site_a_id, site_b_id, distance_km, route, section)
-    VALUES (:site_a_id, :site_b_id, CAST(:distance AS numeric), :route, :section)
+    INSERT INTO segments (site_a_id, site_b_id, distance_km, route, section, survey_cores, cable_size)
+    VALUES (:site_a_id, :site_b_id, CAST(:distance AS numeric), :route, :section,
+            CAST(:verified_cores AS integer), CAST(:total_cores AS integer))
+    RETURNING id
 """
 
 
@@ -93,6 +107,19 @@ def _distance(value: Any) -> tuple[str | None, str | None]:
     return str(distance), None
 
 
+def _count(value: Any, label: str, minimum: int) -> tuple[int | None, str | None]:
+    """(whole number, reason). Blank is allowed; a decimal like 24.5 or text is a problem, never rounded."""
+    if blank(value):
+        return None, None
+    count_text = format(Decimal(repr(value)), "f") if isinstance(value, float) else str(value).strip()
+    if isinstance(value, bool) or not re.fullmatch(r"\d+(\.0+)?", count_text):
+        return None, f"{label} is not a whole number"
+    count = int(count_text.split(".")[0])
+    if count < minimum:
+        return None, f"{label} must be above 0"
+    return count, None
+
+
 def _raw_cells(headers: list[str], values: tuple[Any, ...]) -> dict[str, Any]:
     return {header: _json(value) for header, value in zip(headers, values) if header and not blank(value)}
 
@@ -119,6 +146,9 @@ def _parse_row(headers: list[str], values: tuple[Any, ...]) -> Item:
     distance, distance_reason = _distance(fields.get("distance"))
     if distance_reason:
         reasons.append(distance_reason)
+    verified_cores, verified_reason = _count(fields.get("verified_cores"), "Verified cores", 0)
+    total_cores, total_reason = _count(fields.get("total_cores"), "Total cores", 1)
+    reasons.extend(reason for reason in (verified_reason, total_reason) if reason)
     # The keys "a" and "b" are stored in staged payloads; keep them.
     item.parsed = {
         "link": link,
@@ -127,6 +157,8 @@ def _parse_row(headers: list[str], values: tuple[Any, ...]) -> Item:
         "distance": distance,
         "route": _cell(fields.get("route")),
         "section": _cell(fields.get("section")),
+        "verified_cores": verified_cores,
+        "total_cores": total_cores,
         "reasons": reasons,
     }
     return item
@@ -159,6 +191,7 @@ def parse_workbook(data: Any) -> Parsed:
         except Exception as error:  # noqa: BLE001  a bad row never stops the import
             failed = {
                 "link": None, "a": None, "b": None, "distance": None, "route": None, "section": None,
+                "verified_cores": None, "total_cores": None,
                 "reasons": [f"could not parse row: {type(error).__name__}: {error}"],
             }
             item = Item(0, _raw_cells(headers, values), failed)
@@ -197,7 +230,13 @@ def _problems(item: Item, pairs: Counter, items: list[Item], sites: dict[str, An
 def _changes(item: Item, row: Any, protected: dict[int, set[str]]) -> list[dict[str, Any]]:
     parsed = item.parsed
     old = _old(row)
-    new = {"distance_km": parsed["distance"], "route": parsed["route"], "section": parsed["section"]}
+    new = {
+        "distance_km": parsed["distance"],
+        "route": parsed["route"],
+        "section": parsed["section"],
+        "survey_cores": _text(parsed.get("verified_cores")),
+        "cable_size": _text(parsed.get("total_cores")),
+    }
     changes = []
     for field_name in FIELDS:
         # A blank file cell never clears a value.
@@ -212,7 +251,26 @@ def _changes(item: Item, row: Any, protected: dict[int, set[str]]) -> list[dict[
             "protected": is_protected,
             "note": note,
         })
+        if field_name == "survey_cores" and int(new[field_name]) < row["n_cores"]:
+            changes[-1]["blocked"] = f"cannot lower below the {row['n_cores']} cores that already exist"
     return changes
+
+
+def _text(number: int | None) -> str | None:
+    return None if number is None else str(number)
+
+
+def _too_many_verified(item: Item, row: Any) -> str | None:
+    """Verified cores above Total cores, using the database value for whichever cell the file leaves blank."""
+    verified = item.parsed.get("verified_cores")
+    total = item.parsed.get("total_cores")
+    if verified is None and row is not None:
+        verified = row["survey_cores"]
+    if total is None:
+        total = DEFAULT_CABLE_SIZE if row is None else row["cable_size"]
+    if verified is not None and verified > total:
+        return f"Verified cores {verified} is above Total cores {total}"
+    return None
 
 
 def evaluate(db: Session, parsed: Parsed) -> list[Item]:
@@ -234,6 +292,12 @@ def evaluate(db: Session, parsed: Parsed) -> list[Item]:
         site_b_id = sites[item.parsed["b"]].id
         item.ids = (site_a_id, site_b_id)
         row = segments.get(frozenset((site_a_id, site_b_id)))
+        too_many = _too_many_verified(item, row)
+        if too_many:
+            item.reason = too_many
+            item.status = "needs_review"
+            item.group = "problem"
+            continue
         if row is None:
             item.group = "new"
             continue
@@ -322,8 +386,12 @@ def _create_segment(db: Session, item: Item) -> None:
         "distance": parsed["distance"],
         "route": parsed["route"],
         "section": parsed["section"],
+        "verified_cores": parsed.get("verified_cores"),
+        "total_cores": parsed.get("total_cores") or DEFAULT_CABLE_SIZE,
     }
-    db.execute(text(INSERT_SEGMENT), params)
+    segment_id = db.execute(text(INSERT_SEGMENT), params).scalar_one()
+    if params["verified_cores"]:
+        add_cores(db, segment_id, params["verified_cores"])
 
 
 def _update_segment(
@@ -333,6 +401,8 @@ def _update_segment(
         write_segment_field(
             db, admin_id, upload_id, item.db_id, change["field"], change["old"], change["new"], why  # type: ignore[arg-type]
         )
+        if change["field"] == "survey_cores":
+            add_cores(db, item.db_id, int(change["new"]))  # type: ignore[arg-type]
 
 
 def apply_upload(db: Session, admin_id: int, upload_id: int) -> dict[str, Any]:
@@ -347,6 +417,7 @@ def apply_upload(db: Session, admin_id: int, upload_id: int) -> dict[str, Any]:
         why = f"{UPLOAD_REMARKS} {upload['filename']} #{upload_id}"
         counts = {"created": 0, "changed": 0, "protected_kept": 0, "skipped": 0}
         warnings: list[str] = []
+        blocked: list[str] = []
         # Same order as reservation create(), which locks segments by id; new segments (no id yet) go last.
         for item in sorted(items, key=_segment_id_order):
             if item.group == "problem":
@@ -356,13 +427,21 @@ def apply_upload(db: Session, admin_id: int, upload_id: int) -> dict[str, Any]:
                 counts["created"] += 1
             elif item.group == "changed":
                 counts["protected_kept"] += sum(change["protected"] for change in item.changes)
-                to_apply = [change for change in item.changes if not change["protected"]]
+                link = item.parsed["link"]
+                # a protected change is kept anyway, so it is not reported as blocked
+                blocked.extend(
+                    f"row {item.row_number} {link}: {c['blocked']}"
+                    for c in item.changes
+                    if "blocked" in c and not c["protected"]
+                )
+                to_apply = [c for c in item.changes if not c["protected"] and "blocked" not in c]
                 if not to_apply:
                     continue
                 _update_segment(db, admin_id, upload_id, item, to_apply, why)
                 counts["changed"] += 1
-        applied = {"by": admin_id, "at": datetime.now(UTC).isoformat(), **counts, "warnings": warnings}
-        return applied, {"upload_id": upload_id, **counts, "warnings": warnings}
+        extra = {"warnings": warnings, "blocked": len(blocked), "blocked_changes": blocked}
+        applied = {"by": admin_id, "at": datetime.now(UTC).isoformat(), **counts, **extra}
+        return applied, {"upload_id": upload_id, **counts, **extra}
 
     message = "This upload was already applied"
     return apply_staged_upload(db, upload_id, "segment_list", message, evaluate_staged, write_all)
