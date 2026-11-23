@@ -14,6 +14,7 @@ type RowProps = {
   choice: GroupChoice;
   lists: TargetLists | null;
   onChange: (change: Partial<GroupChoice>) => void;
+  fixed?: boolean;
 };
 
 // Ready / Needs review with its symbol; a ticked row without a target says what is missing.
@@ -111,7 +112,7 @@ function Elements({ group }: { group: KmzGroup }) {
   );
 }
 
-function GroupRow({ group, choice, lists, onChange }: RowProps) {
+function GroupRow({ group, choice, lists, onChange, fixed }: RowProps) {
   const [open, setOpen] = useState(false);
   const changeTarget = (target: Target) => {
     onChange({ target, included: target !== "skip", pick: pickFor(target, group) });
@@ -139,13 +140,17 @@ function GroupRow({ group, choice, lists, onChange }: RowProps) {
         </th>
         <td className="num">{elementCounts(group.counts)}</td>
         <td className="whitespace-normal! text-left!"><Status group={group} choice={choice} lists={lists} /></td>
-        <td>
-          <select className="field" value={choice.target} aria-label={`Target for ${group.name}`}
-            onChange={(event) => changeTarget(event.target.value as Target)}>
-            {TARGETS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-          </select>
-        </td>
-        <td><Picker group={group} choice={choice} lists={lists} onChange={onChange} /></td>
+        {!fixed && (
+          <>
+            <td>
+              <select className="field" value={choice.target} aria-label={`Target for ${group.name}`}
+                onChange={(event) => changeTarget(event.target.value as Target)}>
+                {TARGETS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              </select>
+            </td>
+            <td><Picker group={group} choice={choice} lists={lists} onChange={onChange} /></td>
+          </>
+        )}
         <td>
           <select className="field" value={choice.colourMode} aria-label={`Colours for ${group.name}`}
             onChange={(event) => onChange({ colourMode: event.target.value as ColourMode })}>
@@ -157,7 +162,7 @@ function GroupRow({ group, choice, lists, onChange }: RowProps) {
       {(open || newCluster) && (
         <tr>
           <td />
-          <td colSpan={6} className="h-auto! space-y-2 py-2! text-left!">
+          <td colSpan={fixed ? 4 : 6} className="h-auto! space-y-2 py-2! text-left!">
             {open && <Elements group={group} />}
             {newCluster && <Members group={group} choice={choice} lists={lists} onChange={onChange} />}
           </td>
@@ -167,11 +172,13 @@ function GroupRow({ group, choice, lists, onChange }: RowProps) {
   );
 }
 
-export function KmzGroups({ groups, choices, lists, onChange }: {
+// `fixed`: the target is set by the caller, so the Target and Attach to columns are left out.
+export function KmzGroups({ groups, choices, lists, onChange, fixed }: {
   groups: KmzGroup[];
   choices: Record<string, GroupChoice>;
   lists: TargetLists | null;
   onChange: (key: string, change: Partial<GroupChoice>) => void;
+  fixed?: boolean;
 }) {
   return (
     <div className="tbox">
@@ -181,8 +188,8 @@ export function KmzGroups({ groups, choices, lists, onChange }: {
           <col />
           <col className="w-44" />
           <col className="w-64" />
-          <col className="w-32" />
-          <col className="w-64" />
+          {!fixed && <col className="w-32" />}
+          {!fixed && <col className="w-64" />}
           <col className="w-36" />
         </colgroup>
         <thead>
@@ -191,15 +198,15 @@ export function KmzGroups({ groups, choices, lists, onChange }: {
             <th scope="col" className="text-left!">Folder</th>
             <th scope="col">Elements</th>
             <th scope="col" className="text-left!">Status</th>
-            <th scope="col">Target</th>
-            <th scope="col">Attach to</th>
+            {!fixed && <th scope="col">Target</th>}
+            {!fixed && <th scope="col">Attach to</th>}
             <th scope="col">Colours</th>
           </tr>
         </thead>
         <tbody>
           {groups.map((group) => (
             <GroupRow key={group.key} group={group} choice={choices[group.key]} lists={lists}
-              onChange={(change) => onChange(group.key, change)} />
+              onChange={(change) => onChange(group.key, change)} fixed={fixed} />
           ))}
         </tbody>
       </table>

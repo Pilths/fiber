@@ -217,12 +217,16 @@ def clusters(db: DB) -> list[KmzCluster]:
 
 @router.patch("/clusters/{cluster_id}")
 def rename_cluster(db: DB, admin: Admin, cluster_id: int, body: KmzClusterPatch) -> KmzCluster:
-    return KmzCluster(**kmz_edit.rename_cluster(db, admin.id, cluster_id, body.name, body.remarks))
+    cluster = kmz_edit.rename_cluster(db, admin.id, cluster_id, body.name, body.remarks)
+    db.commit()
+    return KmzCluster(**cluster)
 
 
 @router.post("/clusters/{cluster_id}/sites", status_code=201)
 def add_cluster_site(db: DB, admin: Admin, cluster_id: int, body: KmzClusterSiteIn) -> KmzCluster:
-    return KmzCluster(**kmz_edit.add_site(db, admin.id, cluster_id, body.site_id, body.remarks))
+    cluster = kmz_edit.add_site(db, admin.id, cluster_id, body.site_id, body.remarks)
+    db.commit()
+    return KmzCluster(**cluster)
 
 
 @router.delete("/clusters/{cluster_id}/sites/{site_id}", status_code=204)
@@ -230,6 +234,7 @@ def remove_cluster_site(
     db: DB, admin: Admin, cluster_id: int, site_id: int, remarks: Annotated[Remarks, Query()] = ""
 ) -> Response:
     kmz_edit.remove_site(db, admin.id, cluster_id, site_id, remarks)
+    db.commit()
     return Response(status_code=204)
 
 
@@ -246,4 +251,6 @@ def list_groups(
 @router.patch("/groups/{group_id}")
 def patch_group(db: DB, admin: Admin, group_id: int, body: KmzGroupPatch) -> KmzGroupListed:
     changes = body.model_dump(exclude={"remarks"}, exclude_none=True)
-    return KmzGroupListed(**kmz_edit.edit_group(db, admin.id, group_id, changes, body.remarks))
+    group = kmz_edit.edit_group(db, admin.id, group_id, changes, body.remarks)
+    db.commit()
+    return KmzGroupListed(**group)

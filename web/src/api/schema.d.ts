@@ -721,7 +721,7 @@ export interface paths {
         };
         /**
          * Clusters
-         * @description Cluster picker for the KMZ preview.
+         * @description Cluster picker for the KMZ preview, with each cluster's active sites.
          */
         get: operations["clusters_api_admin_kmz_clusters_get"];
         put?: never;
@@ -730,6 +730,91 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/admin/kmz/clusters/{cluster_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Rename Cluster */
+        patch: operations["rename_cluster_api_admin_kmz_clusters__cluster_id__patch"];
+        trace?: never;
+    };
+    "/api/admin/kmz/clusters/{cluster_id}/sites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add Cluster Site */
+        post: operations["add_cluster_site_api_admin_kmz_clusters__cluster_id__sites_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/kmz/clusters/{cluster_id}/sites/{site_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove Cluster Site */
+        delete: operations["remove_cluster_site_api_admin_kmz_clusters__cluster_id__sites__site_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/kmz/groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Groups */
+        get: operations["list_groups_api_admin_kmz_groups_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/kmz/groups/{group_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Patch Group */
+        patch: operations["patch_group_api_admin_kmz_groups__group_id__patch"];
         trace?: never;
     };
     "/api/admin/uploads": {
@@ -1659,6 +1744,35 @@ export interface components {
             id: number;
             /** Name */
             name: string;
+            /** Sites */
+            sites: components["schemas"]["KmzClusterSite"][];
+        };
+        /** KmzClusterPatch */
+        KmzClusterPatch: {
+            /** Name */
+            name: string;
+            /**
+             * Remarks
+             * @default
+             */
+            remarks: string;
+        };
+        /** KmzClusterSite */
+        KmzClusterSite: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+        };
+        /** KmzClusterSiteIn */
+        KmzClusterSiteIn: {
+            /** Site Id */
+            site_id: number;
+            /**
+             * Remarks
+             * @default
+             */
+            remarks: string;
         };
         /** KmzElementOut */
         KmzElementOut: {
@@ -1698,6 +1812,27 @@ export interface components {
             /** Points */
             points: number;
         };
+        /** KmzGroupListed */
+        KmzGroupListed: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Folder Path */
+            folder_path: string;
+            counts: components["schemas"]["KmzGroupCounts"];
+            /**
+             * Colour Mode
+             * @enum {string}
+             */
+            colour_mode: "theme" | "kmz";
+            /** Hidden */
+            hidden: boolean;
+            /** Hidden At */
+            hidden_at: string | null;
+            target: components["schemas"]["KmzTarget"];
+            upload: components["schemas"]["KmzGroupUpload"];
+        };
         /** KmzGroupOut */
         KmzGroupOut: {
             /** Key */
@@ -1726,6 +1861,33 @@ export interface components {
             /** Member Site Ids */
             member_site_ids: number[];
         };
+        /** KmzGroupPatch */
+        KmzGroupPatch: {
+            /** Name */
+            name?: string | null;
+            /** Hidden */
+            hidden?: boolean | null;
+            /** Colour Mode */
+            colour_mode?: ("theme" | "kmz") | null;
+            target?: components["schemas"]["KmzTarget"] | null;
+            /**
+             * Remarks
+             * @default
+             */
+            remarks: string;
+        };
+        /** KmzGroupUpload */
+        KmzGroupUpload: {
+            /** Id */
+            id: number;
+            /** Filename */
+            filename: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
         /** KmzShaped */
         KmzShaped: {
             /** Segment Id */
@@ -1747,6 +1909,16 @@ export interface components {
             name: string;
             /** Reason */
             reason: string;
+        };
+        /** KmzTarget */
+        KmzTarget: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "segment" | "site" | "cluster";
+            /** Id */
+            id: number;
         };
         /** KmzUploadOut */
         KmzUploadOut: {
@@ -4431,6 +4603,196 @@ export interface operations {
             };
         };
     };
+    rename_cluster_api_admin_kmz_clusters__cluster_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-dev-user"?: string | null;
+            };
+            path: {
+                cluster_id: number;
+            };
+            cookie?: {
+                fiber_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KmzClusterPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KmzCluster"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_cluster_site_api_admin_kmz_clusters__cluster_id__sites_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-dev-user"?: string | null;
+            };
+            path: {
+                cluster_id: number;
+            };
+            cookie?: {
+                fiber_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KmzClusterSiteIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KmzCluster"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_cluster_site_api_admin_kmz_clusters__cluster_id__sites__site_id__delete: {
+        parameters: {
+            query?: {
+                remarks?: string;
+            };
+            header?: {
+                "x-dev-user"?: string | null;
+            };
+            path: {
+                cluster_id: number;
+                site_id: number;
+            };
+            cookie?: {
+                fiber_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_groups_api_admin_kmz_groups_get: {
+        parameters: {
+            query?: {
+                segment_id?: number | null;
+                site_id?: number | null;
+                cluster_id?: number | null;
+            };
+            header?: {
+                "x-dev-user"?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                fiber_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KmzGroupListed"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patch_group_api_admin_kmz_groups__group_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-dev-user"?: string | null;
+            };
+            path: {
+                group_id: number;
+            };
+            cookie?: {
+                fiber_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KmzGroupPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KmzGroupListed"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     upload_api_admin_uploads_post: {
         parameters: {
             query?: never;
@@ -4654,7 +5016,7 @@ export interface operations {
     get_history_api_admin_history_get: {
         parameters: {
             query: {
-                entity: "core" | "segment" | "site";
+                entity: "core" | "segment" | "site" | "kmz_group" | "cluster";
                 id: number;
             };
             header?: {

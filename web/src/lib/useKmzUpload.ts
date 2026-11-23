@@ -77,7 +77,7 @@ export function pickFor(target: Target, group: KmzGroup): string {
   return "";
 }
 
-async function loadTargetLists(): Promise<TargetLists> {
+export async function loadTargetLists(): Promise<TargetLists> {
   const [segments, sites, clusters] = await Promise.all([
     api.get("/api/segments"),
     api.get("/api/map/sites"),
@@ -159,8 +159,22 @@ function folderFields(folderIds: string[]): Record<string, string | string[]> {
   return { folder_ids: folderIds };
 }
 
+// "Add from KMZ" in an edit box: every folder goes to this one segment or site, and no route line is drawn.
+export type FixedTarget = { kind: "segment" | "site"; id: number; name: string };
+
+// The only list entry is the fixed target, so each ticked folder resolves to it by name.
+function fixedLists(fixed: FixedTarget): TargetLists {
+  const lists: TargetLists = { segment: [], site: [], cluster: [] };
+  lists[fixed.kind] = [{ id: fixed.id, name: fixed.name }];
+  return lists;
+}
+
+function fixedChoice(fixed: FixedTarget): GroupChoice {
+  return { included: true, target: fixed.kind, pick: fixed.name, colourMode: "theme", members: [] };
+}
+
 // Pick file -> folder tree -> preview -> apply. State and actions live here so the screen parts stay plain.
-export function useKmzUpload() {
+export function useKmzUpload(fixed?: FixedTarget) {
   const [file, setFile] = useState<File | null>(null);
   const [folders, setFolders] = useState<FolderNode[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -175,13 +189,21 @@ export function useKmzUpload() {
 
   const upload = async (chosen: File, folderIds: string[]) => {
     const loaded: KmzStaged = await api.postFile("/api/admin/kmz/uploads", chosen, folderFields(folderIds));
-    if (loaded.groups.length > 0) {
-      setLists(await loadTargetLists());
-    }
-    setRouteIds(new Set(loaded.shaped.map((row) => row.segment_id)));
     const initial: Record<string, GroupChoice> = {};
-    for (const group of loaded.groups) {
-      initial[group.key] = defaultChoice(group);
+    if (fixed) {
+      setLists(fixedLists(fixed));
+      setRouteIds(new Set());
+      for (const group of loaded.groups) {
+        initial[group.key] = fixedChoice(fixed);
+      }
+    } else {
+      if (loaded.groups.length > 0) {
+        setLists(await loadTargetLists());
+      }
+      setRouteIds(new Set(loaded.shaped.map((row) => row.segment_id)));
+      for (const group of loaded.groups) {
+        initial[group.key] = defaultChoice(group);
+      }
     }
     setChoices(initial);
     setStaged(loaded);
