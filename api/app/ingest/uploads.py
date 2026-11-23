@@ -19,6 +19,9 @@ VALUES (:user_id, :filename, :kind, 'staged', CAST(:summary AS jsonb)) RETURNING
 LOCK_UPLOAD_SQL = """
 SELECT id, filename, status, summary FROM uploads WHERE id = :upload_id AND kind = :kind FOR UPDATE
 """
+GET_UPLOAD_SQL = """
+SELECT id, filename, status, summary, created_at, confirmed_at FROM uploads WHERE id = :upload_id AND kind = :kind
+"""
 UPLOAD_EXISTS_SQL = "SELECT 1 FROM uploads WHERE id = :upload_id AND kind = :kind"
 FINISH_UPLOAD_SQL = """
 UPDATE uploads SET status = 'confirmed', confirmed_at = now(), summary = COALESCE(CAST(:summary AS jsonb), summary)
@@ -49,6 +52,13 @@ def finish_upload(db: Session, upload_id: int, summary: dict[str, Any] | None = 
     """Mark confirmed; a None summary keeps the stored one."""
     summary_json = None if summary is None else json.dumps(summary)
     db.execute(text(FINISH_UPLOAD_SQL), {"upload_id": upload_id, "summary": summary_json})
+
+
+def get_upload(db: Session, upload_id: int, kind: str) -> dict[str, Any]:
+    upload = db.execute(text(GET_UPLOAD_SQL), {"upload_id": upload_id, "kind": kind}).mappings().first()
+    if not upload:
+        raise NotFound("Upload not found")
+    return dict(upload)
 
 
 def require_upload(db: Session, upload_id: int, kind: str) -> None:

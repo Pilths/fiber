@@ -8,7 +8,7 @@ from sqlalchemy import text
 
 from app.auth.deps import DB, Admin, require_admin
 from app.ingest.upload_file import read_upload
-from app.ingest.uploads import ApplyError, finish_upload, insert_upload, lock_staged_upload
+from app.ingest.uploads import finish_upload, insert_upload, lock_staged_upload
 from app.load_kmz import (
     SEGMENT_BY_ID_SQL,
     compute_shapes,
@@ -136,10 +136,7 @@ def apply(db: DB, admin: Admin, upload_id: int) -> KmzApplyOut:
 
 
 def _apply(db: DB, upload_id: int) -> KmzApplyOut:
-    try:
-        upload_row = lock_staged_upload(db, upload_id, "kmz", "Already applied or discarded")
-    except ApplyError as error:
-        raise HTTPException(error.status, error.message) from error
+    upload_row = lock_staged_upload(db, upload_id, "kmz", "Already applied or discarded")
     summary = upload_row["summary"]
     if summary["block_reason"] or not summary["shaped"]:
         raise HTTPException(409, summary["block_reason"] or "Nothing to apply")

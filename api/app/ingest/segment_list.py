@@ -17,10 +17,10 @@ from sqlalchemy.orm import Session
 
 from app.ingest.checks import blank, clean, split_nodes
 from app.ingest.excel import _json
+from app.ingest.pipeline import apply_staged_upload, insert_staged_rows, load_staged_rows
 from app.ingest.segment_fields import write_segment_field
 from app.ingest.site_master import hkey, load_protected
-from app.ingest.uploads import ApplyError, finish_upload, insert_upload, lock_staged_upload
-from app.routing.graph import invalidate as invalidate_routes
+from app.ingest.uploads import ApplyError, insert_upload
 
 UPLOAD_REMARKS = "segment list upload"
 ALIASES = {
@@ -41,12 +41,6 @@ MAX_DISTANCE = Decimal("9999999.999")  # numeric(10,3)
 
 SELECT_SITES_BY_NAME = "SELECT id, name, active FROM sites WHERE name = ANY(:names)"
 SELECT_SEGMENTS = "SELECT id, site_a_id, site_b_id, distance_km, route, section FROM segments"
-INSERT_UPLOAD_ROWS = """
-    INSERT INTO upload_rows (upload_id, row_group, entity, payload, sheet, row_number, status, reason, raw)
-    VALUES (:upload_id, :row_group, 'segment', CAST(:payload AS jsonb), :sheet, :row_number, :status, :reason,
-            CAST(:raw AS jsonb))
-"""
-SELECT_STAGED_ROWS = "SELECT id, row_number, raw, payload FROM upload_rows WHERE upload_id = :upload_id ORDER BY id"
 INSERT_SEGMENT = """
     INSERT INTO segments (site_a_id, site_b_id, distance_km, route, section)
     VALUES (:site_a_id, :site_b_id, CAST(:distance AS numeric), :route, :section)
@@ -281,6 +275,7 @@ def _staged_row(upload_id: int, sheet_name: str | None, item: Item) -> dict[str,
     return {
         "upload_id": upload_id,
         "row_group": GROUP_COL[item.group],
+        "entity": "segment",
         "sheet": sheet_name,
         "row_number": item.row_number,
         "status": item.status,
@@ -301,15 +296,14 @@ def stage(db: Session, admin_id: int, filename: str, parsed: Parsed) -> dict[str
         "applied": None,
     }
     upload_id = insert_upload(db, admin_id, filename, "segment_list", summary)
-    if items:
-        db.execute(text(INSERT_UPLOAD_ROWS), [_staged_row(upload_id, parsed.sheet_name, item) for item in items])
+    insert_staged_rows(db, [_staged_row(upload_id, parsed.sheet_name, item) for item in items])
     db.commit()
     return {"upload_id": upload_id, "filename": filename, **summary}
 
 
 def load_staged(db: Session, upload_id: int, summary: dict[str, Any]) -> Parsed:
     items = []
-    for row in db.execute(text(SELECT_STAGED_ROWS), {"upload_id": upload_id}).mappings():
+    for row in load_staged_rows(db, upload_id):
         items.append(Item(row["row_number"], row["raw"] or {}, row["payload"]["parsed"], id=row["id"]))
     return Parsed(summary["sheet_name"], items, summary["found"])
 
@@ -342,16 +336,17 @@ def _update_segment(
 
 
 def apply_upload(db: Session, admin_id: int, upload_id: int) -> dict[str, Any]:
-    upload = lock_staged_upload(db, upload_id, "segment_list", "This upload was already applied")
-    parsed = load_staged(db, upload_id, upload["summary"])
-    blocked = block_reason(parsed)
-    if blocked:
-        raise ApplyError(409, f"Nothing can be applied: {blocked}")
-    items = evaluate(db, parsed)
-    why = f"{UPLOAD_REMARKS} {upload['filename']} #{upload_id}"
-    counts = {"created": 0, "changed": 0, "protected_kept": 0, "skipped": 0}
-    warnings: list[str] = []
-    with db.begin_nested():  # all or nothing
+    def evaluate_staged(upload: dict[str, Any]) -> list[Item]:
+        parsed = load_staged(db, upload_id, upload["summary"])
+        blocked = block_reason(parsed)
+        if blocked:
+            raise ApplyError(409, f"Nothing can be applied: {blocked}")
+        return evaluate(db, parsed)
+
+    def write_all(upload: dict[str, Any], items: list[Item]) -> tuple[dict[str, Any], dict[str, Any]]:
+        why = f"{UPLOAD_REMARKS} {upload['filename']} #{upload_id}"
+        counts = {"created": 0, "changed": 0, "protected_kept": 0, "skipped": 0}
+        warnings: list[str] = []
         # Same order as reservation create(), which locks segments by id; new segments (no id yet) go last.
         for item in sorted(items, key=_segment_id_order):
             if item.group == "problem":
@@ -367,7 +362,7 @@ def apply_upload(db: Session, admin_id: int, upload_id: int) -> dict[str, Any]:
                 _update_segment(db, admin_id, upload_id, item, to_apply, why)
                 counts["changed"] += 1
         applied = {"by": admin_id, "at": datetime.now(UTC).isoformat(), **counts, "warnings": warnings}
-        finish_upload(db, upload_id, dict(upload["summary"], applied=applied))
-    db.commit()
-    invalidate_routes()
-    return {"upload_id": upload_id, **counts, "warnings": warnings}
+        return applied, {"upload_id": upload_id, **counts, "warnings": warnings}
+
+    message = "This upload was already applied"
+    return apply_staged_upload(db, upload_id, "segment_list", message, evaluate_staged, write_all)
