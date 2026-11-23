@@ -4,24 +4,13 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile
 from pydantic import BaseModel
-from sqlalchemy import text
 
 from app.auth.deps import DB, Admin, require_admin
+from app.ingest.kmz import DEFAULT_FOLDER, apply_upload, folder_tree, stage_preview
 from app.ingest.upload_file import read_upload
-from app.ingest.uploads import finish_upload, insert_upload, lock_staged_upload
-from app.load_kmz import (
-    SEGMENT_BY_ID_SQL,
-    compute_shapes,
-    folder_tree,
-    lines_in_folder_ids,
-    parse_lines,
-    save_shape,
-)
 from app.observability import logged_apply
 
-
 router = APIRouter(prefix="/api/admin/kmz", dependencies=[Depends(require_admin)])
-DEFAULT_FOLDER = "propose route"
 
 
 class KmzShaped(BaseModel):
@@ -99,54 +88,13 @@ def upload(
 ) -> KmzUploadOut:
     name, data = read_upload(file, ".kmz")
     try:
-        if folder_ids:
-            lines, selected_names = lines_in_folder_ids(io.BytesIO(data), folder_ids)
-            folder = ", ".join(selected_names)
-            folders_found = selected_names
-        else:
-            lines, folders_found = parse_lines(io.BytesIO(data), folder)
+        upload_id, summary = stage_preview(db, admin.id, name, data, folder, folder_ids)
     except ValueError as error:
         raise HTTPException(422, f"Cannot read the KMZ: {error}") from error
-    result = {"shaped": [], "skipped": []}
-    block_reason = None
-    if lines:
-        result = compute_shapes(db, lines)
-    else:
-        found = ", ".join(folders_found) or "none"
-        block_reason = f"No lines in folder '{folder}'. Folders in the file: {found}"
-        if folder_ids:
-            block_reason = "No lines in the selected folders."
-    summary = {
-        "filename": name,
-        "folder": folder,
-        "folders_found": folders_found,
-        "lines": len(lines),
-        "block_reason": block_reason,
-        **result,
-    }
-    upload_id = insert_upload(db, admin.id, name, "kmz", summary)
-    db.commit()
     return preview_from(upload_id, summary)
 
 
 @router.post("/uploads/{upload_id}/apply")
 def apply(db: DB, admin: Admin, upload_id: int) -> KmzApplyOut:
     with logged_apply("kmz", upload_id, admin.id):
-        return _apply(db, upload_id)
-
-
-def _apply(db: DB, upload_id: int) -> KmzApplyOut:
-    upload_row = lock_staged_upload(db, upload_id, "kmz", "Already applied or discarded")
-    summary = upload_row["summary"]
-    if summary["block_reason"] or not summary["shaped"]:
-        raise HTTPException(409, summary["block_reason"] or "Nothing to apply")
-    saved = 0
-    for item in summary["shaped"]:
-        segment = db.execute(text(SEGMENT_BY_ID_SQL), {"segment_id": item["segment_id"]}).mappings().first()
-        if segment is None:
-            continue
-        save_shape(db, segment, item["coords"])
-        saved += 1
-    finish_upload(db, upload_id)
-    db.commit()
-    return KmzApplyOut(upload_id=upload_id, shaped=saved)
+        return KmzApplyOut(upload_id=upload_id, shaped=apply_upload(db, upload_id))
