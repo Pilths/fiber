@@ -2,14 +2,17 @@
 import io
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile
+from datetime import datetime
+
+from fastapi import APIRouter, Depends, Form, HTTPException, Query, Response, UploadFile
 from pydantic import BaseModel
-from sqlalchemy import text
 
 from app.auth.deps import DB, Admin, require_admin
+from app.ingest import kmz_edit
 from app.ingest.kmz import DEFAULT_FOLDER, apply_upload, folder_tree, stage_preview
 from app.ingest.upload_file import read_upload
 from app.observability import logged_apply
+from app.reservations.schemas import Remarks
 
 router = APIRouter(prefix="/api/admin/kmz", dependencies=[Depends(require_admin)])
 
@@ -78,9 +81,56 @@ class KmzFoldersOut(BaseModel):
     loose_lines: int
 
 
+class KmzClusterSite(BaseModel):
+    id: int
+    name: str
+
+
 class KmzCluster(BaseModel):
     id: int
     name: str
+    sites: list[KmzClusterSite]
+
+
+class KmzTarget(BaseModel):
+    kind: Literal["segment", "site", "cluster"]
+    id: int
+
+
+class KmzGroupPatch(BaseModel):
+    name: str | None = None
+    hidden: bool | None = None
+    colour_mode: Literal["theme", "kmz"] | None = None
+    target: KmzTarget | None = None
+    remarks: Remarks = ""
+
+
+class KmzGroupUpload(BaseModel):
+    id: int
+    filename: str
+    created_at: datetime
+
+
+class KmzGroupListed(BaseModel):
+    id: int
+    name: str
+    folder_path: str
+    counts: KmzGroupCounts
+    colour_mode: Literal["theme", "kmz"]
+    hidden: bool
+    hidden_at: datetime | None
+    target: KmzTarget
+    upload: KmzGroupUpload
+
+
+class KmzClusterSiteIn(BaseModel):
+    site_id: int
+    remarks: Remarks = ""
+
+
+class KmzClusterPatch(BaseModel):
+    name: str
+    remarks: Remarks = ""
 
 
 class KmzApplyGroup(BaseModel):
@@ -161,6 +211,39 @@ def apply(db: DB, admin: Admin, upload_id: int, body: KmzApplyIn | None = None) 
 
 @router.get("/clusters")
 def clusters(db: DB) -> list[KmzCluster]:
-    """Cluster picker for the KMZ preview."""
-    rows = db.execute(text("SELECT id, name FROM clusters ORDER BY name")).mappings()
-    return [KmzCluster(**row) for row in rows]
+    """Cluster picker for the KMZ preview, with each cluster's active sites."""
+    return [KmzCluster(**cluster) for cluster in kmz_edit.all_clusters(db)]
+
+
+@router.patch("/clusters/{cluster_id}")
+def rename_cluster(db: DB, admin: Admin, cluster_id: int, body: KmzClusterPatch) -> KmzCluster:
+    return KmzCluster(**kmz_edit.rename_cluster(db, admin.id, cluster_id, body.name, body.remarks))
+
+
+@router.post("/clusters/{cluster_id}/sites", status_code=201)
+def add_cluster_site(db: DB, admin: Admin, cluster_id: int, body: KmzClusterSiteIn) -> KmzCluster:
+    return KmzCluster(**kmz_edit.add_site(db, admin.id, cluster_id, body.site_id, body.remarks))
+
+
+@router.delete("/clusters/{cluster_id}/sites/{site_id}", status_code=204)
+def remove_cluster_site(
+    db: DB, admin: Admin, cluster_id: int, site_id: int, remarks: Annotated[Remarks, Query()] = ""
+) -> Response:
+    kmz_edit.remove_site(db, admin.id, cluster_id, site_id, remarks)
+    return Response(status_code=204)
+
+
+@router.get("/groups")
+def list_groups(
+    db: DB,
+    segment_id: Annotated[int | None, Query()] = None,
+    site_id: Annotated[int | None, Query()] = None,
+    cluster_id: Annotated[int | None, Query()] = None,
+) -> list[KmzGroupListed]:
+    return [KmzGroupListed(**group) for group in kmz_edit.groups_for(db, segment_id, site_id, cluster_id)]
+
+
+@router.patch("/groups/{group_id}")
+def patch_group(db: DB, admin: Admin, group_id: int, body: KmzGroupPatch) -> KmzGroupListed:
+    changes = body.model_dump(exclude={"remarks"}, exclude_none=True)
+    return KmzGroupListed(**kmz_edit.edit_group(db, admin.id, group_id, changes, body.remarks))

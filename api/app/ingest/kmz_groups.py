@@ -32,7 +32,9 @@ CLUSTER_NAME_TAKEN_SQL = "SELECT 1 FROM clusters WHERE lower(name) = lower(:name
 INSERT_CLUSTER_SQL = "INSERT INTO clusters (name, created_by) VALUES (:name, :user_id) RETURNING id"
 INSERT_MEMBER_SQL = """
 INSERT INTO cluster_sites (cluster_id, site_id, created_by) VALUES (:cluster_id, :site_id, :user_id)
-ON CONFLICT DO NOTHING RETURNING site_id
+ON CONFLICT (cluster_id, site_id) DO UPDATE SET removed_at = NULL, removed_by = NULL
+WHERE cluster_sites.removed_at IS NOT NULL
+RETURNING site_id
 """
 INSERT_GROUP_SQL = """
 INSERT INTO kmz_groups (upload_id, name, folder_path, segment_id, site_id, cluster_id, colour_mode, created_by)
