@@ -35,15 +35,16 @@ class UploadOut(BaseModel):
 
 
 # Rows staged before route type was derived may still hold a route_type change; it is skipped when shown.
-CHANGE_FIELDS = ("distance_km", "route", "section")
+CHANGE_FIELDS = ("distance_km", "route", "section", "survey_cores", "cable_size")
 
 
 class Change(BaseModel):
-    field: Literal["distance_km", "route", "section"]
+    field: Literal["distance_km", "route", "section", "survey_cores", "cable_size"]
     old: str | None
     new: str | None
     protected: bool  # edited in the dashboard: shown, not applied
     note: str | None = None
+    blocked: str | None = None  # why the change cannot be applied (lowering verified cores below existing cores)
 
 
 class Parsed(BaseModel):
@@ -53,6 +54,8 @@ class Parsed(BaseModel):
     distance_km: str | None
     route: str | None
     section: str | None
+    verified_cores: int | None = None
+    total_cores: int | None = None
 
 
 class RowOut(BaseModel):
@@ -83,6 +86,8 @@ class ApplyOut(BaseModel):
     protected_kept: int
     skipped: int
     warnings: list[str]
+    blocked: int = 0
+    blocked_changes: list[str] = []
 
 
 @router.post("/uploads", status_code=201)
@@ -110,6 +115,8 @@ def _row_out(row: Any, group: Group) -> RowOut:
             distance_km=parsed["distance"],
             route=parsed["route"],
             section=parsed["section"],
+            verified_cores=parsed.get("verified_cores"),
+            total_cores=parsed.get("total_cores"),
         ),
         changes=[Change(**change) for change in payload.get("changes", []) if change["field"] in CHANGE_FIELDS],
         edited_in_dashboard=payload.get("edited_in_dashboard", False),

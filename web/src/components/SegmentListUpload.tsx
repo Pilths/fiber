@@ -27,6 +27,8 @@ const FIELD: Record<Row["changes"][number]["field"], string> = {
   distance_km: "Distance (km)",
   route: "Route",
   section: "Section",
+  survey_cores: "Verified cores",
+  cable_size: "Total cores",
 };
 
 function TextCell({ value, className = "" }: { value: string; className?: string }) {
@@ -37,10 +39,13 @@ function TextCell({ value, className = "" }: { value: string; className?: string
 function RowLine({ row, info }: { row: Row; info: GroupInfo<Group> }) {
   const link = cell(row.parsed.link, field(row.raw, /^links?$/i));
   const distance = cell(row.parsed.distance_km, field(row.raw, /^(distance|km)/i));
+  const verified = cell(row.parsed.verified_cores, field(row.raw, /^(verified|surveyed)\s*cores?$/i));
+  const total = cell(row.parsed.total_cores, field(row.raw, /^total\s*cores?$/i));
   const changes = row.changes.map((change) => ({
     ...change,
     field: FIELD[change.field],
     note: "kept: edited in dashboard",
+    blocked: change.blocked ?? undefined,
   }));
   return (
     <tr>
@@ -49,6 +54,8 @@ function RowLine({ row, info }: { row: Row; info: GroupInfo<Group> }) {
       <TextCell value={distance} className="num" />
       <TextCell value={cell(row.parsed.route, null)} />
       <TextCell value={cell(row.parsed.section, null)} />
+      <TextCell value={verified} className="num" />
+      <TextCell value={total} className="num" />
       <StatusCell info={info}>
         {row.reason && <p className="text-body">{row.reason}</p>}
         {info.g === "changed" && <Changes changes={changes} />}
@@ -77,10 +84,12 @@ function Rows({ staged }: { staged: SegmentListStaged }) {
             <thead>
               <tr>
                 <th scope="col" className="num w-16">Row</th>
-                <th scope="col" className="w-[18%]">Link</th>
+                <th scope="col" className="w-[15%]">Link</th>
                 <th scope="col" className="num w-28">Distance (km)</th>
-                <th scope="col" className="w-[9%]">Route</th>
-                <th scope="col" className="w-[9%]">Section</th>
+                <th scope="col" className="w-[8%]">Route</th>
+                <th scope="col" className="w-[8%]">Section</th>
+                <th scope="col" className="num w-28">Verified cores</th>
+                <th scope="col" className="num w-24">Total cores</th>
                 <th scope="col">Status or reason</th>
               </tr>
             </thead>
@@ -150,6 +159,14 @@ export function SegmentListUpload() {
                   {result.created} created, {result.changed} changed,{" "}
                   {result.protected_kept} dashboard edits kept, {result.skipped} skipped.
                 </p>
+                {result.blocked > 0 && (
+                  <>
+                    <p className="mt-2 font-semibold">Not applied</p>
+                    <ul className="list-disc pl-4">
+                      {result.blocked_changes.map((change) => <li key={change}>{change}</li>)}
+                    </ul>
+                  </>
+                )}
                 {result.warnings.length > 0 && (
                   <>
                     <p className="mt-2 font-semibold">Warnings</p>
