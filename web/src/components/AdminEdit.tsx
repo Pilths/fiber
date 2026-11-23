@@ -5,6 +5,7 @@ import { PastePortsDialog } from "@/components/PastePortsDialog";
 import { Dialog } from "@/components/upload-parts";
 import { formatDateTime } from "@/lib/format";
 import { type SegmentFocus, type Site, useEditSegment, useEditSite } from "@/lib/useAdminEdit";
+import { ignoreFailure } from "@/lib/utils";
 
 export type { SegmentFocus };
 
@@ -66,7 +67,7 @@ function SitePicker({ label, site, onPick }: {
     const search = () => {
       api.get("/api/admin/sites", { query: { q: query } })
         .then((found) => setOptions(found as unknown as Site[]))
-        .catch(() => {});
+        .catch(ignoreFailure);
     };
     const timer = setTimeout(search, 150);
     return () => clearTimeout(timer);

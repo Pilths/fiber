@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, errorText } from "@/api/client";
 import type { components } from "@/api/schema";
-import { uploadError } from "@/lib/utils";
+import { ignoreFailure, uploadError } from "@/lib/utils";
 
 export type Staged = components["schemas"]["app__ingest__site_master_router__UploadOut"];
 export type Sheet = components["schemas"]["SheetOut"];
@@ -31,7 +31,7 @@ export function useSiteMasterUpload() {
   const loadCurrent = useCallback(() => {
     api.get("/api/admin/site-master/current")
       .then(setUploads)
-      .catch(() => {});
+      .catch(ignoreFailure);
   }, []);
   useEffect(loadCurrent, [loadCurrent]);
 

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api } from "@/api/client";
 import type { components } from "@/api/schema";
 import type { View } from "@/components/Header";
+import { ignoreFailure } from "@/lib/utils";
 
 type Bell = components["schemas"]["Bell"];
 
@@ -31,10 +32,10 @@ export function useDashboardView() {
   }
 
   const refreshBell = useCallback(() => {
-    api.get("/api/bell").then(setBell).catch(() => {});
+    api.get("/api/bell").then(setBell).catch(ignoreFailure);
     api.get("/api/reservations", { query: { mine: true } })
       .then((reservations) => setStale(reservations.filter((reservation) => reservation.stale).length))
-      .catch(() => {});
+      .catch(ignoreFailure);
   }, []);
 
   const setView = useCallback((next: View) => {

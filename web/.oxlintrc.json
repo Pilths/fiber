@@ -6,6 +6,8 @@
     "curly": "error",
     "no-nested-ternary": "error",
     "no-unused-expressions": "error",
+    "no-empty": "error",
+    "no-empty-function": "error",
     "react/only-export-components": ["warn", { "allowConstantExport": true }]
   }
 }

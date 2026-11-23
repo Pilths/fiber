@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useState } from "react";
 import { api } from "@/api/client";
 import { fitView, MALAYSIA, type Camera, type Size } from "@/lib/mapGeometry";
 import type { MapData, SegmentFeature, SiteFeature } from "@/lib/mapLayers";
+import { ignoreFailure } from "@/lib/utils";
 
 export function useFullscreen(box: React.RefObject<HTMLDivElement | null>) {
   const [full, setFull] = useState(false);
@@ -12,7 +13,7 @@ export function useFullscreen(box: React.RefObject<HTMLDivElement | null>) {
   }, [box]);
   const toggleFull = () => {
     const request = full ? document.exitFullscreen() : box.current!.requestFullscreen();
-    request.catch(() => {});
+    request.catch(ignoreFailure);
   };
   return { full, toggleFull };
 }

@@ -3,6 +3,7 @@ import { api, errorText } from "@/api/client";
 import type { components } from "@/api/schema";
 import { Dialog } from "@/components/upload-parts";
 import { formatDate } from "@/lib/format";
+import { ignoreFailure } from "@/lib/utils";
 
 type Me = components["schemas"]["CurrentUser"];
 type User = components["schemas"]["UserOut"];
@@ -15,7 +16,7 @@ const lbl = "lbl mb-1 block text-body! text-foreground!";
 function TempPassword({ temp, onClose }: { temp: Temp; onClose: () => void }) {
   const [copied, setCopied] = useState(false);
   const copy = () => {
-    navigator.clipboard?.writeText(temp.temporary_password).then(() => setCopied(true), () => {});
+    navigator.clipboard?.writeText(temp.temporary_password).then(() => setCopied(true), ignoreFailure);
   };
   return (
     <div role="region" aria-label="Temporary password" className="mb-4 note px-4 py-3">

@@ -22,8 +22,8 @@ Anything a tool can enforce lives in config, not in review comments. Reviewers s
 
 ## Names and words
 
-- Use the domain words from the "Domain rules" section of `CLAUDE.md` exactly (`GLOSSARY.md` takes over once
-  `/domain-modeling` creates it): `site`, `segment`, `core`, `port`, `reservation`, `planner`, `customer`,
+- Use the domain words from the "Domain rules" section of `CLAUDE.md` exactly (`GLOSSARY.md` at the repo root
+  holds the full list; if the two disagree, fix both): `site`, `segment`, `core`, `port`, `reservation`, `planner`, `customer`,
   `route`. One word per idea. If the team renames a term, rename it everywhere in one commit.
 - A `building` is a kind of site (`sites.kind`, `api/app/models.py:76`), never another word for site.
 - Known word clashes to avoid spreading:
@@ -32,7 +32,7 @@ Anything a tool can enforce lives in config, not in review comments. Reviewers s
   - "Core verification" in UI, docs and messages; `survey_cores` stays only as the DB column and API field.
   - `route_type` is the name of the derived Trunk / Metro / DC-DC / DC-TOC value (computed in
     `api/app/link_type.py`). Don't call it link type in new code.
-  - "Needs review" means an upload row status (`needs_review`). The reservation alert list (`NeedsReview.tsx`:
+  - "Needs review" means an upload row status (`needs_review`). The reservation alert list (`web/src/components/reservations/NeedsReview.tsx`:
     stale, release requested, fiber cut) is a different thing; name new code for it "alerts", not needs review.
 - Full, plain names: `planner`, `option`, `segment`, `site`, not `rp`, `op`, `s`, `g`, `x`. Short names only for
   loop counters (`i`) and tiny arrow functions over one item.
@@ -64,11 +64,11 @@ function or view, never retyped inline. Duplicating one even once is a finding.
 | Calculated loss: 0.25 dB/km + 0.1 dB per splice (one per 4 km) + 0.5 dB x 2 connectors, 2 decimals | `calculated_loss_db()` and its constants, `api/app/loss/service.py` |
 | Deviation of measured from calculated loss | `deviation_pct()`, `api/app/loss/service.py` |
 | Loss levels: green up to 3%, amber to 7%, red to 10%, off-scale above; edges go to the lower level | `warning_level()`, `api/app/loss/service.py`. The UI shows the API's `level` (`web/src/lib/lossLevel.tsx`) and never redoes the math |
-| Stale: approved, no approval or keep for over 3 months, no release waiting | `is_stale` in the `reservation_state_v` view (`api/alembic/versions/0001_baseline.py`). Code reads `is_stale`; it never recomputes the 3 months |
+| Stale: approved, no approval or keep for over 3 months, no release waiting | `is_stale` in the `reservation_state_v` view (`api/alembic/versions/0001_baseline.py:314`). Code reads `is_stale`; it never recomputes the 3 months. Changing the period needs a new migration that redefines the view, plus the four texts that say "3 months": `api/app/reservations/service.py:376`, `web/src/components/CoresTable.tsx:76`, `web/src/components/reservations/ReservationCard.tsx:125`, `web/src/components/reservations/Approvals.tsx:122` |
 | Reservation status | Derived from the latest event in `reservation_state_v`. Never stored, never written |
 | Route type from the two end sites' kinds | `api/app/link_type.py` |
 | Port label shapes | `api/app/port_label.py`, mirrored in `web/src/lib/portLabel.ts` |
-| Time zone `Asia/Kuala_Lumpur` | One constant per side: `TZ` in `api/app/reservations/service.py`, `TIME_ZONE` in `web/src/lib/format.ts`. New SQL uses the constant, not the literal (11 inline copies exist today) |
+| Time zone `Asia/Kuala_Lumpur` | One constant per side: `TZ` in `api/app/reservations/service.py` (also imported by `api/app/inventory/service.py`), `TIME_ZONE` in `web/src/lib/format.ts`. `TZ` holds the quoted SQL literal, so it goes straight into an f-string. New SQL uses the constant, not the literal. Inline copies today: `api/app/loss/service.py:55,61,65,94`, `api/app/admin_edits/measurements.py:22`, `api/app/seed_dev_loss.py:22`. Moving `TZ` to a shared module such as `api/app/db.py` is the cleanup |
 
 - Reservation events are insert-only. The event types are `requested`, `approved`, `rejected`, `withdrawn`,
   `kept`, `release_requested`, `released`, `release_declined`, `corrected`, `assigned`. No `UPDATE` or `DELETE` on
@@ -76,14 +76,19 @@ function or view, never retyped inline. Duplicating one even once is a finding.
 - Every event goes through `_event()` in `api/app/reservations/service.py`, after `_require()` checks the move and
   `_own_or_admin()` checks who may make it. (`api/app/ingest/reservation_import.py` still inserts its own events;
   see Target structure.)
-- Use `Decimal` with `ROUND_HALF_UP` for dB math, not floats.
+- Use `Decimal` with `ROUND_HALF_UP` for dB math, not floats. `float` is allowed only when serialising to JSON
+  (`api/app/loss/schemas.py:10-11`).
 
 ## Errors and debugging
 
 - Never swallow an error. No bare `except:` or `except Exception: pass`; no `.catch(() => {})` or empty
   `catch {}` in TypeScript. If an error really can be ignored, say why in a comment on that line.
 - One exception: upload parsing catches the error of a single row, records it as that row's reason, and moves on
-  (`api/app/ingest/excel.py:131`). Mark it with `# noqa: BLE001` and a short why.
+  (`api/app/ingest/excel.py:131`, `api/app/ingest/segment_list.py:172`, `api/app/ingest/site_master/parse.py:119`).
+  Mark it with `# noqa: BLE001` and a short why.
+- Lint enforces this in the web app (`no-empty`, `no-empty-function` in `web/.oxlintrc.json`). A best-effort call
+  whose failure the user does not need to see (refresh, clipboard) uses `.catch(ignoreFailure)` from
+  `web/src/lib/utils.ts`.
 - Fail loudly at the edge: check input where it enters (FastAPI request models in Pydantic, Excel and KMZ rows at
   import). Inside the app, trust the data.
 - Error messages say what was expected and what was found: `"Segment KLCC-PJYA: expected 24 verified cores,
@@ -117,7 +122,8 @@ function or view, never retyped inline. Duplicating one even once is a finding.
 
 - API response types come from `web/src/api/schema.d.ts`, generated by `npm run gen:api`. Never edit it by hand;
   regenerate it after an API change. No `any`.
-- Calls go through the `api` helpers in `web/src/api/client.ts`, never plain `fetch`.
+- API calls go through the `api` helpers in `web/src/api/client.ts`, never plain `fetch`. Static map files
+  (PMTiles, glyphs in `web/src/lib/basemap.ts`) may use `fetch`.
 - Every view that loads data handles three states on purpose: loading, empty, error.
 
 ## Architecture
@@ -156,9 +162,9 @@ for them. New code moves toward them where it is cheap; the big moves go through
 |---|---|
 | Frontend by feature: `web/src/features/<feature>/` with its API calls, hooks and components | Flat `web/src/components/` and `web/src/lib/` (~50 files) |
 | One entry file per feature; other features import only from it (`__init__.py`, `index.ts`) | `__init__.py` files are empty; about 99 imports reach inner files |
-| A feature's API calls in one file; components don't call `api.*` directly | 15 component files call `api.*` (for example `GlobalSearch.tsx:41`) |
+| A feature's API calls in one file; components don't call `api.*` directly | 14 component files call `api.*` (for example `GlobalSearch.tsx:41`) |
 | No component over ~150 lines | 13 are over, largest `ReservationUpload.tsx` (479) |
-| No SQL in routers | `ingest/reservation_upload_router.py:129`, `ingest/site_master_router.py:126`, `ingest/segment_list_router.py` |
+| No SQL in routers | `auth/router.py:110-155` (login, logout, password change; about 8 queries), `ingest/site_master_router.py:151` (the `/current` list) |
 | One reservation event writer | `ingest/reservation_import.py:90` inserts events itself |
 
 ## Tests (light, on the rules that matter)

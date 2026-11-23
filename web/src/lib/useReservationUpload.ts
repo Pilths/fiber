@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, errorText } from "@/api/client";
 import type { components } from "@/api/schema";
-import { uploadError } from "@/lib/utils";
+import { ignoreFailure, uploadError } from "@/lib/utils";
 
 export type ReservationPreview = components["schemas"]["StagedOut"];
 export type ImportState = components["schemas"]["ImportStateOut"];
@@ -32,7 +32,7 @@ export function useReservationUpload() {
   const loadImportState = useCallback(() => {
     api.get("/api/admin/reservation-import")
       .then(setImportState)
-      .catch(() => {});
+      .catch(ignoreFailure);
   }, []);
   useEffect(loadImportState, [loadImportState]);
 
