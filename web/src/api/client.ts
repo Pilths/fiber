@@ -1,6 +1,6 @@
 import type { paths } from "./schema";
 
-type Method = "get" | "post";
+type Method = "get" | "post" | "patch" | "delete";
 type Path<M extends Method> = {
   [P in keyof paths]: paths[P] extends Record<M, unknown> ? P : never;
 }[keyof paths];
@@ -15,7 +15,7 @@ type BodyOpt<O> = O extends { requestBody: { content: { "application/json": infe
 type Options<O, M extends Method> = {
   path?: Part<Part<O, "parameters">, "path">;
   query?: Part<Part<O, "parameters">, "query">;
-} & (M extends "post" ? BodyOpt<O> : unknown);
+} & (M extends "post" | "patch" ? BodyOpt<O> : unknown);
 
 // Dev user switcher: sends X-Dev-User only in a Vite dev build (import.meta.env.DEV is false in a production
 // build, so this is compiled out) and only after someone picks a user in the switcher. The API also ignores the
@@ -165,6 +165,8 @@ type PostArgs<P extends Path<"post">> = {} extends PostOptions<P> ? [opts?: Post
 export const api = {
   get: <P extends Path<"get">>(url: P, opts?: Options<Op<P, "get">, "get">) => request("get", url, opts),
   post: <P extends Path<"post">>(url: P, ...[opts]: PostArgs<P>) => request("post", url, opts),
+  patch: <P extends Path<"patch">>(url: P, opts: Options<Op<P, "patch">, "patch">) => request("patch", url, opts),
+  delete: <P extends Path<"delete">>(url: P, opts?: Options<Op<P, "delete">, "delete">) => request("delete", url, opts),
   // Multipart upload of one file as field "file". The generated types have no multipart body, so this is untyped.
   // A list value repeats the field once per item.
   postFile: <P extends Path<"post">>(url: P, file: File, fields: Record<string, string | string[]> = {}) => {

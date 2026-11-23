@@ -1,6 +1,7 @@
 import { useEffect, useId, useState } from "react";
 import { api } from "@/api/client";
 import type { components } from "@/api/schema";
+import { MapElements } from "@/components/MapElements";
 import { PastePortsDialog } from "@/components/PastePortsDialog";
 import { Dialog } from "@/components/upload-parts";
 import { formatDateTime } from "@/lib/format";
@@ -53,7 +54,7 @@ function Remarks({ value, onChange, autoFocus }: {
 }
 
 // Site typeahead on the native <datalist>; a name must match one from the list to count.
-function SitePicker({ label, site, onPick }: {
+export function SitePicker({ label, site, onPick }: {
   label: string; site: Site | null; onPick: (site: Site | null) => void;
 }) {
   const id = useId();
@@ -124,7 +125,7 @@ type SegmentDialogProps = { segmentId: number; focus?: SegmentFocus; onClose: ()
 
 export function EditSegmentDialog({ segmentId, focus, onClose, onSaved }: SegmentDialogProps) {
   const {
-    segment, form, siteA, setSiteA, siteB, setSiteB, error, busy, pasting, setPasting, surveyInput,
+    segment, form, siteA, setSiteA, siteB, setSiteB, error, setError, busy, pasting, setPasting, surveyInput,
     setField, setCut, setRemarks, copyTotalCores, portsApplied, submit,
   } = useEditSegment(segmentId, focus, onClose, onSaved);
   const pasteButton = (
@@ -168,6 +169,10 @@ export function EditSegmentDialog({ segmentId, focus, onClose, onSaved }: Segmen
           <Buttons busy={busy} onClose={onClose} left={pasteButton} />
           <EditHistory rows={segment.history} />
         </form>
+      )}
+      {segment && (
+        <MapElements owner={{ kind: "segment", id: segmentId, name: `${segment.site_a} - ${segment.site_b}` }}
+          onError={setError} />
       )}
       {segment && pasting && (
         <PastePortsDialog segmentId={segmentId} siteA={segment.site_a} siteB={segment.site_b}
@@ -220,6 +225,7 @@ export function EditSiteDialog({ siteId, onClose, onSaved }: {
           <EditHistory rows={site.history} />
         </form>
       )}
+      {site && <MapElements owner={{ kind: "site", id: siteId, name: site.name }} onError={edit.setError} />}
     </Dialog>
   );
 }

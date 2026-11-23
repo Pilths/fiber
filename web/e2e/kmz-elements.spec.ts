@@ -6,6 +6,8 @@ import { zip } from "./xlsx";
 // changes no segment line. The cluster name is new on every run.
 const stamp = Date.now();
 const CLUSTER = `E2E Cluster ${stamp}`;
+// Stamped too: a folder named like an existing cluster defaults to it, and an earlier run may have made one.
+const AREA = `Cluster area ${stamp}`;
 
 function box(lon: number, lat: number, half: number) {
   const corners = [[lon - half, lat - half], [lon + half, lat - half], [lon + half, lat + half],
@@ -21,7 +23,7 @@ function kmz() {
   const poe = "<Placemark><name>POE 1</name><Point><coordinates>101.687,3.141,0</coordinates></Point></Placemark>";
   const kml = `<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document>
 <Folder><name>E2E Cluster</name>
-<Folder><name>Cluster area</name>${area}</Folder>
+<Folder><name>${AREA}</name>${area}</Folder>
 <Folder><name>Blocks</name>${blocks}</Folder>
 <Folder><name>POE</name>${poe}</Folder>
 </Folder></Document></kml>`;
@@ -47,8 +49,8 @@ test("KMZ folders: tree counts, preview targets, apply saves folders and a new c
   await page.getByLabel("Target for Blocks").selectOption("segment");
   await expect(preview.getByRole("button", { name: "Apply 1 folder" })).toBeDisabled();
   await page.getByLabel("Segment for Blocks").fill("DEV Kuala Lumpur DC - DEV Cyberjaya DC");
-  await page.getByLabel("Target for Cluster area").selectOption("cluster");
-  await page.getByLabel("Cluster for Cluster area").fill(CLUSTER);
+  await page.getByLabel(`Target for ${AREA}`).selectOption("cluster");
+  await page.getByLabel(`Cluster for ${AREA}`).fill(CLUSTER);
   await expect(preview.getByRole("group", { name: "Sites in the new cluster" })
     .getByRole("checkbox", { name: "DEV Kuala Lumpur DC" })).toBeChecked();
   await preview.getByRole("button", { name: "Apply 2 folders" }).click();

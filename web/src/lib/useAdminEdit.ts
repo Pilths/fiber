@@ -158,7 +158,7 @@ export function useEditSegment(segmentId: number, focus: SegmentFocus | undefine
   };
 
   return {
-    segment, form, siteA, setSiteA, siteB, setSiteB, error, busy, pasting, setPasting, surveyInput,
+    segment, form, siteA, setSiteA, siteB, setSiteB, error, setError, busy, pasting, setPasting, surveyInput,
     setField, setCut, setRemarks, copyTotalCores, portsApplied, submit,
   };
 }
@@ -239,5 +239,5 @@ export function useEditSite(siteId: number, onClose: () => void, onSaved: () => 
     await save(body, () => api.post("/api/admin/sites/{sid}", { path: { sid: siteId }, body }));
   };
 
-  return { site, form, error, busy, setField, setActive, setRemarks, submit };
+  return { site, form, error, setError, busy, setField, setActive, setRemarks, submit };
 }

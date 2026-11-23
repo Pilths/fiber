@@ -2,7 +2,7 @@ import { KmzFolderTree } from "@/components/KmzFolderTree";
 import { KmzGroups } from "@/components/KmzGroups";
 import { FilePick, Note } from "@/components/upload-parts";
 import { PreviewCard } from "@/components/upload-preview";
-import { useKmzUpload, type KmzStaged } from "@/lib/useKmzUpload";
+import { useKmzUpload, type FixedTarget, type KmzStaged } from "@/lib/useKmzUpload";
 import { formatKm, plural } from "@/lib/format";
 
 type Staged = KmzStaged;
@@ -82,8 +82,11 @@ function applyLabel(routes: number, folders: number): string {
   return ["Apply", parts.join(" and ")].join(" ").trim();
 }
 
-function Preview({ staged, upload }: { staged: Staged; upload: Upload }) {
-  const nothing = staged.shaped.length === 0 && staged.groups.length === 0;
+// With a fixed target the route lines are left out: only folders are attached.
+function Preview({ staged, upload, fixed }: { staged: Staged; upload: Upload; fixed: boolean }) {
+  const routes = fixed ? [] : staged.shaped;
+  const skipped = fixed ? [] : staged.skipped;
+  const nothing = routes.length === 0 && staged.groups.length === 0;
   return (
     <PreviewCard titleId="kmz-prev-title" testId="kmz-preview" filename={staged.filename} onDiscard={upload.discard}>
       <p className="text-body text-muted-foreground">
@@ -93,22 +96,24 @@ function Preview({ staged, upload }: { staged: Staged; upload: Upload }) {
         <Note tone="red" role="alert" title="This file will not be applied">{staged.block_reason}</Note>
       ) : (
         <>
-          {staged.shaped.length > 0 && (
+          {routes.length > 0 && (
             <section className="space-y-2" aria-labelledby="kmz-routes-h">
               <h3 id="kmz-routes-h" className="font-semibold">Route lines</h3>
-              <ShapedTable rows={staged.shaped} ticked={upload.routeIds} onTick={upload.toggleRoute} />
+              <ShapedTable rows={routes} ticked={upload.routeIds} onTick={upload.toggleRoute} />
             </section>
           )}
-          {staged.skipped.length > 0 && <SkippedTable rows={staged.skipped} />}
+          {skipped.length > 0 && <SkippedTable rows={skipped} />}
           {staged.groups.length > 0 && (
             <section className="space-y-2" aria-labelledby="kmz-groups-h">
               <h3 id="kmz-groups-h" className="font-semibold">Folders</h3>
               <KmzGroups groups={staged.groups} choices={upload.choices} lists={upload.lists}
-                onChange={upload.changeChoice} />
+                onChange={upload.changeChoice} fixed={fixed} />
             </section>
           )}
-          {nothing && staged.skipped.length === 0 && (
-            <p className="text-body text-muted-foreground">No line title matches a segment.</p>
+          {nothing && skipped.length === 0 && (
+            <p className="text-body text-muted-foreground">
+              {fixed ? "No folders" : "No line title matches a segment."}
+            </p>
           )}
           {upload.error && <Note tone="red" role="alert" title={upload.error} />}
           <div className="flex flex-wrap items-center gap-4 border-t pt-4">
@@ -138,8 +143,9 @@ function Result({ upload }: { upload: Upload }) {
   );
 }
 
-export function KmzUpload() {
-  const upload = useKmzUpload();
+// `fixed` (Add from KMZ in an edit box): every folder goes to that segment or site; no target picker, no route lines.
+export function KmzUpload({ fixed }: { fixed?: FixedTarget }) {
+  const upload = useKmzUpload(fixed);
   return (
     <div className="space-y-4">
       <section className="card" aria-labelledby="kmz-h">
@@ -163,7 +169,7 @@ export function KmzUpload() {
           </div>
         </div>
       </section>
-      {upload.staged && <Preview staged={upload.staged} upload={upload} />}
+      {upload.staged && <Preview staged={upload.staged} upload={upload} fixed={!!fixed} />}
     </div>
   );
 }
