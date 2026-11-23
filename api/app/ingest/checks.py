@@ -64,6 +64,11 @@ def split_nodes(v: object) -> tuple[str, str, bool] | None:
     return parts[0], parts[1], bool(additional)
 
 
+def check_site_name(name: str) -> str | None:
+    """A site name is free text but never holds '-', which separates the two sites in a segment link."""
+    return "site name has '-'" if "-" in name else None
+
+
 def check_known_sites(codes: Iterable[str], known: set[str] | None) -> str | None:
     if not known:
         return None

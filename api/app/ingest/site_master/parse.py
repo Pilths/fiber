@@ -81,6 +81,10 @@ def _parse_row(kind: str, headers: list[str], values: tuple[Any, ...]) -> Item:
     parsed: dict[str, Any] = {"key": key, "lat": lat, "lon": lon, "details": details}
     if not key:
         reasons.append("site_name is blank")
+    else:
+        dash_problem = checks.check_site_name(key)
+        if dash_problem:
+            reasons.append(dash_problem)
     if coordinate_problem:
         reasons.append(coordinate_problem)
     # no Type column: parsed has no "kind" and existing kinds are left alone

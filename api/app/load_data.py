@@ -8,7 +8,7 @@
 Put the file in api/data/ (git-ignored; real data is never committed). ADMIN is an existing admin username
 (make one with app.create_admin); every write is attributed to that admin and kept as history.
 
-Sheet "Sites": site_name (4-letter LRD), latitude_in_decimal, longitude_in_decimal, region (optional),
+Sheet "Sites": site_name (any length, no '-'), latitude_in_decimal, longitude_in_decimal, region (optional),
     Type (optional: Trunk, DC, TOC; blank means Trunk).
 Sheet "Segments": Link (AAAA-BBBB), Distance (km), Route, Section, Verified cores (old files with
     "Surveyed cores" still load), Total cores.
