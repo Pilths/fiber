@@ -84,6 +84,9 @@ def _edit_name(
         raise Invalid("Name cannot be blank")
     if name == old["name"]:
         return
+    dash_problem = checks.check_site_name(name)
+    if dash_problem:
+        raise Invalid(dash_problem.capitalize() + ".")
     if db.execute(text(NAME_TAKEN_SQL), {"name": name, "site_id": site_id}).first():
         raise conflict("Another site already has this name.")
     db.execute(text(SET_SITE_NAME_SQL), {"name": name, "site_id": site_id})
