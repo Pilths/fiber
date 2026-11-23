@@ -23,6 +23,11 @@ def sites(db: DB) -> dict[str, Any]:
     return service.map_sites(db)
 
 
+@router.get("/kmz-elements")
+def kmz_elements(db: DB) -> dict[str, Any]:
+    return service.map_kmz_elements(db)
+
+
 def _zip_kml(kml: str) -> bytes:
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:

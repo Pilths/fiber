@@ -54,6 +54,17 @@ function RouteLayerRows({ state }: { state: NetworkMapState }) {
   );
 }
 
+// Saved KMZ elements (areas, lines and points from KMZ uploads), drawn under the segments.
+function KmzLayerRow({ state }: { state: NetworkMapState }) {
+  return (
+    <label className="lrow">
+      <input type="checkbox" checked={state.kmzOn} onChange={(event) => state.setKmzOn(event.target.checked)} />
+      <i className="slot" aria-hidden="true"><i className="ll k" /></i>
+      KMZ elements
+    </label>
+  );
+}
+
 // Site kinds: tick boxes with their marker shape, then the key's Selected line.
 function SiteLayerRows({ state }: { state: NetworkMapState }) {
   const siteLayers = state.siteLayers;
@@ -82,7 +93,10 @@ export function MapFilterPanel({ state, region }: { state: NetworkMapState; regi
     <div role="group" aria-label="Map filters" data-testid="map-filters" className={FILTERS_CLASS}>
       {region}
       <div className="grid grid-cols-2 gap-x-3">
-        <RouteLayerRows state={state} />
+        <div>
+          <RouteLayerRows state={state} />
+          <KmzLayerRow state={state} />
+        </div>
         <SiteLayerRows state={state} />
       </div>
     </div>

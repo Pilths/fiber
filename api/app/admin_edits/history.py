@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from app.auth.deps import DB, CurrentUser
 
 router = APIRouter()
-Entity = Literal["core", "segment", "site"]
+Entity = Literal["core", "segment", "site", "kmz_group", "cluster"]
 HISTORY_SHOWN = 10  # history rows returned with an item, newest first
 
 HISTORY_SQL = """

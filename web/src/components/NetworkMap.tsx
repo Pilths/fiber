@@ -124,6 +124,14 @@ export function NetworkMap(props: NetworkMapProps) {
             ))}
           </>
         )}
+        {state.kmzTip && (
+          <div data-testid="kmz-tip" style={{ left: state.kmzTip.x + 12, top: state.kmzTip.y + 12 }}
+            className="pointer-events-none absolute z-10 rounded border border-border bg-white px-2 py-1 text-xs
+              shadow-sm">
+            <b className="block font-semibold">{state.kmzTip.name || "Unnamed"}</b>
+            {state.kmzTip.group}
+          </div>
+        )}
         <MapControls state={state} tools={tools} />
         {note && <p role="status" data-testid="map-note" className={NOTE_CLASS}>{note}</p>}
       </div>

@@ -65,3 +65,18 @@ export function formatKm(km: number | null | undefined): string {
   }
   return String(Number(km.toFixed(1)));
 }
+
+// "3 lines · 2 areas · 6 points", zero parts left out.
+export function elementCounts(counts: { lines: number; areas: number; points: number }): string {
+  const parts = [];
+  if (counts.lines > 0) {
+    parts.push(plural(counts.lines, "line"));
+  }
+  if (counts.areas > 0) {
+    parts.push(plural(counts.areas, "area"));
+  }
+  if (counts.points > 0) {
+    parts.push(plural(counts.points, "point"));
+  }
+  return parts.join(" · ");
+}

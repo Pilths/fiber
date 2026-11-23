@@ -1,6 +1,7 @@
 import { KmzFolderTree } from "@/components/KmzFolderTree";
+import { KmzGroups } from "@/components/KmzGroups";
 import { FilePick, Note } from "@/components/upload-parts";
-import { ConfirmDialog, PreviewCard } from "@/components/upload-preview";
+import { PreviewCard } from "@/components/upload-preview";
 import { useKmzUpload, type KmzStaged } from "@/lib/useKmzUpload";
 import { formatKm, plural } from "@/lib/format";
 
@@ -10,12 +11,17 @@ type Skipped = Staged["skipped"][number];
 
 const KMZ = { accept: ".kmz,application/vnd.google-earth.kmz", button: "Choose .kmz file" };
 
-function ShapedTable({ rows }: { rows: Shaped[] }) {
+type Upload = ReturnType<typeof useKmzUpload>;
+
+function ShapedTable({ rows, ticked, onTick }: {
+  rows: Shaped[]; ticked: Set<number>; onTick: (segmentId: number, checked: boolean) => void;
+}) {
   return (
     <div className="tbox">
       <table className="tbl band table-fixed" aria-label="Segments to draw">
         <thead>
           <tr>
+            <th scope="col" className="w-12"><span className="sr-only">Include</span></th>
             <th scope="col">Segment</th>
             <th scope="col" className="num w-32">Drawn (km)</th>
             <th scope="col" className="num w-32">Excel (km)</th>
@@ -25,6 +31,10 @@ function ShapedTable({ rows }: { rows: Shaped[] }) {
         <tbody>
           {rows.map((row) => (
             <tr key={`${row.segment_id ?? "title"}-${row.name}`}>
+              <td>
+                <input type="checkbox" checked={ticked.has(row.segment_id)} aria-label={`Include ${row.name}`}
+                  onChange={(event) => onTick(row.segment_id, event.target.checked)} />
+              </td>
               <th scope="row" className="truncate font-semibold" title={row.name}>{row.name}</th>
               <td className="num">{formatKm(row.km)}</td>
               <td className="num">{formatKm(row.excel_km)}</td>
@@ -60,10 +70,22 @@ function SkippedTable({ rows }: { rows: Skipped[] }) {
   );
 }
 
-function Preview({ staged, onApply, onDiscard }: { staged: Staged; onApply: () => void; onDiscard: () => void }) {
-  const nothing = staged.shaped.length === 0;
+// "Apply 2 route lines and 3 folders"
+function applyLabel(routes: number, folders: number): string {
+  const parts = [];
+  if (routes > 0) {
+    parts.push(plural(routes, "route line"));
+  }
+  if (folders > 0) {
+    parts.push(plural(folders, "folder"));
+  }
+  return ["Apply", parts.join(" and ")].join(" ").trim();
+}
+
+function Preview({ staged, upload }: { staged: Staged; upload: Upload }) {
+  const nothing = staged.shaped.length === 0 && staged.groups.length === 0;
   return (
-    <PreviewCard titleId="kmz-prev-title" testId="kmz-preview" filename={staged.filename} onDiscard={onDiscard}>
+    <PreviewCard titleId="kmz-prev-title" testId="kmz-preview" filename={staged.filename} onDiscard={upload.discard}>
       <p className="text-body text-muted-foreground">
         {plural(staged.lines, "line")} in folder <b className="font-semibold text-foreground">“{staged.folder}”</b>.
       </p>
@@ -71,13 +93,29 @@ function Preview({ staged, onApply, onDiscard }: { staged: Staged; onApply: () =
         <Note tone="red" role="alert" title="This file will not be applied">{staged.block_reason}</Note>
       ) : (
         <>
-          {staged.shaped.length > 0 && <ShapedTable rows={staged.shaped} />}
+          {staged.shaped.length > 0 && (
+            <section className="space-y-2" aria-labelledby="kmz-routes-h">
+              <h3 id="kmz-routes-h" className="font-semibold">Route lines</h3>
+              <ShapedTable rows={staged.shaped} ticked={upload.routeIds} onTick={upload.toggleRoute} />
+            </section>
+          )}
           {staged.skipped.length > 0 && <SkippedTable rows={staged.skipped} />}
+          {staged.groups.length > 0 && (
+            <section className="space-y-2" aria-labelledby="kmz-groups-h">
+              <h3 id="kmz-groups-h" className="font-semibold">Folders</h3>
+              <KmzGroups groups={staged.groups} choices={upload.choices} lists={upload.lists}
+                onChange={upload.changeChoice} />
+            </section>
+          )}
           {nothing && staged.skipped.length === 0 && (
             <p className="text-body text-muted-foreground">No line title matches a segment.</p>
           )}
+          {upload.error && <Note tone="red" role="alert" title={upload.error} />}
           <div className="flex flex-wrap items-center gap-4 border-t pt-4">
-            <button type="button" className="btn btn-p" disabled={nothing} onClick={onApply}>Apply KMZ…</button>
+            <button type="button" className="btn btn-p" disabled={!upload.canApply || upload.busy}
+              onClick={upload.apply}>
+              {applyLabel(upload.routeCount, upload.groupCount)}
+            </button>
           </div>
         </>
       )}
@@ -85,16 +123,18 @@ function Preview({ staged, onApply, onDiscard }: { staged: Staged; onApply: () =
   );
 }
 
-function ConfirmApply({ staged, onCancel, onApply }: { staged: Staged; onCancel: () => void; onApply: () => void }) {
-  const total = staged.shaped.length;
-  const replacing = staged.shaped.filter((row) => row.had_shape).length;
+function Result({ upload }: { upload: Upload }) {
+  const result = upload.result;
+  if (!result) {
+    return null;
+  }
   return (
-    <ConfirmDialog title="Apply KMZ?" onCancel={onCancel} onConfirm={onApply}>
-      <p className="mt-3 text-body">
-        {plural(total, "segment line")} drawn on the map, {replacing} of them replace the current line.
-        {staged.skipped.length > 0 && ` ${staged.skipped.length} need review and are skipped.`}
-      </p>
-    </ConfirmDialog>
+    <Note tone="green" title="KMZ applied">
+      <p>{plural(result.shaped, "segment line")} drawn on the map.</p>
+      {result.groups_saved > 0 && <p>{plural(result.groups_saved, "folder")} saved.</p>}
+      {result.clusters_created > 0 && <p>{plural(result.clusters_created, "cluster")} created.</p>}
+      <button type="button" className="btn btn-sm mt-2" onClick={upload.reset}>Upload another</button>
+    </Note>
   );
 }
 
@@ -104,34 +144,26 @@ export function KmzUpload() {
     <div className="space-y-4">
       <section className="card" aria-labelledby="kmz-h">
         <div className="card-h">
-          <h2 id="kmz-h">Route lines (KMZ)</h2>
+          <h2 id="kmz-h">KMZ</h2>
         </div>
         <div className="space-y-4">
           <FilePick label="Upload a KMZ file" busy={upload.busy} onFile={upload.pick} kind={KMZ} />
           {upload.folders.length > 0 && (
             <>
-              <KmzFolderTree nodes={upload.folders} selected={upload.selected} onToggle={upload.toggle} />
+              <KmzFolderTree nodes={upload.folders} selected={upload.selected} onToggle={upload.toggle}
+                onSelectAll={upload.selectAll} onSelectNone={upload.selectNone} />
               <button type="button" className="btn btn-p" disabled={!upload.canPreview} onClick={upload.preview}>
                 Preview
               </button>
             </>
           )}
-          {upload.error && <Note tone="red" role="alert" title={upload.error} />}
+          {upload.error && !upload.staged && <Note tone="red" role="alert" title={upload.error} />}
           <div aria-live="polite" data-testid="kmz-result">
-            {upload.result && (
-              <Note tone="green" title="KMZ applied">
-                <p>{plural(upload.result.shaped, "segment line")} drawn on the map.</p>
-              </Note>
-            )}
+            <Result upload={upload} />
           </div>
         </div>
       </section>
-      {upload.staged && (
-        <Preview staged={upload.staged} onApply={() => upload.setConfirming(true)} onDiscard={upload.discard} />
-      )}
-      {upload.confirming && upload.staged && (
-        <ConfirmApply staged={upload.staged} onCancel={() => upload.setConfirming(false)} onApply={upload.apply} />
-      )}
+      {upload.staged && <Preview staged={upload.staged} upload={upload} />}
     </div>
   );
 }

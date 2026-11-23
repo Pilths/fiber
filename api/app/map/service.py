@@ -44,6 +44,27 @@ FROM sites s LEFT JOIN sites l ON l.id = s.lrd_site_id
 WHERE s.active
 ORDER BY s.id
 """
+# Elements of every group that is not hidden, as one GeoJSON FeatureCollection. label_point is a point inside each
+# cluster area, where the map writes the cluster name.
+KMZ_ELEMENTS_SQL = """
+SELECT json_build_object('type', 'FeatureCollection', 'features', coalesce(json_agg(json_build_object(
+    'type', 'Feature',
+    'geometry', ST_AsGeoJSON(e.geom)::json,
+    'properties', json_build_object(
+        'element_id', e.id, 'element_name', e.name, 'kind', e.kind,
+        'group_id', g.id, 'group_name', g.name, 'colour_mode', g.colour_mode, 'kmz_style', e.kmz_style,
+        'target', CASE WHEN g.segment_id IS NOT NULL THEN 'segment'
+                       WHEN g.site_id IS NOT NULL THEN 'site'
+                       ELSE 'cluster' END,
+        'cluster_name', c.name,
+        'label_point', CASE WHEN c.id IS NOT NULL AND e.kind = 'area'
+                            THEN ST_AsGeoJSON(ST_PointOnSurface(e.geom))::json -> 'coordinates' END)
+) ORDER BY e.id), '[]'::json))
+FROM kmz_elements e
+JOIN kmz_groups g ON g.id = e.group_id
+LEFT JOIN clusters c ON c.id = g.cluster_id
+WHERE g.hidden_at IS NULL
+"""
 
 
 def _ok(x: float | None, y: float | None) -> bool:
@@ -141,6 +162,10 @@ def map_sites(db: Session) -> dict[str, Any]:
                 continue
         feats.append({"type": "Feature", "properties": props, "geometry": {"type": "Point", "coordinates": [x, y]}})
     return {"type": "FeatureCollection", "features": feats, "not_drawn": not_drawn}
+
+
+def map_kmz_elements(db: Session) -> dict[str, Any]:
+    return db.execute(text(KMZ_ELEMENTS_SQL)).scalar_one()
 
 
 SEGMENT_SITES_SQL = """

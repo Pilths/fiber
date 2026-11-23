@@ -712,6 +712,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/kmz/clusters": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Clusters
+         * @description Cluster picker for the KMZ preview.
+         */
+        get: operations["clusters_api_admin_kmz_clusters_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/uploads": {
         parameters: {
             query?: never;
@@ -1054,6 +1074,23 @@ export interface paths {
         };
         /** Sites */
         get: operations["sites_api_map_sites_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/map/kmz-elements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Kmz Elements */
+        get: operations["kmz_elements_api_map_kmz_elements_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1564,12 +1601,71 @@ export interface components {
             /** Remarks */
             remarks: string | null;
         };
+        /** KmzApplyGroup */
+        KmzApplyGroup: {
+            /** Key */
+            key: string;
+            /**
+             * Target
+             * @enum {string}
+             */
+            target: "segment" | "site" | "cluster" | "skip";
+            /** Target Id */
+            target_id?: number | null;
+            /** New Cluster Name */
+            new_cluster_name?: string | null;
+            /**
+             * Colour Mode
+             * @default theme
+             * @enum {string}
+             */
+            colour_mode: "theme" | "kmz";
+            /**
+             * Member Site Ids
+             * @default []
+             */
+            member_site_ids: number[];
+        };
+        /** KmzApplyIn */
+        KmzApplyIn: {
+            /** Route Segment Ids */
+            route_segment_ids?: number[] | null;
+            /**
+             * Groups
+             * @default []
+             */
+            groups: components["schemas"]["KmzApplyGroup"][];
+        };
         /** KmzApplyOut */
         KmzApplyOut: {
             /** Upload Id */
             upload_id: number;
             /** Shaped */
             shaped: number;
+            /**
+             * Groups Saved
+             * @default 0
+             */
+            groups_saved: number;
+            /**
+             * Clusters Created
+             * @default 0
+             */
+            clusters_created: number;
+        };
+        /** KmzCluster */
+        KmzCluster: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+        };
+        /** KmzElementOut */
+        KmzElementOut: {
+            /** Name */
+            name: string;
+            /** Kind */
+            kind: string;
         };
         /** KmzFolder */
         KmzFolder: {
@@ -1579,6 +1675,10 @@ export interface components {
             name: string;
             /** Lines */
             lines: number;
+            /** Areas */
+            areas: number;
+            /** Points */
+            points: number;
             /** Children */
             children: components["schemas"]["KmzFolder"][];
         };
@@ -1588,6 +1688,43 @@ export interface components {
             folders: components["schemas"]["KmzFolder"][];
             /** Loose Lines */
             loose_lines: number;
+        };
+        /** KmzGroupCounts */
+        KmzGroupCounts: {
+            /** Lines */
+            lines: number;
+            /** Areas */
+            areas: number;
+            /** Points */
+            points: number;
+        };
+        /** KmzGroupOut */
+        KmzGroupOut: {
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+            /** Folder Path */
+            folder_path: string;
+            counts: components["schemas"]["KmzGroupCounts"];
+            /** Elements */
+            elements: components["schemas"]["KmzElementOut"][];
+            /**
+             * Default Target
+             * @enum {string}
+             */
+            default_target: "segment" | "site" | "cluster" | "skip";
+            /** Default Target Id */
+            default_target_id: number | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "Ready" | "Needs review";
+            /** Reason */
+            reason: string | null;
+            /** Member Site Ids */
+            member_site_ids: number[];
         };
         /** KmzShaped */
         KmzShaped: {
@@ -1629,6 +1766,8 @@ export interface components {
             shaped: components["schemas"]["KmzShaped"][];
             /** Skipped */
             skipped: components["schemas"]["KmzSkipped"][];
+            /** Groups */
+            groups: components["schemas"]["KmzGroupOut"][];
         };
         /** LoginBody */
         LoginBody: {
@@ -4233,7 +4372,11 @@ export interface operations {
                 fiber_session?: string | null;
             };
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["KmzApplyIn"] | null;
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -4242,6 +4385,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["KmzApplyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    clusters_api_admin_kmz_clusters_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-dev-user"?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                fiber_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KmzCluster"][];
                 };
             };
             /** @description Validation Error */
@@ -5032,6 +5208,41 @@ export interface operations {
         };
     };
     sites_api_map_sites_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-dev-user"?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                fiber_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    kmz_elements_api_map_kmz_elements_get: {
         parameters: {
             query?: never;
             header?: {
