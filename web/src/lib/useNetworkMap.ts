@@ -9,6 +9,7 @@ import {
   type Camera,
   type Point,
 } from "@/lib/mapGeometry";
+import { addKmzLayers, showKmzElements, type KmzTip } from "@/lib/kmzLayers";
 import { useFullscreen, useMapData, useMapSize } from "@/lib/mapHooks";
 import {
   ALL_ROUTES,
@@ -59,6 +60,8 @@ export function useNetworkMap(options: NetworkMapOptions) {
   const [routeLayers, setRouteLayers] = useState<RouteLayers>(ALL_ROUTES);
   const [trunkOff, setTrunkOff] = useState<Set<string>>(new Set());
   const [siteLayers, setSiteLayers] = useState<SiteLayers>(ALL_SITES);
+  const [kmzOn, setKmzOn] = useState(true);
+  const [kmzTip, setKmzTip] = useState<KmzTip | null>(null);
   const fullscreen = useFullscreen(box);
   const data = useMapData(version);
   const size = useMapSize(box, setCamera);
@@ -67,6 +70,18 @@ export function useNetworkMap(options: NetworkMapOptions) {
   useEffect(() => {
     cameraRef.current = camera;
   }, [camera]);
+
+  // KMZ elements: read by the map's load handler, which may run after the data arrived.
+  const kmzRef = useRef({ elements: data.kmz, on: kmzOn });
+  useEffect(() => {
+    kmzRef.current = { elements: data.kmz, on: kmzOn };
+    if (map.current) {
+      showKmzElements(map.current, data.kmz, kmzOn);
+    }
+    if (!kmzOn) {
+      setKmzTip(null);
+    }
+  }, [data.kmz, kmzOn]);
 
   // Basemap: WebGL and the PMTiles file are both needed, otherwise stay on the SVG overlay.
   const ready = camera != null;
@@ -97,6 +112,10 @@ export function useNetworkMap(options: NetworkMapOptions) {
           flushSync(() => {
             setCamera({ lng: center.lng, lat: center.lat, zoom: created.getZoom() });
           });
+        });
+        created.once("load", () => {
+          addKmzLayers(created, installed.glyphs, setKmzTip);
+          showKmzElements(created, kmzRef.current.elements, kmzRef.current.on);
         });
         created.on("error", (event) => {
           if (isPmtilesError(event)) {
@@ -251,6 +270,9 @@ export function useNetworkMap(options: NetworkMapOptions) {
     setTrunkOff,
     siteLayers,
     setSiteLayers,
+    kmzOn,
+    setKmzOn,
+    kmzTip,
     ...fullscreen,
     zoomBy,
     zoomAt,

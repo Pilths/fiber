@@ -4,7 +4,7 @@ import { SiteMasterUpload } from "@/components/SiteMasterUpload";
 import { SegmentListUpload } from "@/components/SegmentListUpload";
 import { KmzUpload } from "@/components/KmzUpload";
 
-const TABS = [["site-master", "Sites (Excel)"], ["segment-list", "Segments (Excel)"], ["kmz", "Route lines (KMZ)"],
+const TABS = [["site-master", "Sites (Excel)"], ["segment-list", "Segments (Excel)"], ["kmz", "KMZ"],
   ["reservations", "Reservations (Excel)"]] as const;
 type Tab = (typeof TABS)[number][0];
 const TAB_CLASS = "-mb-px h-10 border-b-2 border-transparent px-4 font-medium text-muted-foreground "

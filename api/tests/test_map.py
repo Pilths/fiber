@@ -149,3 +149,58 @@ def test_segment_kmz_without_coordinates_is_404(client, db):
     b = site(db, "RINI")
     sid = segment(db, a, b, 4)
     assert client.get(f"/api/map/segments/{sid}/kmz", headers=H()).status_code == 404
+
+
+def kmz_group(db, name, target, target_id, hidden=False, colour_mode="theme"):
+    user = "(SELECT id FROM users WHERE username = 'planner1')"
+    upload = one(db, f"INSERT INTO uploads (user_id, filename, kind) VALUES ({user}, 'x.kmz', 'kmz') RETURNING id")
+    hidden_at = "now()" if hidden else "NULL"
+    return one(
+        db,
+        f"INSERT INTO kmz_groups (upload_id, name, folder_path, {target}_id, colour_mode, hidden_at, created_by) "
+        f"VALUES (:u, :n, :n, :t, :m, {hidden_at}, {user}) RETURNING id",
+        u=upload, n=name, t=target_id, m=colour_mode,
+    )
+
+
+def kmz_element(db, group_id, name, kind, wkt, style="{}"):
+    return one(
+        db,
+        "INSERT INTO kmz_elements (group_id, name, kind, geom, kmz_style) "
+        "VALUES (:g, :n, :k, ST_GeomFromText(:w, 4326), CAST(:s AS jsonb)) RETURNING id",
+        g=group_id, n=name, k=kind, w=wkt, s=style,
+    )
+
+
+def test_kmz_elements(client, db):
+    mkuser(db)
+    assert client.get("/api/map/kmz-elements").status_code == 401
+    site_id = site(db, "Hut", xy=(101.5, 3.0))
+    cluster_id = one(db, "INSERT INTO clusters (name, created_by) VALUES ('Alpha', "
+                         "(SELECT id FROM users WHERE username = 'planner1')) RETURNING id")
+    cluster_group = kmz_group(db, "Boundary", "cluster", cluster_id, colour_mode="kmz")
+    area = kmz_element(db, cluster_group, "Area", "area", "POLYGON((101 3, 101.2 3, 101.2 3.2, 101 3.2, 101 3))",
+                       '{"fill_colour": "#ff0000", "fill_opacity": 0.3}')
+    site_group = kmz_group(db, "Compound", "site", site_id)
+    point = kmz_element(db, site_group, "Gate", "point", "POINT(101.5 3.0)")
+    hidden_group = kmz_group(db, "Old", "site", site_id, hidden=True)
+    kmz_element(db, hidden_group, "Gone", "line", "LINESTRING(101 3, 102 3)")
+
+    body = client.get("/api/map/kmz-elements", headers=H()).json()
+    assert body["type"] == "FeatureCollection"
+    features = {feature["properties"]["element_id"]: feature for feature in body["features"]}
+    assert set(features) == {area, point}
+    area_props = features[area]["properties"]
+    assert area_props["target"] == "cluster"
+    assert area_props["cluster_name"] == "Alpha"
+    assert area_props["colour_mode"] == "kmz"
+    assert area_props["kmz_style"] == {"fill_colour": "#ff0000", "fill_opacity": 0.3}
+    assert area_props["group_name"] == "Boundary"
+    assert features[area]["geometry"]["type"] == "Polygon"
+    label_x, label_y = area_props["label_point"]
+    assert 101 <= label_x <= 101.2 and 3 <= label_y <= 3.2
+    point_props = features[point]["properties"]
+    assert point_props["target"] == "site"
+    assert point_props["cluster_name"] is None
+    assert point_props["label_point"] is None
+    assert features[point]["geometry"] == {"type": "Point", "coordinates": [101.5, 3.0]}

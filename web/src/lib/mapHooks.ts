@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useState } from "react";
 import { api } from "@/api/client";
 import { fitView, MALAYSIA, type Camera, type Size } from "@/lib/mapGeometry";
+import type { KmzElements } from "@/lib/kmzLayers";
 import type { MapData, SegmentFeature, SiteFeature } from "@/lib/mapLayers";
 import { ignoreFailure } from "@/lib/utils";
 
@@ -21,14 +22,18 @@ export function useFullscreen(box: React.RefObject<HTMLDivElement | null>) {
 export function useMapData(version: number) {
   const [segments, setSegments] = useState<MapData<SegmentFeature> | null>(null);
   const [sites, setSites] = useState<MapData<SiteFeature> | null>(null);
+  const [kmz, setKmz] = useState<KmzElements | null>(null);
   const [failed, setFailed] = useState(false);
   useEffect(() => {
     let live = true;
-    Promise.all([api.get("/api/map/segments"), api.get("/api/map/sites")])
-      .then(([loadedSegments, loadedSites]) => {
+    // KMZ elements are extra: if they fail to load, the map still shows segments and sites
+    const kmzRequest = api.get("/api/map/kmz-elements").catch(() => null);
+    Promise.all([api.get("/api/map/segments"), api.get("/api/map/sites"), kmzRequest])
+      .then(([loadedSegments, loadedSites, loadedKmz]) => {
         if (live) {
           setSegments(loadedSegments as unknown as MapData<SegmentFeature>);
           setSites(loadedSites as unknown as MapData<SiteFeature>);
+          setKmz(loadedKmz as unknown as KmzElements | null);
         }
       })
       .catch(() => {
@@ -40,7 +45,7 @@ export function useMapData(version: number) {
       live = false;
     };
   }, [version]);
-  return { segments, sites, failed };
+  return { segments, sites, kmz, failed };
 }
 
 // Map size from the card; the camera starts on Malaysia (the data fit follows once segments arrive).

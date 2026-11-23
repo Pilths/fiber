@@ -49,7 +49,8 @@ def test_stage_apply_then_restage(client, db, admin, segments, kmz_bytes):
 
     applied = client.post(f"{URL}/uploads/{body['upload_id']}/apply")
     assert applied.status_code == 200
-    assert applied.json() == {"upload_id": body["upload_id"], "shaped": 2}
+    assert applied.json() == {
+        "upload_id": body["upload_id"], "shaped": 2, "groups_saved": 0, "clusters_created": 0}
     assert shaped_ids(db) == set(segments)
     assert one(db, "SELECT status FROM uploads WHERE id = :i", i=body["upload_id"]) == "confirmed"
 
@@ -104,9 +105,9 @@ def test_folder_tree_shape_and_counts(client, admin):
     assert response.status_code == 200
     assert response.json() == {
         "folders": [
-            {"id": "0", "name": "outer", "lines": 2, "children": [
-                {"id": "0/0", "name": "inner", "lines": 1, "children": []}]},
-            {"id": "1", "name": "other", "lines": 0, "children": []},
+            {"id": "0", "name": "outer", "lines": 2, "areas": 0, "points": 0, "children": [
+                {"id": "0/0", "name": "inner", "lines": 1, "areas": 0, "points": 0, "children": []}]},
+            {"id": "1", "name": "other", "lines": 0, "areas": 0, "points": 0, "children": []},
         ],
         "loose_lines": 1,
     }

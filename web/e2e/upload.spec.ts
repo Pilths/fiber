@@ -32,7 +32,7 @@ const SITE_ROWS = [
 const file = (name: string, sheets: Sheet[]) => ({ name, mimeType: XLSX, buffer: xlsx(sheets) });
 const nav = (page: Page) => page.getByRole("navigation", { name: "Main" });
 
-type UploadTab = "Sites (Excel)" | "Segments (Excel)" | "Route lines (KMZ)" | "Reservations (Excel)";
+type UploadTab = "Sites (Excel)" | "Segments (Excel)" | "KMZ" | "Reservations (Excel)";
 
 async function openUpload(page: Page, tab: UploadTab) {
   await signIn(page, "admin1");
@@ -368,12 +368,12 @@ function kmz(folder: string) {
 }
 
 async function openKmzTree(page: Page) {
-  await openUpload(page, "Route lines (KMZ)");
+  await openUpload(page, "KMZ");
   await page.getByLabel("Upload a KMZ file").setInputFiles(kmz("propose route"));
   return page.getByRole("group", { name: "Folders" });
 }
 
-test("Route lines (KMZ): preview lists the segment to draw, apply shows the count (apply mocked)", async ({ page }) => {
+test("KMZ: preview lists the segment to draw, apply shows the count (apply mocked)", async ({ page }) => {
   const tree = await openKmzTree(page);
   await expect(tree.getByRole("checkbox", { name: /propose route/ })).toBeChecked();
   await page.getByRole("button", { name: "Preview", exact: true }).click();
@@ -384,19 +384,18 @@ test("Route lines (KMZ): preview lists the segment to draw, apply shows the coun
   await expect(row).toBeVisible();
   await page.screenshot({ path: "e2e/screenshots/upload-kmz-preview.png", fullPage: true });
   await page.route("**/api/admin/kmz/uploads/*/apply", (route) => route.fulfill({ json: { upload_id: 1, shaped: 1 } }));
-  await preview.getByRole("button", { name: "Apply KMZ…" }).click();
-  await page.getByRole("dialog", { name: "Apply KMZ?" }).getByRole("button", { name: "Apply" }).click();
+  await preview.getByRole("button", { name: "Apply 1 route line" }).click();
   await expect(page.getByTestId("kmz-result")).toContainText("1 segment line drawn on the map.");
   await expect(preview).toHaveCount(0);
 });
 
-test("Route lines (KMZ): folder tree ticks children, disables empty folders and needs a tick to preview", async ({ page }) => {
+test("KMZ: folder tree ticks children, enables folders with any element and needs a tick to preview", async ({ page }) => {
   const tree = await openKmzTree(page);
   const parent = tree.getByRole("checkbox", { name: /Asbuilt Cable E2E/ });
   const exInfra = tree.getByRole("checkbox", { name: /ex infra/ });
   const proposeRoute = tree.getByRole("checkbox", { name: /propose route/ });
   const previewButton = page.getByRole("button", { name: "Preview", exact: true });
-  await expect(tree.getByRole("checkbox", { name: /site/ })).toBeDisabled();
+  await expect(tree.getByRole("checkbox", { name: /site/ })).toBeEnabled();
   await expect(parent).not.toBeChecked();
   await proposeRoute.uncheck();
   await expect(previewButton).toBeDisabled();

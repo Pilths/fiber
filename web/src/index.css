@@ -219,5 +219,7 @@
 .ll { width: 26px; height: 0; border-top: 6px solid var(--line-trunk); flex: none; }
 .ll.m { height: 4px; border-top: 0; background: repeating-linear-gradient(90deg, var(--line-metro) 0 10px, transparent 10px 13px, var(--line-metro) 13px 16px, transparent 16px 19px); } .ll.dd { border-top: 7px double var(--line-dcdc); }
 .ll.dt { border-top: 4px dashed var(--line-dctoc); } .ll.s { border-top: 4px solid var(--blue); }
+/* KMZ elements: the theme look of an area, a light grey tint with a thin outline */
+.ll.k { height: 12px; border: 1px solid var(--muted-ink); background: color-mix(in srgb, var(--muted-ink) 8%, transparent); }
 /* MapLibre's attribution sits bottom right. */
 .maplibregl-ctrl-attrib { font-size: 11px; }
