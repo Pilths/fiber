@@ -46,10 +46,12 @@ Each area has a `router.py` (the web address and input checks), a `service.py` (
 ### Upload and parsing
 - What it does: reads Excel and KMZ files, keeps every row raw, gives each row a status (Ready, Needs review, Rejected), shows a preview, and applies it on confirm.
 - Key files: `api/app/ingest/excel.py`, `api/app/ingest/checks.py`, `api/app/ingest/uploads.py`, `api/app/ingest/upload_file.py`.
+- Shared steps: `api/app/ingest/pipeline.py` (staged rows store, apply skeleton) and `api/app/ingest/segment_fields.py` (the one segment column writer). Each kind keeps its own parse, evaluate and row writes.
+- Protection: a field is protected from uploads when it has a `data_edits` row with no `upload_id` (a dashboard edit). Uploads and `app.load_data` fill `upload_id`; remarks text does not matter.
 - Site master: `api/app/ingest/site_master/` (`parse.py`, `stage.py`, `evaluate.py`, `apply.py`) and `api/app/ingest/site_master_router.py`.
 - Reservation workbook: `api/app/ingest/reservation_upload.py` and `reservation_upload_router.py`.
 - Segment list: `api/app/ingest/segment_list.py` and `segment_list_router.py`.
-- KMZ lines: `api/app/ingest/kmz_router.py`. The command line twin is `api/app/load_kmz.py`.
+- KMZ lines: `api/app/ingest/kmz.py`, used by `kmz_router.py` and the command `api/app/load_kmz.py`.
 - Called by: the Upload tab (`web/src/components/Upload.tsx`) and the commands `app.load_data` and `app.load_kmz`.
 
 ### Small helpers
@@ -169,7 +171,7 @@ Each area has a `router.py` (the web address and input checks), a `service.py` (
 
 ### Excel and KMZ parsing
 - In simple words: reading someone else's handwriting. The reader keeps the original text and writes its reading beside it.
-- Where in our code: `api/app/ingest/excel.py`, `api/app/ingest/site_master/parse.py`, `api/app/load_kmz.py`.
+- Where in our code: `api/app/ingest/excel.py`, `api/app/ingest/site_master/parse.py`, `api/app/ingest/kmz.py`.
 - Why it's used here: real files are messy, and the parser must not guess values.
 - Learn more: openpyxl read xlsx
 
