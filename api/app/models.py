@@ -267,7 +267,7 @@ class CoreHold(Base):
 class Upload(Base):
     __tablename__ = "uploads"
     __table_args__ = (
-        _in("kind", ("excel", "kmz", "site_master", "segment_list"), "uploads_kind_ck"),
+        _in("kind", ("excel", "kmz", "site_master", "segment_list", "data_file"), "uploads_kind_ck"),
         _in("status", ("staged", "confirmed", "discarded"), "uploads_status_ck"),
     )
     id: Mapped[int] = _id()
@@ -326,6 +326,7 @@ class DataEdit(Base):
     __tablename__ = "data_edits"
     __table_args__ = (
         Index("data_edits_entity_ix", "entity", "entity_id", "field", "created_at"),
+        Index("data_edits_upload_id_ix", "upload_id"),
     )
     id: Mapped[int] = _id()
     entity: Mapped[str] = mapped_column(Text)
@@ -335,6 +336,7 @@ class DataEdit(Base):
     new_value: Mapped[str | None] = mapped_column(Text)
     remarks: Mapped[str | None] = mapped_column(Text)
     user_id: Mapped[int] = _fk("users")
+    upload_id: Mapped[int | None] = _fk("uploads", nullable=True)  # empty = a dashboard edit
     created_at: Mapped[datetime] = _created()
 
 

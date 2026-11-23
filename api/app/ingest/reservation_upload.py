@@ -307,7 +307,7 @@ def _segment_items(
         item = segments.setdefault(key, new_item)
         row.extra["segment_key"] = key
         _add_row_to_segment_item(row, item)
-    protected = load_protected(db, "segment", (REMARKS,))
+    protected = load_protected(db, "segment")
     for item in segments.values():
         found = find_segment(db, sites[item.site_a], sites[item.site_b])
         if found is None:
@@ -646,7 +646,8 @@ def _apply_segment_changes(
             continue
         params = {"value": change["new"], "segment_id": segment_id}
         db.execute(text(update_segment_field_sql(change["field"])), params)
-        log_edits_for_user(db, admin_id, "segment", segment_id, [(change["field"], change["old"], change["new"])], why)
+        edit = [(change["field"], change["old"], change["new"])]
+        log_edits_for_user(db, admin_id, "segment", segment_id, edit, why, upload_id)
         if change["field"] == "survey_cores":
             counts["cores"] += add_cores(db, segment_id, change["new"])
         counts["segment_updates"] += 1

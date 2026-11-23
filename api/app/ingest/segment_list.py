@@ -18,7 +18,6 @@ from sqlalchemy.orm import Session
 from app.admin_edits.history import log_edits_for_user
 from app.ingest.checks import blank, clean, split_nodes
 from app.ingest.excel import _json
-from app.ingest.reservation_upload import REMARKS as RESERVATION_REMARKS
 from app.ingest.site_master import hkey, load_protected
 from app.ingest.uploads import ApplyError, finish_upload, insert_upload, lock_staged_upload
 from app.routing.graph import invalidate as invalidate_routes
@@ -234,7 +233,7 @@ def evaluate(db: Session, parsed: Parsed) -> list[Item]:
     sites = {row.name: row for row in db.execute(text(SELECT_SITES_BY_NAME), {"names": sorted(names)})}
     segment_rows = db.execute(text(SELECT_SEGMENTS)).mappings()
     segments = {frozenset((row["site_a_id"], row["site_b_id"])): row for row in segment_rows}
-    protected = load_protected(db, "segment", (UPLOAD_REMARKS, RESERVATION_REMARKS))
+    protected = load_protected(db, "segment")
     pairs = Counter(_pair_key(item) for item in parsed.items if item.parsed["a"])
     for item in parsed.items:
         reasons = _problems(item, pairs, parsed.items, sites)
@@ -339,12 +338,14 @@ def _create_segment(db: Session, item: Item) -> None:
     db.execute(text(INSERT_SEGMENT), params)
 
 
-def _update_segment(db: Session, admin_id: int, item: Item, changes: list[dict[str, Any]], why: str) -> None:
+def _update_segment(
+    db: Session, admin_id: int, upload_id: int, item: Item, changes: list[dict[str, Any]], why: str
+) -> None:
     for change in changes:
         params = {"value": change["new"], "segment_id": item.db_id}
         db.execute(text(update_segment_field_sql(change["field"])), params)
         edit = [(change["field"], change["old"], change["new"])]
-        log_edits_for_user(db, admin_id, "segment", item.db_id, edit, why)  # type: ignore[arg-type]
+        log_edits_for_user(db, admin_id, "segment", item.db_id, edit, why, upload_id)  # type: ignore[arg-type]
 
 
 def apply_upload(db: Session, admin_id: int, upload_id: int) -> dict[str, Any]:
@@ -370,7 +371,7 @@ def apply_upload(db: Session, admin_id: int, upload_id: int) -> dict[str, Any]:
                 to_apply = [change for change in item.changes if not change["protected"]]
                 if not to_apply:
                     continue
-                _update_segment(db, admin_id, item, to_apply, why)
+                _update_segment(db, admin_id, upload_id, item, to_apply, why)
                 counts["changed"] += 1
         applied = {"by": admin_id, "at": datetime.now(UTC).isoformat(), **counts, "warnings": warnings}
         finish_upload(db, upload_id, dict(upload["summary"], applied=applied))

@@ -10,7 +10,6 @@ from app.ingest.site_master.model import (
     DROP_LIMIT,
     LOCATION_FIELDS,
     SHEETS,
-    UPLOAD_REMARKS,
     DbSite,
     Item,
     ParsedSheet,
@@ -23,10 +22,7 @@ SELECT s.id, s.name, s.kind, s.active, ST_Y(s.geom) AS lat, ST_X(s.geom) AS lon,
        s.lrd_site_id AS lrd_id
 FROM sites s
 """
-PROTECTED_SQL = (
-    "SELECT entity_id, field FROM data_edits "
-    "WHERE entity = :entity AND NOT (COALESCE(remarks, '') LIKE ANY (CAST(:prefixes AS text[])))"
-)
+PROTECTED_SQL = "SELECT entity_id, field FROM data_edits WHERE entity = :entity AND upload_id IS NULL"
 USED_SITE_IDS_SQL = """
 SELECT DISTINCT site_id FROM (
     SELECT site_a_id AS site_id FROM segments
@@ -46,14 +42,13 @@ def load_snapshot(db: Session) -> dict[str, DbSite]:
     return snapshot
 
 
-def load_protected(db: Session, entity: str, upload_reasons: tuple[str, ...]) -> dict[int, set[str]]:
+def load_protected(db: Session, entity: str) -> dict[int, set[str]]:
     """Fields edited in the dashboard are protected from uploads.
 
-    An edit counts unless its reason starts with one of the upload reasons.
+    A dashboard edit is a data_edits row with no upload_id. Remarks text does not matter.
     """
     protected: dict[int, set[str]] = {}
-    prefixes = [reason + "%" for reason in upload_reasons]
-    for entity_id, field_name in db.execute(text(PROTECTED_SQL), {"entity": entity, "prefixes": prefixes}):
+    for entity_id, field_name in db.execute(text(PROTECTED_SQL), {"entity": entity}):
         protected.setdefault(entity_id, set()).add(field_name)
     return protected
 
@@ -210,7 +205,7 @@ def used_site_ids(db: Session, ids: list[int]) -> set[int]:
 
 def evaluate(db: Session, parsed: dict[str, ParsedSheet], add_only: bool = False) -> dict[str, SheetResult]:
     snapshot = load_snapshot(db)
-    protected = load_protected(db, "site", (UPLOAD_REMARKS,))
+    protected = load_protected(db, "site")
     out = {"sites": _eval_sheet("sites", parsed["sites"], snapshot, protected, add_only)}
     for result in out.values():
         result.in_use = used_site_ids(db, [missing.id for missing in result.missing])
