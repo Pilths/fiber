@@ -5,6 +5,7 @@ import type { View } from "@/components/Header";
 import type { Found } from "@/components/NetworkDetail";
 import { inFilter, NO_FILTER, segmentName, type LossDetail, type SegmentFilter } from "@/lib/status";
 import { useRoutePlanner, type RouteOption } from "@/lib/useRoutePlanner";
+import { ignoreFailure } from "@/lib/utils";
 
 export type Segment = components["schemas"]["SegmentSummary"];
 export type Detail = components["schemas"]["SegmentDetail"];
@@ -101,7 +102,7 @@ export function useInventory(view: View, version: number) {
           setLoss(loaded);
         }
       })
-      .catch(() => {});
+      .catch(ignoreFailure);
     return () => {
       stale = true;
     };

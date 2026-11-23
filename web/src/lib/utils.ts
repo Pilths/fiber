@@ -14,3 +14,8 @@ export const cell = (parsed: unknown, raw: unknown) => {
   const v = parsed ?? raw;
   return v == null || v === "" ? "—" : String(v);
 };
+
+// For best-effort calls (refresh, clipboard, fullscreen) whose failure the user does not need to see.
+export function ignoreFailure(): void {
+  // Nothing to do: the screen keeps what it already shows.
+}
