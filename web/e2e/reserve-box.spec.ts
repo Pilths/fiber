@@ -103,7 +103,7 @@ test("count-only reservation shows on the segment and in My reservations", async
   await pickSegment(page, /^DEV Cyberjaya DC - DEV Bukit Jalil/);
   await expect(page.getByTestId("unassigned-row").first()).toContainText("3 cores");
   await page.getByRole("button", { name: /My reservations/ }).click();
-  await expect(page.getByTestId("reservation").filter({ hasText: "3 not assigned yet" })).toBeVisible();
+  await expect(page.getByTestId("reservation").filter({ hasText: "3 not assigned" })).toBeVisible();
   const pendingChip = page.getByRole("button", { name: /^Pending \d+$/ });
   await pendingChip.click();
   await expect(pendingChip).toHaveAttribute("aria-pressed", "true");

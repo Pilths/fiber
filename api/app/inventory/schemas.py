@@ -71,6 +71,7 @@ class Holder(BaseModel):
     age_days: int
     owner: Owner
     is_mine: bool
+    actions: list[str]  # what the viewer may do on this reservation (reservations/actions.py)
 
 
 class CoreHolderDetail(BaseModel):

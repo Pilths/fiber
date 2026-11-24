@@ -13,5 +13,5 @@ def test_service_refuses_without_a_request(db):
 
 def test_service_not_found_without_a_request(db):
     with pytest.raises(NotFound) as caught:
-        service.get(db, 999999999)
+        service.get(db, None, 999999999)
     assert (caught.value.status, caught.value.message) == (404, "Reservation not found")

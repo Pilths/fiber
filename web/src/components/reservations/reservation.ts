@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { errorText, resAction, type Action } from "@/api/client";
 import type { components } from "@/api/schema";
+import { EVENT_WORD } from "@/lib/status";
 
 export type Reservation = components["schemas"]["ReservationOut"];
 export type Me = components["schemas"]["CurrentUser"];
@@ -17,8 +18,21 @@ export function groupCores(reservation: Reservation) {
   return [...bySegment.entries()];
 }
 
+// Label of the last event's remarks: "Rejected: ...", "Declined: ...", else "Remarks: ...".
 export function lastRemarksLabel(reservation: Reservation) {
-  return reservation.status === "rejected" ? "Rejection remarks" : "Release declined remarks";
+  if (reservation.last_event === "rejected") {
+    return "Rejected";
+  }
+  if (reservation.last_event === "release_declined") {
+    return "Declined";
+  }
+  return "Remarks";
+}
+
+// "Last Approved · 12 d": the last event's word and its age in days.
+export function lastEventText(reservation: Reservation) {
+  const word = reservation.last_event ? (EVENT_WORD[reservation.last_event] ?? reservation.last_event) : "-";
+  return `Last ${word} · ${reservation.age_days} d`;
 }
 
 // One reservation's actions: run an action, then reset the open form and tell the parent to reload.

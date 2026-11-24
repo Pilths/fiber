@@ -12,11 +12,12 @@ from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.errors import NotFound, Conflict, Forbidden, Invalid, ServiceError
+from app.errors import NotFound, Conflict, Invalid, ServiceError
 from app.auth.deps import CurrentUser
 from app.db import set_lock_timeout
 from app.inventory import service as inventory
 from app.inventory.capacity import check_booking
+from app.reservations.actions import RULES, allowed_names
 from app.reservations.schemas import NeedsReviewItem, ReservationOut
 
 TZ = "'Asia/Kuala_Lumpur'"
@@ -74,6 +75,14 @@ SELECT x.reservation_id, a.name || ' - ' || b.name FROM (
 JOIN segments s ON s.id = x.segment_id AND s.fiber_cut
 JOIN sites a ON a.id = s.site_a_id JOIN sites b ON b.id = s.site_b_id
 ORDER BY x.reservation_id, s.id
+"""
+
+REQUEST_REMARKS_SQL = """
+SELECT e.reservation_id, e.remarks FROM reservation_events e
+JOIN reservation_state_v st ON st.reservation_id = e.reservation_id
+WHERE e.reservation_id = ANY(CAST(:ids AS bigint[])) AND e.type = 'release_requested'
+  AND e.id = (SELECT max(x.id) FROM reservation_events x WHERE x.reservation_id = e.reservation_id)
+  AND st.status = 'approved' AND st.last_event = 'release_requested'
 """
 
 APPROVALS_WHERE = "st.status = 'pending' OR (st.status = 'approved' AND st.last_event = 'release_requested')"
@@ -156,7 +165,8 @@ def _awaiting(status: str, last_event: str | None) -> str | None:
     return None
 
 
-def load(db: Session, where: str = "true", order: str = "r.id DESC", **params: Any) -> list[ReservationOut]:
+def load(db: Session, user: CurrentUser, where: str = "true", order: str = "r.id DESC",
+         **params: Any) -> list[ReservationOut]:
     """where/order are fixed fragments from this module, never user text."""
     sql = f"{RES_SQL} WHERE {where} ORDER BY {order}"
     rows = [dict(row) for row in db.execute(text(sql), params).mappings()]
@@ -167,10 +177,14 @@ def load(db: Session, where: str = "true", order: str = "r.id DESC", **params: A
     requested: dict[int, list[int]] = {reservation_id: [] for reservation_id in ids}
     for reservation_id, core_id in db.execute(text(REQUESTED_RELEASE_SQL), {"ids": ids}):
         requested[reservation_id].append(core_id)
+    request_remarks = dict(db.execute(text(REQUEST_REMARKS_SQL), {"ids": ids}).all())
     out = []
     for row in rows:
+        action_row = {**row, "is_stale": row["stale"], "remaining": row["remaining_unassigned"]}
         reservation = ReservationOut(
             **row,
+            actions=allowed_names(action_row, user),
+            release_request_remarks=request_remarks.get(row["id"]),
             awaiting=_awaiting(row["status"], row["last_event"]),
             cores=cores[row["id"]],
             release_requested_cores=requested[row["id"]],
@@ -179,8 +193,8 @@ def load(db: Session, where: str = "true", order: str = "r.id DESC", **params: A
     return out
 
 
-def get(db: Session, reservation_id: int) -> ReservationOut:
-    found = load(db, "r.id = :id", id=reservation_id)
+def get(db: Session, user: CurrentUser, reservation_id: int) -> ReservationOut:
+    found = load(db, user, "r.id = :id", id=reservation_id)
     if not found:
         raise NotFound("Reservation not found")
     return found[0]
@@ -192,11 +206,19 @@ def list_reservations(db: Session, user: CurrentUser, mine: bool, status: str | 
         where.append("r.planner_id = :uid")
     if status:
         where.append("st.status = :status")
-    return load(db, " AND ".join(where), uid=user.id, status=status)
+    return load(db, user, " AND ".join(where), uid=user.id, status=status)
 
 
-def approvals(db: Session) -> list[ReservationOut]:
-    return load(db, APPROVALS_WHERE, OLDEST_EVENT_FIRST)
+def get_visible(db: Session, user: CurrentUser, reservation_id: int) -> ReservationOut:
+    """Own planner or admin; anyone else gets 404 so existence is not leaked."""
+    reservation = get(db, user, reservation_id)
+    if reservation.planner_id != user.id and user.role != "admin":
+        raise NotFound("Reservation not found")
+    return reservation
+
+
+def approvals(db: Session, user: CurrentUser) -> list[ReservationOut]:
+    return load(db, user, APPROVALS_WHERE, OLDEST_EVENT_FIRST)
 
 
 def _cut_segments(db: Session) -> dict[int, list[str]]:
@@ -212,12 +234,12 @@ def needs_review(db: Session, user: CurrentUser) -> list[NeedsReviewItem]:
     if user.role != "admin":
         where += " AND r.planner_id = :uid"
     items = []
-    for reservation in load(db, where, OLDEST_EVENT_FIRST, cut=list(cut), uid=user.id):
+    for reservation in load(db, user, where, OLDEST_EVENT_FIRST, cut=list(cut), uid=user.id):
         if reservation.stale:
-            detail = f"Stale: {reservation.age_days} days since last event. Keep it or request release."
+            detail = f"Stale · {reservation.age_days} d"
             items.append(NeedsReviewItem(kind="stale", reservation=reservation, detail=detail))
         if reservation.awaiting == "release":
-            detail = "Release requested, waiting for an admin."
+            detail = "Release requested"
             items.append(NeedsReviewItem(kind="release_requested", reservation=reservation, detail=detail))
         if reservation.id in cut:
             detail = "Fiber cut: " + ", ".join(cut[reservation.id])
@@ -249,14 +271,10 @@ def _event(db: Session, reservation_id: int, kind: str, user: CurrentUser, remar
     return db.execute(text(INSERT_EVENT_SQL), params).scalar_one()
 
 
-def _require(row: dict[str, Any], *statuses: str) -> None:
-    if row["status"] not in statuses:
-        raise conflict(f"Reservation is {row['status']}; this needs it to be {' or '.join(statuses)}.")
-
-
-def _own_or_admin(row: dict[str, Any], user: CurrentUser) -> None:
-    if row["planner_id"] != user.id and user.role != "admin":
-        raise Forbidden("Only the planner who made the request can do this")
+def _allow(row: dict[str, Any], user: CurrentUser, action: str) -> None:
+    refusal = RULES[action](row, user)
+    if refusal is not None:
+        raise refusal
 
 
 def _customer_exists(db: Session, customer_id: int) -> bool:
@@ -346,31 +364,24 @@ def create(db: Session, user: CurrentUser, customer_id: int, planned_date: date 
     _event(db, reservation_id, "requested", user)
     _hold(db, reservation_id, core_ids)
     db.commit()
-    return get(db, reservation_id)
+    return get(db, user, reservation_id)
 
 
 def withdraw(db: Session, user: CurrentUser, reservation_id: int) -> ReservationOut:
     row = _lock(db, reservation_id)
-    if row["planner_id"] != user.id:
-        raise Forbidden("Only the planner who made the request can withdraw it")
-    _require(row, "pending")
+    _allow(row, user, "withdraw")
     _event(db, reservation_id, "withdrawn", user)
     db.execute(text(DELETE_HOLDS_SQL), {"reservation_id": reservation_id})
     db.commit()
-    return get(db, reservation_id)
+    return get(db, user, reservation_id)
 
 
 def keep(db: Session, user: CurrentUser, reservation_id: int) -> ReservationOut:
     row = _lock(db, reservation_id)
-    _own_or_admin(row, user)
-    _require(row, "approved")
-    if row["last_event"] == "release_requested":
-        raise conflict("A release is already requested; an admin has to decide it first.")
-    if not row["is_stale"]:
-        raise conflict("Keep is only for a stale reservation (no approval or keep for over 3 months).")
+    _allow(row, user, "keep")
     _event(db, reservation_id, "kept", user)
     db.commit()
-    return get(db, reservation_id)
+    return get(db, user, reservation_id)
 
 
 def _held(db: Session, reservation_id: int, core_ids: list[int]) -> list[int]:
@@ -395,59 +406,54 @@ def _cores_to_free(db: Session, reservation_id: int, core_ids: list[int]) -> lis
 
 
 def request_release(
-    db: Session, user: CurrentUser, reservation_id: int, core_ids: list[int]
+    db: Session, user: CurrentUser, reservation_id: int, core_ids: list[int], remarks: str | None = None
 ) -> ReservationOut:
     row = _lock(db, reservation_id)
-    _own_or_admin(row, user)
-    _require(row, "approved")
-    if row["last_event"] == "release_requested":
-        raise conflict("A release is already requested.")
+    _allow(row, user, "request-release")
     ids = _cores_to_free(db, reservation_id, core_ids)
-    event_id = _event(db, reservation_id, "release_requested", user)
+    event_id = _event(db, reservation_id, "release_requested", user, (remarks or "").strip() or None)
     _record_cores(db, INSERT_RELEASE_CORE_SQL, event_id, ids)
     db.commit()
-    return get(db, reservation_id)
+    return get(db, user, reservation_id)
 
 
 # ---------- admin ----------
 
 def approve(db: Session, user: CurrentUser, reservation_id: int) -> ReservationOut:
     row = _lock(db, reservation_id)
-    _require(row, "pending")
+    _allow(row, user, "approve")
     _event(db, reservation_id, "approved", user)
     db.commit()
-    return get(db, reservation_id)
+    return get(db, user, reservation_id)
 
 
 def reject(db: Session, user: CurrentUser, reservation_id: int, remarks: str) -> ReservationOut:
     row = _lock(db, reservation_id)
-    _require(row, "pending")
+    _allow(row, user, "reject")
     _event(db, reservation_id, "rejected", user, remarks or None)
     db.execute(text(DELETE_HOLDS_SQL), {"reservation_id": reservation_id})
     db.commit()
-    return get(db, reservation_id)
+    return get(db, user, reservation_id)
 
 
 def release(db: Session, user: CurrentUser, reservation_id: int, core_ids: list[int]) -> ReservationOut:
     """Frees only the named cores' holds. The reservation ends (derived) when nothing is held any more."""
     row = _lock(db, reservation_id)
-    _require(row, "approved")
+    _allow(row, user, "release")
     ids = _cores_to_free(db, reservation_id, core_ids)
     event_id = _event(db, reservation_id, "released", user)
     _record_cores(db, INSERT_RELEASE_CORE_SQL, event_id, ids)
     db.execute(text(DELETE_SOME_HOLDS_SQL), {"reservation_id": reservation_id, "ids": ids})
     db.commit()
-    return get(db, reservation_id)
+    return get(db, user, reservation_id)
 
 
 def decline_release(db: Session, user: CurrentUser, reservation_id: int, remarks: str) -> ReservationOut:
     row = _lock(db, reservation_id)
-    _require(row, "approved")
-    if row["last_event"] != "release_requested":
-        raise conflict("No release request is waiting.")
+    _allow(row, user, "decline-release")
     _event(db, reservation_id, "release_declined", user, remarks or None)
     db.commit()
-    return get(db, reservation_id)
+    return get(db, user, reservation_id)
 
 
 def correct(db: Session, user: CurrentUser, reservation_id: int, remarks: str, customer_id: int | None,
@@ -457,21 +463,21 @@ def correct(db: Session, user: CurrentUser, reservation_id: int, remarks: str, c
     if customer_id is None and planned_date is None:
         raise Invalid("Give a customer or a planned date to correct")
     row = _lock(db, reservation_id)
-    _require(row, "approved")
+    _allow(row, user, "correct")
     if planned_date is not None and row["imported"] and row["planned_date"] is None:
         raise conflict("The date of an undated imported reservation cannot be corrected.")
     if customer_id is not None and not _customer_exists(db, customer_id):
         raise Invalid("Unknown customer")
     _event(db, reservation_id, "corrected", user, remarks or None, customer_id, planned_date)
     db.commit()
-    return get(db, reservation_id)
+    return get(db, user, reservation_id)
 
 
 def assign(db: Session, user: CurrentUser, reservation_id: int, core_ids: list[int]) -> ReservationOut:
     """Turn part of a count-only reservation into named cores (on its segment)."""
     core_ids = sorted(set(core_ids))
     row = _lock(db, reservation_id)
-    _require(row, "approved")
+    _allow(row, user, "assign")
     if not core_ids:
         raise Invalid("Name at least one core")
     if len(core_ids) > row["remaining"]:
@@ -488,4 +494,4 @@ def assign(db: Session, user: CurrentUser, reservation_id: int, core_ids: list[i
     event_id = _event(db, reservation_id, "assigned", user)
     _record_cores(db, INSERT_ASSIGN_CORE_SQL, event_id, core_ids)
     db.commit()
-    return get(db, reservation_id)
+    return get(db, user, reservation_id)

@@ -5,6 +5,8 @@ import { Icon } from "@/components/Icon";
 import { Blank } from "@/components/LossCard";
 import { MeasurementDialog } from "@/components/MeasurementDialog";
 import { PortsDialog } from "@/components/PortsDialog";
+import { ReleaseBox } from "@/components/reservations/ReleaseBox";
+import type { Reservation } from "@/components/reservations/reservation";
 import { Dialog } from "@/components/upload-parts";
 import { LossDeviation } from "@/lib/lossLevel";
 import { db, EVENT_WORD, segmentName, STATUS, statusLabel } from "@/lib/status";
@@ -79,32 +81,13 @@ function useCoreDrawer(core: Core, me: Me, onChanged: () => void) {
     load();
   };
 
-  const canRequestRelease = holder && (holder.is_mine || admin) && holder.state === "approved";
-  return {
-    items,
-    holder,
-    error,
-    busy,
-    admin,
-    act,
-    changedAndReload,
-    canRequestRelease,
-    canKeep: canRequestRelease && holder.stale,
-    canRelease: admin && holder?.state === "release_requested",
-  };
+  return { items, holder, error, setError, busy, admin, act, changedAndReload };
 }
 
 type Drawer = ReturnType<typeof useCoreDrawer>;
 
-// The holder has no list of requested cores; admins see every reservation, so read it at click time.
-async function releaseRequestedCores(reservationId: number) {
-  const reservations = await api.get("/api/reservations");
-  const reservation = reservations.find((each) => each.id === reservationId);
-  return resAction(reservationId, "release", { cores: reservation?.release_requested_cores ?? [] });
-}
-
 // Core detail: right-side drawer on the native <dialog> (Esc closes, focus returns to the cell or row that opened it).
-// The holder comes from GET /api/cores/{id}: everyone sees who holds a core; actions follow holder.is_mine or admin.
+// The holder comes from GET /api/cores/{id}: everyone sees who holds a core; buttons follow holder.actions.
 // Loss is per core: `calc` is the core's calculated loss (the segment's formula when the core has no row),
 // `loss` its tests.
 export function CoreDrawer({ core, segment, ends, me, onClose, onChanged, loss, calc }: {
@@ -210,27 +193,39 @@ function CoreFacts({ core, holder, loss, calc }: {
   );
 }
 
+// Keep, Request release (planner, this core) and Release (admin, opens the Release box), as holder.actions allows.
 function ReservationActions({ core, drawer }: { core: Core; drawer: Drawer }) {
+  const [releasing, setReleasing] = useState<Reservation | null>(null);
   const holder = drawer.holder;
-  if (!holder || !(drawer.canRequestRelease || drawer.canRelease)) {
+  if (!holder) {
+    return null;
+  }
+  const allows = (name: string) => holder.actions.includes(name);
+  if (!allows("keep") && !allows("request-release") && !allows("release")) {
     return null;
   }
   const reservationId = holder.reservation_id;
   const keep = () => drawer.act(() => resAction(reservationId, "keep"));
   const requestRelease = () => drawer.act(() => resAction(reservationId, "request-release", { cores: [core.id] }));
-  const release = () => drawer.act(() => releaseRequestedCores(reservationId));
+  const openRelease = () => {
+    drawer.setError(null);
+    api.get("/api/reservations/{rid}", { path: { rid: reservationId } })
+      .then(setReleasing)
+      .catch((failure) => drawer.setError(errorText(failure, "Could not load the reservation. Try again.")));
+  };
   return (
     <div className="mt-4 flex flex-wrap gap-2 border-t pt-4">
-      {drawer.canKeep && <button type="button" className="btn" disabled={drawer.busy} onClick={keep}>Keep</button>}
-      {drawer.canRequestRelease && (
+      {allows("keep") && <button type="button" className="btn" disabled={drawer.busy} onClick={keep}>Keep</button>}
+      {allows("request-release") && (
         <button type="button" className="btn" disabled={drawer.busy} onClick={requestRelease}>
           Request release of core {core.number}
         </button>
       )}
-      {drawer.canRelease && (
-        <button type="button" className="btn btn-p" disabled={drawer.busy} onClick={release}>
-          Release requested cores
-        </button>
+      {allows("release") && (
+        <button type="button" className="btn btn-p" disabled={drawer.busy} onClick={openRelease}>Release</button>
+      )}
+      {releasing && (
+        <ReleaseBox reservation={releasing} onClose={() => setReleasing(null)} onChanged={drawer.changedAndReload} />
       )}
     </div>
   );

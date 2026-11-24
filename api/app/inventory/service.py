@@ -18,7 +18,9 @@ from app.inventory.schemas import (
     UnassignedHold,
 )
 from app.inventory.capacity import free_to_reserve, health
+from app.auth.deps import CurrentUser
 from app.link_type import ROUTE_TYPE_SQL
+from app.reservations.actions import allowed_names
 from app.reservations.service import TZ
 
 PER_TYPE = 20
@@ -131,7 +133,10 @@ FROM reservations r JOIN users u ON u.id = r.planner_id
 WHERE r.id = :reservation_id
 """
 RESERVATION_STATE_SQL = """
-SELECT status, last_event FROM reservation_state_v WHERE reservation_id = :reservation_id
+SELECT st.status, st.last_event, st.is_stale, COALESCE(un.remaining, 0) AS remaining
+FROM reservation_state_v st
+LEFT JOIN reservation_unassigned_v un ON un.reservation_id = st.reservation_id
+WHERE st.reservation_id = :reservation_id
 """
 
 LIST_CUSTOMERS_SQL = """
@@ -279,41 +284,43 @@ def get_segment(db: Session, segment_id: int) -> SegmentDetail | None:
     )
 
 
-def _holder_state(db: Session, reservation_id: int) -> str:
+def _holder_state(last: Any) -> str:
     """pending = requested; approved with a release waiting = release_requested."""
-    last = db.execute(text(RESERVATION_STATE_SQL), {"reservation_id": reservation_id}).one()
-    if last.status == "pending":
+    if last["status"] == "pending":
         return "requested"
-    if last.last_event == "release_requested":
+    if last["last_event"] == "release_requested":
         return "release_requested"
     return "approved"
 
 
-def _holder(db: Session, row: Any, user_id: int) -> Holder:
+def _holder(db: Session, row: Any, user: CurrentUser) -> Holder:
     reservation_id = row["reservation_id"]
     owner = db.execute(text(HOLDER_SQL), {"reservation_id": reservation_id}).mappings().one()
+    last = db.execute(text(RESERVATION_STATE_SQL), {"reservation_id": reservation_id}).mappings().one()
+    action_row = {**last, "planner_id": owner["id"]}
     return Holder(
         reservation_id=reservation_id,
         customer=row["customer"],
         planned_date=row["planned_date"],
-        state=_holder_state(db, reservation_id),
+        state=_holder_state(last),
+        actions=allowed_names(action_row, user),
         stale=row["stale"],
         stale_since=row["stale_since"],
         srf_id=row["srf_id"],
         planner=row["planner"],
         age_days=row["age_days"],
         owner=Owner(**owner),
-        is_mine=owner["id"] == user_id,
+        is_mine=owner["id"] == user.id,
     )
 
 
-def get_core(db: Session, core_id: int, user_id: int) -> CoreHolderDetail | None:
+def get_core(db: Session, core_id: int, user: CurrentUser) -> CoreHolderDetail | None:
     row = db.execute(text(CORE_ONE_SQL), {"id": core_id}).mappings().first()
     if row is None:
         return None
     holder = None
     if row["reservation_id"] is not None:
-        holder = _holder(db, row, user_id)
+        holder = _holder(db, row, user)
     return CoreHolderDetail(
         core_id=row["id"],
         number=row["number"],

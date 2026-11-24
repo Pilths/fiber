@@ -27,6 +27,8 @@ Read before working: `docs/PRD.md` (requirements), `docs/architecture.md` (desig
 - Reservations are insert-only events. An upload never changes a reservation.
 - Excel imports reservations only until the one-time "Close reservation import" switch is closed (a `data_edits` row: entity 'system', entity_id 0, field 'reservation_import', new_value 'closed'). After that, reservation rows in an upload are ignored with a warning and new reservations are made only in the dashboard.
 - Release is not deletion. It adds a 'released' event and frees only the `core_holds` lock row; the reservation, its cores and its events stay. A release can cover only some cores of a route reservation.
+- Actions are decided once: `api/app/reservations/actions.py` `allowed_actions` gives each viewer's allowed actions; the API refusals and the `actions` list on reservations and core holders come from it, and buttons read only `actions`.
+- An admin releases directly (any approved reservation, chosen cores, no request needed) and never requests a release (403). A planner requests release of picked cores with optional Remarks.
 - Keep is offered only on a stale reservation (approved, no approval or keep for over 3 months, no release waiting); it adds a 'kept' event and restarts the 3-month clock. The API refuses Keep otherwise (409).
 - Corrections are only for customer and planned date, on approved reservations, as a 'corrected' event (remarks optional). Cores are never corrected or swapped: release and request again. Customer is required on every reservation.
 - Core verification is the term in all UI, docs and messages; the DB column `segments.survey_cores` and API fields keep the old name.

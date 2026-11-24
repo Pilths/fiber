@@ -3,9 +3,10 @@ import { api } from "@/api/client";
 import { Icon } from "@/components/Icon";
 import { useLoad } from "@/lib/useLoad";
 import { ReservationHistory } from "@/components/reservations/ReservationHistory";
-import { ReservationSummary } from "@/components/reservations/ReservationSummary";
+import { ReleaseBox } from "@/components/reservations/ReleaseBox";
+import { ReservationChips, ReservationSummary } from "@/components/reservations/ReservationSummary";
 import {
-  groupCores, lastRemarksLabel, type Me, type Mode, type Reservation, useReservationAction,
+  groupCores, lastEventText, lastRemarksLabel, type Me, type Mode, type Reservation, useReservationAction,
 } from "@/components/reservations/reservation";
 import { formatDate } from "@/lib/format";
 
@@ -20,10 +21,12 @@ function segmentText(reservation: Reservation) {
 }
 
 // Approvals (admin): one table of waiting requests, oldest first. Approve / Reject (or Release / Decline for a release
-// request) sit at the right of each row; Reject and Decline open the row to ask for remarks. The chevron opens the
-// row for its cores, notes and history.
+// request) sit at the right of each row; Reject and Decline open the row to ask for remarks, Release opens the
+// Release box. The chevron opens the row for its cores, notes and history.
 export function Approvals({ me, onChanged }: { me: Me; onChanged: () => void }) {
   const { data, error, reload } = useLoad(() => api.get("/api/approvals"));
+  // Opened outside the table, so the box does not take the table's cell styles.
+  const [releasing, setReleasing] = useState<Reservation | null>(null);
   const rowChanged = () => {
     reload();
     onChanged();
@@ -42,10 +45,14 @@ export function Approvals({ me, onChanged }: { me: Me; onChanged: () => void }) 
             <caption className="sr-only">Requests waiting for an admin, oldest first</caption>
             <ApprovalsHead />
             {data.map((reservation) => (
-              <ApprovalRow key={reservation.id} reservation={reservation} onChanged={rowChanged} />
+              <ApprovalRow key={reservation.id} reservation={reservation} onChanged={rowChanged}
+                onRelease={setReleasing} />
             ))}
           </table>
         </div>
+      )}
+      {releasing && (
+        <ReleaseBox reservation={releasing} onClose={() => setReleasing(null)} onChanged={rowChanged} />
       )}
     </section>
   );
@@ -69,23 +76,23 @@ function ApprovalsHead() {
 
 type Action = ReturnType<typeof useReservationAction>;
 
-function RowButtons({ reservation, action, onAsk }: {
-  reservation: Reservation; action: Action; onAsk: (mode: Mode) => void;
+// The buttons the API allows: Approve / Reject on a new request, Release / Decline on a release request.
+function RowButtons({ reservation, action, onAsk, onRelease }: {
+  reservation: Reservation; action: Action; onAsk: (mode: Mode) => void; onRelease: () => void;
 }) {
-  const { busy, run } = action;
-  if (reservation.awaiting === "release") {
-    const release = () => run("release", { cores: reservation.release_requested_cores });
-    return (
-      <>
-        <button type="button" className="btn btn-sm" disabled={busy} onClick={release}>Release</button>
-        <button type="button" className="btn btn-sm" onClick={() => onAsk("decline-release")}>Decline</button>
-      </>
-    );
-  }
+  const allows = (name: string) => reservation.actions.includes(name);
   return (
     <>
-      <button type="button" className="btn btn-p btn-sm" disabled={busy} onClick={() => run("approve")}>Approve</button>
-      <button type="button" className="btn btn-sm" onClick={() => onAsk("reject")}>Reject</button>
+      {allows("approve") && (
+        <button type="button" className="btn btn-p btn-sm" disabled={action.busy} onClick={() => action.run("approve")}>
+          Approve
+        </button>
+      )}
+      {allows("reject") && <button type="button" className="btn btn-sm" onClick={() => onAsk("reject")}>Reject</button>}
+      {allows("release") && <button type="button" className="btn btn-sm" onClick={onRelease}>Release</button>}
+      {allows("decline-release") && (
+        <button type="button" className="btn btn-sm" onClick={() => onAsk("decline-release")}>Decline</button>
+      )}
     </>
   );
 }
@@ -113,14 +120,22 @@ function RemarksForm({ action }: { action: Action }) {
   );
 }
 
+// "#12 · Imported · Last Approved · 12 d"
+function detailsText(reservation: Reservation) {
+  const parts = [`#${reservation.id}`];
+  if (reservation.imported) {
+    parts.push("Imported");
+  }
+  parts.push(lastEventText(reservation));
+  return parts.join(" · ");
+}
+
 function ApprovalDetails({ reservation, action }: { reservation: Reservation; action: Action }) {
   const message = action.message;
   return (
     <div className="space-y-1.5 text-body">
-      <p className="text-muted-foreground">
-        Request #{reservation.id}{reservation.imported && ", imported"}. Last event: {reservation.last_event ?? "none"},
-        {" "}{reservation.age_days} days ago.{reservation.stale && " Stale: no approval or keep for over 3 months."}
-      </p>
+      <p className="text-muted-foreground">{detailsText(reservation)}</p>
+      <ReservationChips reservation={reservation} showWaiting={false} />
       <ReservationSummary reservation={reservation} variant="row" />
       {reservation.last_remarks && <p role="note">{lastRemarksLabel(reservation)}: {reservation.last_remarks}</p>}
       <RemarksForm action={action} />
@@ -130,7 +145,9 @@ function ApprovalDetails({ reservation, action }: { reservation: Reservation; ac
   );
 }
 
-function ApprovalRow({ reservation, onChanged }: { reservation: Reservation; onChanged: () => void }) {
+function ApprovalRow({ reservation, onChanged, onRelease }: {
+  reservation: Reservation; onChanged: () => void; onRelease: (reservation: Reservation) => void;
+}) {
   const action = useReservationAction(reservation.id, onChanged);
   const [open, setOpen] = useState(false);
   const release = reservation.awaiting === "release";
@@ -177,7 +194,8 @@ function ApprovalRow({ reservation, onChanged }: { reservation: Reservation; onC
         <td>{reservation.planned_date ?? "—"}</td>
         <td>
           <span className="inline-flex gap-2">
-            <RowButtons reservation={reservation} action={action} onAsk={ask} />
+            <RowButtons reservation={reservation} action={action} onAsk={ask}
+              onRelease={() => onRelease(reservation)} />
           </span>
         </td>
       </tr>

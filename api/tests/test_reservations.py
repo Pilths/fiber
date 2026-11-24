@@ -495,3 +495,56 @@ def test_srf_and_planner_on_segment_detail(client, w, db):
     assert held["srf_id"] == "SRF-9" and held["planner"] and held["srf_id"] != " SRF-9 "
     free = next(c for c in segment(client, w["s1"])["cores"] if c["id"] != core and c["status"] == "Available")
     assert free["srf_id"] is None and free["planner"] is None
+
+
+# ---------- actions, GET one, stale boundary, release remarks ----------
+
+def test_stale_boundary_day(db, w):
+    today = one(db, "SELECT (now() AT TIME ZONE 'Asia/Kuala_Lumpur')::date")
+    edge = one(db, "SELECT (:t - interval '3 months')::date", t=today)
+    if one(db, "SELECT (CAST(:e AS date) + interval '3 months')::date", e=edge) != today:
+        pytest.skip("month-end day: three months back does not round-trip")
+
+    def stale_at(day):
+        rid = one(db, "INSERT INTO reservations (customer_id, planner_id) VALUES (:c,:u) RETURNING id",
+                  c=w["cust"], u=w["planner1"])
+        for kind, who in (("requested", "planner1"), ("approved", "admin1")):
+            db.execute(
+                text("INSERT INTO reservation_events (reservation_id, type, user_id, created_at) "
+                     "VALUES (:r,:t,:u, (CAST(:d AS date) + time '12:00') AT TIME ZONE 'Asia/Kuala_Lumpur')"),
+                {"r": rid, "t": kind, "u": w[who], "d": day})
+        return one(db, "SELECT is_stale FROM reservation_state_v WHERE reservation_id = :r", r=rid)
+
+    assert stale_at(edge) is False  # exactly three months ago: not stale (view uses <)
+    assert stale_at(one(db, "SELECT CAST(:e AS date) - 1", e=edge)) is True
+
+
+def test_admin_request_release_is_403(client, w):
+    rid = book(client, w, [w["c1"][1]]).json()["id"]
+    act(client, rid, "approve")
+    r = act(client, rid, "request-release", user="admin1", cores=[w["c1"][1]])
+    assert r.status_code == 403 and r.json()["detail"] == "Admins release directly"
+    assert "release" in client.get(f"/api/reservations/{rid}", headers=H("admin1")).json()["actions"]
+
+
+def test_get_one_reservation_visibility(client, w):
+    rid = book(client, w, [w["c1"][1]]).json()["id"]
+    own = client.get(f"/api/reservations/{rid}", headers=H("planner1"))
+    assert own.status_code == 200 and own.json()["actions"] == ["withdraw"]
+    assert client.get(f"/api/reservations/{rid}", headers=H("planner2")).status_code == 404
+    admin = client.get(f"/api/reservations/{rid}", headers=H("admin1"))
+    assert admin.status_code == 200 and admin.json()["actions"] == ["approve", "reject"]
+    assert client.get("/api/reservations/999999", headers=H("admin1")).status_code == 404
+
+
+def test_request_release_remarks_stored(client, w, db):
+    core = w["c1"][1]
+    rid = book(client, w, [core]).json()["id"]
+    act(client, rid, "approve")
+    assert client.get(f"/api/reservations/{rid}", headers=H("planner1")).json()["release_request_remarks"] is None
+    r = act(client, rid, "request-release", user="planner1", cores=[core], remarks="  Customer left  ").json()
+    assert r["release_request_remarks"] == "Customer left"
+    assert one(db, "SELECT remarks FROM reservation_events WHERE reservation_id = :r AND type = 'release_requested'",
+               r=rid) == "Customer left"
+    holder = client.get(f"/api/cores/{core}", headers=H("admin1")).json()["holder"]
+    assert "decline-release" in holder["actions"] and "request-release" not in holder["actions"]
