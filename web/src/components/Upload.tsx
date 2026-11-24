@@ -3,10 +3,9 @@ import { ReservationUpload } from "@/components/ReservationUpload";
 import { SiteMasterUpload } from "@/components/SiteMasterUpload";
 import { SegmentListUpload } from "@/components/SegmentListUpload";
 import { KmzUpload } from "@/components/KmzUpload";
-import { Clusters } from "@/components/Clusters";
 
 const TABS = [["site-master", "Sites (Excel)"], ["segment-list", "Segments (Excel)"], ["kmz", "KMZ"],
-  ["reservations", "Reservations (Excel)"], ["clusters", "Clusters"]] as const;
+  ["reservations", "Reservations (Excel)"]] as const;
 type Tab = (typeof TABS)[number][0];
 const TAB_CLASS = "-mb-px h-10 border-b-2 border-transparent px-4 font-medium text-muted-foreground "
   + "hover:text-foreground aria-selected:border-foreground aria-selected:font-semibold aria-selected:text-foreground";
@@ -22,9 +21,6 @@ function UploadPanel({ tab }: { tab: Tab }) {
   }
   if (tab === "kmz") {
     return <KmzUpload />;
-  }
-  if (tab === "clusters") {
-    return <Clusters />;
   }
   return <ReservationUpload />;
 }
