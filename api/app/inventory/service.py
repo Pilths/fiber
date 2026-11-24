@@ -238,7 +238,8 @@ GET_CUSTOMER_SQL = "SELECT id, name FROM customers WHERE id = :customer_id"
 SEARCH_SEGMENT_SQL = """
 SELECT a.name || ' - ' || b.name, s.id, NULL::bigint, NULL::bigint FROM segments s
 JOIN sites a ON a.id = s.site_a_id JOIN sites b ON b.id = s.site_b_id
-WHERE a.name ILIKE :like ESCAPE '\\' OR b.name ILIKE :like ESCAPE '\\'
+WHERE (a.name ILIKE :like_a ESCAPE '\\' AND b.name ILIKE :like_b ESCAPE '\\')
+   OR (a.name ILIKE :like_b ESCAPE '\\' AND b.name ILIKE :like_a ESCAPE '\\')
 ORDER BY s.id LIMIT :n
 """
 SEARCH_CORE_SQL = """
@@ -375,6 +376,13 @@ def search(db: Session, query: str) -> list[SearchResult]:
     if query.isdigit():
         number = int(query)
     params = {"q": query, "like": _like_pattern(query), "n": PER_TYPE, "num": number}
+    # A segment matches one name in either site, or "A-B" (site names have no dash) in either order.
+    params["like_a"] = params["like"]
+    params["like_b"] = "%"
+    site_names = [part.strip() for part in query.split("-")]
+    if len(site_names) == 2 and all(site_names):
+        params["like_a"] = _like_pattern(site_names[0])
+        params["like_b"] = _like_pattern(site_names[1])
     searches = [
         ("customer", SEARCH_CUSTOMER_SQL),
         ("segment", SEARCH_SEGMENT_SQL),
