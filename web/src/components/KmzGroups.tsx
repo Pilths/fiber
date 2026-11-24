@@ -6,7 +6,7 @@ import {
   type ColourMode, type GroupChoice, type KmzGroup, type Target, type TargetLists,
 } from "@/lib/useKmzUpload";
 
-const TARGETS: [Target, string][] = [["segment", "Segment"], ["site", "Site"], ["cluster", "Cluster"], ["skip", "Skip"]];
+const TARGETS: [Target, string][] = [["segment", "Segment"], ["site", "Site"], ["cluster", "Cluster"], ["skip", "-"]];
 const PICK_LABEL: Record<Target, string> = { segment: "Segment", site: "Site", cluster: "Cluster", skip: "" };
 
 type RowProps = {
