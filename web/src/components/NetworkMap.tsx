@@ -117,7 +117,7 @@ export function NetworkMap(props: NetworkMapProps) {
           <>
             <MapLines lines={lines} onSelect={state.selectSegment} />
             <SiteMarkers state={state} layout={layout} nameShown={nameShown} />
-            {lines.filter((line) => line.show).map((line) => (
+            {lines.filter((line) => line.show && !line.segment.extra_line).map((line) => (
               <SegmentChip key={line.segment.segment_id} line={line}
                 shown={chipShown.has(line.segment.segment_id)} usage={chipUsage(customer, line.segment.segment_id)}
                 onSelect={state.selectSegment} />

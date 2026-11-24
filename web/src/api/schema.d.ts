@@ -1965,6 +1965,11 @@ export interface components {
             suggested_segment_id: number | null;
             /** Suggested By */
             suggested_by: "title" | null;
+            /**
+             * Coords
+             * @default []
+             */
+            coords: number[][];
         };
         /** KmzShaped */
         KmzShaped: {

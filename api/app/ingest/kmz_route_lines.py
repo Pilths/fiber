@@ -9,7 +9,7 @@ import json
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app.admin_edits.history import log_edits_for_user
+from app.admin_edits.history import bool_text, log_edits_for_user
 from app.errors import Invalid
 from app.ingest.kmz_groups import INSERT_ELEMENT_SQL, target_must_exist
 
@@ -36,6 +36,12 @@ SELECT id FROM totals WHERE total IS NOT NULL ORDER BY total, id LIMIT 1
 INSERT_ROUTE_GROUP_SQL = """
 INSERT INTO kmz_groups (upload_id, name, folder_path, segment_id, route, colour_mode, created_by)
 VALUES (:upload_id, :name, :folder_path, :segment_id, true, 'theme', :user_id)
+RETURNING id
+"""
+# A new import replaces the segment's route lines: the earlier ones are hidden (never deleted).
+HIDE_OLD_ROUTE_GROUPS_SQL = """
+UPDATE kmz_groups SET hidden_at = now(), hidden_by = :user_id
+WHERE segment_id = :segment_id AND route AND hidden_at IS NULL
 RETURNING id
 """
 
@@ -82,8 +88,20 @@ def check_route_lines(db: Session, staged_lines: list[dict], choices: list[dict]
     return to_save
 
 
+def hide_old_route_groups(db: Session, admin_id: int, upload_id: int, segment_id: int) -> None:
+    parameters = {"user_id": admin_id, "segment_id": segment_id}
+    hidden_ids = db.execute(text(HIDE_OLD_ROUTE_GROUPS_SQL), parameters).scalars().all()
+    for group_id in hidden_ids:
+        edit = ("hidden", bool_text(False), bool_text(True))
+        log_edits_for_user(db, admin_id, "kmz_group", group_id, [edit], "", upload_id)
+
+
 def save_route_lines(db: Session, admin_id: int, upload_id: int, to_save: list[dict]) -> int:
-    """One route group with one line element per pick, as drawn. Returns how many lines were saved."""
+    """One route group with one line element per pick, as drawn. Returns how many lines were saved.
+    The segment's earlier route lines are hidden first, so the new import replaces them."""
+    segment_ids = sorted({pick["segment_id"] for pick in to_save})
+    for segment_id in segment_ids:
+        hide_old_route_groups(db, admin_id, upload_id, segment_id)
     for pick in to_save:
         line = pick["line"]
         parameters = {

@@ -129,3 +129,24 @@ def test_route_group_moves_only_to_a_segment(client, db, admin, segments, tmp_pa
     assert to_site.status_code == 422
     to_segment = client.patch(f"{URL}/groups/{group_id}", json={"target": {"kind": "segment", "id": segments[1]}})
     assert to_segment.status_code == 200
+
+
+def test_preview_route_lines_carry_thinned_coords(client, admin, segments, tmp_path):
+    long_line = [(101.0 + index / 1000, 3.0) for index in range(250)]
+    body = stage(client, kmz_bytes_of(tmp_path, line_xml(long_line, "Long")), folder_ids=["0"]).json()
+    coords = body["route_lines"][0]["coords"]
+    assert len(coords) <= 101
+    assert coords[0] == [101.0, 3.0]
+    assert coords[-1] == [101.249, 3.0]
+
+
+def test_new_import_hides_the_segments_earlier_route_lines(client, db, admin, segments, tmp_path):
+    first = preview(client, tmp_path)
+    earlier = [{"key": "0:0", "segment_id": segments[0]}]
+    client.post(f"{URL}/uploads/{first['upload_id']}/apply", json={"route_lines": earlier})
+    second = preview(client, tmp_path)
+    picks = [{"key": "0:1", "segment_id": segments[0]}]
+    assert client.post(f"{URL}/uploads/{second['upload_id']}/apply", json={"route_lines": picks}).status_code == 200
+    assert one(db, "SELECT count(*) FROM kmz_groups WHERE route AND hidden_at IS NULL") == 1
+    assert one(db, "SELECT count(*) FROM kmz_groups WHERE route") == 2
+    assert len(feature_lines(db, segments[0])) == 1

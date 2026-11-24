@@ -1,5 +1,6 @@
 """Admin KMZ upload: stage a preview of segment shapes, then apply."""
 import io
+import math
 from typing import Annotated, Literal
 
 from datetime import datetime
@@ -62,6 +63,7 @@ class KmzRouteLineOut(BaseModel):
     folder_path: str
     suggested_segment_id: int | None
     suggested_by: Literal["title"] | None
+    coords: list[list[float]] = []  # [lon, lat] thinned to at most PREVIEW_VERTICES, for the map preview
 
 
 class KmzLocationSuggestion(BaseModel):
@@ -177,6 +179,25 @@ class KmzApplyOut(BaseModel):
     route_lines_saved: int = 0
 
 
+PREVIEW_VERTICES = 100
+
+
+def preview_coords(geometry: dict) -> list[list[float]]:
+    """The line's vertices (a MultiLineString's parts one after another), every Nth kept, always the last."""
+    vertices = geometry["coordinates"]
+    if geometry["type"] == "MultiLineString":
+        vertices = [vertex for part in vertices for vertex in part]
+    step = max(1, math.ceil(len(vertices) / PREVIEW_VERTICES))
+    thinned = vertices[::step]
+    if thinned[-1] != vertices[-1]:
+        thinned.append(vertices[-1])
+    return [[vertex[0], vertex[1]] for vertex in thinned]
+
+
+def route_line_out(line: dict) -> KmzRouteLineOut:
+    return KmzRouteLineOut(**line, coords=preview_coords(line["geometry"]))
+
+
 def group_out(group: dict) -> KmzGroupOut:
     elements = [KmzElementOut(name=element["name"], kind=element["kind"]) for element in group["elements"]]
     fields = {key: value for key, value in group.items() if key not in ("elements", "outside_malaysia")}
@@ -194,7 +215,7 @@ def preview_from(upload_id: int, summary: dict) -> KmzUploadOut:
         shaped=[KmzShaped(**item) for item in summary["shaped"]],
         skipped=[KmzSkipped(**item) for item in summary["skipped"]],
         groups=[group_out(group) for group in summary.get("groups", [])],
-        route_lines=[KmzRouteLineOut(**line) for line in summary.get("route_lines", [])],
+        route_lines=[route_line_out(line) for line in summary.get("route_lines", [])],
     )
 
 

@@ -64,8 +64,8 @@ export function MapLines({ lines, onSelect }: { lines: DrawnLine[]; onSelect: (i
   return (
     <svg className="pointer-events-none absolute inset-0 size-full" aria-hidden="true"
       data-testid="map-lines">
-      {selectedOnTop.map((line) => (
-        <MapLine key={line.segment.segment_id} line={line} onSelect={onSelect} />
+      {selectedOnTop.map((line, index) => (
+        <MapLine key={`${line.segment.segment_id}-${index}`} line={line} onSelect={onSelect} />
       ))}
     </svg>
   );

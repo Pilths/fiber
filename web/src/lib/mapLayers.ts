@@ -16,6 +16,7 @@ export type SegmentProps = {
   health: SegmentHealth;
   route_id: number | null;
   shaped?: boolean;
+  extra_line?: boolean; // a segment's second or later route line: drawn, no chip
 };
 export type SiteProps = {
   site_id: number;

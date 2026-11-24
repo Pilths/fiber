@@ -155,7 +155,11 @@ test("Layers: route types and trunk routes hide their lines; turning off the sel
   const drawnIds = await lines.evaluateAll((es) => es.map((e) => Number(e.getAttribute("data-segment-id"))));
   const drawn = segs.filter((s) => drawnIds.includes(s.id)); // segments without coordinates are not drawn
   type Drawn = { route_type: string | null; route: string | null };
-  const count = (test: (segment: Drawn) => boolean) => drawn.filter(test).length;
+  // counted per drawn line: a segment with several KMZ route lines draws one line each
+  const count = (test: (segment: Drawn) => boolean) => drawnIds.filter((id) => {
+    const segment = drawn.find((item) => item.id === id);
+    return segment != null && test(segment);
+  }).length;
   await expect(map(page).getByLabel("Type")).toHaveCount(0); // route types are in Layers, not a filter
   const metro = page.getByRole("checkbox", { name: "Metro", exact: true });
   await metro.uncheck();
