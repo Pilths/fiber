@@ -1,0 +1,419 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KMZ import</title>
+<style>
+:root {
+  --ground: #f2f4f7; --ink: #0a0a0a; --muted-ink: #5b6068; --line: #868c96; --rule: #eceef2; --raised: #eceef2;
+  --border: #e2e5ea; --subtle: #f7f8fa;
+  --blue: #1d5fbf; --blue-bg: #eff5fd; --blue-bd: #bcd2f2;
+  --amber: #b45309; --amber-bg: #fff7ed; --amber-bd: #eec9a0;
+  --red: #b42318; --map-bg: #eef1f5;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body { min-width: 1200px; background: var(--ground); color: var(--ink); font: 14px/1.45 'Geist Variable', 'Geist', system-ui, sans-serif;
+  font-variant-numeric: tabular-nums; -webkit-font-smoothing: antialiased; overflow: hidden; }
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
+input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--blue); flex: none; margin: 0; cursor: pointer; }
+
+/* App behind the box */
+.top { height: 60px; background: #fff; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 32px; padding: 0 24px; }
+.top b { font-size: 16px; }
+.top nav { display: flex; gap: 20px; color: #3d4046; font-weight: 500; }
+.top nav .on { color: var(--ink); font-weight: 600; }
+.page { padding: 24px; }
+.utabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
+.utabs span { height: 40px; display: flex; align-items: center; padding: 0 16px; color: var(--muted-ink); font-weight: 500; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.utabs .on { color: var(--ink); font-weight: 600; border-color: var(--ink); }
+.card { background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 20px; }
+.card h2 { font-size: 16px; font-weight: 600; padding-bottom: 12px; margin-bottom: 16px; border-bottom: 1px solid var(--border); }
+.dim { position: fixed; inset: 0; background: rgb(10 10 10 / .45); }
+
+/* Shared */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 36px; padding: 0 16px; border: 1px solid var(--line); border-radius: 6px; background: #fff; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.btn:hover { background: var(--raised); }
+.btn-p { background: var(--ink); border-color: var(--ink); color: #fff; }
+.btn-p:hover { background: #2c2c2c; }
+.btn-sm { height: 32px; padding: 0 12px; }
+.link { color: var(--blue); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; background: none; border: 0; padding: 0; font-size: 13px; }
+.field { width: 100%; height: 36px; padding: 0 12px; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
+.field::placeholder { color: var(--muted-ink); opacity: 1; }
+select.field { appearance: none; padding-right: 30px; cursor: pointer; background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 6l4 4 4-4' fill='none' stroke='%235b6068' stroke-width='1.5'/%3E%3C/svg%3E") no-repeat right 8px center / 16px; }
+.chip { height: 32px; padding: 0 12px; border: 1px solid var(--line); border-radius: 6px; background: #fff; font-size: 13px; cursor: pointer; display: inline-flex; align-items: center; }
+.chip[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: #fff; }
+.mono { font-family: 'Geist Mono Variable', 'Geist Mono', ui-monospace, monospace; }
+.warn { color: var(--amber); font-weight: 600; }
+.muted { color: var(--muted-ink); }
+
+/* Box */
+.box { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 1240px; height: 820px; background: #fff; border-radius: 8px;
+  border: 1px solid var(--border); display: grid; grid-template-rows: auto 1fr auto; overflow: hidden; }
+.bh { display: flex; align-items: center; gap: 32px; padding: 16px 20px; border-bottom: 1px solid var(--border); }
+.bh h1 { font-size: 18px; font-weight: 600; }
+.steps { display: flex; align-items: center; gap: 8px; flex: 1; }
+.step { display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 10px; border: 0; background: none; border-radius: 6px; cursor: pointer; color: var(--muted-ink); font-weight: 500; }
+.step:hover { background: var(--raised); }
+.step i { font-style: normal; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 700; border: 1.5px solid var(--line); }
+.step[aria-current="step"] { color: var(--ink); font-weight: 600; }
+.step[aria-current="step"] i { background: var(--ink); border-color: var(--ink); color: #fff; }
+.step.past i { background: var(--raised); border-color: var(--raised); color: var(--ink); }
+.step.past { color: var(--ink); }
+.sep { width: 32px; height: 1px; background: var(--line); }
+.x { width: 36px; height: 36px; border: 0; border-radius: 6px; background: none; cursor: pointer; display: grid; place-items: center; }
+.x:hover { background: var(--raised); }
+.bf { display: flex; align-items: center; gap: 16px; padding: 14px 20px; border-top: 1px solid var(--border); }
+.bf .count { flex: 1; text-align: right; font-size: 13px; }
+.view { min-height: 0; }
+[hidden] { display: none !important; }
+
+/* Select step */
+.sel { display: grid; grid-template-columns: 520px 1fr; height: 100%; min-height: 0; }
+.left { border-right: 1px solid var(--border); display: flex; flex-direction: column; min-height: 0; }
+.lh { padding: 16px 20px 12px; display: grid; gap: 10px; }
+.lh .row { display: flex; align-items: center; gap: 16px; }
+.lh h2 { font-size: 16px; font-weight: 600; flex: 1; }
+.list { overflow-y: auto; flex: 1; padding: 0 12px 16px; }
+.seg { display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 8px; border-radius: 6px; }
+.seg:hover, .el:hover { background: var(--subtle); }
+.seg .name { font-weight: 600; flex: 1; }
+.seg .n { font-size: 13px; }
+.chev { width: 24px; height: 24px; border: 0; background: none; border-radius: 4px; display: grid; place-items: center; cursor: pointer; flex: none; }
+.chev svg { width: 14px; height: 14px; fill: none; stroke: var(--muted-ink); stroke-width: 1.8; transition: transform .12s; }
+.chev[aria-expanded="true"] svg { transform: rotate(90deg); }
+.els { padding: 2px 0 6px 40px; display: grid; gap: 2px; }
+.el { display: grid; grid-template-columns: 16px 1fr auto auto; align-items: center; gap: 10px; height: 36px; padding: 0 8px; border-radius: 6px; border: 1px solid transparent; font-size: 13px; }
+.el .path { color: var(--muted-ink); white-space: nowrap; }
+.src { font-size: 12px; font-weight: 600; min-width: 64px; text-align: right; color: var(--muted-ink); }
+.el.sug { border: 1.5px dashed var(--blue); background: var(--blue-bg); font-weight: 700; }
+.el.sug .src { color: var(--blue); }
+.addbtn { margin: 4px 0 4px 8px; }
+.nm { margin-top: 12px; border: 1px solid var(--amber-bd); background: var(--amber-bg); border-radius: 6px; }
+.nm-h { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-bottom: 1px solid var(--amber-bd); }
+.nm-h h3 { font-size: 14px; font-weight: 600; flex: 1; }
+.nm-r { display: grid; grid-template-columns: 1fr auto 150px; align-items: center; gap: 12px; padding: 6px 12px; font-size: 13px; }
+.nm-r + .nm-r { border-top: 1px solid #f6e2c8; }
+.nm-r .field { height: 32px; font-size: 13px; }
+
+.right { display: flex; flex-direction: column; min-height: 0; padding: 16px 20px; gap: 12px; }
+.right h2 { font-size: 16px; font-weight: 600; }
+.map { flex: 1; min-height: 0; background: var(--map-bg); border: 1px solid var(--border); border-radius: 6px; position: relative; overflow: hidden; }
+.map svg { width: 100%; height: 100%; display: block; }
+.legend { display: flex; gap: 24px; font-size: 13px; }
+.legend span { display: inline-flex; align-items: center; gap: 8px; }
+.sw { width: 30px; height: 0; border-top: 4px solid var(--blue); }
+.sw.s { border-top: 4px dashed var(--blue); }
+.sw.o { border-top: 3px dotted #7a808a; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--blue); border: 1.5px solid #fff; outline: 1px solid var(--blue); }
+
+/* Add from file panel */
+.add { display: flex; flex-direction: column; min-height: 0; flex: 1; gap: 12px; }
+.chips { display: flex; gap: 8px; }
+.tree { flex: 1; overflow-y: auto; border: 1px solid var(--border); border-radius: 6px; padding: 6px; }
+.fold { display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 6px; font-weight: 600; border-radius: 6px; }
+.fold .n { margin-left: auto; font-weight: 400; font-size: 13px; }
+.leaf { display: grid; grid-template-columns: 16px 1fr auto; align-items: center; gap: 10px; height: 36px; padding: 0 8px 0 38px; border-radius: 6px; font-size: 13px; cursor: pointer; }
+.leaf:hover, .fold:hover { background: var(--subtle); }
+.af { display: flex; align-items: center; gap: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+.af .c { flex: 1; font-size: 13px; font-weight: 600; }
+
+/* Confirm */
+.conf { padding: 20px; display: grid; gap: 16px; align-content: start; }
+.conf h2 { font-size: 16px; font-weight: 600; }
+.tbl { width: 100%; table-layout: fixed; border-collapse: collapse; border: 1px solid var(--border); border-radius: 6px; }
+.tbl th, .tbl td { text-align: center; padding: 4px 16px; }
+.tbl thead th { font-size: 12px; font-weight: 500; color: var(--muted-ink); background: var(--subtle); height: 36px; border-bottom: 1px solid var(--border); }
+.tbl td, .tbl tbody th { height: 40px; border-bottom: 1px solid var(--rule); }
+.tbl tbody th { font-weight: 600; }
+.sugw { color: var(--blue); font-weight: 600; font-size: 12px; margin-left: 6px; }
+
+/* Upload step */
+.up { padding: 20px; display: grid; gap: 16px; align-content: start; max-width: 640px; }
+.drop { border: 1px dashed var(--line); border-radius: 6px; padding: 28px; display: flex; align-items: center; gap: 16px; }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <b>Fiber Dashboard</b>
+  <nav><span>Inventory</span><span>My reservations</span><span>Approvals</span><span class="on">Upload</span></nav>
+</header>
+<main class="page">
+  <div class="utabs"><span>Sites (Excel)</span><span>Segments (Excel)</span><span class="on">KMZ</span><span>Reservations (Excel)</span><span>Clusters</span></div>
+  <section class="card"><h2>KMZ</h2><button class="btn btn-p" type="button">Import KMZ</button></section>
+</main>
+<div class="dim"></div>
+
+<div class="box" role="dialog" aria-modal="true" aria-labelledby="kmz-title">
+  <div class="bh">
+    <h1 id="kmz-title">KMZ import</h1>
+    <nav class="steps" aria-label="Steps">
+      <button class="step past" type="button" data-go="upload"><i>1</i>Upload</button>
+      <span class="sep"></span>
+      <button class="step" type="button" data-go="select" aria-current="step"><i>2</i>Select</button>
+      <span class="sep"></span>
+      <button class="step" type="button" data-go="confirm"><i>3</i>Confirm</button>
+    </nav>
+    <button class="x" type="button" aria-label="Close"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 3l10 10M13 3L3 13"/></svg></button>
+  </div>
+
+  <!-- 1 Upload -->
+  <section class="view" data-view="upload" hidden>
+    <div class="up">
+      <h2 style="font-size:16px;font-weight:600">KMZ file</h2>
+      <div class="drop"><button class="btn" type="button">Choose file</button><span class="mono">BBBB.kmz</span></div>
+    </div>
+  </section>
+
+  <!-- 2 Select -->
+  <section class="view" data-view="select">
+    <div class="sel">
+      <div class="left">
+        <div class="lh">
+          <div class="row">
+            <h2>Segments in BBBB.kmz (4)</h2>
+            <button class="link" type="button" id="all">Select all</button>
+            <button class="link" type="button" id="clear">Clear</button>
+            <button class="link" type="button" id="collapse">Collapse</button>
+          </div>
+          <input class="field" type="search" placeholder="Search segments" aria-label="Search segments">
+        </div>
+        <div class="list">
+          <div class="grp">
+            <div class="seg">
+              <input type="checkbox" class="parent" aria-label="S01-S02" checked>
+              <button class="chev" type="button" aria-expanded="true" aria-label="Expand S01-S02"><svg viewBox="0 0 16 16"><path d="M6 3l5 5-5 5"/></svg></button>
+              <span class="name">S01-S02</span><span class="n">2 lines</span>
+            </div>
+            <div class="els">
+              <label class="el"><input type="checkbox" checked><span>Line S01-S02</span><span class="path">Route / Completed</span><span class="src">title</span></label>
+              <label class="el sug"><input type="checkbox" checked><span>Line S01-S02 b</span><span class="path">Route / Phase 2</span><span class="src">suggested</span></label>
+              <label class="el"><input type="checkbox" checked><span>Point PT 01</span><span class="path">AAAA / BBBB</span><span class="src">added</span></label>
+              <label class="el"><input type="checkbox" checked><span>Point PT 02</span><span class="path">AAAA / BBBB</span><span class="src">added</span></label>
+              <div><button class="btn btn-sm addbtn" type="button" id="open-add">+ Add from file</button></div>
+            </div>
+          </div>
+          <div class="grp">
+            <div class="seg">
+              <input type="checkbox" class="parent" aria-label="S03-S04" checked>
+              <button class="chev" type="button" aria-expanded="false" aria-label="Expand S03-S04"><svg viewBox="0 0 16 16"><path d="M6 3l5 5-5 5"/></svg></button>
+              <span class="name">S03-S04</span><span class="n">1 line</span>
+            </div>
+            <div class="els" hidden>
+              <label class="el"><input type="checkbox" checked><span>Line S03-S04</span><span class="path">Route / Completed</span><span class="src">title</span></label>
+            </div>
+          </div>
+          <div class="grp">
+            <div class="seg">
+              <input type="checkbox" class="parent" aria-label="S05-S06" checked>
+              <button class="chev" type="button" aria-expanded="false" aria-label="Expand S05-S06"><svg viewBox="0 0 16 16"><path d="M6 3l5 5-5 5"/></svg></button>
+              <span class="name">S05-S06</span><span class="n">1 line · <span class="warn">replaces line</span></span>
+            </div>
+            <div class="els" hidden>
+              <label class="el"><input type="checkbox" checked><span>Line S05-S06</span><span class="path">Route / Completed</span><span class="src">title</span></label>
+            </div>
+          </div>
+          <div class="grp">
+            <div class="seg">
+              <input type="checkbox" class="parent" aria-label="S06-S07">
+              <button class="chev" type="button" aria-expanded="false" aria-label="Expand S06-S07"><svg viewBox="0 0 16 16"><path d="M6 3l5 5-5 5"/></svg></button>
+              <span class="name">S06-S07</span><span class="n">1 line</span>
+            </div>
+            <div class="els" hidden>
+              <label class="el"><input type="checkbox"><span>Line S06-S07</span><span class="path">Route / Phase 2</span><span class="src">title</span></label>
+            </div>
+          </div>
+
+          <section class="nm" aria-labelledby="nm-h">
+            <div class="nm-h"><h3 id="nm-h">Not matched (3)</h3><button class="btn btn-sm" type="button">Suggest by location</button></div>
+            <div class="nm-r"><span>Line S02-S09</span><span class="warn">no segment</span>
+              <select class="field" aria-label="Assign Line S02-S09"><option>-</option><option>S01-S02</option><option>S03-S04</option><option>S05-S06</option><option>S06-S07</option></select></div>
+            <div class="nm-r"><span>Untitled Path</span><span class="warn">no title</span>
+              <select class="field" aria-label="Assign Untitled Path"><option>-</option><option>S01-S02</option><option>S03-S04</option><option>S05-S06</option><option>S06-S07</option></select></div>
+            <div class="nm-r"><span>Line S08-S09</span><span class="warn">no segment</span>
+              <select class="field" aria-label="Assign Line S08-S09"><option>-</option><option>S01-S02</option><option>S03-S04</option><option>S05-S06</option><option>S06-S07</option></select></div>
+          </section>
+        </div>
+      </div>
+
+      <div class="right">
+        <!-- Map preview -->
+        <div class="add" id="map-panel">
+          <h2>Map preview</h2>
+          <div class="map">
+            <svg viewBox="0 0 660 560" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Map preview: 4 picked lines, 1 suggested, 1 left out">
+              <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+                <!-- casings -->
+                <g stroke="#fff" stroke-width="9">
+                  <path d="M110 110 C 160 150, 190 130, 240 190"/>
+                  <path d="M110 110 C 130 190, 200 210, 240 190"/>
+                  <path d="M320 260 C 360 300, 380 320, 430 330"/>
+                  <path d="M180 400 C 240 420, 290 430, 360 470"/>
+                  <path d="M360 470 C 430 450, 500 430, 560 380"/>
+                </g>
+                <path d="M110 110 C 160 150, 190 130, 240 190" stroke="#1d5fbf" stroke-width="4"/>
+                <path d="M110 110 C 130 190, 200 210, 240 190" stroke="#1d5fbf" stroke-width="4" stroke-dasharray="10 7"/>
+                <path d="M320 260 C 360 300, 380 320, 430 330" stroke="#1d5fbf" stroke-width="4"/>
+                <path d="M180 400 C 240 420, 290 430, 360 470" stroke="#1d5fbf" stroke-width="4"/>
+                <path d="M360 470 C 430 450, 500 430, 560 380" stroke="#7a808a" stroke-width="3" stroke-dasharray="1 7"/>
+              </g>
+              <!-- points -->
+              <g fill="#1d5fbf" stroke="#fff" stroke-width="2">
+                <circle cx="163" cy="142" r="5"/><circle cx="205" cy="152" r="5"/>
+              </g>
+              <g font-size="12" font-weight="600" fill="#1d5fbf"><text x="150" y="132">PT 01</text><text x="210" y="146">PT 02</text></g>
+              <!-- sites from the database -->
+              <g fill="#0a0a0a" stroke="#fff" stroke-width="2">
+                <circle cx="110" cy="110" r="7"/><circle cx="240" cy="190" r="7"/><circle cx="320" cy="260" r="7"/>
+                <circle cx="430" cy="330" r="7"/><circle cx="180" cy="400" r="7"/><circle cx="360" cy="470" r="7"/><circle cx="560" cy="380" r="7"/>
+              </g>
+              <g font-size="13" font-weight="700" fill="#0a0a0a" paint-order="stroke" stroke="#eef1f5" stroke-width="4">
+                <text x="84" y="96">S01</text><text x="252" y="196">S02</text><text x="290" y="252">S03</text>
+                <text x="442" y="336">S04</text><text x="150" y="388">S05</text><text x="346" y="496">S06</text><text x="572" y="386">S07</text>
+              </g>
+            </svg>
+          </div>
+          <div class="legend">
+            <span><i class="sw"></i>Picked</span>
+            <span><i class="sw s"></i>Suggested</span>
+            <span><i class="sw o"></i>Left out</span>
+            <span><i class="dot"></i>Point</span>
+          </div>
+        </div>
+
+        <!-- Add from file -->
+        <div class="add" id="add-panel" hidden>
+          <h2>Add to S01-S02</h2>
+          <input class="field" type="search" placeholder="Search the whole file" aria-label="Search the whole file">
+          <div class="chips">
+            <button class="chip" type="button" aria-pressed="true">All</button>
+            <button class="chip" type="button" aria-pressed="false">Not matched</button>
+            <button class="chip" type="button" aria-pressed="false">Points</button>
+          </div>
+          <div class="tree" id="tree">
+            <div class="fold"><button class="chev" type="button" aria-expanded="true" aria-label="Collapse AAAA / BBBB"><svg viewBox="0 0 16 16"><path d="M6 3l5 5-5 5"/></svg></button>AAAA / BBBB<span class="n muted">5 points</span></div>
+            <label class="leaf"><input type="checkbox" checked><span>PT 01</span><span></span></label>
+            <label class="leaf"><input type="checkbox" checked><span>PT 02</span><span></span></label>
+            <label class="leaf"><input type="checkbox"><span>PT 03</span><span></span></label>
+            <label class="leaf"><input type="checkbox"><span>PT 04</span><span class="warn">moves from S04-S05</span></label>
+            <label class="leaf"><input type="checkbox"><span>PT 05</span><span></span></label>
+            <div class="fold"><button class="chev" type="button" aria-expanded="false" aria-label="Expand Route / Completed"><svg viewBox="0 0 16 16"><path d="M6 3l5 5-5 5"/></svg></button>Route / Completed<span class="n muted">3 lines</span></div>
+            <div class="fold"><button class="chev" type="button" aria-expanded="false" aria-label="Expand Route / Phase 2"><svg viewBox="0 0 16 16"><path d="M6 3l5 5-5 5"/></svg></button>Route / Phase 2<span class="n muted">2 lines</span></div>
+          </div>
+          <div class="af">
+            <span class="c" id="add-count">2 selected</span>
+            <button class="btn" type="button" id="cancel-add">Cancel</button>
+            <button class="btn btn-p" type="button" id="do-add">Add 2 points</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3 Confirm -->
+  <section class="view" data-view="confirm" hidden>
+    <div class="conf">
+      <h2>BBBB.kmz</h2>
+      <table class="tbl">
+        <colgroup><col style="width:30%"><col style="width:20%"><col style="width:20%"><col style="width:30%"></colgroup>
+        <thead><tr><th>Segment</th><th>Lines</th><th>Points</th><th>Note</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">S01-S02</th><td>2<span class="sugw">1 suggested</span></td><td>2</td><td>-</td></tr>
+          <tr><th scope="row">S03-S04</th><td>1</td><td>0</td><td>-</td></tr>
+          <tr><th scope="row">S05-S06</th><td>1</td><td>0</td><td><span class="warn">replaces line</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="bf">
+    <button class="btn" type="button" id="back">Back</button>
+    <span class="count" id="count">3 segments · 4 lines · 2 points · 3 not matched</span>
+    <button class="btn btn-p" type="button" id="next">Continue →</button>
+  </div>
+</div>
+
+<script>
+const order = ["upload", "select", "confirm"];
+let current = "select";
+const $ = (s) => document.querySelector(s);
+
+function go(name) {
+  current = name;
+  document.querySelectorAll("[data-view]").forEach((v) => { v.hidden = v.dataset.view !== name; });
+  const at = order.indexOf(name);
+  document.querySelectorAll("[data-go]").forEach((b) => {
+    const i = order.indexOf(b.dataset.go);
+    b.classList.toggle("past", i < at);
+    if (i === at) {
+      b.setAttribute("aria-current", "step");
+    } else {
+      b.removeAttribute("aria-current");
+    }
+  });
+  $("#back").hidden = name === "upload";
+  $("#next").textContent = name === "confirm" ? "Apply 3 + 1 suggested" : "Continue →";
+}
+function showAdd(open) {
+  $("#map-panel").hidden = open;
+  $("#add-panel").hidden = !open;
+}
+
+document.querySelectorAll("[data-go]").forEach((b) => b.addEventListener("click", () => go(b.dataset.go)));
+$("#next").addEventListener("click", () => {
+  if (current !== "confirm") {
+    go(order[order.indexOf(current) + 1]);
+  }
+});
+$("#back").addEventListener("click", () => go(order[Math.max(0, order.indexOf(current) - 1)]));
+$("#open-add").addEventListener("click", () => showAdd(true));
+$("#cancel-add").addEventListener("click", () => showAdd(false));
+$("#do-add").addEventListener("click", () => showAdd(false));
+
+// Segment rows: chevron expands, parent box is tri-state over its elements.
+document.querySelectorAll(".grp").forEach((grp) => {
+  const chev = grp.querySelector(".chev");
+  const els = grp.querySelector(".els");
+  const parent = grp.querySelector(".parent");
+  const kids = [...els.querySelectorAll("input")];
+  chev.addEventListener("click", () => {
+    const open = chev.getAttribute("aria-expanded") !== "true";
+    chev.setAttribute("aria-expanded", open);
+    els.hidden = !open;
+  });
+  const sync = () => {
+    const on = kids.filter((k) => k.checked).length;
+    parent.checked = on === kids.length;
+    parent.indeterminate = on > 0 && on < kids.length;
+  };
+  kids.forEach((k) => k.addEventListener("change", sync));
+  parent.addEventListener("change", () => { kids.forEach((k) => { k.checked = parent.checked; }); });
+});
+$("#all").addEventListener("click", () => document.querySelectorAll(".list input[type=checkbox]").forEach((c) => { c.checked = true; c.indeterminate = false; }));
+$("#clear").addEventListener("click", () => document.querySelectorAll(".list input[type=checkbox]").forEach((c) => { c.checked = false; c.indeterminate = false; }));
+$("#collapse").addEventListener("click", () => document.querySelectorAll(".grp").forEach((g) => {
+  g.querySelector(".chev").setAttribute("aria-expanded", "false");
+  g.querySelector(".els").hidden = true;
+}));
+
+// Add from file: live count on the footer.
+const leaves = [...document.querySelectorAll("#tree .leaf input")];
+leaves.forEach((l) => l.addEventListener("change", () => {
+  const n = leaves.filter((x) => x.checked).length;
+  $("#add-count").textContent = n + " selected";
+  $("#do-add").textContent = "Add " + n + (n === 1 ? " point" : " points");
+}));
+
+// Screenshot states: #add, #confirm
+if (location.hash === "#add") {
+  showAdd(true);
+}
+if (location.hash === "#confirm") {
+  go("confirm");
+}
+</script>
+</body>
+</html>
