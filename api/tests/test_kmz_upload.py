@@ -105,6 +105,7 @@ def test_folder_tree_shape_and_counts(client, admin):
     assert response.status_code == 200
     assert response.json() == {
         "folders": [
+            {"id": "-", "name": "No folder", "lines": 1, "areas": 0, "points": 0, "children": []},
             {"id": "0", "name": "outer", "lines": 2, "areas": 0, "points": 0, "children": [
                 {"id": "0/0", "name": "inner", "lines": 1, "areas": 0, "points": 0, "children": []}]},
             {"id": "1", "name": "other", "lines": 0, "areas": 0, "points": 0, "children": []},

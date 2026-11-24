@@ -4,7 +4,10 @@ import json
 import zipfile
 from xml.etree import ElementTree
 
-from app.ingest.kmz import elements_in_folder, folder_nodes, folder_tree, kml_colour, parse_styles
+from app.ingest.kmz import (
+    LOOSE_ID, elements_in_folder, folder_nodes, folder_tree, groups_in_folders, kml_colour, lines_in_folder_ids,
+    parse_styles,
+)
 from sqlalchemy import text
 from test_auth import login, mkuser
 from test_kmz_upload import URL, admin, segments, stage  # noqa: F401 (fixtures)
@@ -125,6 +128,23 @@ def test_folder_tree_counts_are_recursive():
     assert (outer["lines"], outer["areas"], outer["points"]) == (1, 1, 2)
     assert (outer["children"][0]["areas"], outer["children"][0]["points"]) == (1, 1)
     assert loose == 0
+
+
+
+def test_placemarks_outside_folders_are_one_more_folder():
+    body = (placemark("POE 1", point_xml(101.5, 3.0)) + placemark("POE 2", point_xml(101.5, 3.1))
+            + line_xml([(101.4, 2.9), (101.5, 3.0)], "loose line")
+            + folder_xml("Blocks", placemark("Block", polygon_xml(SQUARE))))
+    data = kml_bytes(body)
+    tree, _ = folder_tree(io.BytesIO(data))
+    assert [(node["id"], node["name"], node["lines"], node["areas"], node["points"]) for node in tree] == [
+        (LOOSE_ID, "No folder", 1, 0, 2), ("0", "Blocks", 0, 1, 0)]
+    lines, names = lines_in_folder_ids(io.BytesIO(data), [LOOSE_ID])
+    assert ([title for title, _ in lines], names) == (["loose line"], ["No folder"])
+    [group] = groups_in_folders(io.BytesIO(data), [LOOSE_ID], set())
+    assert (group["key"], group["folder_path"], group["counts"]) == (
+        LOOSE_ID, "No folder", {"lines": 1, "areas": 0, "points": 2})
+    assert [group["key"] for group in groups_in_folders(io.BytesIO(data), ["0"], set())] == ["0"]
 
 
 # ---- preview and apply ----
