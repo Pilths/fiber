@@ -23,6 +23,8 @@ from app.ingest.uploads import ApplyError, finish_upload, insert_upload, lock_st
 
 MAX_KML_BYTES = 50 * 1024 * 1024  # unpacked size of the KML inside the KMZ
 DEFAULT_FOLDER = "propose route"
+LOOSE_ID = "-"  # folder id of the Placemarks outside any Folder (real ids are digits)
+LOOSE_NAME = "No folder"
 TOO_LARGE_TEXT = "the KML inside is larger than 50 MB"
 EARTH_RADIUS_M = 6_371_000
 MALAYSIA_LON = (99.5, 119.5)
@@ -90,6 +92,8 @@ def local_tag(element: ElementTree.Element) -> str:
 
 
 def folder_name(folder: ElementTree.Element) -> str:
+    if local_tag(folder) == "kml":  # the root stands for the Placemarks outside any Folder
+        return LOOSE_NAME
     for child in folder:
         if local_tag(child) == "name":
             return (child.text or "").strip()
@@ -135,8 +139,9 @@ def placemark_title(placemark: ElementTree.Element) -> str:
     return ""
 
 
-def lines_in_folder(folder: ElementTree.Element) -> list[TitledLine]:
-    """Every LineString under the folder with the title of its Placemark ("" if it has none)."""
+def lines_in_folder(folder: ElementTree.Element, enter_folders: bool = True) -> list[TitledLine]:
+    """Every LineString under the folder with the title of its Placemark ("" if it has none).
+    With enter_folders False, child Folders are left out."""
     lines: list[TitledLine] = []
 
     def collect(parent: ElementTree.Element, title: str) -> None:
@@ -144,6 +149,8 @@ def lines_in_folder(folder: ElementTree.Element) -> list[TitledLine]:
             tag = local_tag(child)
             if tag == "Placemark":
                 collect(child, placemark_title(child))
+            elif tag == "Folder" and not enter_folders:
+                continue
             elif tag == "LineString":
                 for part in child:
                     if local_tag(part) == "coordinates":
@@ -207,6 +214,8 @@ def folder_nodes(root: ElementTree.Element) -> dict[str, ElementTree.Element]:
             walk(folder, f"{folder_id}/")
 
     walk(root, "")
+    if direct_placemarks(root):
+        nodes[LOOSE_ID] = root
     return nodes
 
 
@@ -229,6 +238,9 @@ def folder_tree(source: str | BinaryIO) -> tuple[list[dict], int]:
 
     tree = build(root, "")
     in_folders = sum(node["lines"] for node in tree)
+    if direct_placemarks(root):
+        loose = {"id": LOOSE_ID, "name": LOOSE_NAME, "lines": len(lines_in_folder(root, enter_folders=False))}
+        tree.insert(0, {**loose, **subtree_counts(root, enter_folders=False), "children": []})
     return tree, len(lines_in_folder(root)) - in_folders
 
 
@@ -248,7 +260,7 @@ def lines_in_folder_ids(
         ancestors = {folder_id.rsplit("/", depth)[0] for depth in range(1, folder_id.count("/") + 1)}
         if ancestors & selected:
             continue
-        lines.extend(lines_in_folder(nodes[folder_id]))
+        lines.extend(lines_in_folder(nodes[folder_id], enter_folders=folder_id != LOOSE_ID))
         names.append(folder_name(nodes[folder_id]))
     return lines, names
 
@@ -260,12 +272,15 @@ def inside_malaysia(coords: list[list[float]]) -> bool:
     return True
 
 
-def subtree_counts(folder: ElementTree.Element) -> dict[str, int]:
-    """Areas and points anywhere under the folder, child folders included (same meaning as "lines")."""
+def subtree_counts(folder: ElementTree.Element, enter_folders: bool = True) -> dict[str, int]:
+    """Areas and points anywhere under the folder, child folders included (same meaning as "lines").
+    With enter_folders False, only the folder's own Placemarks."""
     counts = {"areas": 0, "points": 0}
-    for placemark in folder.iter():
-        if local_tag(placemark) != "Placemark":
-            continue
+    if enter_folders:
+        placemarks = [node for node in folder.iter() if local_tag(node) == "Placemark"]
+    else:
+        placemarks = direct_placemarks(folder)
+    for placemark in placemarks:
         shapes = placemark_shapes(placemark)
         counts["areas"] += len(shapes["area"])
         counts["points"] += len(shapes["point"])
