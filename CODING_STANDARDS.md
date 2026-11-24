@@ -14,11 +14,17 @@ Paths: backend is `api/app/`, frontend is `web/src/`.
 Anything a tool can enforce lives in config, not in review comments. Reviewers skip what these already catch.
 
 - Python: `ruff check` with `api/ruff.toml`: line length 120 (E501), no one-line `if` or `for` (E701), no
-  statements joined with `;` (E702, E703), no `l`/`O`/`I` names (E741). There is no auto-formatter.
+  statements joined with `;` (E702, E703), no `l`/`O`/`I` names (E741), no swallowed errors (BLE001, S110), no
+  `print` in server code (T201; command-line scripts and tests are exempt). There is no auto-formatter.
 - TypeScript: `npx tsc -b --noEmit` (TypeScript 6, strict by default, plus `noUnusedLocals` and
   `noUnusedParameters`). oxlint (`web/.oxlintrc.json`): `curly` (every `if` gets braces), `no-nested-ternary`,
-  `no-unused-expressions` (catches `cond && doSomething()`), `react/rules-of-hooks`. There is no auto-formatter.
-- Run both before every commit (commands in `CLAUDE.md`). A diff that fails them is not ready for review.
+  `no-unused-expressions` (catches `cond && doSomething()`), `react/rules-of-hooks`, `no-explicit-any`. There is no
+  auto-formatter.
+- The pre-commit hook (`.githooks/pre-commit`) runs ruff, oxlint and the typecheck, and refuses the commit if one
+  fails. Turn it on once per clone with `git config core.hooksPath .githooks`. Don't skip it with `--no-verify`: fix
+  the failure.
+- A review finding that comes up twice becomes a lint rule (with any existing cases fixed), not another line in
+  this file. When a tool check and a paragraph here disagree, the tool wins and the paragraph is fixed.
 
 ## Names and words
 
@@ -86,13 +92,15 @@ function or view, never retyped inline. Duplicating one even once is a finding.
 - One exception: upload parsing catches the error of a single row, records it as that row's reason, and moves on
   (`api/app/ingest/excel.py:131`, `api/app/ingest/segment_list.py:172`, `api/app/ingest/site_master/parse.py:119`).
   Mark it with `# noqa: BLE001` and a short why.
-- Lint enforces this in the web app (`no-empty`, `no-empty-function` in `web/.oxlintrc.json`). A best-effort call
+- Lint enforces this: ruff `BLE001`, `S110` in the API, `no-empty`, `no-empty-function` in the web app. A best-effort call
   whose failure the user does not need to see (refresh, clipboard) uses `.catch(ignoreFailure)` from
   `web/src/lib/utils.ts`.
 - Fail loudly at the edge: check input where it enters (FastAPI request models in Pydantic, Excel and KMZ rows at
   import). Inside the app, trust the data.
 - Error messages say what was expected and what was found: `"Segment KLCC-PJYA: expected 24 verified cores,
-  found 0"`, not `"Invalid data"`.
+  found 0"`, not `"Invalid data"`. When the reader can act on it (upload row reasons, admin errors, script
+  output), end with the fix: `"... found 0. Fix: enter a verified core count in Edit segment"`. New and changed
+  messages only.
 - Uploads are layered, never all-or-nothing: every row is kept raw in staging with sheet and row number, and gets
   a status Ready, Needs review or Rejected with a reason. A bad row never blocks the good ones. Never guess a value
   to make a row pass.

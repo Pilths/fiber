@@ -28,6 +28,8 @@ Last ticket window
 - A ticket with `Blocked by: NN` waits until those tickets are done.
 - If window A grows long before `/to-tickets` (about 150k tokens), use `/compact` between steps, not `/clear`. A `/clear` there loses the grilling answers.
 - Type the full name `/mattpocock-skills:code-review`. Plain `/code-review` is a different built-in skill.
+- When reporting a ticket done, say which of three it is: code ready (tests and checks pass), deployed (running on
+  the server), or verified (seen working in the app). They are separate facts; don't let one stand for another.
 - `/retro` suggests changes to `CODING_STANDARDS.md`, checks or docs. Accept the ones that would have prevented a real mistake.
 
 ## Shortcuts

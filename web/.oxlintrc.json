@@ -8,6 +8,7 @@
     "no-unused-expressions": "error",
     "no-empty": "error",
     "no-empty-function": "error",
+    "typescript/no-explicit-any": "error",
     "react/only-export-components": ["warn", { "allowConstantExport": true }]
   }
 }

@@ -1,0 +1,19 @@
+#!/bin/sh
+# Pre-commit fence: ruff, oxlint and the TypeScript typecheck must pass before a commit.
+# Turn it on once per clone: git config core.hooksPath .githooks
+# Needs the dev stack running (docker compose up -d).
+set -e
+
+cd "$(git rev-parse --show-toplevel)"
+
+if ! docker compose exec -T api true 2>/dev/null; then
+    echo "pre-commit: the dev stack is not running. Fix: docker compose up -d" >&2
+    exit 1
+fi
+
+echo "pre-commit: ruff"
+docker compose exec -T api ruff check .
+echo "pre-commit: oxlint"
+docker compose exec -T web npm run --silent lint
+echo "pre-commit: typecheck"
+docker compose exec -T web npx tsc -b --noEmit

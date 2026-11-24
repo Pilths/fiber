@@ -9,4 +9,12 @@ exclude = [
 ]
 
 [lint]
-select = ["E701", "E702", "E703", "E501", "E741"]
+# BLE001, S110: never swallow an error. T201: the server logs with `logging`, not `print`.
+select = ["E701", "E702", "E703", "E501", "E741", "BLE001", "S110", "T201"]
+
+[lint.per-file-ignores]
+# Command-line scripts may print their output (CODING_STANDARDS.md, Errors and debugging).
+"app/create_admin.py" = ["T201"]
+"app/load_*.py" = ["T201"]
+"app/seed_*.py" = ["T201"]
+"tests/**" = ["T201"]
