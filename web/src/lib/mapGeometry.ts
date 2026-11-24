@@ -199,7 +199,7 @@ export function declutter(
       chipShown.add(line.segment.segment_id);
     }
   };
-  const shown = lines.filter((line) => line.show);
+  const shown = lines.filter((line) => line.show && !line.segment.extra_line);
   shown.filter((line) => line.selected).forEach(placeChip);
   shown.filter((line) => !line.selected).forEach(placeChip);
   const nameShown = new Set<number>();

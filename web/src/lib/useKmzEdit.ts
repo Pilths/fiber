@@ -5,7 +5,6 @@ import type { components } from "@/api/schema";
 export type MapGroup = components["schemas"]["KmzGroupListed"];
 export type GroupPatch = Omit<components["schemas"]["KmzGroupPatch"], "remarks">;
 export type GroupOwner = { kind: "segment" | "site" | "cluster"; id: number };
-export type Cluster = components["schemas"]["KmzCluster"];
 
 function ownerQuery(owner: GroupOwner) {
   if (owner.kind === "segment") {
@@ -52,48 +51,4 @@ export function useMapGroups(owner: GroupOwner, onError: (message: string | null
   };
 
   return { groups, change, reload };
-}
-
-// Clusters with their sites: rename, add a site, remove a site. Every change reloads the list.
-export function useClusters() {
-  const [clusters, setClusters] = useState<Cluster[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [version, setVersion] = useState(0);
-
-  useEffect(() => {
-    let stale = false;
-    api.get("/api/admin/kmz/clusters")
-      .then((loaded) => {
-        if (!stale) {
-          setClusters(loaded);
-        }
-      })
-      .catch((caught) => setError(errorText(caught, "Could not load the clusters.")));
-    return () => {
-      stale = true;
-    };
-  }, [version]);
-
-  const run = async (call: () => Promise<unknown>) => {
-    setError(null);
-    try {
-      await call();
-    } catch (caught) {
-      setError(errorText(caught, "Could not save. Try again."));
-    }
-    setVersion((old) => old + 1);
-  };
-
-  const rename = (clusterId: number, name: string) => run(() => api.patch(
-    "/api/admin/kmz/clusters/{cluster_id}", { path: { cluster_id: clusterId }, body: { name, remarks: "" } },
-  ));
-  const addSite = (clusterId: number, siteId: number) => run(() => api.post(
-    "/api/admin/kmz/clusters/{cluster_id}/sites",
-    { path: { cluster_id: clusterId }, body: { site_id: siteId, remarks: "" } },
-  ));
-  const removeSite = (clusterId: number, siteId: number) => run(() => api.delete(
-    "/api/admin/kmz/clusters/{cluster_id}/sites/{site_id}", { path: { cluster_id: clusterId, site_id: siteId } },
-  ));
-
-  return { clusters, error, setError, rename, addSite, removeSite };
 }

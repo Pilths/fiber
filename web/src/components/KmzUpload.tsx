@@ -1,3 +1,5 @@
+import { useState } from "react";
+import { KmzImportBox } from "@/components/KmzImport";
 import { KmzFolderTree } from "@/components/KmzFolderTree";
 import { KmzGroups } from "@/components/KmzGroups";
 import { FilePick, Note } from "@/components/upload-parts";
@@ -146,6 +148,12 @@ function Result({ upload }: { upload: Upload }) {
 // `fixed` (Add from KMZ in an edit box): every folder goes to that segment or site; no target picker, no route lines.
 export function KmzUpload({ fixed }: { fixed?: FixedTarget }) {
   const upload = useKmzUpload(fixed);
+  const [importOpen, setImportOpen] = useState(false);
+  const [imported, setImported] = useState<number | null>(null);
+  const applied = (saved: number) => {
+    setImportOpen(false);
+    setImported(saved);
+  };
   return (
     <div className="space-y-4">
       <section className="card" aria-labelledby="kmz-h">
@@ -153,6 +161,15 @@ export function KmzUpload({ fixed }: { fixed?: FixedTarget }) {
           <h2 id="kmz-h">KMZ</h2>
         </div>
         <div className="space-y-4">
+          {!fixed && (
+            <div className="flex flex-wrap items-center gap-4">
+              <button type="button" className="btn btn-p" onClick={() => setImportOpen(true)}>Import KMZ</button>
+              <div aria-live="polite" data-testid="kmz-import-result">
+                {imported != null && <Note tone="green" title={`${plural(imported, "route line")} drawn on the map`} />}
+              </div>
+            </div>
+          )}
+          {importOpen && <KmzImportBox onClose={() => setImportOpen(false)} onApplied={applied} />}
           <FilePick label="Upload a KMZ file" busy={upload.busy} onFile={upload.pick} kind={KMZ} />
           {upload.folders.length > 0 && (
             <>

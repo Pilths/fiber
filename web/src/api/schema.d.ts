@@ -729,6 +729,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/kmz/uploads/{upload_id}/suggest-by-location": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Suggest By Location
+         * @description Segments whose two sites lie near the two ends of each staged line. Saves nothing.
+         */
+        post: operations["suggest_by_location_api_admin_kmz_uploads__upload_id__suggest_by_location_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/kmz/clusters": {
         parameters: {
             query?: never;
@@ -1739,6 +1759,8 @@ export interface components {
              * @default []
              */
             groups: components["schemas"]["KmzApplyGroup"][];
+            /** Route Lines */
+            route_lines?: components["schemas"]["KmzApplyRouteLine"][] | null;
         };
         /** KmzApplyOut */
         KmzApplyOut: {
@@ -1756,6 +1778,18 @@ export interface components {
              * @default 0
              */
             clusters_created: number;
+            /**
+             * Route Lines Saved
+             * @default 0
+             */
+            route_lines_saved: number;
+        };
+        /** KmzApplyRouteLine */
+        KmzApplyRouteLine: {
+            /** Key */
+            key: string;
+            /** Segment Id */
+            segment_id: number;
         };
         /** KmzCluster */
         KmzCluster: {
@@ -1907,6 +1941,36 @@ export interface components {
              */
             created_at: string;
         };
+        /** KmzLocationSuggestion */
+        KmzLocationSuggestion: {
+            /** Key */
+            key: string;
+            /** Segment Id */
+            segment_id: number;
+            /**
+             * Suggested By
+             * @constant
+             */
+            suggested_by: "location";
+        };
+        /** KmzRouteLineOut */
+        KmzRouteLineOut: {
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+            /** Folder Path */
+            folder_path: string;
+            /** Suggested Segment Id */
+            suggested_segment_id: number | null;
+            /** Suggested By */
+            suggested_by: "title" | null;
+            /**
+             * Coords
+             * @default []
+             */
+            coords: number[][];
+        };
         /** KmzShaped */
         KmzShaped: {
             /** Segment Id */
@@ -1959,6 +2023,11 @@ export interface components {
             skipped: components["schemas"]["KmzSkipped"][];
             /** Groups */
             groups: components["schemas"]["KmzGroupOut"][];
+            /**
+             * Route Lines
+             * @default []
+             */
+            route_lines: components["schemas"]["KmzRouteLineOut"][];
         };
         /** LoginBody */
         LoginBody: {
@@ -4625,6 +4694,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["KmzApplyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    suggest_by_location_api_admin_kmz_uploads__upload_id__suggest_by_location_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-dev-user"?: string | null;
+            };
+            path: {
+                upload_id: number;
+            };
+            cookie?: {
+                fiber_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KmzLocationSuggestion"][];
                 };
             };
             /** @description Validation Error */

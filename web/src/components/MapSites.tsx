@@ -82,6 +82,9 @@ type SiteMarkersProps = {
 export function SiteMarkers({ state, layout, nameShown }: SiteMarkersProps) {
   const features = state.data.sites?.features ?? [];
   const segmentCount = (siteId: number) => state.features.filter((feature) => {
+    if (feature.properties.extra_line) {
+      return false;
+    }
     return feature.properties.site_a_id === siteId || feature.properties.site_b_id === siteId;
   }).length;
   const namesOf = (badge: SiteBadge) => badge.crowd.members.map((member) => features[member.index].properties.name);

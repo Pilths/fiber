@@ -36,6 +36,25 @@ FROM routes g JOIN route_segments gs ON gs.route_id = g.id
 WHERE g.geom IS NOT NULL AND g.id IN (SELECT route_id FROM route_segments WHERE segment_id = :segment_id)
 GROUP BY g.id ORDER BY g.id
 """
+# Every line of the route groups that are not hidden, longest first per segment (a MultiLineString is split).
+ROUTE_GROUP_LINES_SQL = """
+SELECT g.segment_id, ST_AsGeoJSON(part.geom) AS geom
+FROM kmz_groups g
+JOIN kmz_elements e ON e.group_id = g.id AND e.kind = 'line'
+CROSS JOIN LATERAL ST_Dump(e.geom) AS part
+WHERE g.route AND g.hidden_at IS NULL
+ORDER BY g.segment_id, ST_Length(part.geom::geography) DESC, e.id
+"""
+# What is stored for one segment (not hidden groups), route lines first.
+SEGMENT_ELEMENTS_SQL = """
+SELECT e.name, ST_AsGeoJSON(e.geom) AS geom
+FROM kmz_elements e JOIN kmz_groups g ON g.id = e.group_id
+WHERE g.segment_id = :segment_id AND g.hidden_at IS NULL
+ORDER BY g.route DESC, e.id
+"""
+ROUTE_GROUP_EXISTS_SQL = """
+SELECT 1 FROM kmz_groups WHERE segment_id = :segment_id AND route AND hidden_at IS NULL LIMIT 1
+"""
 SITE_SQL = """
 SELECT s.id, s.name, s.kind, s.lrd_site_id, s.details->>'region' AS region,
        ST_X(s.geom) AS x, ST_Y(s.geom) AS y, l.name AS lname, ST_X(l.geom) AS lx, ST_Y(l.geom) AS ly,
@@ -63,7 +82,7 @@ SELECT json_build_object('type', 'FeatureCollection', 'features', coalesce(json_
 FROM kmz_elements e
 JOIN kmz_groups g ON g.id = e.group_id
 LEFT JOIN clusters c ON c.id = g.cluster_id
-WHERE g.hidden_at IS NULL
+WHERE g.hidden_at IS NULL AND NOT g.route
 """
 
 
@@ -119,9 +138,18 @@ def _shaped_lines(db: Session, geo: dict[int, dict[str, Any]], route_sql: str, p
     return shaped
 
 
+def _route_group_lines(db: Session) -> dict[int, list[list[list[float]]]]:
+    """{segment_id: its route lines as vertex lists, longest first}."""
+    lines: dict[int, list[list[list[float]]]] = {}
+    for row in db.execute(text(ROUTE_GROUP_LINES_SQL)).mappings():
+        lines.setdefault(row["segment_id"], []).append(json.loads(row["geom"])["coordinates"])
+    return lines
+
+
 def map_segments(db: Session) -> dict[str, Any]:
     geo = {r["id"]: dict(r) for r in db.execute(text(SEGMENT_GEO_SQL)).mappings()}
     shaped = _shaped_lines(db, geo, ROUTE_SQL, {})
+    group_lines = _route_group_lines(db)
     feats, not_drawn = [], []
     for s in list_segments(db, None, None, None):
         g, name = geo[s["id"]], f"{s['site_a']} - {s['site_b']}"
@@ -131,6 +159,9 @@ def map_segments(db: Session) -> dict[str, Any]:
             not_drawn.append({"segment_id": s["id"], "name": name, "reason": reason})
             continue
         seg_id, coords = shaped.get(s["id"], (None, None))
+        drawn_lines = group_lines.get(s["id"], [])
+        if drawn_lines:
+            seg_id, coords = None, drawn_lines[0]  # route lines stored as drawn win over routes.geom
         surveyed = s["survey_cores"] is not None
         props = {"segment_id": s["id"], "name": name, "site_a_id": g["site_a_id"], "site_b_id": g["site_b_id"],
                  "route_type": s["route_type"], "route": s["route"], "region": s["region"],
@@ -141,6 +172,10 @@ def map_segments(db: Session) -> dict[str, Any]:
             props["shaped"] = True
         feats.append({"type": "Feature", "properties": props, "geometry": {
             "type": "LineString", "coordinates": coords or [[g["ax"], g["ay"]], [g["bx"], g["by"]]]}})
+        for other_line in drawn_lines[1:]:
+            # the chip belongs to the longest line; the map draws these without one
+            feats.append({"type": "Feature", "properties": {**props, "extra_line": True},
+                          "geometry": {"type": "LineString", "coordinates": other_line}})
     return {"type": "FeatureCollection", "features": feats, "not_drawn": not_drawn}
 
 
@@ -180,11 +215,55 @@ def _kml_point(name: str, lon: float, lat: float) -> str:
             f"<Point><coordinates>{lon},{lat},0</coordinates></Point></Placemark>")
 
 
+def _kml_ring(ring: list[list[float]]) -> str:
+    return " ".join(f"{lon},{lat},0" for lon, lat in ring)
+
+
+def _kml_polygon(rings: list[list[list[float]]]) -> str:
+    inner = "".join(f"<innerBoundaryIs><LinearRing><coordinates>{_kml_ring(ring)}</coordinates></LinearRing>"
+                    "</innerBoundaryIs>" for ring in rings[1:])
+    return (f"<Polygon><outerBoundaryIs><LinearRing><coordinates>{_kml_ring(rings[0])}</coordinates></LinearRing>"
+            f"</outerBoundaryIs>{inner}</Polygon>")
+
+
+def _kml_geometry(geometry: dict[str, Any]) -> str:
+    kind, coordinates = geometry["type"], geometry["coordinates"]
+    if kind == "Point":
+        return f"<Point><coordinates>{coordinates[0]},{coordinates[1]},0</coordinates></Point>"
+    if kind == "LineString":
+        return f"<LineString><coordinates>{_kml_ring(coordinates)}</coordinates></LineString>"
+    if kind == "Polygon":
+        return _kml_polygon(coordinates)
+    if kind == "MultiPoint":
+        parts = [{"type": "Point", "coordinates": part} for part in coordinates]
+    elif kind == "MultiLineString":
+        parts = [{"type": "LineString", "coordinates": part} for part in coordinates]
+    else:
+        parts = [{"type": "Polygon", "coordinates": part} for part in coordinates]
+    return "<MultiGeometry>" + "".join(_kml_geometry(part) for part in parts) + "</MultiGeometry>"
+
+
+def _stored_segment_kml(db: Session, segment_id: int, name: str) -> str | None:
+    """KML of what is stored for the segment as it is (route lines first); None when no route group exists."""
+    has_route = db.execute(text(ROUTE_GROUP_EXISTS_SQL), {"segment_id": segment_id}).first() is not None
+    if not has_route:
+        return None
+    placemarks = ""
+    for row in db.execute(text(SEGMENT_ELEMENTS_SQL), {"segment_id": segment_id}).mappings():
+        shape = _kml_geometry(json.loads(row["geom"]))
+        placemarks += f"<Placemark><name>{escape(row['name'])}</name>{shape}</Placemark>"
+    return ('<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2"><Document>'
+            f"<name>{escape(name)}</name>{placemarks}</Document></kml>")
+
+
 def segment_kml(db: Session, segment_id: int) -> tuple[str, str] | None:
     """(file name, KML text) of one segment: its line as drawn on the map plus its two sites; None if not drawn."""
     sites = db.execute(text(SEGMENT_SITES_SQL), {"segment_id": segment_id}).mappings().first()
     if sites is None:
         return None
+    stored = _stored_segment_kml(db, segment_id, f"{sites['site_a']} - {sites['site_b']}")
+    if stored is not None:
+        return f"{sites['site_a']} - {sites['site_b']}", stored
     params = {"segment_id": segment_id}
     geo = {r["id"]: dict(r) for r in db.execute(text(SEGMENT_GEO_SQL + SEGMENT_GEO_ONE_FILTER), params).mappings()}
     this = geo[segment_id]
