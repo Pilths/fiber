@@ -60,12 +60,12 @@ export function MyReservations({ me, onChanged }: { me: Me; onChanged: () => voi
         {shown && shown.length === 0 && <p>{EMPTY_TEXT[chip]}</p>}
         <ul className="space-y-3">
           {shown?.map((reservation) => (
-            <ReservationCard key={reservation.id} reservation={reservation} me={me} onChanged={reloadAll} />
+            <ReservationCard key={reservation.id} reservation={reservation} onChanged={reloadAll} />
           ))}
         </ul>
       </section>
       {me.role === "admin" && (
-        <NeedsReview me={me} data={review.data} error={review.error} onChanged={reloadAll} />
+        <NeedsReview data={review.data} error={review.error} onChanged={reloadAll} />
       )}
     </>
   );

@@ -19,6 +19,10 @@ class CoreIds(BaseModel):
     cores: list[int] = Field(default_factory=list)
 
 
+class ReleaseRequestBody(CoreIds):
+    remarks: Remarks = ""
+
+
 class RemarksBody(BaseModel):
     remarks: Remarks = ""
 
@@ -60,6 +64,8 @@ class ReservationOut(BaseModel):
     imported: bool
     cores: list[ResCore]
     release_requested_cores: list[int]
+    release_request_remarks: str | None  # remarks of the waiting release request
+    actions: list[str]  # what the viewer may do now (see actions.py)
 
 
 class NeedsReviewItem(BaseModel):

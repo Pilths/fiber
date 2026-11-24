@@ -39,7 +39,7 @@ def get_segment(db: DB, segment_id: int) -> SegmentDetail:
 
 @router.get("/cores/{core_id}")
 def get_core(db: DB, user: Annotated[CurrentUser, Depends(get_current_user)], core_id: int) -> CoreHolderDetail:
-    core = service.get_core(db, core_id, user.id)
+    core = service.get_core(db, core_id, user)
     if core is None:
         raise HTTPException(404, "Core not found")
     return core

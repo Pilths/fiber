@@ -156,7 +156,7 @@ def set_core_ports(db: DB, admin: Admin, core_id: int, body: CorePortsBody) -> C
     wanted = {end: getattr(body, end) for end in PORT_ENDS if end in body.model_fields_set}
     if _write_core_ports(db, admin, core_id, wanted, body.remarks):
         db.commit()
-    core = inventory.get_core(db, core_id, admin.id)
+    core = inventory.get_core(db, core_id, admin)
     if core is None:
         raise NotFound("Core not found")
     return core

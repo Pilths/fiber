@@ -318,6 +318,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/reservations/{rid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Reservation */
+        get: operations["get_reservation_api_reservations__rid__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/reservations/{rid}/withdraw": {
         parameters: {
             query?: never;
@@ -1674,6 +1691,8 @@ export interface components {
             owner: components["schemas"]["Owner"];
             /** Is Mine */
             is_mine: boolean;
+            /** Actions */
+            actions: string[];
         };
         /** ImportStateOut */
         ImportStateOut: {
@@ -2125,6 +2144,16 @@ export interface components {
             /** Confirmed At */
             confirmed_at: string | null;
         };
+        /** ReleaseRequestBody */
+        ReleaseRequestBody: {
+            /** Cores */
+            cores?: number[];
+            /**
+             * Remarks
+             * @default
+             */
+            remarks: string;
+        };
         /** RemarksBody */
         RemarksBody: {
             /**
@@ -2204,6 +2233,10 @@ export interface components {
             cores: components["schemas"]["ResCore"][];
             /** Release Requested Cores */
             release_requested_cores: number[];
+            /** Release Request Remarks */
+            release_request_remarks: string | null;
+            /** Actions */
+            actions: string[];
         };
         /** ReservationUsage */
         ReservationUsage: {
@@ -3717,6 +3750,41 @@ export interface operations {
             };
         };
     };
+    get_reservation_api_reservations__rid__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-dev-user"?: string | null;
+            };
+            path: {
+                rid: number;
+            };
+            cookie?: {
+                fiber_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReservationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     withdraw_api_reservations__rid__withdraw_post: {
         parameters: {
             query?: never;
@@ -3802,7 +3870,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["CoreIds"];
+                "application/json": components["schemas"]["ReleaseRequestBody"];
             };
         };
         responses: {
