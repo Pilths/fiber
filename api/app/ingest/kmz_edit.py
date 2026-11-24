@@ -12,7 +12,8 @@ from app.errors import Conflict, Invalid, NotFound
 from app.ingest.kmz_groups import CLUSTER_NAME_TAKEN_SQL, INSERT_MEMBER_SQL, target_must_exist
 
 GROUP_FOR_UPDATE_SQL = """
-SELECT id, name, colour_mode, hidden_at, hidden_by, segment_id, site_id, cluster_id FROM kmz_groups WHERE id = :group_id
+SELECT id, name, colour_mode, hidden_at, hidden_by, segment_id, site_id, cluster_id, route
+FROM kmz_groups WHERE id = :group_id
 FOR UPDATE
 """
 SET_GROUP_SQL = """
@@ -123,6 +124,8 @@ def edit_group(db: Session, admin_id: int, group_id: int, changes: dict, remarks
         values["colour_mode"] = changes["colour_mode"]
     target = changes.get("target")
     if target is not None:
+        if row["route"] and target["kind"] != "segment":
+            raise Invalid("a route line can move only to another segment")
         target_must_exist(db, target["kind"], target["id"])
         old_target = target_text(row)
         new_target = f"{target['kind']} {target['id']}"

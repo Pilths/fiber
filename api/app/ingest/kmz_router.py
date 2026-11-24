@@ -8,9 +8,10 @@ from fastapi import APIRouter, Depends, Form, HTTPException, Query, Response, Up
 from pydantic import BaseModel
 
 from app.auth.deps import DB, Admin, require_admin
-from app.ingest import kmz_edit
+from app.ingest import kmz_edit, kmz_route_lines
 from app.ingest.kmz import DEFAULT_FOLDER, apply_upload, folder_tree, stage_preview
 from app.ingest.upload_file import read_upload
+from app.ingest.uploads import get_upload
 from app.observability import logged_apply
 from app.reservations.schemas import Remarks
 
@@ -55,6 +56,20 @@ class KmzGroupOut(BaseModel):
     member_site_ids: list[int]  # active sites inside the group's areas, the members of a new cluster
 
 
+class KmzRouteLineOut(BaseModel):
+    key: str  # folder id and element index, stable until apply
+    name: str
+    folder_path: str
+    suggested_segment_id: int | None
+    suggested_by: Literal["title"] | None
+
+
+class KmzLocationSuggestion(BaseModel):
+    key: str
+    segment_id: int
+    suggested_by: Literal["location"]
+
+
 class KmzUploadOut(BaseModel):
     upload_id: int
     filename: str
@@ -65,6 +80,7 @@ class KmzUploadOut(BaseModel):
     shaped: list[KmzShaped]
     skipped: list[KmzSkipped]
     groups: list[KmzGroupOut]
+    route_lines: list[KmzRouteLineOut] = []
 
 
 class KmzFolder(BaseModel):
@@ -142,9 +158,15 @@ class KmzApplyGroup(BaseModel):
     member_site_ids: list[int] = []  # cluster target only
 
 
+class KmzApplyRouteLine(BaseModel):
+    key: str
+    segment_id: int
+
+
 class KmzApplyIn(BaseModel):
     route_segment_ids: list[int] | None = None  # None = every previewed route line
     groups: list[KmzApplyGroup] = []  # groups not listed are skipped
+    route_lines: list[KmzApplyRouteLine] | None = None  # lines saved as drawn on their segment; replaces the title join
 
 
 class KmzApplyOut(BaseModel):
@@ -152,6 +174,7 @@ class KmzApplyOut(BaseModel):
     shaped: int
     groups_saved: int = 0
     clusters_created: int = 0
+    route_lines_saved: int = 0
 
 
 def group_out(group: dict) -> KmzGroupOut:
@@ -171,6 +194,7 @@ def preview_from(upload_id: int, summary: dict) -> KmzUploadOut:
         shaped=[KmzShaped(**item) for item in summary["shaped"]],
         skipped=[KmzSkipped(**item) for item in summary["skipped"]],
         groups=[group_out(group) for group in summary.get("groups", [])],
+        route_lines=[KmzRouteLineOut(**line) for line in summary.get("route_lines", [])],
     )
 
 
@@ -204,9 +228,18 @@ def upload(
 def apply(db: DB, admin: Admin, upload_id: int, body: KmzApplyIn | None = None) -> KmzApplyOut:
     body = body or KmzApplyIn()
     choices = [group.model_dump() for group in body.groups]
+    line_choices = [line.model_dump() for line in body.route_lines or []]
     with logged_apply("kmz", upload_id, admin.id):
-        result = apply_upload(db, admin.id, upload_id, body.route_segment_ids, choices)
+        result = apply_upload(db, admin.id, upload_id, body.route_segment_ids, choices, line_choices)
         return KmzApplyOut(upload_id=upload_id, **result)
+
+
+@router.post("/uploads/{upload_id}/suggest-by-location")
+def suggest_by_location(db: DB, upload_id: int) -> list[KmzLocationSuggestion]:
+    """Segments whose two sites lie near the two ends of each staged line. Saves nothing."""
+    upload = get_upload(db, upload_id, "kmz")
+    route_lines = upload["summary"].get("route_lines", [])
+    return [KmzLocationSuggestion(**item) for item in kmz_route_lines.suggest_by_location(db, route_lines)]
 
 
 @router.get("/clusters")

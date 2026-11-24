@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 
 from app.ingest.checks import split_nodes
 from app.admin_edits.history import log_edits_for_user
-from app.ingest import kmz_groups
+from app.ingest import kmz_groups, kmz_route_lines
 from app.ingest.uploads import ApplyError, finish_upload, insert_upload, lock_staged_upload
 
 MAX_KML_BYTES = 50 * 1024 * 1024  # unpacked size of the KML inside the KMZ
@@ -478,19 +478,61 @@ def part_count(geometry: dict) -> int:
     return 1
 
 
+FolderChain = tuple[str, ElementTree.Element, list[str]]
+
+
+def selected_folders(root: ElementTree.Element, folder_ids: list[str]) -> list[FolderChain]:
+    """(folder id, folder, ids from the top folder down to it) for each selected folder and each folder below it."""
+    nodes = folder_nodes(root)
+    selected = set(folder_ids)
+    found = []
+    for folder_id, folder in nodes.items():
+        parts = folder_id.split("/")
+        chain = ["/".join(parts[:count]) for count in range(1, len(parts) + 1)]
+        if selected & set(chain):
+            found.append((folder_id, folder, chain))
+    return found
+
+
+def folder_path_of(root: ElementTree.Element, chain: list[str]) -> str:
+    nodes = folder_nodes(root)
+    return " / ".join(folder_name(nodes[prefix]) for prefix in chain)
+
+
+def route_lines_in_folders(
+    source: str | BinaryIO, folder_ids: list[str], segment_ids: dict[frozenset, int]
+) -> list[dict]:
+    """Every line element of the selected folders (and below) with a key "folder id:element index" and, when its
+    title is a site pair of a segment, that segment as the suggestion. Geometry is kept as drawn."""
+    root = read_kml_root(source)
+    styles = parse_styles(root)
+    route_lines = []
+    for folder_id, folder, chain in selected_folders(root, folder_ids):
+        folder_path = folder_path_of(root, chain)
+        for index, element in enumerate(elements_in_folder(folder, styles)):
+            if element["kind"] != "line":
+                continue
+            pair = pair_from_title(element["name"])
+            segment_id = None if pair is None else segment_ids.get(frozenset(pair))
+            route_lines.append({
+                "key": f"{folder_id}:{index}",
+                "name": element["name"],
+                "folder_path": folder_path,
+                "suggested_segment_id": segment_id,
+                "suggested_by": None if segment_id is None else "title",
+                "geometry": element["geometry"],
+                "kmz_style": element["kmz_style"],
+            })
+    return route_lines
+
+
 def groups_in_folders(source: str | BinaryIO, folder_ids: list[str], route_pairs: set[frozenset]) -> list[dict]:
     """One group per selected folder and per folder below it, with its own elements. Lines titled with a site
     pair in `route_pairs` are route lines and are left out. A folder with no element left gives no group."""
     root = read_kml_root(source)
-    nodes = folder_nodes(root)
-    selected = set(folder_ids)
     styles = parse_styles(root)
     groups = []
-    for folder_id, folder in nodes.items():
-        parts = folder_id.split("/")
-        chain = ["/".join(parts[:count]) for count in range(1, len(parts) + 1)]
-        if not selected & set(chain):
-            continue
+    for folder_id, folder, chain in selected_folders(root, folder_ids):
         elements = []
         for element in elements_in_folder(folder, styles):
             pair = pair_from_title(element["name"])
@@ -508,7 +550,7 @@ def groups_in_folders(source: str | BinaryIO, folder_ids: list[str], route_pairs
         groups.append({
             "key": folder_id,
             "name": folder_name(folder),
-            "folder_path": " / ".join(folder_name(nodes[prefix]) for prefix in chain),
+            "folder_path": folder_path_of(root, chain),
             "counts": counts,
             "elements": elements,
             "outside_malaysia": outside,
@@ -634,6 +676,14 @@ def compute_shapes(db: Session, lines: list[TitledLine]) -> dict:
     return {"shaped": shaped, "skipped": skipped}
 
 
+def segment_ids_by_pair(db: Session) -> dict[frozenset, int]:
+    """Segment id per site-name pair (upper case, either order)."""
+    ids = {}
+    for segment in db.execute(text(SEGMENTS_SQL)).mappings():
+        ids[frozenset((segment["a_name"].upper(), segment["b_name"].upper()))] = segment["id"]
+    return ids
+
+
 def route_pairs_of(db: Session) -> set[frozenset]:
     """Site-name pairs (upper case) of every segment: a line titled with one of them is a route line."""
     pairs = set()
@@ -648,12 +698,14 @@ def stage_preview(
     """Read the KMZ, compute the shapes and groups and store the preview in an uploads row.
     Groups are read only for selected folder ids. Raises ValueError for a bad file."""
     groups: list[dict] = []
+    route_lines: list[dict] = []
     if folder_ids:
         lines, selected_names = lines_in_folder_ids(io.BytesIO(data), folder_ids)
         folder = ", ".join(selected_names)
         folders_found = selected_names
         raw_groups = groups_in_folders(io.BytesIO(data), folder_ids, route_pairs_of(db))
         groups = kmz_groups.describe_groups(db, raw_groups)
+        route_lines = route_lines_in_folders(io.BytesIO(data), folder_ids, segment_ids_by_pair(db))
     else:
         lines, folders_found = parse_lines(io.BytesIO(data), folder)
     result = {"shaped": [], "skipped": []}
@@ -672,6 +724,7 @@ def stage_preview(
         "lines": len(lines),
         "block_reason": block_reason,
         "groups": groups,
+        "route_lines": route_lines,
         **result,
     }
     upload_id = insert_upload(db, admin_id, filename, "kmz", summary)
@@ -697,6 +750,7 @@ def apply_upload(
     upload_id: int,
     route_segment_ids: list[int] | None = None,
     group_choices: list[dict] | None = None,
+    route_line_choices: list[dict] | None = None,
 ) -> dict:
     """Save the previewed route lines (all, or only `route_segment_ids`) and the groups the admin chose.
     Returns {"shaped": n, "groups_saved": n, "clusters_created": n}."""
@@ -706,10 +760,13 @@ def apply_upload(
     if summary["block_reason"]:
         raise ApplyError(409, summary["block_reason"])
     shaped = summary["shaped"]
-    if route_segment_ids is not None:
+    chosen_lines = kmz_route_lines.check_route_lines(db, summary.get("route_lines", []), route_line_choices or [])
+    if chosen_lines:
+        shaped = []  # lines assigned by the admin replace the title join
+    elif route_segment_ids is not None:
         shaped = [item for item in shaped if item["segment_id"] in route_segment_ids]
     chosen_groups = kmz_groups.check_choices(db, summary.get("groups", []), choices)
-    if not shaped and not chosen_groups:
+    if not shaped and not chosen_groups and not chosen_lines:
         raise ApplyError(409, "Nothing to apply")
     saved = 0
     for item in shaped:
@@ -719,6 +776,8 @@ def apply_upload(
         save_shape_logged(db, admin_id, upload_id, segment, item["coords"])
         saved += 1
     groups_saved, clusters_created = kmz_groups.save_groups(db, admin_id, upload_id, chosen_groups)
+    lines_saved = kmz_route_lines.save_route_lines(db, admin_id, upload_id, chosen_lines)
     finish_upload(db, upload_id)
     db.commit()
-    return {"shaped": saved, "groups_saved": groups_saved, "clusters_created": clusters_created}
+    return {"shaped": saved, "groups_saved": groups_saved, "clusters_created": clusters_created,
+            "route_lines_saved": lines_saved}

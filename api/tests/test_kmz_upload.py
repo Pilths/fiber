@@ -50,7 +50,8 @@ def test_stage_apply_then_restage(client, db, admin, segments, kmz_bytes):
     applied = client.post(f"{URL}/uploads/{body['upload_id']}/apply")
     assert applied.status_code == 200
     assert applied.json() == {
-        "upload_id": body["upload_id"], "shaped": 2, "groups_saved": 0, "clusters_created": 0}
+        "upload_id": body["upload_id"], "shaped": 2, "groups_saved": 0, "clusters_created": 0,
+        "route_lines_saved": 0}
     assert shaped_ids(db) == set(segments)
     assert one(db, "SELECT status FROM uploads WHERE id = :i", i=body["upload_id"]) == "confirmed"
 

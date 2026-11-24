@@ -213,7 +213,8 @@ def test_apply_to_segment_site_and_skip(client, db, admin, segments, sites):
         {"key": "2", "target": "skip"},
     ])
     assert response.status_code == 200
-    assert response.json() == {"upload_id": upload_id, "shaped": 0, "groups_saved": 2, "clusters_created": 0}
+    assert response.json() == {"upload_id": upload_id, "shaped": 0, "groups_saved": 2, "clusters_created": 0,
+        "route_lines_saved": 0}
     rows = group_rows(db)
     assert [row["name"] for row in rows] == ["Blocks", "INSIDE"]
     assert rows[0]["segment_id"] == segments[0]
