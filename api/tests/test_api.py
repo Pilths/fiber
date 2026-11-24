@@ -72,6 +72,12 @@ def test_search_segment(client, net):
     assert {h["segment_id"] for h in hits} == {net["s1"], net["s2"]}
 
 
+def test_search_segment_by_pair_either_order(client, net):
+    for query in ("Alpha-Bravo", "bravo hub - alpha hub", "Bravo Hub-Alpha"):
+        assert [h["segment_id"] for h in labels(client, query, "segment")] == [net["s1"]]
+    assert labels(client, "Alpha-Charlie", "segment") == []
+
+
 def test_search_core_number(client, net):
     hits = labels(client, "3", "core")
     assert hits[0]["core_id"] == net["cores"][3]
