@@ -1,0 +1,802 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KMZ import v2</title>
+<style>
+:root {
+  --ground: #f2f4f7; --ink: #0a0a0a; --muted-ink: #5b6068; --line: #868c96; --rule: #eceef2; --raised: #eceef2;
+  --border: #e2e5ea; --subtle: #f7f8fa; --nav-ink: #3d4046;
+  --blue: #1d5fbf; --blue-bg: #eff5fd; --blue-bd: #bcd2f2;
+  --green: #1a7f4b; --green-bg: #ecfdf3; --green-bd: #b7e4c7;
+  --amber: #b45309; --amber-bg: #fff7ed; --amber-bd: #eec9a0;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body { min-width: 1200px; background: var(--ground); color: var(--ink); font: 14px/1.45 'Geist Variable', 'Geist', system-ui, sans-serif;
+  font-variant-numeric: tabular-nums; -webkit-font-smoothing: antialiased; overflow: hidden; }
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
+input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--blue); flex: none; margin: 0; cursor: pointer; }
+input[type=checkbox]:disabled { cursor: not-allowed; }
+[hidden] { display: none !important; }
+a { color: inherit; }
+
+/* Prototype bar (not part of the app) */
+.proto { height: 32px; background: #24272c; color: #c9ccd1; display: flex; align-items: center; gap: 4px; padding: 0 12px; font-size: 12px; }
+.proto b { color: #fff; margin-right: 12px; font-weight: 600; }
+.proto a { color: #c9ccd1; text-decoration: none; padding: 4px 8px; border-radius: 4px; }
+.proto a:hover { background: #3a3e45; }
+.proto a.on { background: #fff; color: var(--ink); font-weight: 600; }
+
+/* App behind the box */
+.top { height: 60px; background: #fff; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 32px; padding: 0 24px; }
+.top b { font-size: 16px; }
+.top nav { display: flex; gap: 20px; color: var(--nav-ink); font-weight: 500; }
+.top nav .on { color: var(--ink); font-weight: 600; }
+.page { padding: 24px; height: calc(100vh - 92px); overflow: auto; }
+.utabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
+.utabs a { height: 40px; display: flex; align-items: center; padding: 0 16px; color: var(--muted-ink); font-weight: 500; border-bottom: 2px solid transparent; margin-bottom: -1px; text-decoration: none; }
+.utabs a:hover { color: var(--ink); }
+.utabs .on { color: var(--ink); font-weight: 600; border-color: var(--ink); }
+.card { background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 20px; }
+.card-h { display: flex; align-items: center; gap: 12px; padding-bottom: 12px; margin-bottom: 16px; border-bottom: 1px solid var(--border); }
+.card-h h2 { font-size: 16px; font-weight: 600; flex: 1; }
+.dim { position: fixed; inset: 0; background: rgb(10 10 10 / .45); }
+
+/* Shared */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 36px; padding: 0 16px; border: 1px solid var(--line); border-radius: 6px; background: #fff; font-weight: 600; cursor: pointer; white-space: nowrap; text-decoration: none; }
+.btn:hover { background: var(--raised); }
+.btn-p { background: var(--ink); border-color: var(--ink); color: #fff; }
+.btn-p:hover { background: #2c2c2c; }
+.btn-sm { height: 32px; padding: 0 12px; }
+.btn-xs { height: 28px; padding: 0 10px; font-size: 13px; }
+.link { color: var(--blue); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; background: none; border: 0; padding: 0; font-size: 13px; }
+.field { width: 100%; height: 36px; padding: 0 12px; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
+.field::placeholder { color: var(--muted-ink); opacity: 1; }
+select.field { appearance: none; padding-right: 30px; cursor: pointer; background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 6l4 4 4-4' fill='none' stroke='%235b6068' stroke-width='1.5'/%3E%3C/svg%3E") no-repeat right 8px center / 16px; }
+.chip { height: 32px; padding: 0 12px; border: 1px solid var(--line); border-radius: 6px; background: #fff; font-size: 13px; cursor: pointer; display: inline-flex; align-items: center; }
+.chip[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: #fff; }
+.pill { display: inline-flex; align-items: center; font-size: 12px; line-height: 20px; font-weight: 600; padding: 0 10px; border-radius: 999px; border: 1px solid; white-space: nowrap; }
+.h-amber { color: var(--amber); background: var(--amber-bg); border-color: var(--amber-bd); }
+.warn { color: var(--amber); font-weight: 600; }
+.muted { color: var(--muted-ink); }
+.note-g { display: flex; align-items: center; gap: 12px; padding: 10px 14px; margin-bottom: 16px; border: 1px solid var(--green-bd); background: var(--green-bg); border-radius: 6px; color: var(--green); font-weight: 600; }
+.tbl { width: 100%; table-layout: fixed; border-collapse: collapse; }
+.tbl th, .tbl td { text-align: center; padding: 4px 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13px; }
+.tbl thead th { font-size: 12px; font-weight: 500; color: var(--muted-ink); background: var(--subtle); height: 36px; border-bottom: 1px solid var(--border); }
+.tbl td, .tbl tbody th { height: 40px; border-bottom: 1px solid var(--rule); }
+.tbl tbody tr:last-child > * { border-bottom: 0; }
+.tbl tbody th { font-weight: 600; }
+.tbox { border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+.chev { width: 24px; height: 24px; border: 0; background: none; border-radius: 4px; display: grid; place-items: center; cursor: pointer; flex: none; }
+.chev:hover { background: var(--raised); }
+.chev svg { width: 14px; height: 14px; fill: none; stroke: var(--muted-ink); stroke-width: 1.8; transition: transform .12s; }
+.chev[aria-expanded="true"] svg { transform: rotate(90deg); }
+
+/* Box */
+.box { position: fixed; left: 50%; top: calc(50% + 16px); transform: translate(-50%, -50%); width: 1240px; height: min(820px, calc(100vh - 72px)); background: #fff; border-radius: 8px;
+  border: 1px solid var(--border); display: grid; grid-template-rows: auto minmax(0, 1fr) auto; overflow: hidden; }
+.bh { display: flex; align-items: center; gap: 32px; padding: 16px 20px; border-bottom: 1px solid var(--border); }
+.bh h1 { font-size: 18px; font-weight: 600; }
+.steps { display: flex; align-items: center; gap: 8px; flex: 1; list-style: none; padding: 0; }
+.steps li { display: inline-flex; align-items: center; gap: 8px; color: var(--muted-ink); font-weight: 500; }
+.steps i { font-style: normal; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 700; border: 1px solid var(--line); background: #fff; color: var(--ink); }
+.steps li[aria-current="step"] { color: var(--ink); font-weight: 600; }
+.steps li[aria-current="step"] i { background: var(--ink); border-color: var(--ink); color: #fff; }
+.steps .sep { width: 32px; height: 1px; background: var(--line); }
+.x { width: 36px; height: 36px; border: 0; border-radius: 6px; background: none; cursor: pointer; display: grid; place-items: center; }
+.x:hover { background: var(--raised); }
+.bf { display: flex; align-items: center; gap: 16px; padding: 14px 20px; border-top: 1px solid var(--border); }
+.bf .count { flex: 1; text-align: right; font-size: 13px; }
+
+/* Upload step */
+.up { padding: 20px; display: grid; gap: 16px; align-content: start; max-width: 720px; }
+.up h2 { font-size: 16px; font-weight: 600; }
+.drop { border: 1px dashed var(--line); border-radius: 6px; padding: 20px; display: flex; align-items: center; gap: 16px; }
+.fh { display: flex; align-items: center; gap: 16px; }
+.fh h2 { flex: 1; }
+.folders { border: 1px solid var(--border); border-radius: 6px; }
+.folder { display: grid; grid-template-columns: 16px 1fr auto; align-items: center; gap: 12px; height: 44px; padding: 0 14px; cursor: pointer; }
+.folder + .folder { border-top: 1px solid var(--rule); }
+.folder:hover { background: var(--subtle); }
+.folder .nm { font-weight: 600; }
+.folder.off { cursor: not-allowed; color: var(--muted-ink); }
+.folder.off .nm { font-weight: 500; }
+
+/* Select step */
+.sel { display: grid; grid-template-columns: 660px 1fr; height: 100%; min-height: 0; }
+.left { border-right: 1px solid var(--border); display: flex; flex-direction: column; min-height: 0; }
+.lh { padding: 16px 20px 12px; display: grid; gap: 10px; }
+.lh .row { display: flex; align-items: center; gap: 16px; }
+.lh h2 { font-size: 16px; font-weight: 600; flex: 1; }
+.list { overflow-y: auto; flex: 1; padding: 0 12px 16px; scroll-behavior: smooth; }
+.seg { display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 8px; border-radius: 6px; }
+.seg:hover { background: var(--subtle); }
+.seg .name { font-weight: 600; flex: 1; }
+.seg .n { font-size: 13px; }
+.els { padding: 2px 0 6px 40px; display: grid; gap: 2px; }
+.el { display: grid; grid-template-columns: 16px minmax(0, 1fr) 74px 126px 184px 80px; align-items: center; gap: 6px; height: 36px; padding: 0 8px; border-radius: 6px; border: 1.5px solid transparent; font-size: 13px; cursor: pointer; }
+.el:hover, .el.hl { background: var(--blue-bg); border-color: var(--blue-bd); }
+.el > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.el .fold, .el .ev { color: var(--muted-ink); font-size: 12px; }
+.el .ev b { color: var(--amber); font-weight: 600; }
+.src { font-size: 12px; font-weight: 600; text-align: right; color: var(--muted-ink); }
+.el.sug { border: 1.5px dashed var(--blue); background: var(--blue-bg); font-weight: 700; }
+.el.sug.hl { border-style: solid; }
+.el.sug .src { color: var(--blue); }
+.el.dup .src { color: var(--amber); }
+.nmsec { margin-top: 12px; border: 1px solid var(--amber-bd); background: var(--amber-bg); border-radius: 6px; }
+.nm-h { display: flex; align-items: center; gap: 12px; padding: 10px 12px; }
+.nm-h h3 { font-size: 14px; font-weight: 600; flex: 1; }
+.nm-r { display: grid; grid-template-columns: minmax(0, 1fr) 100px 330px; align-items: center; gap: 12px; padding: 6px 12px; font-size: 13px; border-top: 1px solid var(--amber-bd); border-left: 3px solid transparent; }
+.nm-r.hl { background: #fdecd6; border-left-color: var(--amber); }
+.nm-r > span { white-space: nowrap; }
+.nm-r .field { height: 32px; font-size: 13px; }
+.closest { display: flex; align-items: center; gap: 8px; }
+.closest span { flex: 1; white-space: nowrap; height: 32px; display: flex; align-items: center; gap: 8px; padding: 0 10px; border: 1.5px dashed var(--blue); border-radius: 6px; background: var(--blue-bg); font-weight: 700; }
+.closest span i { font-style: normal; margin-left: auto; color: var(--blue); font-size: 12px; }
+
+.right { display: flex; flex-direction: column; min-height: 0; padding: 16px 20px; gap: 12px; }
+.right h2 { font-size: 16px; font-weight: 600; }
+.map { flex: 1; min-height: 0; border: 1px solid var(--border); border-radius: 6px; position: relative; overflow: hidden; background: #f4f3ef; }
+.map svg { width: 100%; height: 100%; display: block; }
+.map .ln { cursor: pointer; }
+.mctl { position: absolute; top: 10px; right: 10px; display: grid; gap: 6px; }
+.mbtn { min-width: 36px; height: 32px; padding: 0 10px; border: 1px solid var(--line); border-radius: 6px; background: #fff; font-size: 13px; font-weight: 600; cursor: pointer; }
+.mbtn:hover { background: var(--raised); }
+.scale { position: absolute; left: 10px; bottom: 10px; display: flex; align-items: flex-end; gap: 6px; font-size: 12px; font-weight: 600; background: rgb(255 255 255 / .85); padding: 2px 6px; border-radius: 3px; }
+.scale i { display: block; width: 80px; height: 6px; border: 1.5px solid var(--ink); border-top: 0; }
+.legend { display: flex; gap: 20px; font-size: 13px; flex-wrap: wrap; }
+.legend span { display: inline-flex; align-items: center; gap: 8px; }
+
+/* Confirm */
+.conf { padding: 20px; display: grid; gap: 16px; align-content: start; max-width: 860px; }
+.conf h2 { font-size: 16px; font-weight: 600; }
+.sugw { color: var(--blue); font-weight: 700; font-size: 12px; margin-left: 8px; }
+
+/* Route lines list */
+.tools { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.tools .field { width: 320px; }
+.pg-split { display: grid; gap: 16px; max-width: 1100px; }
+
+/* Edit segment box */
+.ebox { position: fixed; left: 50%; top: calc(50% + 16px); transform: translate(-50%, -50%); width: 1120px; height: 640px; background: #fff; border-radius: 8px; border: 1px solid var(--border); display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; overflow: hidden; }
+.etabs { display: flex; gap: 4px; padding: 0 20px; border-bottom: 1px solid var(--border); }
+.etabs span { height: 40px; display: flex; align-items: center; padding: 0 14px; color: var(--muted-ink); font-weight: 500; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.etabs .on { color: var(--ink); font-weight: 600; border-color: var(--ink); }
+.ebody { display: grid; grid-template-columns: 560px 1fr; gap: 20px; padding: 20px; min-height: 0; }
+.ebody h2 { font-size: 15px; font-weight: 600; margin-bottom: 10px; }
+.ebody .tbl td:first-child, .ebody .tbl th:first-child { text-align: left; }
+details { margin-top: 16px; border: 1px solid var(--border); border-radius: 6px; }
+summary { list-style: none; display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 10px; font-weight: 600; cursor: pointer; }
+summary::-webkit-details-marker { display: none; }
+summary svg { width: 14px; height: 14px; fill: none; stroke: var(--muted-ink); stroke-width: 1.8; transition: transform .12s; }
+details[open] summary svg { transform: rotate(90deg); }
+details[open] summary { border-bottom: 1px solid var(--border); }
+details .tbl td { color: var(--muted-ink); }
+</style>
+</head>
+<body>
+
+<nav class="proto" aria-label="Prototype views">
+  <b>Prototype</b>
+  <a href="#entry">Entry</a><a href="#upload">Upload</a><a href="#select">Select</a><a href="#notmatched">Not matched</a>
+  <a href="#confirm">Confirm</a><a href="#segments">Segments</a><a href="#map-elements">Map elements</a>
+</nav>
+
+<header class="top">
+  <b>Fiber Dashboard</b>
+  <nav><span>Inventory</span><span>My reservations</span><span>Approvals</span><span class="on">Upload</span></nav>
+</header>
+
+<main class="page">
+  <div class="utabs" role="tablist">
+    <a>Sites (Excel)</a><a>Segments (Excel)</a><a href="#entry" id="tab-kmz">KMZ</a><a href="#segments" id="tab-lines">Route lines</a><a>Reservations (Excel)</a>
+  </div>
+
+  <div id="pg-kmz">
+    <section class="card" style="max-width:720px">
+      <div class="card-h"><h2>KMZ route lines</h2></div>
+      <a class="btn btn-p" href="#upload">Import KMZ</a>
+    </section>
+  </div>
+
+  <div id="pg-lines" class="pg-split" hidden>
+    <div class="note-g" id="applied" hidden>KMZ applied · 6 lines saved</div>
+    <section class="card">
+      <div class="card-h"><h2 id="seg-title">Segments (9)</h2><a class="btn btn-sm" href="#upload">Import KMZ</a></div>
+      <div class="tools">
+        <input class="field" type="search" id="seg-search" placeholder="Search segments" aria-label="Search segments">
+        <button class="chip" type="button" id="noline" aria-pressed="false">No line only</button>
+      </div>
+      <div class="tbox">
+        <table class="tbl" aria-label="Segments and their route lines">
+          <colgroup><col style="width:22%"><col style="width:16%"><col style="width:42%"><col style="width:20%"></colgroup>
+          <thead><tr><th>Segment</th><th>Lines</th><th>Last KMZ</th><th>Edit</th></tr></thead>
+          <tbody id="seg-rows"></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+</main>
+
+<div class="dim" id="dim" hidden></div>
+
+<!-- KMZ import box -->
+<div class="box" id="box" role="dialog" aria-modal="true" aria-labelledby="kmz-title" hidden>
+  <div class="bh">
+    <h1 id="kmz-title">KMZ import</h1>
+    <ol class="steps" aria-label="Steps">
+      <li data-step="upload"><i>1</i>Upload</li><li><span class="sep"></span></li>
+      <li data-step="select"><i>2</i>Select</li><li><span class="sep"></span></li>
+      <li data-step="confirm"><i>3</i>Confirm</li>
+    </ol>
+    <a class="x" href="#entry" aria-label="Close"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 3l10 10M13 3L3 13"/></svg></a>
+  </div>
+
+  <section data-view="upload">
+    <div class="up">
+      <div class="drop"><button class="btn" type="button">Choose .kmz file</button><span>BBBB.kmz</span></div>
+      <div class="fh"><h2>Folders in BBBB.kmz (3)</h2>
+        <button class="link" type="button" id="f-all">Select all</button><button class="link" type="button" id="f-none">Clear</button></div>
+      <div class="folders" id="folders"></div>
+    </div>
+  </section>
+
+  <section data-view="select" hidden>
+    <div class="sel">
+      <div class="left">
+        <div class="lh">
+          <div class="row">
+            <h2 id="sel-title">Segments in BBBB.kmz</h2>
+            <button class="link" type="button" id="all">Select all</button>
+            <button class="link" type="button" id="clear">Clear</button>
+            <button class="link" type="button" id="collapse">Collapse</button>
+          </div>
+          <input class="field" type="search" id="search" placeholder="Search segments" aria-label="Search segments">
+        </div>
+        <div class="list" id="list"></div>
+      </div>
+      <div class="right">
+        <h2>Map preview</h2>
+        <div class="map" id="map">
+          <div class="mctl">
+            <button class="mbtn" type="button" id="zin" aria-label="Zoom in">+</button>
+            <button class="mbtn" type="button" id="zout" aria-label="Zoom out">-</button>
+            <button class="mbtn" type="button" id="fit">Fit</button>
+          </div>
+          <div class="scale"><i></i><span id="scale">2 km</span></div>
+        </div>
+        <div class="legend" aria-label="Map key">
+          <span><svg width="32" height="8" aria-hidden="true"><line x1="0" y1="4" x2="32" y2="4" stroke="#1d5fbf" stroke-width="3.5"/></svg>Picked</span>
+          <span><svg width="32" height="8" aria-hidden="true"><line x1="0" y1="4" x2="32" y2="4" stroke="#1d5fbf" stroke-width="3.5" stroke-dasharray="9 5"/></svg>Suggested</span>
+          <span><svg width="32" height="8" aria-hidden="true"><line x1="1" y1="4" x2="32" y2="4" stroke="#5b6068" stroke-width="3" stroke-dasharray="0.1 6" stroke-linecap="round"/></svg>Left out</span>
+          <span><svg width="12" height="12" aria-hidden="true"><rect x="1" y="1" width="10" height="10" fill="#0a0a0a"/></svg>DC</span>
+          <span><svg width="14" height="12" aria-hidden="true"><path d="M7 0L14 12H0z" fill="#0a0a0a"/></svg>TOC</span>
+          <span><svg width="12" height="12" aria-hidden="true"><path d="M6 1L11 6 6 11 1 6z" fill="#fff" stroke="#0a0a0a" stroke-width="2"/></svg>Site</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section data-view="confirm" hidden>
+    <div class="conf">
+      <h2>BBBB.kmz</h2>
+      <div class="tbox">
+        <table class="tbl" aria-label="Lines to apply">
+          <colgroup><col style="width:30%"><col style="width:30%"><col style="width:40%"></colgroup>
+          <thead><tr><th>Segment</th><th>Lines</th><th>Note</th></tr></thead>
+          <tbody id="conf-rows"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <div class="bf">
+    <button class="btn" type="button" id="back">Back</button>
+    <span class="count" id="count"></span>
+    <button class="btn btn-p" type="button" id="next">Continue</button>
+  </div>
+</div>
+
+<!-- Edit segment box, Map elements -->
+<div class="ebox" id="ebox" role="dialog" aria-modal="true" aria-labelledby="e-title" hidden>
+  <div class="bh"><h1 id="e-title" style="flex:1">Edit segment S01-S02</h1>
+    <a class="x" href="#segments" aria-label="Close"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 3l10 10M13 3L3 13"/></svg></a></div>
+  <div class="etabs"><span>Details</span><span class="on">Map elements</span></div>
+  <div class="ebody">
+    <div style="overflow:auto">
+      <h2 id="cur-h">Lines (2)</h2>
+      <div class="tbox">
+        <table class="tbl" aria-label="Current lines">
+          <colgroup><col style="width:32%"><col style="width:24%"><col style="width:26%"><col style="width:18%"></colgroup>
+          <thead><tr><th>Name</th><th>File</th><th>Date</th><th><span style="position:absolute;left:-9999px">Action</span></th></tr></thead>
+          <tbody id="cur-rows"></tbody>
+        </table>
+      </div>
+      <details id="hid-box">
+        <summary><svg viewBox="0 0 16 16"><path d="M6 3l5 5-5 5"/></svg><span id="hid-h">Hidden (2)</span></summary>
+        <table class="tbl" aria-label="Hidden lines">
+          <colgroup><col style="width:32%"><col style="width:24%"><col style="width:26%"><col style="width:18%"></colgroup>
+          <tbody id="hid-rows"></tbody>
+        </table>
+      </details>
+    </div>
+    <div class="map" id="emap"></div>
+  </div>
+  <div class="bf"><span class="count"></span><a class="btn" href="#segments">Close</a></div>
+</div>
+
+<script>
+const $ = (selector) => document.querySelector(selector);
+const SVGNS = "http://www.w3.org/2000/svg";
+
+// Fake sites (viewBox 640 x 560) and their kinds.
+const SITES = {
+  S01: [90, 110, "dc"], S02: [250, 180, "toc"], S03: [330, 250, "st"], S04: [470, 300, "st"], S05: [170, 400, "st"],
+  S06: [360, 470, "dc"], S07: [560, 390, "st"], S08: [520, 110, "st"], S09: [600, 200, "st"],
+};
+const SEGMENTS = ["S01-S02", "S02-S03", "S03-S04", "S05-S06", "S06-S07", "S04-S07", "S07-S08", "S08-S09", "S02-S09"];
+const REPLACES = { "S05-S06": 2, "S02-S03": 1 };
+
+// Lines in BBBB.kmz. source: title | suggested (by location) | duplicate | null (not matched).
+const LINES = [
+  { id: "l1", name: "S01-S02", folder: "Route / Completed", seg: "S01-S02", source: "title", km: 12.4, excel: 12.0, d: "M90 110 C 140 130, 190 150, 250 180" },
+  { id: "l2", name: "Path 7", folder: "Route / Phase 2", seg: "S01-S02", source: "suggested", ends: "ends 40 m · 120 m", km: 12.9, excel: 12.0, d: "M95 122 C 112 172, 190 214, 244 192" },
+  { id: "l3", name: "S02-S03", folder: "Route / Completed", seg: "S02-S03", source: "title", km: 10.2, excel: 10.0, d: "M250 180 C 280 196, 300 232, 330 250" },
+  { id: "l4", name: "S03-S04", folder: "Route / Completed", seg: "S03-S04", source: "title", km: 15.2, excel: 15.0, d: "M330 250 C 380 290, 420 300, 470 300" },
+  { id: "l5", name: "S03-S04", folder: "Route / Phase 2", seg: "S03-S04", source: "duplicate", km: 15.2, excel: 15.0, d: "M330 250 C 380 290, 420 300, 470 300" },
+  { id: "l6", name: "S05-S06", folder: "Route / Completed", seg: "S05-S06", source: "title", km: 9.8, excel: 6.1, d: "M170 400 C 220 420, 300 440, 360 470" },
+  { id: "l7", name: "S06-S07", folder: "Route / Phase 2", seg: "S06-S07", source: "title", km: 21.0, excel: 20.5, d: "M360 470 C 430 452, 500 430, 560 390" },
+  { id: "n1", name: "S01-S02X", folder: "Route / Phase 2", seg: null, reason: "no segment", closest: "S01-S02", d: "M92 104 C 150 86, 222 118, 256 172" },
+  { id: "n2", name: "Untitled Path", folder: "Route / Completed", seg: null, reason: "no title", d: "M396 150 C 428 172, 462 160, 492 196" },
+  { id: "n3", name: "S08-S09", folder: "Route / Phase 2", seg: null, reason: "no segment", d: "M520 110 C 560 130, 582 160, 600 200" },
+];
+const ticked = new Set(LINES.filter((line) => line.seg && line.source !== "duplicate").map((line) => line.id));
+const open = new Set(["S01-S02", "S05-S06"]);
+const FOLDERS = [["Route / Completed", 5], ["Route / Phase 2", 5], ["Poles", 0]];
+const pickedFolders = new Set(FOLDERS.filter((folder) => folder[1] > 0).map((folder) => folder[0]));
+
+function styleOf(line) {
+  if (!line.seg || !ticked.has(line.id)) {
+    return "left";
+  }
+  if (line.source === "suggested") {
+    return "suggested";
+  }
+  return "picked";
+}
+const CHEV = '<svg viewBox="0 0 16 16"><path d="M6 3l5 5-5 5"/></svg>';
+const segNames = () => [...new Set(LINES.filter((line) => line.seg).map((line) => line.seg))]
+  .sort((a, b) => SEGMENTS.indexOf(a) - SEGMENTS.indexOf(b));
+const plural = (count, word) => count + " " + word + (count === 1 ? "" : "s");
+
+/* ---------- Fake basemap ---------- */
+function basemap() {
+  return `
+  <rect x="-400" y="-400" width="1440" height="1360" fill="#f4f3ef"/>
+  <g fill="#e2ecd9"><path d="M20 220 L140 200 L170 280 L60 320 Z"/><path d="M430 40 L560 30 L600 80 L470 90 Z"/><path d="M460 500 L620 470 L640 560 L470 560 Z"/></g>
+  <g fill="#e9e6e0"><path d="M200 140 L300 130 L320 220 L210 230 Z"/><path d="M300 420 L420 410 L430 500 L310 510 Z"/><path d="M60 60 L150 50 L150 140 L70 150 Z"/></g>
+  <path d="M-20 330 C 90 300, 170 360, 270 340 S 450 380, 660 260" fill="none" stroke="#d5e3f0" stroke-width="16"/>
+  <g fill="none" stroke-linecap="round">
+    <g stroke="#dcdfe3" stroke-width="4"><path d="M0 60 L640 90"/><path d="M0 250 L640 210"/><path d="M0 520 L640 540"/><path d="M120 0 L100 560"/><path d="M380 0 L410 560"/><path d="M540 0 L520 560"/><path d="M0 360 L640 300"/></g>
+    <g stroke="#fff" stroke-width="2"><path d="M0 60 L640 90"/><path d="M0 250 L640 210"/><path d="M0 520 L640 540"/><path d="M120 0 L100 560"/><path d="M380 0 L410 560"/><path d="M540 0 L520 560"/><path d="M0 360 L640 300"/></g>
+    <g stroke="#c9ccd1" stroke-width="8"><path d="M0 140 C 120 130, 200 170, 300 230 S 480 310, 640 330"/><path d="M200 0 C 220 120, 250 200, 230 330 S 190 470, 220 560"/><path d="M0 430 C 150 420, 300 480, 420 470 S 560 400, 640 380"/><path d="M420 0 C 440 100, 500 160, 640 190"/></g>
+    <g stroke="#fff" stroke-width="5"><path d="M0 140 C 120 130, 200 170, 300 230 S 480 310, 640 330"/><path d="M200 0 C 220 120, 250 200, 230 330 S 190 470, 220 560"/><path d="M0 430 C 150 420, 300 480, 420 470 S 560 400, 640 380"/><path d="M420 0 C 440 100, 500 160, 640 190"/></g>
+  </g>`;
+}
+function siteMarks(names) {
+  return names.map((name) => {
+    const [x, y, kind] = SITES[name];
+    let shape = `<path d="M${x} ${y - 7}L${x + 7} ${y} ${x} ${y + 7} ${x - 7} ${y}z" fill="#fff" stroke="#0a0a0a" stroke-width="2.5"/>`;
+    if (kind === "dc") {
+      shape = `<rect x="${x - 6}" y="${y - 6}" width="12" height="12" fill="#0a0a0a" stroke="#fff" stroke-width="1.5"/>`;
+    }
+    if (kind === "toc") {
+      shape = `<path d="M${x} ${y - 8}L${x + 8} ${y + 6}H${x - 8}z" fill="#0a0a0a" stroke="#fff" stroke-width="1.5"/>`;
+    }
+    return shape + `<text x="${x}" y="${y + 22}" text-anchor="middle" font-size="12" font-weight="700" fill="#0a0a0a" paint-order="stroke" stroke="#fff" stroke-width="4" stroke-linejoin="round">${name}</text>`;
+  }).join("");
+}
+const STROKE = {
+  picked: 'stroke="#1d5fbf" stroke-width="3.5"',
+  suggested: 'stroke="#1d5fbf" stroke-width="3.5" stroke-dasharray="9 6"',
+  left: 'stroke="#5b6068" stroke-width="3" stroke-dasharray="0.1 7"',
+};
+
+/* ---------- Upload step ---------- */
+function renderFolders() {
+  $("#folders").innerHTML = FOLDERS.map(([name, count]) => {
+    const disabled = count === 0;
+    return `<label class="folder${disabled ? " off" : ""}"><input type="checkbox" data-folder="${name}" ${pickedFolders.has(name) ? "checked" : ""} ${disabled ? "disabled" : ""}>
+      <span class="nm">${name}</span><span>${disabled ? "0 lines" : plural(count, "line")}</span></label>`;
+  }).join("");
+}
+$("#folders").addEventListener("change", (event) => {
+  const name = event.target.dataset.folder;
+  if (event.target.checked) {
+    pickedFolders.add(name);
+  } else {
+    pickedFolders.delete(name);
+  }
+  renderFooter();
+});
+$("#f-all").addEventListener("click", () => {
+  FOLDERS.filter((folder) => folder[1] > 0).forEach((folder) => pickedFolders.add(folder[0]));
+  renderFolders();
+  renderFooter();
+});
+$("#f-none").addEventListener("click", () => {
+  pickedFolders.clear();
+  renderFolders();
+  renderFooter();
+});
+
+/* ---------- Select step: list ---------- */
+function evidence(line) {
+  let text = `${line.km.toFixed(1)} km · Excel ${line.excel.toFixed(1)}`;
+  if (Math.abs(line.km - line.excel) / line.excel > 0.2) {
+    text += " <b>km differs</b>";
+  }
+  return text;
+}
+function lineRow(line) {
+  let cls = "el";
+  if (line.source === "suggested") {
+    cls += " sug";
+  }
+  if (line.source === "duplicate") {
+    cls += " dup";
+  }
+  return `<label class="${cls}" data-line="${line.id}">
+    <input type="checkbox" aria-label="Include ${line.name}" data-tick="${line.id}" ${ticked.has(line.id) ? "checked" : ""}>
+    <span>${line.name}</span><span class="fold" title="${line.folder}">${line.folder.split(" / ").pop()}</span>
+    <span class="ev">${line.ends || ""}</span><span class="ev">${evidence(line)}</span><span class="src">${line.source}</span></label>`;
+}
+function renderList() {
+  const query = $("#search").value.trim().toLowerCase();
+  const segs = segNames();
+  $("#sel-title").textContent = `Segments in BBBB.kmz (${segs.length})`;
+  let html = "";
+  for (const seg of segs) {
+    const lines = LINES.filter((line) => line.seg === seg);
+    if (query && !seg.toLowerCase().includes(query) && !lines.some((line) => line.name.toLowerCase().includes(query))) {
+      continue;
+    }
+    const on = lines.filter((line) => ticked.has(line.id)).length;
+    const isOpen = open.has(seg);
+    let note = "";
+    if (REPLACES[seg]) {
+      note = ` · <span class="warn">replaces ${REPLACES[seg]}</span>`;
+    }
+    html += `<div class="grp" data-seg="${seg}">
+      <div class="seg"><input type="checkbox" aria-label="Include ${seg}" data-segtick="${seg}" ${on === lines.length ? "checked" : ""} data-ind="${on > 0 && on < lines.length}">
+        <button class="chev" type="button" aria-expanded="${isOpen}" aria-label="Open or close ${seg}" data-chev="${seg}">${CHEV}</button>
+        <span class="name">${seg}</span><span class="n">${plural(lines.length, "line")}${note}</span></div>
+      <div class="els" ${isOpen ? "" : "hidden"}>${lines.map(lineRow).join("")}</div></div>`;
+  }
+  const unmatched = LINES.filter((line) => !line.seg);
+  if (unmatched.length > 0) {
+    const options = SEGMENTS.map((seg) => `<option>${seg}</option>`).join("");
+    html += `<section class="nmsec" aria-labelledby="nm-h"><div class="nm-h"><h3 id="nm-h">Not matched (${unmatched.length})</h3>
+      <button class="btn btn-sm" type="button">Suggest by location</button></div>`;
+    for (const line of unmatched) {
+      let pick = `<select class="field" aria-label="Segment for ${line.name}" data-assign="${line.id}"><option value="">-</option>${options}</select>`;
+      if (line.closest) {
+        pick = `<div class="closest"><span>closest: ${line.closest}<i>suggested</i></span>
+          <button class="btn btn-sm" type="button" data-accept="${line.id}">Accept</button></div>`;
+      }
+      html += `<div class="nm-r" data-line="${line.id}"><span title="${line.folder}">${line.name}</span><span class="warn">${line.reason}</span>${pick}</div>`;
+    }
+    html += "</section>";
+  }
+  $("#list").innerHTML = html;
+  document.querySelectorAll("[data-ind]").forEach((box) => { box.indeterminate = box.dataset.ind === "true"; });
+}
+
+/* ---------- Select step: map ---------- */
+let zoom = 1;
+const center = [320, 280];
+function renderMap() {
+  const map = $("#map");
+  map.querySelector("svg")?.remove();
+  const svg = document.createElementNS(SVGNS, "svg");
+  svg.setAttribute("role", "img");
+  svg.setAttribute("aria-label", "Map preview of the lines in BBBB.kmz");
+  // Left out first, so picked lines draw on top.
+  const order = [...LINES].sort((a, b) => (styleOf(a) === "left" ? 0 : 1) - (styleOf(b) === "left" ? 0 : 1));
+  const lines = order.map((line) => `<g class="ln" data-line="${line.id}">
+      <path d="${line.d}" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round" vector-effect="non-scaling-stroke" class="cas"/>
+      <path d="${line.d}" fill="none" ${STROKE[styleOf(line)]} stroke-linecap="round" vector-effect="non-scaling-stroke" class="ink"/>
+      <path d="${line.d}" fill="none" stroke="transparent" stroke-width="16" vector-effect="non-scaling-stroke"/></g>`).join("");
+  svg.innerHTML = basemap() + lines + siteMarks(Object.keys(SITES)) + '<g id="label"></g>';
+  map.prepend(svg);
+  applyZoom();
+}
+function applyZoom() {
+  const width = 640 / zoom;
+  const height = 560 / zoom;
+  $("#map svg").setAttribute("viewBox", `${center[0] - width / 2} ${center[1] - height / 2} ${width} ${height}`);
+  $("#scale").textContent = `${2 / zoom} km`;
+}
+$("#zin").addEventListener("click", () => { zoom = Math.min(zoom * 2, 8); applyZoom(); });
+$("#zout").addEventListener("click", () => { zoom = Math.max(zoom / 2, 0.5); applyZoom(); });
+$("#fit").addEventListener("click", () => { zoom = 1; applyZoom(); });
+
+// One highlight for both sides: thicker line plus its name on the map, tinted row in the list.
+function highlight(id, scroll) {
+  document.querySelectorAll(".hl").forEach((element) => element.classList.remove("hl"));
+  document.querySelectorAll("#map .ln .ink").forEach((path) => path.removeAttribute("data-hl"));
+  const label = $("#label");
+  label.innerHTML = "";
+  if (!id) {
+    renderLineWidths();
+    return;
+  }
+  const row = document.querySelector(`#list [data-line="${id}"]`);
+  row?.classList.add("hl");
+  const group = document.querySelector(`#map .ln[data-line="${id}"]`);
+  const ink = group.querySelector(".ink");
+  ink.setAttribute("data-hl", "1");
+  group.parentNode.insertBefore(group, label);
+  renderLineWidths();
+  const middle = ink.getPointAtLength(ink.getTotalLength() / 2);
+  const line = LINES.find((item) => item.id === id);
+  label.innerHTML = `<text x="${middle.x}" y="${middle.y - 10}" text-anchor="middle" font-size="12" font-weight="700" fill="#1d5fbf" paint-order="stroke" stroke="#fff" stroke-width="5" stroke-linejoin="round">${line.name}</text>`;
+  if (scroll && row) {
+    row.scrollIntoView({ block: "center" });
+  }
+}
+function renderLineWidths() {
+  document.querySelectorAll("#map .ln").forEach((group) => {
+    const on = group.querySelector(".ink").hasAttribute("data-hl");
+    const line = LINES.find((item) => item.id === group.dataset.line);
+    group.querySelector(".ink").setAttribute("stroke-width", on ? "6.5" : (styleOf(line) === "left" ? "3" : "3.5"));
+    group.querySelector(".cas").setAttribute("stroke-width", on ? "11" : "7");
+  });
+}
+$("#list").addEventListener("mouseover", (event) => {
+  const row = event.target.closest("[data-line]");
+  if (row && !row.classList.contains("hl")) {
+    highlight(row.dataset.line, false);
+  }
+});
+$("#list").addEventListener("mouseleave", () => highlight(null));
+$("#map").addEventListener("mouseover", (event) => {
+  const group = event.target.closest(".ln");
+  if (group && !document.querySelector(`#list .hl[data-line="${group.dataset.line}"]`)) {
+    highlight(group.dataset.line, true);
+  }
+});
+$("#map").addEventListener("click", (event) => {
+  const group = event.target.closest(".ln");
+  if (!group) {
+    return;
+  }
+  const line = LINES.find((item) => item.id === group.dataset.line);
+  if (line.seg && !open.has(line.seg)) {
+    open.add(line.seg);
+    refresh();
+  }
+  highlight(line.id, true);
+});
+
+/* ---------- Select step: actions ---------- */
+$("#list").addEventListener("change", (event) => {
+  const target = event.target;
+  if (target.dataset.tick) {
+    if (target.checked) {
+      ticked.add(target.dataset.tick);
+    } else {
+      ticked.delete(target.dataset.tick);
+    }
+  }
+  if (target.dataset.segtick) {
+    LINES.filter((line) => line.seg === target.dataset.segtick).forEach((line) => {
+      if (target.checked) {
+        ticked.add(line.id);
+      } else {
+        ticked.delete(line.id);
+      }
+    });
+  }
+  if (target.dataset.assign && target.value) {
+    assign(target.dataset.assign, target.value, "title");
+  }
+  refresh();
+});
+function assign(id, seg, source) {
+  const line = LINES.find((item) => item.id === id);
+  line.seg = seg;
+  line.source = source;
+  line.km = line.km || 12.6;
+  line.excel = line.excel || 12.0;
+  ticked.add(id);
+  open.add(seg);
+}
+$("#list").addEventListener("click", (event) => {
+  const chev = event.target.closest("[data-chev]");
+  if (chev) {
+    const seg = chev.dataset.chev;
+    if (open.has(seg)) {
+      open.delete(seg);
+    } else {
+      open.add(seg);
+    }
+    renderList();
+  }
+  const accept = event.target.closest("[data-accept]");
+  if (accept) {
+    const line = LINES.find((item) => item.id === accept.dataset.accept);
+    line.ends = "ends 30 m · 15 m";
+    assign(line.id, line.closest, "suggested");
+    refresh();
+  }
+});
+$("#search").addEventListener("input", renderList);
+$("#all").addEventListener("click", () => { LINES.filter((line) => line.seg).forEach((line) => ticked.add(line.id)); refresh(); });
+$("#clear").addEventListener("click", () => { ticked.clear(); refresh(); });
+$("#collapse").addEventListener("click", () => { open.clear(); renderList(); });
+
+/* ---------- Confirm ---------- */
+function confirmCounts() {
+  const lines = LINES.filter((line) => line.seg && ticked.has(line.id));
+  const suggested = lines.filter((line) => line.source === "suggested").length;
+  return { lines, suggested, picked: lines.length - suggested };
+}
+function renderConfirm() {
+  const { lines } = confirmCounts();
+  $("#conf-rows").innerHTML = segNames().filter((seg) => lines.some((line) => line.seg === seg)).map((seg) => {
+    const mine = lines.filter((line) => line.seg === seg);
+    const suggested = mine.filter((line) => line.source === "suggested").length;
+    let note = "-";
+    if (REPLACES[seg]) {
+      note = `<span class="warn">replaces ${plural(REPLACES[seg], "line")}</span>`;
+    }
+    return `<tr><th scope="row">${seg}</th><td>${mine.length}${suggested ? `<span class="sugw">${suggested} suggested</span>` : ""}</td><td>${note}</td></tr>`;
+  }).join("");
+}
+
+/* ---------- Box frame ---------- */
+const STEPS = ["upload", "select", "confirm"];
+let step = "upload";
+function renderFooter() {
+  const { lines, suggested, picked } = confirmCounts();
+  const segs = new Set(lines.map((line) => line.seg)).size;
+  const unmatched = LINES.filter((line) => !line.seg).length;
+  if (step === "upload") {
+    const count = FOLDERS.filter((folder) => pickedFolders.has(folder[0])).reduce((sum, folder) => sum + folder[1], 0);
+    $("#count").textContent = `${plural(pickedFolders.size, "folder")} · ${plural(count, "line")}`;
+  } else {
+    $("#count").textContent = `${plural(segs, "segment")} · ${plural(lines.length, "line")} · ${unmatched} not matched`;
+  }
+  $("#next").textContent = "Continue";
+  if (step === "confirm") {
+    $("#next").textContent = suggested ? `Apply ${picked} + ${suggested} suggested` : `Apply ${plural(picked, "line")}`;
+  }
+}
+function refresh() {
+  renderList();
+  renderMap();
+  renderConfirm();
+  renderFooter();
+}
+function showStep(name) {
+  step = name;
+  document.querySelectorAll("[data-view]").forEach((view) => { view.hidden = view.dataset.view !== name; });
+  document.querySelectorAll("[data-step]").forEach((item) => {
+    if (item.dataset.step === name) {
+      item.setAttribute("aria-current", "step");
+    } else {
+      item.removeAttribute("aria-current");
+    }
+  });
+  $("#back").hidden = name === "upload";
+  renderFooter();
+}
+$("#next").addEventListener("click", () => {
+  if (step === "confirm") {
+    $("#applied").hidden = false;
+    location.hash = "#segments";
+    return;
+  }
+  location.hash = "#" + STEPS[STEPS.indexOf(step) + 1];
+});
+$("#back").addEventListener("click", () => { location.hash = "#" + STEPS[Math.max(0, STEPS.indexOf(step) - 1)]; });
+
+/* ---------- Route lines page ---------- */
+const SEG_ROWS = [
+  ["S01-S02", 2, "BBBB.kmz", "26 Nov 2026"], ["S02-S03", 1, "BBBB.kmz", "26 Nov 2026"], ["S03-S04", 1, "AAAA.kmz", "12 Oct 2026"],
+  ["S04-S07", 0], ["S05-S06", 1, "AAAA.kmz", "12 Oct 2026"], ["S06-S07", 1, "AAAA.kmz", "12 Oct 2026"],
+  ["S07-S08", 0], ["S08-S09", 0], ["S02-S09", 0],
+];
+function renderSegRows() {
+  const query = $("#seg-search").value.trim().toLowerCase();
+  const onlyNoLine = $("#noline").getAttribute("aria-pressed") === "true";
+  const rows = SEG_ROWS.filter((row) => row[0].toLowerCase().includes(query) && (!onlyNoLine || row[1] === 0));
+  $("#seg-rows").innerHTML = rows.map(([seg, count, file, date]) => {
+    const lines = count === 0 ? '<span class="pill h-amber">No line</span>' : count;
+    const last = count === 0 ? "-" : `${file} · ${date}`;
+    return `<tr><th scope="row">${seg}</th><td>${lines}</td><td>${last}</td><td><a class="btn btn-xs" href="#map-elements">Edit</a></td></tr>`;
+  }).join("") || '<tr><td colspan="4">No segments</td></tr>';
+}
+$("#seg-search").addEventListener("input", renderSegRows);
+$("#noline").addEventListener("click", () => {
+  const pressed = $("#noline").getAttribute("aria-pressed") === "true";
+  $("#noline").setAttribute("aria-pressed", String(!pressed));
+  renderSegRows();
+});
+
+/* ---------- Map elements (Edit segment S01-S02) ---------- */
+const current = [
+  { name: "S01-S02", file: "BBBB.kmz", date: "26 Nov 2026", d: "M90 110 C 140 130, 190 150, 250 180" },
+  { name: "Path 7", file: "BBBB.kmz", date: "26 Nov 2026", d: "M95 122 C 112 172, 190 214, 244 192" },
+];
+const hidden = [
+  { name: "S01-S02", file: "AAAA.kmz", date: "12 Oct 2026", d: "M90 110 C 120 160, 200 150, 250 180" },
+  { name: "S01-S02 old", file: "AAAA.kmz", date: "12 Oct 2026", d: "M90 110 C 150 110, 220 140, 250 180" },
+];
+function renderElements() {
+  const row = (item, index, action) => `<tr><td>${item.name}</td><td>${item.file}</td><td>${item.date}</td>
+    <td><button class="btn btn-xs" type="button" data-${action.toLowerCase()}="${index}">${action}</button></td></tr>`;
+  $("#cur-h").textContent = `Lines (${current.length})`;
+  $("#hid-h").textContent = `Hidden (${hidden.length})`;
+  $("#cur-rows").innerHTML = current.map((item, index) => row(item, index, "Hide")).join("") || '<tr><td colspan="4" style="text-align:center">No line</td></tr>';
+  $("#hid-rows").innerHTML = hidden.map((item, index) => row(item, index, "Show")).join("");
+  const svg = `<svg viewBox="10 30 330 230" role="img" aria-label="Lines on S01-S02">${basemap()}
+    ${current.map((item) => `<path d="${item.d}" fill="none" stroke="#fff" stroke-width="7" vector-effect="non-scaling-stroke"/><path d="${item.d}" fill="none" ${STROKE.picked} stroke-linecap="round" vector-effect="non-scaling-stroke"/>`).join("")}
+    ${siteMarks(["S01", "S02"])}</svg>`;
+  $("#emap").innerHTML = svg;
+}
+$("#ebox").addEventListener("click", (event) => {
+  const hide = event.target.closest("[data-hide]");
+  const show = event.target.closest("[data-show]");
+  if (hide) {
+    hidden.unshift(...current.splice(Number(hide.dataset.hide), 1));
+  }
+  if (show) {
+    current.push(...hidden.splice(Number(show.dataset.show), 1));
+  }
+  renderElements();
+});
+
+/* ---------- Routing ---------- */
+function route() {
+  let view = location.hash.slice(1) || "entry";
+  document.querySelectorAll(".proto a").forEach((link) => link.classList.toggle("on", link.getAttribute("href") === "#" + view));
+  const inBox = ["upload", "select", "notmatched", "confirm"].includes(view);
+  const onLines = view === "segments" || view === "map-elements";
+  $("#pg-kmz").hidden = onLines;
+  $("#pg-lines").hidden = !onLines;
+  $("#tab-kmz").classList.toggle("on", !onLines);
+  $("#tab-lines").classList.toggle("on", onLines);
+  $("#box").hidden = !inBox;
+  $("#ebox").hidden = view !== "map-elements";
+  $("#dim").hidden = !inBox && view !== "map-elements";
+  if (view === "notmatched") {
+    open.add("S03-S04");
+    refresh();
+    showStep("select");
+    $("#list").style.scrollBehavior = "auto";
+    $("#list").scrollTop = $("#list").scrollHeight;
+    highlight("n1", false);
+    return;
+  }
+  if (inBox) {
+    showStep(view);
+  }
+  if (view === "map-elements") {
+    $("#hid-box").open = true;
+  }
+}
+renderFolders();
+refresh();
+renderSegRows();
+renderElements();
+window.addEventListener("hashchange", route);
+route();
+</script>
+</body>
+</html>
