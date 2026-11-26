@@ -256,6 +256,29 @@ def _stored_segment_kml(db: Session, segment_id: int, name: str) -> str | None:
             f"<name>{escape(name)}</name>{placemarks}</Document></kml>")
 
 
+GROUP_ELEMENTS_SQL = """
+SELECT g.name AS group_name, e.name, ST_AsGeoJSON(e.geom) AS geom
+FROM kmz_groups g JOIN kmz_elements e ON e.group_id = g.id
+WHERE g.id = :group_id AND g.route
+ORDER BY e.id
+"""
+
+
+def group_kml(db: Session, group_id: int) -> tuple[str, str] | None:
+    """(file name, KML text) of one route group; None when it is not a route group."""
+    rows = db.execute(text(GROUP_ELEMENTS_SQL), {"group_id": group_id}).mappings().all()
+    if not rows:
+        return None
+    placemarks = ""
+    for row in rows:
+        shape = _kml_geometry(json.loads(row["geom"]))
+        placemarks += f"<Placemark><name>{escape(row['name'])}</name>{shape}</Placemark>"
+    name = rows[0]["group_name"]
+    kml = ('<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2"><Document>'
+           f"<name>{escape(name)}</name>{placemarks}</Document></kml>")
+    return name, kml
+
+
 def segment_kml(db: Session, segment_id: int) -> tuple[str, str] | None:
     """(file name, KML text) of one segment: its line as drawn on the map plus its two sites; None if not drawn."""
     sites = db.execute(text(SEGMENT_SITES_SQL), {"segment_id": segment_id}).mappings().first()

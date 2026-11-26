@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from app.admin_edits.history import bool_text, log_edits_for_user
 from app.errors import Invalid
 from app.ingest.kmz_groups import INSERT_ELEMENT_SQL, target_must_exist
+from app.ingest.kmz_segment_routes import line_statuses
 
 NEAR_METRES = 200
 # The segment whose two sites both lie within :near metres of the two line ends (either way round); the smaller
@@ -96,12 +97,30 @@ def hide_old_route_groups(db: Session, admin_id: int, upload_id: int, segment_id
         log_edits_for_user(db, admin_id, "kmz_group", group_id, [edit], "", upload_id)
 
 
-def save_route_lines(db: Session, admin_id: int, upload_id: int, to_save: list[dict]) -> int:
-    """One route group with one line element per pick, as drawn. Returns how many lines were saved.
-    The segment's earlier route lines are hidden first, so the new import replaces them."""
-    segment_ids = sorted({pick["segment_id"] for pick in to_save})
-    for segment_id in segment_ids:
+def drop_same_and_hide_old(db: Session, admin_id: int, upload_id: int, to_save: list[dict]) -> list[dict]:
+    """Per-segment path: a line equal to a stored route is not saved again; the earlier routes are hidden only when
+    a saved line replaces them."""
+    statuses = {}
+    for pick in to_save:
+        found = line_statuses(db, pick["segment_id"], [pick["line"]])[0]
+        statuses[pick["line"]["key"]] = found["status"]
+    replaced = {pick["segment_id"] for pick in to_save if statuses[pick["line"]["key"]] == "replaces route"}
+    for segment_id in sorted(replaced):
         hide_old_route_groups(db, admin_id, upload_id, segment_id)
+    return [pick for pick in to_save if statuses[pick["line"]["key"]] != "same"]
+
+
+def save_route_lines(
+    db: Session, admin_id: int, upload_id: int, to_save: list[dict], per_segment: bool = False
+) -> int:
+    """One route group with one line element per pick, as drawn. Returns how many lines were saved.
+    The segment's earlier route lines are hidden first, so the new import replaces them. With per_segment, only
+    a "replaces route" line hides them and a "same" line is skipped."""
+    if per_segment:
+        to_save = drop_same_and_hide_old(db, admin_id, upload_id, to_save)
+    else:
+        for segment_id in sorted({pick["segment_id"] for pick in to_save}):
+            hide_old_route_groups(db, admin_id, upload_id, segment_id)
     for pick in to_save:
         line = pick["line"]
         parameters = {
