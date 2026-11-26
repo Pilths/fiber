@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KMZ import v4</title>
+<style>
+:root {
+  --ground: #f2f4f7; --ink: #0a0a0a; --muted-ink: #5b6068; --line: #868c96; --rule: #eceef2; --raised: #eceef2;
+  --border: #e2e5ea; --subtle: #f7f8fa; --nav-ink: #3d4046;
+  --blue: #1d5fbf; --blue-bg: #eff5fd; --blue-bd: #bcd2f2;
+  --amber: #b45309; --amber-bg: #fff7ed; --amber-bd: #eec9a0;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body { min-width: 1200px; background: var(--ground); color: var(--ink); font: 14px/1.45 'Geist Variable', 'Geist', system-ui, sans-serif;
+  font-variant-numeric: tabular-nums; -webkit-font-smoothing: antialiased; overflow: hidden; }
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
+input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--blue); flex: none; margin: 0; cursor: pointer; }
+input[type=checkbox]:disabled { cursor: not-allowed; }
+[hidden] { display: none !important; }
+ul { list-style: none; padding: 0; }
+
+/* Prototype bar (not part of the app) */
+.proto { height: 32px; background: #24272c; color: #c9ccd1; display: flex; align-items: center; gap: 4px; padding: 0 12px; font-size: 12px; }
+.proto b { color: #fff; margin-right: 12px; font-weight: 600; }
+.proto a { color: #c9ccd1; text-decoration: none; padding: 4px 8px; border-radius: 4px; }
+.proto a:hover { background: #3a3e45; }
+.proto a.on { background: #fff; color: var(--ink); font-weight: 600; }
+
+/* App behind the box */
+.top { height: 60px; background: #fff; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 32px; padding: 0 24px; }
+.top b { font-size: 16px; }
+.top nav { display: flex; gap: 20px; color: var(--nav-ink); font-weight: 500; }
+.top nav .on { color: var(--ink); font-weight: 600; }
+.dim { position: fixed; inset: 0; background: rgb(10 10 10 / .45); }
+
+/* Shared */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 36px; padding: 0 16px; border: 1px solid var(--line); border-radius: 6px; background: #fff; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.btn:hover { background: var(--raised); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn-p { background: var(--ink); border-color: var(--ink); color: #fff; }
+.btn-p:hover { background: #2c2c2c; }
+.btn-sm { height: 32px; padding: 0 12px; }
+.link { color: var(--blue); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; background: none; border: 0; padding: 0; font-size: 13px; }
+.field { width: 100%; height: 36px; padding: 0 12px; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
+.field::placeholder { color: var(--muted-ink); opacity: 1; }
+select.field { appearance: none; padding-right: 30px; cursor: pointer; background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 6l4 4 4-4' fill='none' stroke='%235b6068' stroke-width='1.5'/%3E%3C/svg%3E") no-repeat right 8px center / 16px; }
+.chip { height: 32px; padding: 0 12px; border: 1px solid var(--line); border-radius: 6px; background: #fff; font-size: 13px; cursor: pointer; display: inline-flex; align-items: center; }
+.chip[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: #fff; }
+.warn { color: var(--amber); font-weight: 600; }
+.muted { color: var(--muted-ink); }
+.tbl { width: 100%; table-layout: fixed; border-collapse: collapse; }
+.tbl th, .tbl td { text-align: center; padding: 4px 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13px; }
+.tbl thead th { font-size: 12px; font-weight: 500; color: var(--muted-ink); background: var(--subtle); height: 36px; border-bottom: 1px solid var(--border); }
+.tbl td, .tbl tbody th { height: 40px; border-bottom: 1px solid var(--rule); }
+.tbl tbody tr:last-child > * { border-bottom: 0; }
+.tbl tbody th { font-weight: 600; }
+.tbox { border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+.chev { width: 24px; height: 24px; border: 0; background: none; border-radius: 4px; display: grid; place-items: center; cursor: pointer; flex: none; }
+.chev:hover { background: var(--raised); }
+.chev svg { width: 14px; height: 14px; fill: none; stroke: var(--muted-ink); stroke-width: 1.8; transition: transform .12s; }
+.chev[aria-expanded="true"] svg { transform: rotate(90deg); }
+.chev-pad { width: 24px; flex: none; }
+
+/* Box */
+.box { position: fixed; left: 50%; top: calc(50% + 16px); transform: translate(-50%, -50%); width: 1240px; height: calc(100vh - 64px); background: #fff; border-radius: 8px;
+  border: 1px solid var(--border); display: grid; grid-template-rows: auto minmax(0, 1fr) auto; overflow: hidden; }
+.bh { display: flex; align-items: center; gap: 32px; padding: 16px 20px; border-bottom: 1px solid var(--border); }
+.bh h1 { font-size: 18px; font-weight: 600; }
+.steps { display: flex; align-items: center; gap: 12px; flex: 1; }
+.steps li { display: inline-flex; align-items: center; gap: 12px; }
+.steps i { font-style: normal; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 600; border: 1px solid var(--line); background: #fff; }
+.steps li[aria-current="step"] { font-weight: 600; }
+.steps li[aria-current="step"] i { background: var(--ink); border-color: var(--ink); color: #fff; }
+.steps .sep { width: 32px; height: 1px; background: var(--line); }
+.x { width: 32px; height: 32px; border: 0; border-radius: 6px; background: none; cursor: pointer; display: grid; place-items: center; }
+.x:hover { background: var(--raised); }
+.bf { display: flex; align-items: center; gap: 16px; padding: 14px 20px; border-top: 1px solid var(--border); }
+.bf .count { flex: 1; text-align: right; font-size: 13px; }
+
+/* Upload step */
+.up { padding: 20px; display: grid; gap: 16px; align-content: start; max-width: 760px; overflow: auto; }
+.drop { border: 1px dashed var(--line); background: var(--subtle); border-radius: 6px; padding: 14px 16px; display: flex; align-items: center; gap: 16px; font-size: 13px; }
+.fh { display: flex; align-items: center; gap: 16px; }
+.fh h2 { flex: 1; font-size: 14px; font-weight: 600; }
+.tree li > div { display: flex; align-items: center; gap: 4px; height: 32px; font-size: 13px; }
+.tree label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.tree .sub { padding-left: 24px; }
+
+/* Select step */
+.sel { display: grid; grid-template-columns: 760px 1fr; height: 100%; min-height: 0; }
+.left { border-right: 1px solid var(--border); display: flex; flex-direction: column; min-height: 0; }
+.lh { padding: 16px 20px 12px; display: grid; gap: 10px; }
+.lh .row { display: flex; align-items: center; gap: 16px; }
+.lh h2 { font-size: 14px; font-weight: 600; flex: 1; }
+.list { overflow-y: auto; flex: 1; padding: 0 20px 16px; }
+.seg { display: flex; align-items: center; gap: 8px; height: 40px; font-size: 13px; }
+.seg .name { font-weight: 600; flex: 1; font-size: 14px; }
+.els { padding: 0 0 8px 32px; display: grid; gap: 4px; }
+.el { display: grid; grid-template-columns: 16px minmax(0, 1fr) 86px 140px 210px 80px; align-items: center; gap: 8px; height: 34px; padding: 0 8px; border-radius: 6px; border: 1px solid transparent; font-size: 13px; }
+.el > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.el .fold, .el .ev { color: var(--muted-ink); }
+.el .ev b { color: var(--amber); font-weight: 600; margin-left: 4px; }
+.src { text-align: right; color: var(--muted-ink); }
+.el.sug { border: 1px dashed var(--blue); background: var(--blue-bg); font-weight: 600; }
+.el.sug .src { color: var(--blue); }
+.el .src.dup { color: var(--amber); font-weight: 600; }
+.addbtn { margin-top: 4px; justify-self: start; }
+.nmsec { margin-top: 12px; border: 1px solid var(--amber-bd); background: var(--amber-bg); border-radius: 6px; }
+.nm-h { display: flex; align-items: center; gap: 12px; padding: 8px 12px; }
+.nm-h h3 { font-size: 14px; font-weight: 600; flex: 1; }
+.nm-h [role=status] { font-size: 13px; }
+.nm-r { display: grid; grid-template-columns: minmax(0, 1fr) 90px 330px; align-items: center; gap: 12px; padding: 6px 12px; font-size: 13px; border-top: 1px solid var(--amber-bd); }
+.nm-r > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nm-r .field { height: 32px; font-size: 13px; }
+.closest { display: flex; align-items: center; gap: 8px; }
+.closest span { flex: 1; white-space: nowrap; height: 32px; display: flex; align-items: center; gap: 8px; padding: 0 10px; border: 1px dashed var(--blue); border-radius: 6px; background: var(--blue-bg); font-weight: 600; }
+.closest span i { font-style: normal; margin-left: auto; color: var(--blue); }
+
+.right { display: flex; flex-direction: column; min-height: 0; padding: 16px 20px; gap: 12px; }
+.right h2 { font-size: 14px; font-weight: 600; }
+.map { flex: 1; min-height: 0; width: 100%; border: 1px solid var(--border); border-radius: 6px; background: var(--subtle); display: block; }
+.legend { display: flex; gap: 24px; font-size: 13px; }
+.legend span { display: inline-flex; align-items: center; gap: 8px; }
+
+/* Add from file */
+.add { display: flex; flex-direction: column; gap: 12px; min-height: 0; flex: 1; }
+.add .chips { display: flex; gap: 8px; }
+.add .tree-box { flex: 1; min-height: 0; overflow: auto; border: 1px solid var(--border); border-radius: 6px; padding: 8px; }
+.add .tree-box li li { display: flex; align-items: center; gap: 12px; height: 30px; font-size: 13px; }
+.add .tree-box li li span { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.add .tree-box li li .warn { flex: none; }
+.add .af { display: flex; align-items: center; gap: 12px; border-top: 1px solid var(--border); padding-top: 12px; }
+.add .af b { flex: 1; }
+
+/* Confirm */
+.conf { padding: 20px; display: grid; gap: 12px; align-content: start; max-width: 860px; overflow: auto; }
+.conf h2 { font-size: 14px; font-weight: 600; }
+.sugw { color: var(--blue); font-weight: 700; margin-left: 8px; }
+.grp { border-top: 1px solid var(--border); }
+.gh { display: flex; align-items: center; gap: 8px; height: 40px; font-size: 14px; font-weight: 600; }
+.gh .n { color: var(--muted-ink); font-weight: 500; }
+.r { display: grid; grid-template-columns: 24px minmax(0,1fr) minmax(0,1.5fr) 165px; align-items: center; gap: 8px; height: 40px; padding: 0 8px; border-radius: 6px; font-size: 13px; text-align: center; }
+.r.chk { grid-template-columns: minmax(0,1fr) minmax(0,1.5fr) 130px; }
+.r > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.r:hover, .r:focus-within, .r.hl { background: var(--blue-bg); }
+.r .field { height: 32px; font-size: 13px; }
+.colh { display: grid; gap: 8px; padding: 0 8px; height: 28px; align-items: center; font-size: 12px; color: var(--muted-ink); text-align: center; }
+.colh.a { grid-template-columns: 24px minmax(0,1fr) minmax(0,1.5fr) 165px; }
+.colh.b { grid-template-columns: minmax(0,1fr) minmax(0,1.5fr) 130px; }
+.st { font-weight: 600; }
+.st.new { color: #1a7f4b; }
+.st.rep { color: var(--amber); }
+.st.mut { color: var(--muted-ink); font-weight: 500; }
+.bf .sp { flex: 1; }
+.ok { color: #1a7f4b; font-weight: 600; }
+</style>
+</head>
+<body>
+<nav class="proto" aria-label="Prototype views"><b>Prototype</b><a href="#upload">Upload</a><a href="#select">Select</a></nav>
+<header class="top"><b>Fiber Dashboard</b><nav><span>Inventory</span><span>My reservations</span><span>Approvals</span><span class="on">Upload</span></nav></header>
+<div class="dim"></div>
+<div class="box" role="dialog" aria-modal="true" aria-labelledby="t">
+  <div class="bh"><h1 id="t">KMZ import</h1>
+    <ol class="steps" aria-label="Steps"><li data-step="upload"><i>1</i>Upload</li><li data-step="select"><span class="sep"></span><i>2</i>Select</li></ol>
+    <button class="x" type="button" aria-label="Close"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 3l10 10M13 3L3 13"/></svg></button></div>
+  <section data-view="upload"><div class="up"><div class="drop"><button class="btn btn-p" type="button">Choose .kmz file</button><span>DEV-routes.kmz</span></div></div></section>
+  <section data-view="select" hidden><div class="sel"><div class="left"><div class="list" id="list" style="padding-top:12px"></div></div><div class="right" id="right"></div></div></section>
+    <div class="bf"><button class="btn" type="button" id="back">Back</button><span class="sp"></span><button class="btn btn-p" type="button" id="next"></button></div>
+</div>
+<script>
+const $ = (s) => document.querySelector(s);
+const SITES = { "DEV Klang Hut": [70, 150], "DEV Puchong Hut": [190, 250], "DEV Kuala Lumpur DC": [300, 90], "DEV Kajang Hut": [450, 200], "DEV Serdang Hut": [330, 320], "DEV Cyberjaya DC": [220, 440] };
+const S = Object.keys(SITES);
+const link = (a, b) => `${a}-${b}`;
+// group: ready | check | skip ; status: new | Route Replaced | same | duplicate
+const LINES = [
+  { id: 1, name: "KL-Kajang", seg: [2, 3], status: "new", group: "ready", on: true },
+  { id: 2, name: "KL-Puchong", seg: [2, 1], status: "new", group: "ready", on: true },
+  { id: 3, name: "Puchong-Serdang", seg: [1, 4], status: "Route Replaced", group: "ready", on: true },
+  { id: 4, name: "Serdang-Cyberjaya", seg: [4, 5], status: "new", group: "ready", on: true },
+  { id: 5, name: "Klang-Puchong", seg: [0, 1], status: "Route Replaced", group: "ready", on: true },
+  { id: 6, name: "Kajang-Serdang", seg: [3, 4], status: "new", group: "ready", on: true },
+  { id: 7, name: "Untitled Path", seg: null, sug: [0, 5], group: "check" },
+  { id: 8, name: "Path 12", seg: null, sug: null, group: "check" },
+  { id: 9, name: "Klang-KL", seg: [0, 2], status: "same", group: "skip", on: false },
+  { id: 10, name: "Kajang-Cyberjaya", seg: [3, 5], status: "same", group: "skip", on: false },
+  { id: 11, name: "KL-Kajang", seg: [2, 3], status: "duplicate", group: "skip", on: false, off: [8, -10] },
+];
+const OPTIONS = [[0, 4], [1, 5], [0, 3], [1, 3]];
+let skipOpen = false, hover = null;
+const name = (p) => p ? `${S[p[0]]} - ${S[p[1]]}` : "-";
+const path = (l) => {
+  const p = l.seg || l.sug; if (!p) return "M470 360 C 440 400, 420 440, 400 470";
+  const [a, b] = [SITES[S[p[0]]], SITES[S[p[1]]]]; const o = l.off || [0, 0];
+  const mx = (a[0] + b[0]) / 2 + o[0] + (b[1] - a[1]) * 0.08, my = (a[1] + b[1]) / 2 + o[1] - (b[0] - a[0]) * 0.08;
+  return `M${a[0]} ${a[1]} Q ${mx} ${my} ${b[0]} ${b[1]}`;
+};
+const ready = (l) => l.group === "ready" && l.on;
+const count = () => LINES.filter(ready).length;
+const label = (l) => l.status === "Route Replaced" ? "rep" : l.status === "new" ? "new" : "mut";
+function row(l) {
+  const st = `<span class="st ${label(l)}">${l.status}</span>`;
+  const attr = `data-id="${l.id}" tabindex="0"`;
+  if (l.group === "check") {
+    const act = l.sug ? `<button class="btn btn-sm" type="button" data-accept="${l.id}">Accept</button>`
+      : `<select class="field" aria-label="Segment for ${l.name}" data-pick="${l.id}"><option value="">Choose segment</option>${OPTIONS.map((p, i) => `<option value="${i}">${name(p)}</option>`).join("")}</select>`;
+    return `<div class="r" ${attr}><span></span><span>${l.name}</span><span>${l.sug ? name(l.sug) : "-"}</span>${act}</div>`;
+  }
+  return `<div class="r" ${attr}><input type="checkbox" aria-label="Include ${l.name}" data-tick="${l.id}" ${l.on ? "checked" : ""}><span>${l.name}</span><span>${name(l.seg)}</span>${st}</div>`;
+}
+function group(title, g, extra = "") {
+  const items = LINES.filter((l) => l.group === g);
+  return `<div class="grp">${extra || `<div class="gh">${title} <span class="n">(${items.length})</span></div>`}${items.map(row).join("")}</div>`;
+}
+function render() {
+  const check = LINES.filter((l) => l.group === "check");
+  const skip = LINES.filter((l) => l.group === "skip");
+  const rdy = LINES.filter((l) => l.group === "ready");
+  const heads = (cols, a, b, c, d) => `<div class="colh ${cols}"><span>${a}</span><span>${b}</span><span>${c}</span>${d ? `<span>${d}</span>` : ""}</div>`;
+  let html = "";
+  if (check.length) html += `<div class="gh" style="border:0">To check <span class="n">(${check.length})</span></div>` + `<div class="colh a"><span></span><span>Line</span><span>Segment</span><span></span></div>` + check.map(row).join("");
+  html += `<div class="grp" style="margin-top:8px"><div class="gh">Ready <span class="n">(${rdy.length})</span></div>` +
+    `<div class="colh a"><span></span><span>Line</span><span>Segment</span><span>Status</span></div>` + rdy.map(row).join("") + `</div>`;
+  const chev = `<button class="chev" type="button" aria-expanded="${skipOpen}" aria-label="Show or hide Skipped" data-skip>${'<svg viewBox="0 0 16 16"><path d="M6 3.5L10.5 8 6 12.5"/></svg>'}</button>`;
+  html += `<div class="grp" style="margin-top:8px"><div class="gh">${chev}<span>Skipped</span> <span class="n">(${skip.length})</span></div>` + (skipOpen ? skip.map(row).join("") : "") + `</div>`;
+  $("#list").innerHTML = html;
+  renderMap(); renderFoot();
+}
+function renderMap() {
+  const kind = (l) => l.group === "ready" && l.on ? "ready" : l.group === "check" ? "check" : "skip";
+  const sty = { ready: 'stroke="#1d5fbf" stroke-width="3"', check: 'stroke="#b45309" stroke-width="3" stroke-dasharray="9 6"', skip: 'stroke="#868c96" stroke-width="2.5" stroke-dasharray="0.1 7"' };
+  const order = ["skip", "check", "ready"];
+  const lines = [...LINES].sort((a, b) => order.indexOf(kind(a)) - order.indexOf(kind(b))).map((l) => {
+    const h = hover === l.id;
+    return `<path d="${path(l)}" fill="none" stroke-linecap="round" ${h ? 'stroke="#1d5fbf" stroke-width="7"' : sty[kind(l)]}/>`;
+  }).join("");
+  const sites = Object.entries(SITES).map(([n, [x, y]]) => `<circle cx="${x}" cy="${y}" r="6" fill="#0a0a0a" stroke="#fff" stroke-width="2"/><text x="${x > 400 ? x - 10 : x + 10}" text-anchor="${x > 400 ? "end" : "start"}" y="${y - 10}" font-size="13" font-weight="400" paint-order="stroke" stroke="#fff" stroke-width="3">${n}</text>`).join("");
+  const lg = (s, t) => `<span><svg width="32" height="8" aria-hidden="true"><line x1="1" y1="4" x2="31" y2="4" ${sty[s]} stroke-linecap="round"/></svg>${t}</span>`;
+  $("#right").innerHTML = `<svg class="map" viewBox="0 0 560 520" role="img" aria-label="Map preview">${lines}${sites}</svg><div class="legend">${lg("ready", "Ready")}${lg("check", "To check")}${lg("skip", "Skipped")}</div>`;
+}
+function renderFoot() {
+  const n = count(), plural = `${n} route${n === 1 ? "" : "s"}`;
+  $("#next").textContent = `Add ${plural}`; $("#next").disabled = n === 0;
+}
+function toReady(l, seg) { l.seg = seg; l.group = "ready"; l.status = "new"; l.on = true; }
+$("#list").addEventListener("click", (e) => {
+  const a = e.target.closest("[data-accept]");
+  if (a) { const l = LINES.find((x) => x.id == a.dataset.accept); toReady(l, l.sug); render(); }
+  if (e.target.closest("[data-skip]")) { skipOpen = !skipOpen; render(); }
+});
+$("#list").addEventListener("change", (e) => {
+  const t = e.target.dataset.tick, p = e.target.dataset.pick;
+  if (t) { const l = LINES.find((x) => x.id == t); l.on = e.target.checked; if (l.group === "skip") { l.group = "ready"; l.on = true; } render(); }
+  if (p && e.target.value !== "") { toReady(LINES.find((x) => x.id == p), OPTIONS[e.target.value]); render(); }
+});
+const hl = (e) => { const r = e.target.closest("[data-id]"); const id = r ? +r.dataset.id : null; if (id !== hover) { hover = id; renderMap(); } };
+$("#list").addEventListener("mouseover", hl); $("#list").addEventListener("focusin", hl);
+$("#list").addEventListener("mouseleave", () => { hover = null; renderMap(); });
+const STEPS = ["upload", "select"];
+function show() {
+  const step = STEPS.includes(location.hash.slice(1)) ? location.hash.slice(1) : "select";
+  STEPS.forEach((s) => { document.querySelector(`[data-view=${s}]`).hidden = s !== step; const li = document.querySelector(`[data-step=${s}]`); step === s ? li.setAttribute("aria-current", "step") : li.removeAttribute("aria-current"); });
+  document.querySelectorAll(".proto a").forEach((a) => a.classList.toggle("on", a.hash === "#" + step));
+  $("#back").style.visibility = step === "upload" ? "hidden" : "visible";
+  if (step === "upload") { $("#next").textContent = "Continue"; $("#next").disabled = false; } else { renderFoot(); }
+  $("#next").dataset.step = step;
+}
+$("#next").addEventListener("click", () => { const s = $("#next").dataset.step; if (s === "upload") location.hash = "select"; else { $("#next").outerHTML = `<span class="ok">${count()} routes added</span>`; } });
+$("#back").addEventListener("click", () => { const s = $("#next").dataset.step; location.hash = "upload"; });
+window.addEventListener("hashchange", show);
+render(); show();
+</script>
+</body>
+</html>
