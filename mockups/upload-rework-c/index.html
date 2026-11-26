@@ -1,0 +1,955 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Upload rework</title>
+<style>
+:root {
+  --ground: #f2f4f7; --ink: #0a0a0a; --muted-ink: #5b6068; --line: #868c96; --rule: #eceef2; --raised: #eceef2;
+  --border: #e2e5ea; --subtle: #f7f8fa; --nav-ink: #3d4046;
+  --blue: #1d5fbf; --blue-bg: #eff5fd; --blue-bd: #bcd2f2;
+  --amber: #b45309; --amber-bg: #fff7ed; --amber-bd: #eec9a0;
+  --green: #1a7f4b; --red: #b42318;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body { min-width: 1200px; background: var(--ground); color: var(--ink); font: 14px/1.45 'Geist Variable', 'Geist', system-ui, sans-serif;
+  font-variant-numeric: tabular-nums; -webkit-font-smoothing: antialiased; overflow: hidden; }
+button, input, select, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
+input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--blue); flex: none; margin: 0; cursor: pointer; }
+[hidden] { display: none !important; }
+ul { list-style: none; padding: 0; }
+
+/* Prototype bar (not part of the app) */
+.proto { height: 32px; background: #24272c; color: #c9ccd1; display: flex; align-items: center; gap: 8px; padding: 0 16px; font-size: 13px; }
+.proto b { color: #fff; margin-right: 12px; font-weight: 600; }
+.proto a { color: #c9ccd1; text-decoration: none; padding: 4px 8px; border-radius: 4px; }
+.proto a:hover { background: #3a3e45; }
+.proto a.on { background: #fff; color: var(--ink); font-weight: 600; }
+
+.top { height: 60px; background: #fff; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 32px; padding: 0 24px; }
+.top b { font-size: 16px; }
+.top nav { display: flex; gap: 20px; color: var(--nav-ink); font-weight: 500; }
+.top nav .on { color: var(--ink); font-weight: 600; }
+
+/* Shared */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 36px; padding: 0 16px; border: 1px solid var(--line); border-radius: 6px; background: #fff; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.btn:hover { background: var(--raised); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn-p { background: var(--ink); border-color: var(--ink); color: #fff; }
+.btn-p:hover { background: #2c2c2c; }
+.btn-sm { height: 32px; padding: 0 12px; font-size: 13px; }
+.link { color: var(--blue); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; background: none; border: 0; padding: 0; font-size: 13px; }
+.field { width: 100%; height: 36px; padding: 0 12px; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
+textarea.field { height: 72px; padding: 8px 12px; resize: vertical; }
+.field::placeholder { color: var(--nav-ink); opacity: 1; }
+.field[aria-invalid="true"] { border-color: var(--red); }
+select.field { appearance: none; padding-right: 30px; cursor: pointer; background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 6l4 4 4-4' fill='none' stroke='%235b6068' stroke-width='1.5'/%3E%3C/svg%3E") no-repeat right 8px center / 16px; }
+.chip { height: 32px; padding: 0 12px; border: 1px solid var(--line); border-radius: 6px; background: #fff; font-size: 13px; cursor: pointer; display: inline-flex; align-items: center; white-space: nowrap; }
+.chip[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: #fff; }
+.warn { color: var(--amber); font-weight: 600; }
+.err { color: var(--red); font-size: 13px; font-weight: 500; }
+.grp { display: flex; align-items: center; gap: 8px; }
+.st-new { color: var(--green); font-weight: 600; }
+.st-changed { color: var(--blue); font-weight: 600; }
+.st-same { color: var(--ink); }
+.st-review { color: var(--amber); font-weight: 600; }
+.st-rej { color: var(--red); font-weight: 600; }
+.tbl { width: 100%; table-layout: fixed; border-collapse: collapse; }
+.tbl th, .tbl td { text-align: center; padding: 4px 12px; white-space: normal; overflow-wrap: anywhere; overflow: hidden; line-height: 1.3; font-size: 13px; }
+.tbl .l, .tbl .r { text-align: center; }
+.tbl thead th { font-size: 13px; font-weight: 500; color: var(--muted-ink); background: var(--subtle); height: 36px; border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 1; }
+.tbl td, .tbl tbody th { height: 40px; border-bottom: 1px solid var(--rule); }
+.tbl tbody th { font-weight: 400; }
+.tbox { border: 1px solid var(--border); border-radius: 6px; overflow: hidden; background: #fff; }
+.tbl .c { padding: 0 4px; }
+.chev { width: 24px; height: 24px; border: 0; background: none; border-radius: 4px; display: inline-grid; place-items: center; cursor: pointer; vertical-align: middle; }
+.chev:hover { background: var(--raised); }
+.chev svg { width: 14px; height: 14px; fill: none; stroke: var(--ink); stroke-width: 1.8; transition: transform .12s; }
+.chev[aria-expanded="true"] svg { transform: rotate(90deg); }
+
+/* Page */
+.page { height: calc(100vh - 92px); display: flex; flex-direction: column; padding: 16px 24px 0; gap: 16px; }
+.page > .subbar { gap: 0; }
+.subbar { display: flex; align-items: flex-end; border-bottom: 1px solid var(--border); }
+.subtabs { display: flex; gap: 4px; flex: 1; }
+.subtabs button { height: 44px; margin-bottom: -1px; border: 0; border-bottom: 2px solid transparent; background: none; padding: 0 16px; font-weight: 500; color: var(--nav-ink); cursor: pointer; }
+.subtabs button:hover { color: var(--ink); }
+.subtabs button[aria-selected="true"] { border-color: var(--ink); color: var(--ink); font-weight: 600; }
+.bulk { display: flex; gap: 8px; padding-left: 16px; margin-left: 8px; border-left: 1px solid var(--border); }
+.bulk .btn-sm { padding: 0 16px; height: 36px; }
+.panel { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 16px; }
+.toolbar { display: flex; align-items: center; gap: 16px; }
+.toolbar .btn-sm, .toolbar .chip { padding: 0 16px; height: 36px; }
+.toolbar .field { width: auto; }
+.toolbar .count { margin-left: auto; white-space: nowrap; font-weight: 500; }
+.tcard { flex: 1; min-height: 0; display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: 6px; background: #fff; overflow: hidden; margin-bottom: 16px; }
+.tscroll { flex: 1; min-height: 0; overflow: auto; background: #fff; }
+.tscroll .tbl tbody tr.srow:hover > * { background: #fafbfc; }
+.tscroll .tbl tbody tr.srow.open > * { background: var(--blue-bg); border-bottom-color: var(--blue-bd); }
+.pager { height: 52px; display: flex; align-items: center; gap: 8px; flex: none; padding: 0 16px; border-top: 1px solid var(--border); background: var(--subtle); }
+.pager .info { flex: 1; font-size: 13px; }
+.pager .pg { min-width: 32px; padding: 0 8px; }
+.pager .btn-sm { padding: 0 16px; }
+.pager .btn-sm.pg { padding: 0 8px; }
+.pager .pg[aria-current="page"] { background: var(--ink); border-color: var(--ink); color: #fff; }
+.empty { padding: 32px; text-align: center; }
+
+/* Expanded segment */
+.tbl tr.xrow > td { height: auto; padding: 16px 24px; white-space: normal; background: var(--subtle); border-bottom: 1px solid var(--border); overflow: visible; }
+.kcard { background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 16px; display: grid; gap: 16px; width: 100%; min-width: 0; }
+.khead { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.khead b { font-weight: 600; font-size: 14px; color: var(--ink); }
+.lines { display: grid; }
+.lrow { display: grid; grid-template-columns: 120px minmax(0, 1fr) 90px minmax(0, 1fr) 130px 240px; align-items: center; gap: 12px; text-align: center; min-height: 40px; padding: 0 16px; font-size: 13px; border-bottom: 1px solid var(--rule); }
+.lrow > span { overflow-wrap: anywhere; line-height: 1.3; padding: 4px 0; }
+.lrow.head { min-height: 36px; color: var(--muted-ink); font-weight: 500; background: var(--subtle); border-bottom-color: var(--border); }
+.lrow.item.removing { background: var(--amber-bg); }
+.lrow.item.removed .t { text-decoration: line-through; }
+.lrow .acts { display: flex; gap: 16px; justify-content: center; align-items: center; }
+.kempty { padding: 0 16px; text-align: center; }
+
+/* Boxes */
+.dim { position: fixed; inset: 0; background: rgb(10 10 10 / .45); z-index: 10; }
+.box { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); background: #fff; border-radius: 8px; border: 1px solid var(--border);
+  display: flex; flex-direction: column; max-height: calc(100vh - 80px); z-index: 11; }
+.bh { display: flex; align-items: center; gap: 16px; padding: 16px 24px; border-bottom: 1px solid var(--border); }
+.bh h1 { font-size: 18px; font-weight: 600; flex: 1; }
+.x { width: 32px; height: 32px; border: 0; border-radius: 6px; background: none; cursor: pointer; display: grid; place-items: center; }
+.x:hover { background: var(--raised); }
+.bb { padding: 24px; display: grid; gap: 16px; overflow: auto; min-height: 0; align-content: start; }
+.bf { display: flex; align-items: center; gap: 8px; padding: 16px 24px; border-top: 1px solid var(--border); }
+.bf .count { flex: 1; font-size: 13px; }
+.form { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.form label { display: grid; gap: 8px; font-size: 13px; font-weight: 500; }
+.form .wide { grid-column: 1 / -1; }
+.drop { border: 1px dashed var(--line); background: var(--subtle); border-radius: 6px; padding: 16px; display: flex; align-items: center; gap: 16px; font-size: 13px; }
+.segname { font-size: 16px; font-weight: 500; }
+.flist { border: 1px solid var(--border); border-radius: 6px; }
+.frow { display: grid; grid-template-columns: 16px minmax(0, 1fr) 100px 80px 120px; align-items: center; gap: 12px; min-height: 40px; text-align: center; padding: 0 16px; font-size: 13px; border-bottom: 1px solid var(--rule); cursor: pointer; }
+.frow:last-child { border-bottom: 0; }
+.frow.head { min-height: 36px; font-size: 13px; color: var(--muted-ink); background: var(--subtle); cursor: default; font-weight: 500; }
+.frow > span { overflow-wrap: anywhere; line-height: 1.3; padding: 4px 0; }
+.frow.on { background: var(--blue-bg); }
+.chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.pscroll { max-height: 440px; overflow: auto; border: 1px solid var(--border); border-radius: 6px; }
+.toast { position: fixed; right: 24px; bottom: 24px; background: var(--ink); color: #fff; padding: 12px 16px; border-radius: 6px; font-size: 13px; z-index: 20; }
+
+/* Reservations */
+.card { background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 24px; display: grid; gap: 16px; max-width: 880px; }
+.card h2 { font-size: 16px; font-weight: 600; }
+.swrow { display: flex; align-items: center; gap: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
+.swrow .lbl { font-weight: 600; flex: 1; }
+.switch { width: 40px; height: 22px; border-radius: 11px; border: 1px solid var(--line); background: #fff; position: relative; cursor: pointer; padding: 0; }
+.switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: var(--line); transition: left .12s; }
+.switch[aria-checked="true"] { background: var(--ink); border-color: var(--ink); }
+.switch[aria-checked="true"]::after { left: 20px; background: #fff; }
+.switch:disabled { cursor: not-allowed; opacity: .7; }
+.confirmbar { border: 1px solid var(--amber-bd); background: var(--amber-bg); border-radius: 6px; padding: 16px; display: grid; gap: 16px; }
+.confirmbar .row { display: flex; gap: 8px; align-items: center; }
+</style>
+</head>
+<body>
+
+<nav class="proto" aria-label="Prototype views">
+  <b>Prototype</b>
+  <a href="#segments">Segments</a><a href="#filtered">Filtered</a><a href="#upload-route">Upload KMZ route</a><a href="#edit">Edit segment</a>
+  <a href="#xlsx">segments.xlsx preview</a><a href="#add-segment">Add segment</a><a href="#sites">Sites</a><a href="#add-site">Add site</a><a href="#reservations">Reservations</a>
+</nav>
+
+<header class="top">
+  <b>Fiber Dashboard</b>
+  <nav><span>Inventory</span><span>My reservations</span><span class="on">Upload</span></nav>
+</header>
+
+<main class="page">
+  <div class="subbar">
+    <div class="subtabs" role="tablist" aria-label="Upload">
+      <button type="button" role="tab" data-tab="segments">Segments</button>
+      <button type="button" role="tab" data-tab="sites">Sites</button>
+      <button type="button" role="tab" data-tab="reservations">Reservations</button>
+    </div>
+  </div>
+  <section class="panel" id="panel"></section>
+</main>
+
+<div id="modal"></div>
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script>
+const $ = (selector) => document.querySelector(selector);
+const CHEV = '<svg viewBox="0 0 16 16"><path d="M6 3.5L10.5 8 6 12.5"/></svg>';
+const XICON = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 3l10 10M13 3L3 13"/></svg>';
+const plural = (count, word) => count + " " + word + (count === 1 ? "" : "s");
+const PAGE_SIZE = 50;
+
+/* ---------- Stable fake data ---------- */
+function seeded(seed) {
+  return () => {
+    seed = (seed + 0x6d2b79f5) | 0;
+    let value = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    value = (value + Math.imul(value ^ (value >>> 7), 61 | value)) ^ value;
+    return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
+  };
+}
+const rand = seeded(26112026);
+const pick = (list) => list[Math.floor(rand() * list.length)];
+
+const NAMED = [["KLG Hut", "Site"], ["Klang Hut", "Site"], ["Cyberjaya DC", "DC"], ["Bangsar DC", "DC"], ["Shah Alam DC", "DC"], ["Ipoh DC", "DC"],
+  ["KL TOC", "TOC"], ["Seremban TOC", "TOC"], ["Menara Seri", "Building"], ["Wisma Timur", "Building"], ["Port Hut", "Site"], ["Rawang Hut", "Site"]];
+const SITES = NAMED.map(([name, kind]) => ({ name, kind }));
+for (let number = 1; number <= 78; number++) {
+  SITES.push({ name: "S" + String(number).padStart(2, "0"), kind: number % 7 === 0 ? "Building" : "Site" });
+}
+for (const site of SITES) {
+  site.lat = (1.6 + rand() * 4.9).toFixed(5);
+  site.long = (100.3 + rand() * 3.4).toFixed(5);
+}
+const kindOf = (name) => SITES.find((site) => site.name === name).kind;
+
+function routeType(a, b) {
+  const kinds = [kindOf(a), kindOf(b)];
+  const dcs = kinds.filter((kind) => kind === "DC").length;
+  if (dcs === 2) {
+    return "DC-DC";
+  }
+  if (dcs === 1 && kinds.includes("TOC")) {
+    return "DC-TOC";
+  }
+  if (dcs === 1) {
+    return "Metro";
+  }
+  return "Trunk";
+}
+
+const FILE_OF = { Completed: "completed-nov.kmz", "Phase 2": "phase2-north.kmz" };
+const DATES = ["02 Oct 2026", "14 Oct 2026", "29 Oct 2026", "05 Nov 2026", "12 Nov 2026", "19 Nov 2026", "24 Nov 2026"];
+const SECTIONS = ["N1", "N2", "C1", "C2", "S1", "S2"];
+let lineId = 0;
+
+function makeLines(link, km, count) {
+  const lines = [];
+  for (let index = 0; index < count; index++) {
+    lines.push({ id: ++lineId, folder: index === 0 ? "Completed" : "Phase 2", title: index === 2 ? "Path " + (lineId % 40) : link,
+      km: +(km * (1 + rand() * 0.08)).toFixed(1), file: FILE_OF[index === 0 ? "Completed" : "Phase 2"], date: DATES[Math.floor(rand() * DATES.length)], state: "active" });
+  }
+  return lines;
+}
+const SEGMENTS = [];
+const pairs = new Set();
+function addSegment(a, b, options = {}) {
+  const key = [a, b].sort().join("|");
+  if (a === b || pairs.has(key)) {
+    return null;
+  }
+  pairs.add(key);
+  const km = options.km ?? +(2 + rand() * 40).toFixed(1);
+  const verified = options.verified !== undefined ? options.verified : (rand() < 0.15 ? null : pick([12, 24, 36, 48, 72, 96]));
+  let lineCount = options.lines;
+  if (lineCount === undefined) {
+    const roll = rand();
+    lineCount = roll < 0.25 ? 0 : roll < 0.75 ? 1 : roll < 0.95 ? 2 : 3;
+  }
+  const link = a + "-" + b;
+  const segment = { id: SEGMENTS.length + 1, a, b, link, km, route: "R" + (1 + (SEGMENTS.length % 9)), section: pick(SECTIONS),
+    verified, total: options.total ?? pick([144, 144, 144, 96, 288]), lines: makeLines(link, km, lineCount) };
+  SEGMENTS.push(segment);
+  return segment;
+}
+addSegment("KLG Hut", "Klang Hut", { km: 12.4, verified: 48, total: 144, lines: 2 });
+addSegment("Cyberjaya DC", "Bangsar DC", { lines: 1 });
+addSegment("Cyberjaya DC", "KL TOC", { lines: 0, verified: null });
+addSegment("Cyberjaya DC", "S05", { lines: 0 });
+addSegment("Cyberjaya DC", "Shah Alam DC", { lines: 2 });
+addSegment("Cyberjaya DC", "S12", { lines: 0 });
+addSegment("Shah Alam DC", "Klang Hut", { lines: 1 });
+addSegment("Bangsar DC", "Seremban TOC", { lines: 1 });
+for (let index = 0; index + 1 < SITES.length; index++) {
+  addSegment(SITES[index].name, SITES[index + 1].name);
+}
+while (SEGMENTS.length < 143) {
+  addSegment(pick(SITES).name, pick(SITES).name);
+}
+const activeLines = (segment) => segment.lines.filter((line) => line.state !== "gone");
+const liveLines = (segment) => segment.lines.filter((line) => line.state === "active" || line.state === "removing");
+
+/* ---------- State ---------- */
+const state = {
+  tab: "segments",
+  seg: { search: "", site: "", route: "", noLine: false, notRegistered: false, page: 0 },
+  sites: { search: "", kind: "", page: 0 },
+  open: new Set(),
+  modal: null,
+  reservationClosed: false,
+};
+
+/* ---------- Toast ---------- */
+let toastTimer;
+function toast(text) {
+  $("#toast").textContent = text;
+  $("#toast").hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { $("#toast").hidden = true; }, 2600);
+}
+
+/* ---------- Tabs ---------- */
+function render() {
+  document.querySelectorAll("[data-tab]").forEach((button) => {
+    button.setAttribute("aria-selected", String(button.dataset.tab === state.tab));
+  });
+  if (state.tab === "segments") {
+    renderSegments();
+  } else if (state.tab === "sites") {
+    renderSites();
+  } else {
+    renderReservations();
+  }
+  renderModal();
+}
+document.querySelectorAll("[data-tab]").forEach((button) => {
+  button.addEventListener("click", () => { state.tab = button.dataset.tab; state.modal = null; render(); });
+});
+
+function pager(total, page, key) {
+  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const first = total === 0 ? 0 : page * PAGE_SIZE + 1;
+  const last = Math.min(total, (page + 1) * PAGE_SIZE);
+  let buttons = "";
+  for (let index = 0; index < pages; index++) {
+    buttons += `<button class="btn btn-sm pg" type="button" data-page="${key}:${index}" ${index === page ? 'aria-current="page"' : ""}>${index + 1}</button>`;
+  }
+  return `<div class="pager"><span class="info">${first}-${last} of ${total}</span>
+    <button class="btn btn-sm" type="button" data-page="${key}:${page - 1}" ${page === 0 ? "disabled" : ""}>Previous</button>${buttons}
+    <button class="btn btn-sm" type="button" data-page="${key}:${page + 1}" ${page >= pages - 1 ? "disabled" : ""}>Next</button></div>`;
+}
+
+/* ---------- Segments ---------- */
+function filteredSegments() {
+  const filter = state.seg;
+  const query = filter.search.trim().toLowerCase();
+  return SEGMENTS.filter((segment) => {
+    if (query && !(segment.link.toLowerCase().includes(query) || segment.route.toLowerCase() === query || segment.route.toLowerCase().includes(query))) {
+      return false;
+    }
+    if (filter.site && segment.a !== filter.site && segment.b !== filter.site) {
+      return false;
+    }
+    if (filter.route && segment.route !== filter.route) {
+      return false;
+    }
+    if (filter.noLine && liveLines(segment).length > 0) {
+      return false;
+    }
+    if (filter.notRegistered && segment.verified !== null) {
+      return false;
+    }
+    return true;
+  });
+}
+function siteOptions(selected, blank) {
+  const names = SITES.map((site) => site.name).sort((a, b) => a.localeCompare(b, "en", { numeric: true }));
+  return `<option value="">${blank}</option>` + names.map((name) => `<option ${name === selected ? "selected" : ""}>${name}</option>`).join("");
+}
+function renderSegments() {
+  const filter = state.seg;
+  const routes = [...new Set(SEGMENTS.map((segment) => segment.route))].sort();
+  $("#panel").innerHTML = `
+    <div class="toolbar">
+      <div class="grp"><input class="field" style="width:270px" type="search" id="seg-search" placeholder="Search segment, site or route" aria-label="Search segments" value="${filter.search}">
+      <select class="field" style="width:160px" id="seg-site" aria-label="Site">${siteOptions(filter.site, "All sites")}</select>
+      ${filter.site ? '<button class="btn btn-sm" type="button" data-open="add-segment">Add segment</button>' : ""}
+      <select class="field" style="width:130px" id="seg-route" aria-label="Route"><option value="">All routes</option>${routes.map((route) => `<option ${route === filter.route ? "selected" : ""}>${route}</option>`).join("")}</select></div>
+      <div class="grp"><button class="chip" type="button" id="chip-noline" aria-pressed="${filter.noLine}">No route only</button>
+      <button class="chip" type="button" id="chip-notver" aria-pressed="${filter.notRegistered}">Not registered only</button></div>
+      <span class="count" id="seg-count"></span>
+      <div class="bulk"><button class="btn btn-sm" type="button" data-open="import-kmz">Import KMZ</button>
+      <button class="btn btn-sm" type="button" data-act="download-seg">Download</button>
+      <button class="btn btn-sm" type="button" data-open="xlsx-seg">Upload</button></div>
+    </div>
+    <div class="tcard"><div class="tscroll" id="seg-scroll">
+      <table class="tbl" aria-label="Segments">
+        <colgroup><col style="width:56px"><col><col style="width:110px"><col style="width:90px"><col style="width:110px"><col style="width:90px">
+          <col style="width:150px"><col style="width:120px"><col style="width:100px"><col style="width:80px"></colgroup>
+        <thead><tr><th class="c" aria-label="Open"></th><th>Segment</th><th>Type</th><th>Route</th><th>Cluster</th><th class="r">km</th>
+          <th class="r">Registered cores</th><th class="r">Total cores</th><th class="r">KMZ routes</th><th></th></tr></thead>
+        <tbody id="seg-body"></tbody>
+      </table>
+    </div>
+    <div id="seg-pager"></div></div>`;
+  renderSegmentRows();
+}
+function lineRowHtml(segment, line) {
+  let acts = `<button class="link" type="button" data-export="${line.id}">Export</button><button class="link" type="button" data-remove="${line.id}">Remove</button>`;
+  let cls = "lrow item";
+  if (line.state === "removing") {
+    cls += " removing";
+    acts = `<span>Remove route?</span><button class="btn btn-sm" type="button" data-confirm-remove="${line.id}">Remove</button>
+      <button class="link" type="button" data-cancel-remove="${line.id}">Cancel</button>`;
+  } else if (line.state === "removed") {
+    cls += " removed";
+    acts = `<span class="warn">removed</span><button class="link" type="button" data-undo="${line.id}">Undo</button>`;
+  }
+  return `<div class="${cls}"><span>${line.folder}</span><span class="t" title="${line.title}">${line.title}</span><span>${line.km.toFixed(1)} km</span>
+    <span title="${line.file}">${line.file}</span><span>${line.date}</span><span class="acts">${acts}</span></div>`;
+}
+function expandedHtml(segment) {
+  const lines = activeLines(segment);
+  const head = '<div class="lrow head"><span>Folder</span><span>Name</span><span>km</span><span>File</span><span>Uploaded</span><span></span></div>';
+  const body = lines.length ? `<div class="lines">${head}${lines.map((line) => lineRowHtml(segment, line)).join("")}</div>` : '<div class="kempty">No route</div>';
+  return `<tr class="xrow"><td colspan="10"><div class="kcard"><div class="khead"><b>KMZ routes</b>
+    <button class="btn btn-sm" type="button" data-upline="${segment.id}">Upload KMZ route</button></div>${body}</div></td></tr>`;
+}
+function renderSegmentRows() {
+  const rows = filteredSegments();
+  const pages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  state.seg.page = Math.min(state.seg.page, pages - 1);
+  const shown = rows.slice(state.seg.page * PAGE_SIZE, (state.seg.page + 1) * PAGE_SIZE);
+  $("#seg-count").textContent = plural(rows.length, "segment");
+  $("#seg-body").innerHTML = shown.map((segment) => {
+    const isOpen = state.open.has(segment.id);
+    const count = liveLines(segment).length;
+    const verified = segment.verified === null ? '<span class="warn">not registered</span>' : segment.verified;
+    const lines = count === 0 ? '<span class="warn">no route</span>' : count;
+    const row = `<tr class="srow${isOpen ? " open" : ""}"><td class="c"><button class="chev" type="button" aria-expanded="${isOpen}" aria-label="Open or close ${segment.link}" data-chev="${segment.id}">${CHEV}</button></td>
+      <th scope="row" title="${segment.link}">${segment.link}</th><td>${routeType(segment.a, segment.b)}</td><td>${segment.route}</td><td>${segment.section}</td>
+      <td class="r">${segment.km.toFixed(1)}</td><td class="r">${verified}</td><td class="r">${segment.total}</td><td class="r">${lines}</td>
+      <td class="r"><button class="link" type="button" data-edit="${segment.id}">Edit</button></td></tr>`;
+    return row + (isOpen ? expandedHtml(segment) : "");
+  }).join("") || '<tr><td colspan="10" class="empty">No segments</td></tr>';
+  $("#seg-pager").innerHTML = pager(rows.length, state.seg.page, "seg");
+}
+const segById = (id) => SEGMENTS.find((segment) => segment.id === +id);
+const lineById = (id) => {
+  for (const segment of SEGMENTS) {
+    const line = segment.lines.find((item) => item.id === +id);
+    if (line) {
+      return { segment, line };
+    }
+  }
+  return null;
+};
+
+/* ---------- Sites ---------- */
+const segmentCount = (name) => SEGMENTS.filter((segment) => segment.a === name || segment.b === name).length;
+function renderSites() {
+  const filter = state.sites;
+  $("#panel").innerHTML = `
+    <div class="toolbar">
+      <div class="grp"><input class="field" style="width:280px" type="search" id="site-search" placeholder="Search sites" aria-label="Search sites" value="${filter.search}">
+      <select class="field" style="width:160px" id="site-kind" aria-label="Type"><option value="">All types</option>
+        ${["Site", "Building", "DC", "TOC"].map((kind) => `<option ${kind === filter.kind ? "selected" : ""}>${kind}</option>`).join("")}</select></div>
+      <span class="count" id="site-count"></span>
+      <div class="bulk"><button class="btn btn-sm" type="button" data-open="add-site">Add site</button>
+      <button class="btn btn-sm" type="button" data-act="download-sites">Download</button>
+      <button class="btn btn-sm" type="button" data-open="xlsx-sites">Upload</button></div>
+    </div>
+    <div class="tcard"><div class="tscroll">
+      <table class="tbl" aria-label="Sites">
+        <colgroup><col><col style="width:160px"><col style="width:160px"><col style="width:160px"><col style="width:140px"><col style="width:100px"></colgroup>
+        <thead><tr><th>Name</th><th>Type</th><th class="r">Lat</th><th class="r">Long</th><th class="r">Segments</th><th></th></tr></thead>
+        <tbody id="site-body"></tbody>
+      </table>
+    </div>
+    <div id="site-pager"></div></div>`;
+  renderSiteRows();
+}
+function renderSiteRows() {
+  const filter = state.sites;
+  const query = filter.search.trim().toLowerCase();
+  const rows = SITES.filter((site) => site.name.toLowerCase().includes(query) && (!filter.kind || site.kind === filter.kind));
+  const pages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  filter.page = Math.min(filter.page, pages - 1);
+  $("#site-count").textContent = plural(rows.length, "site");
+  $("#site-body").innerHTML = rows.slice(filter.page * PAGE_SIZE, (filter.page + 1) * PAGE_SIZE).map((site) => `<tr>
+    <th scope="row">${site.name}</th><td>${site.kind}</td><td class="r">${site.lat}</td><td class="r">${site.long}</td>
+    <td class="r"><button class="link" type="button" data-site-jump="${site.name}" aria-label="${segmentCount(site.name)} segments at ${site.name}">${segmentCount(site.name)}</button></td>
+    <td class="r"><button class="link" type="button" data-site-edit="${site.name}">Edit</button></td></tr>`).join("")
+    || '<tr><td colspan="6" class="empty">No sites</td></tr>';
+  $("#site-pager").innerHTML = pager(rows.length, filter.page, "sites");
+}
+
+/* ---------- Reservations ---------- */
+const RES = { file: null, applied: false, confirming: false };
+function renderReservations() {
+  const preview = RES.file ? `
+    <div class="tbox"><table class="tbl" aria-label="Reservation rows">
+      <colgroup><col style="width:80px"><col style="width:280px"><col><col style="width:90px"><col style="width:160px"></colgroup>
+      <thead><tr><th class="r">Row</th><th>Segment</th><th>Customer</th><th class="r">Cores</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td class="r">2</td><td>KLG Hut-Klang Hut</td><td>Customer A</td><td class="r">4</td><td class="st-new">Ready</td></tr>
+        <tr><td class="r">3</td><td>Cyberjaya DC-Bangsar DC</td><td>Customer B</td><td class="r">2</td><td class="st-new">Ready</td></tr>
+        <tr><td class="r">4</td><td>S14-S15</td><td>Customer C</td><td class="r">8</td><td class="st-new">Ready</td></tr>
+        <tr><td class="r">5</td><td>S99-S15</td><td>Customer D</td><td class="r">2</td><td class="st-review">Needs review</td></tr>
+        <tr><td class="r">6</td><td>S20-S21</td><td>-</td><td class="r">2</td><td class="st-rej">Rejected</td></tr>
+      </tbody></table></div>
+    <div class="row" style="display:flex;gap:16px;align-items:center"><span style="flex:1;display:flex;gap:16px"><span>3 Ready</span><span>1 Needs review</span><span>1 Rejected</span></span>
+      <button class="btn btn-p" type="button" id="res-apply" ${RES.applied || state.reservationClosed ? "disabled" : ""}>${RES.applied ? "Imported 3" : "Import 3"}</button></div>` : "";
+  const confirm = RES.confirming ? `<div class="confirmbar"><b>Close reservation import?</b>
+      <label style="display:grid;gap:8px;font-size:13px;font-weight:500">Remarks<input class="field" id="res-remarks"></label>
+      <div class="row" style="gap:8px"><button class="btn btn-p btn-sm" type="button" id="res-close-yes">Close import</button><button class="btn btn-sm" type="button" id="res-close-no">Cancel</button></div></div>` : "";
+  $("#panel").innerHTML = `<div class="card">
+    <h2>Reservation workbook</h2>
+    ${state.reservationClosed ? '<p class="warn">Import closed</p>' : `<div class="drop"><button class="btn btn-p" type="button" id="res-choose">Choose .xlsx file</button><span>${RES.file ?? "No file"}</span></div>`}
+    ${state.reservationClosed ? "" : preview}
+    <div class="swrow"><span class="lbl" id="sw-lbl">Close reservation import</span><span>${state.reservationClosed ? "closed" : "open"}</span>
+      <button class="switch" type="button" role="switch" aria-labelledby="sw-lbl" aria-checked="${state.reservationClosed}" id="res-switch" ${state.reservationClosed ? "disabled" : ""}></button></div>
+    ${confirm}</div>`;
+}
+
+/* ---------- Boxes ---------- */
+function boxShell(width, title, body, foot, labelId = "box-title") {
+  return `<div class="dim" data-close></div><div class="box" role="dialog" aria-modal="true" aria-labelledby="${labelId}" style="width:${width}px">
+    <div class="bh"><h1 id="${labelId}">${title}</h1><button class="x" type="button" aria-label="Close" data-close>${XICON}</button></div>
+    <div class="bb">${body}</div><div class="bf">${foot}</div></div>`;
+}
+function fileLines(segment) {
+  const others = SEGMENTS.slice(8, 13);
+  const list = [{ key: "f0", title: segment.link, folder: "Completed", km: +(segment.km * 1.03).toFixed(1) }];
+  others.forEach((other, index) => list.push({ key: "f" + (index + 1), title: other.link, folder: "Completed", km: +(other.km * 1.02).toFixed(1) }));
+  list.push({ key: "f9", title: "Untitled Path", folder: "Completed", km: 6.9 });
+  return list;
+}
+function uploadLineBox(modal) {
+  const segment = segById(modal.seg);
+  const hasLine = liveLines(segment).length > 0;
+  const file = modal.file;
+  let list = "";
+  if (file) {
+    const rows = fileLines(segment).map((line) => {
+      const on = modal.picked.has(line.key);
+      const note = on && hasLine ? '<span class="warn">replaces route</span>' : "<span></span>";
+      return `<label class="frow${on ? " on" : ""}"><input type="checkbox" data-fpick="${line.key}" ${on ? "checked" : ""} aria-label="Pick ${line.title}">
+        <span title="${line.title}">${line.title}</span><span>${line.folder}</span><span>${line.km.toFixed(1)} km</span>${note}</label>`;
+    }).join("");
+    list = `<div class="flist"><div class="frow head"><span></span><span>Name</span><span>Folder</span><span>km</span><span></span></div>${rows}</div>`;
+  }
+  const size = modal.picked.size;
+  const body = `<div class="segname">${segment.link}</div>
+    <div class="drop"><button class="btn ${file ? "" : "btn-p"}" type="button" id="up-choose">Choose .kmz file</button><span>${file ?? "No file"}</span></div>${list}`;
+  const foot = `<span class="count"></span><button class="btn" type="button" data-close>Cancel</button>
+    <button class="btn btn-p" type="button" id="up-add" ${size === 0 ? "disabled" : ""}>Add ${plural(size, "route")}</button>`;
+  return boxShell(640, "Upload KMZ route", body, foot);
+}
+function editBox(modal) {
+  const segment = segById(modal.seg);
+  const body = `<div class="segname">${segment.link}</div>
+    <div class="form">
+      <label>km<input class="field" id="ed-km" value="${segment.km.toFixed(1)}" inputmode="decimal"></label>
+      <label>Route<input class="field" id="ed-route" value="${segment.route}"></label>
+      <label>Cluster<input class="field" id="ed-section" value="${segment.section}"></label>
+      <span></span>
+      <label>Registered cores<input class="field" id="ed-ver" value="${segment.verified ?? ""}" inputmode="numeric" placeholder="not registered"></label>
+      <label>Total cores<input class="field" id="ed-total" value="${segment.total}" inputmode="numeric"></label>
+      <label class="wide">Remarks<textarea class="field" id="ed-remarks"></textarea></label>
+      <p class="err wide" id="ed-err" role="alert"></p>
+    </div>`;
+  return boxShell(560, "Edit segment", body, '<span class="count"></span><button class="btn" type="button" data-close>Cancel</button><button class="btn btn-p" type="button" id="ed-save">Save</button>');
+}
+function addSegmentBox(modal) {
+  const body = `<div class="form">
+    <label>Site A<select class="field" id="as-a">${siteOptions(modal.a, "-")}</select></label>
+    <label>Site B<select class="field" id="as-b">${siteOptions("", "-")}</select></label>
+    <label>km<input class="field" id="as-km" inputmode="decimal"></label>
+    <label>Route<input class="field" id="as-route" placeholder="R1"></label>
+    <label>Cluster<input class="field" id="as-section"></label>
+    <p class="err wide" id="as-err" role="alert"></p></div>`;
+  return boxShell(560, "Add segment", body, '<span class="count"></span><button class="btn" type="button" data-close>Cancel</button><button class="btn btn-p" type="button" id="as-save">Add segment</button>');
+}
+function siteBox(modal) {
+  const site = modal.edit ? SITES.find((item) => item.name === modal.edit) : { name: modal.name ?? "", kind: "Site", lat: "", long: "" };
+  const body = `<div class="form">
+    <label class="wide">Name<input class="field" id="si-name" value="${modal.nameDraft ?? site.name}" ${modal.err ? 'aria-invalid="true" aria-describedby="si-err"' : ""}></label>
+    <label>Type<select class="field" id="si-kind">${["Site", "Building", "DC", "TOC"].map((kind) => `<option ${kind === site.kind ? "selected" : ""}>${kind}</option>`).join("")}</select></label>
+    <span></span>
+    <label>Lat<input class="field" id="si-lat" value="${site.lat}" inputmode="decimal"></label>
+    <label>Long<input class="field" id="si-long" value="${site.long}" inputmode="decimal"></label>
+    <p class="err wide" id="si-err" role="alert">${modal.err ?? ""}</p></div>`;
+  const label = modal.edit ? "Save" : "Add site";
+  return boxShell(560, modal.edit ? "Edit site" : "Add site", body, `<span class="count"></span><button class="btn" type="button" data-close>Cancel</button><button class="btn btn-p" type="button" id="si-save">${label}</button>`);
+}
+function importKmzBox() {
+  const body = `<p><a class="link" href="../kmz-import-v3/index.html" target="_blank" rel="noopener">Open KMZ import</a></p>`;
+  return boxShell(560, "Import KMZ", body, '<span class="count"></span><button class="btn" type="button" data-close>Close</button>');
+}
+
+const PREVIEWS = {};
+function buildPreview(kind) {
+  if (PREVIEWS[kind]) {
+    return PREVIEWS[kind];
+  }
+  const rows = [];
+  if (kind === "seg") {
+    SEGMENTS.slice(0, 130).forEach((segment, index) => {
+      let status = "same";
+      let change = "";
+      if ([1, 4, 9, 17, 23, 31, 40, 55, 71].includes(index)) {
+        status = "changed";
+        change = index % 3 === 0 ? `km ${segment.km.toFixed(1)} → ${(segment.km + 0.6).toFixed(1)}`
+          : index % 3 === 1 ? `Registered cores ${segment.verified ?? "-"} → 72` : `Route ${segment.route} → R${(index % 9) + 1}A`;
+      }
+      rows.push({ row: index + 2, name: segment.link, status, change });
+    });
+    [["S10-S40", "R3", 14.2], ["S22-S61", "R5", 8.7], ["KL TOC-Port Hut", "R1", 21.5], ["Menara Seri-S33", "R2", 3.1]].forEach(([name, route, km], index) => {
+      rows.push({ row: 132 + index, name, status: "new", change: `${km} km, ${route}` });
+    });
+    rows.push({ row: 136, name: "S99-S15", status: "review", change: "Unknown site S99" });
+    rows.push({ row: 137, name: "S30-S31", status: "review", change: "Registered above Total cores" });
+  } else {
+    SITES.slice(0, 84).forEach((site, index) => {
+      let status = "same";
+      let change = "";
+      if ([3, 12, 27, 44, 60].includes(index)) {
+        status = "changed";
+        change = index % 2 ? `Type ${site.kind} → Building` : `Lat ${site.lat} → ${(+site.lat + 0.002).toFixed(5)}`;
+      }
+      rows.push({ row: index + 2, name: site.name, status, change });
+    });
+    [["S79", "Site"], ["S80", "Site"], ["Putra DC", "DC"]].forEach(([name, siteKind], index) => {
+      rows.push({ row: 86 + index, name, status: "new", change: siteKind });
+    });
+    rows.push({ row: 89, name: "Sri-Damai", status: "review", change: "No dash in a site name" });
+  }
+  PREVIEWS[kind] = rows;
+  return rows;
+}
+const STATUS_WORD = { new: "new", changed: "changed", same: "same", review: "needs review" };
+function xlsxBox(modal) {
+  const rows = buildPreview(modal.kind);
+  const counts = { new: 0, changed: 0, same: 0, review: 0 };
+  rows.forEach((row) => counts[row.status]++);
+  const filter = modal.filter;
+  const order = { review: 0, new: 1, changed: 2, same: 3 };
+  const shown = rows.filter((row) => filter === "all" || row.status === filter).sort((a, b) => order[a.status] - order[b.status] || a.row - b.row);
+  const chip = (key, label) => `<button class="chip" type="button" data-pfilter="${key}" aria-pressed="${filter === key}">${label}</button>`;
+  const fileName = modal.kind === "seg" ? "segments.xlsx" : "sites.xlsx";
+  const what = modal.kind === "seg" ? "Segment" : "Site";
+  const body = `<div class="drop"><button class="btn" type="button">Choose .xlsx file</button><span>${fileName}</span></div>
+    <div class="chips">${chip("all", `All ${rows.length}`)}${chip("new", `new ${counts.new}`)}${chip("changed", `changed ${counts.changed}`)}${chip("same", `same ${counts.same}`)}${chip("review", `needs review ${counts.review}`)}</div>
+    <div class="pscroll"><table class="tbl" aria-label="Preview rows">
+      <colgroup><col style="width:70px"><col style="width:240px"><col style="width:130px"><col></colgroup>
+      <thead><tr><th class="r">Row</th><th>${what}</th><th>Status</th><th>Change</th></tr></thead>
+      <tbody>${shown.map((row) => `<tr><td class="r">${row.row}</td><td>${row.name}</td><td class="st-${row.status}">${STATUS_WORD[row.status]}</td><td>${row.change || "-"}</td></tr>`).join("")}</tbody>
+    </table></div>`;
+  const apply = counts.new + counts.changed;
+  const foot = `<span class="count">${counts.review} needs review</span><button class="btn" type="button" data-close>Cancel</button>
+    <button class="btn btn-p" type="button" id="x-apply" data-kind="${modal.kind}">Apply ${apply}</button>`;
+  return boxShell(880, `Upload ${fileName}`, body, foot);
+}
+function renderModal() {
+  const modal = state.modal;
+  if (!modal) {
+    $("#modal").innerHTML = "";
+    return;
+  }
+  const builders = { "upload-route": uploadLineBox, edit: editBox, "add-segment": addSegmentBox, site: siteBox, "import-kmz": importKmzBox, xlsx: xlsxBox };
+  $("#modal").innerHTML = builders[modal.type](modal);
+}
+
+/* ---------- Events ---------- */
+document.addEventListener("input", (event) => {
+  const id = event.target.id;
+  if (id === "seg-search") {
+    state.seg.search = event.target.value;
+    state.seg.page = 0;
+    renderSegmentRows();
+  } else if (id === "site-search") {
+    state.sites.search = event.target.value;
+    state.sites.page = 0;
+    renderSiteRows();
+  }
+});
+document.addEventListener("change", (event) => {
+  const id = event.target.id;
+  if (id === "seg-site") {
+    state.seg.site = event.target.value;
+    state.seg.page = 0;
+    renderSegments();
+  } else if (id === "seg-route") {
+    state.seg.route = event.target.value;
+    state.seg.page = 0;
+    renderSegmentRows();
+  } else if (id === "site-kind") {
+    state.sites.kind = event.target.value;
+    state.sites.page = 0;
+    renderSiteRows();
+  } else if (event.target.dataset.fpick) {
+    const key = event.target.dataset.fpick;
+    if (state.modal.picked.has(key)) {
+      state.modal.picked.delete(key);
+    } else {
+      state.modal.picked.add(key);
+    }
+    renderModal();
+  }
+});
+
+const removeTimers = {};
+document.addEventListener("click", (event) => {
+  const target = event.target.closest("button, [data-close]");
+  if (!target) {
+    return;
+  }
+  const data = target.dataset;
+  if (data.close !== undefined) {
+    state.modal = null;
+    renderModal();
+    return;
+  }
+  if (target.id === "chip-noline") {
+    state.seg.noLine = !state.seg.noLine;
+    state.seg.page = 0;
+    target.setAttribute("aria-pressed", state.seg.noLine);
+    renderSegmentRows();
+  } else if (target.id === "chip-notver") {
+    state.seg.notRegistered = !state.seg.notRegistered;
+    state.seg.page = 0;
+    target.setAttribute("aria-pressed", state.seg.notRegistered);
+    renderSegmentRows();
+  } else if (data.page) {
+    const [key, page] = data.page.split(":");
+    if (key === "seg") {
+      state.seg.page = +page;
+      renderSegmentRows();
+      $("#seg-scroll").scrollTop = 0;
+    } else {
+      state.sites.page = +page;
+      renderSiteRows();
+    }
+  } else if (data.chev) {
+    const id = +data.chev;
+    if (state.open.has(id)) {
+      state.open.delete(id);
+    } else {
+      state.open.add(id);
+    }
+    renderSegmentRows();
+  } else if (data.remove) {
+    lineById(data.remove).line.state = "removing";
+    renderSegmentRows();
+  } else if (data.cancelRemove) {
+    lineById(data.cancelRemove).line.state = "active";
+    renderSegmentRows();
+  } else if (data.confirmRemove) {
+    const id = data.confirmRemove;
+    lineById(id).line.state = "removed";
+    renderSegmentRows();
+    removeTimers[id] = setTimeout(() => {
+      const found = lineById(id);
+      if (found && found.line.state === "removed") {
+        found.line.state = "gone";
+        if (state.tab === "segments") {
+          renderSegmentRows();
+        }
+      }
+    }, 5000);
+  } else if (data.undo) {
+    clearTimeout(removeTimers[data.undo]);
+    lineById(data.undo).line.state = "active";
+    renderSegmentRows();
+  } else if (data.export) {
+    const { segment } = lineById(data.export);
+    toast(`Exported ${segment.link}.kmz`);
+  } else if (data.upline) {
+    state.modal = { type: "upload-route", seg: +data.upline, file: null, picked: new Set() };
+    renderModal();
+  } else if (target.id === "up-choose") {
+    state.modal.file = "completed-nov.kmz";
+    state.modal.picked = new Set(["f0"]);
+    renderModal();
+  } else if (target.id === "up-add") {
+    const segment = segById(state.modal.seg);
+    const picked = fileLines(segment).filter((line) => state.modal.picked.has(line.key));
+    liveLines(segment).forEach((line) => { line.state = "gone"; });
+    picked.forEach((line) => segment.lines.push({ id: ++lineId, folder: line.folder, title: line.title, km: line.km, file: state.modal.file, date: "26 Nov 2026", state: "active" }));
+    if (!DATES.includes("26 Nov 2026")) {
+      DATES.push("26 Nov 2026");
+    }
+    state.open.add(segment.id);
+    state.modal = null;
+    toast(`Added ${plural(picked.length, "route")} to ${segment.link}`);
+    render();
+  } else if (data.edit) {
+    state.modal = { type: "edit", seg: +data.edit };
+    renderModal();
+  } else if (target.id === "ed-save") {
+    saveEdit();
+  } else if (data.open === "add-segment") {
+    state.modal = { type: "add-segment", a: state.seg.site };
+    renderModal();
+  } else if (target.id === "as-save") {
+    saveNewSegment();
+  } else if (data.open === "import-kmz") {
+    state.modal = { type: "import-kmz" };
+    renderModal();
+  } else if (data.open === "xlsx-seg" || data.open === "xlsx-sites") {
+    state.modal = { type: "xlsx", kind: data.open === "xlsx-seg" ? "seg" : "sites", filter: "all" };
+    renderModal();
+  } else if (data.pfilter) {
+    state.modal.filter = data.pfilter;
+    renderModal();
+  } else if (target.id === "x-apply") {
+    toast(`Applied ${target.textContent.replace("Apply ", "")}`);
+    state.modal = null;
+    renderModal();
+  } else if (data.act === "download-seg") {
+    toast("Downloaded");
+  } else if (data.act === "download-sites") {
+    toast("Downloaded");
+  } else if (data.open === "add-site") {
+    state.modal = { type: "site" };
+    renderModal();
+  } else if (data.siteEdit) {
+    state.modal = { type: "site", edit: data.siteEdit };
+    renderModal();
+  } else if (target.id === "si-save") {
+    saveSite();
+  } else if (data.siteJump) {
+    state.tab = "segments";
+    state.seg = { search: "", site: data.siteJump, route: "", noLine: false, notRegistered: false, page: 0 };
+    render();
+  } else if (target.id === "res-choose") {
+    RES.file = "reservations.xlsx";
+    renderReservations();
+  } else if (target.id === "res-apply") {
+    RES.applied = true;
+    renderReservations();
+  } else if (target.id === "res-switch") {
+    RES.confirming = true;
+    renderReservations();
+  } else if (target.id === "res-close-no") {
+    RES.confirming = false;
+    renderReservations();
+  } else if (target.id === "res-close-yes") {
+    RES.confirming = false;
+    state.reservationClosed = true;
+    renderReservations();
+  }
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && state.modal) {
+    state.modal = null;
+    renderModal();
+  }
+});
+
+function saveEdit() {
+  const segment = segById(state.modal.seg);
+  const km = parseFloat($("#ed-km").value);
+  const verifiedText = $("#ed-ver").value.trim();
+  const verified = verifiedText === "" ? null : Number(verifiedText);
+  const total = Number($("#ed-total").value);
+  if (!(km > 0)) {
+    $("#ed-err").textContent = "km must be above 0";
+    return;
+  }
+  if (!Number.isInteger(total) || total <= 0) {
+    $("#ed-err").textContent = "Total cores: whole number above 0";
+    return;
+  }
+  if (verified !== null && (!Number.isInteger(verified) || verified < 0 || verified > total)) {
+    $("#ed-err").textContent = "Registered cores: whole number up to Total cores";
+    return;
+  }
+  Object.assign(segment, { km, route: $("#ed-route").value.trim(), section: $("#ed-section").value.trim(), verified, total });
+  state.modal = null;
+  toast(`Saved ${segment.link}`);
+  render();
+}
+function saveNewSegment() {
+  const a = $("#as-a").value;
+  const b = $("#as-b").value;
+  const km = parseFloat($("#as-km").value);
+  const error = $("#as-err");
+  if (!a || !b) {
+    error.textContent = "Pick Site A and Site B";
+    return;
+  }
+  if (a === b) {
+    error.textContent = "Pick two different sites";
+    return;
+  }
+  if (pairs.has([a, b].sort().join("|"))) {
+    error.textContent = "Segment already exists";
+    return;
+  }
+  if (!(km > 0)) {
+    error.textContent = "km must be above 0";
+    return;
+  }
+  const segment = addSegment(a, b, { km, verified: null, total: 144, lines: 0 });
+  segment.route = $("#as-route").value.trim() || "-";
+  segment.section = $("#as-section").value.trim() || "-";
+  state.modal = null;
+  toast(`Added ${segment.link}`);
+  render();
+}
+function saveSite() {
+  const name = $("#si-name").value.trim();
+  const modal = state.modal;
+  let error = "";
+  if (!name) {
+    error = "Name is required";
+  } else if (name.includes("-")) {
+    error = "No dash in a site name";
+  } else if (name !== modal.edit && SITES.some((site) => site.name.toLowerCase() === name.toLowerCase())) {
+    error = "Name already used";
+  }
+  if (error) {
+    modal.err = error;
+    modal.nameDraft = name;
+    renderModal();
+    $("#si-name").focus();
+    return;
+  }
+  const values = { name, kind: $("#si-kind").value, lat: $("#si-lat").value.trim(), long: $("#si-long").value.trim() };
+  if (modal.edit) {
+    Object.assign(SITES.find((site) => site.name === modal.edit), values);
+  } else {
+    SITES.push(values);
+  }
+  state.modal = null;
+  toast(modal.edit ? `Saved ${name}` : `Added site ${name}`);
+  render();
+}
+
+/* ---------- Prototype states ---------- */
+function applyHash() {
+  const hash = location.hash.slice(1) || "segments";
+  document.querySelectorAll(".proto a").forEach((link) => link.classList.toggle("on", link.getAttribute("href") === "#" + hash));
+  state.modal = null;
+  state.seg = { search: "", site: "", route: "", noLine: false, notRegistered: false, page: 0 };
+  state.sites = { search: "", kind: "", page: 0 };
+  state.open = new Set([1]);
+  state.tab = "segments";
+  if (hash === "filtered") {
+    state.open = new Set();
+    state.seg.site = "Cyberjaya DC";
+    state.seg.noLine = true;
+  } else if (hash === "upload-route") {
+    state.modal = { type: "upload-route", seg: 1, file: "completed-nov.kmz", picked: new Set(["f0"]) };
+  } else if (hash === "edit") {
+    state.modal = { type: "edit", seg: 1 };
+  } else if (hash === "xlsx") {
+    state.modal = { type: "xlsx", kind: "seg", filter: "all" };
+  } else if (hash === "add-segment") {
+    state.open = new Set();
+    state.seg.site = "Cyberjaya DC";
+    state.modal = { type: "add-segment", a: "Cyberjaya DC" };
+  } else if (hash === "sites") {
+    state.tab = "sites";
+  } else if (hash === "add-site") {
+    state.tab = "sites";
+    state.modal = { type: "site", nameDraft: "Sri-Damai", err: "No dash in a site name" };
+  } else if (hash === "reservations") {
+    state.tab = "reservations";
+    RES.file = "reservations.xlsx";
+  }
+  render();
+}
+window.addEventListener("hashchange", applyHash);
+applyHash();
+</script>
+</body>
+</html>
