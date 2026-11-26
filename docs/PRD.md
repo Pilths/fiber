@@ -1,10 +1,10 @@
 # Fiber Dashboard PRD
 
-Last verified: 2026-11-20, commit b4e4393
+Last verified: 2026-11-27, checked against branch dev commit 97a437d (new Upload text checked; older KMZ text not re-checked)
 
 ## 1. Executive Summary
 
-The MVP gives planners one web dashboard to find free cores, reserve them, and check loss per core, ready for use by 31 October 2026.
+The MVP gives planners one web dashboard to find free cores, reserve them, and check loss per core. The original target was 31 October 2026. As of 26 November 2026 it is not live: `main` holds the code that will go live and is still in development.
 
 **Problem Statement:** Cable management, core reservations and dB loss are tracked from Excel exports of the source system. Planners cannot quickly see which cores are free, which reservations have gone stale, or where measured loss differs from calculated loss.
 
@@ -16,7 +16,7 @@ The MVP gives planners one web dashboard to find free cores, reserve them, and c
 | --- | --- | --- |
 | Find and reserve free cores | A planner submits a reservation request in 2 minutes or less | Timed test with 3 planners on mock data, then real data |
 | No forgotten reservations | 100% of reservations older than 3 months appear in the Action needed list (tagged Stale) and trigger a daily reminder until kept or released | Automated test plus a count of stale items older than 4 months, target 0 |
-| Measured loss coverage | At least 80% of segments have a measured reading | Share of segments with at least one measurement, shown in the dashboard |
+| Measured loss coverage | At least 80% of segments have a measured reading | Share of segments with at least one measurement, available from the API only (no screen yet) |
 | Reservations in one place | 100% of new reservations created in the dashboard after go-live. | Count of reservations recorded outside the dashboard, target 0 |
 
 ## 2. User Experience & Functionality
@@ -38,7 +38,7 @@ The layout, page structure, patterns and style tokens live in `docs/DESIGN.md`. 
 
 **Terms**
 
-- **Site:** the general term for any place a segment ends: a site, a building in it or the equipment in that building, such as a data center or TOC. Every site has latitude and longitude in the Excel. One site is one place with one 4-letter LRD code. A data center (DC) is a site of kind 'data_center' that is linked to its LRD site row from the site list, not a separate place; the map shows the linked site as a data center.
+- **Site:** the general term for any place a segment ends: a site, a building in it or the equipment in that building, such as a data center or TOC. Every site has latitude and longitude in the Excel. One site is one place with one name of any length (free text, trimmed) that has no "-" inside, because "-" separates the two names in a segment link. A data center (DC) is a site of kind 'data_center', set by the site master Type column (blank or Trunk = site, DC = data_center, TOC = toc).
 - **Nodes:** an Excel column name only, used by the parser. It is not a domain or database term, because it means different things to different people. Its value is a site pair `LRD-LRD` and becomes a segment.
 - **Segment:** a connection between two sites (site A and site B). The app gives every segment its own ID. A segment carries many cores.
 - **Route:** a named group of segments end to end, with sites in between; each KMZ line shows one route. A route is a label for display and the line on the map. Routing runs over segments, not routes. Several routes may share the same two end sites.
@@ -61,37 +61,37 @@ To confirm against the mock files arriving 22 October 2026: KMZ lines are named 
    - Each core's status is visible at a glance, and status is never shown by colour alone (for example hatched for Reserved, outlined for Available).
    - Only verified cores are shown. A cable is usually 144 cores, but the data knows only the cores found at core verification (Excel "Core Secured", stored as `segments.survey_cores`). A segment gets one core row per verified core, numbered 1 to the verified core count. Cores with known port ranges show their port labels; the others have blank ports until known. The total cores of the cable (`segments.cable_size`, default 144, admin-editable) is info only, shown as "Total cores", and never shown as core rows.
    - A segment with no verified core count is "not verified" and cannot be booked until an admin enters a count (a segment edit, kept as history). When the admin raises the count, more cores appear; nothing is rebuilt.
-   - The Cores table shows one row per core. Consecutive cores of one reservation, and runs of Available cores, are grouped into one expandable row. Filter chips All, Free, In use and Unassigned show counts. A count-only reservation shows as an "Unassigned" row. Columns: Cores, Status, Customer, Planner, SRF, Planned date, Age, Ports. Loss is in the core details.
+   - The Cores table shows one row per core, grouped by status (Requested, Reserved, In service, Unassigned, Available) with counts in the group headings and no filter chips. A count-only reservation shows as an "Unassigned" row. Columns: Cores, Customer, Planner, SRF, Planned, Days held, Ports. Loss is in the core details. See `docs/DESIGN.md` section 3.
    - The "Free" figure (in the Free chip and the segment list) is Available cores minus the remaining unassigned cores of active reservations on that segment.
 2. As a planner, I want to request cores for a customer with a planned date, so that capacity is held once an admin approves it.
-   - On a segment, "Reserve cores" on the segment diagram opens a reserve box: a "Cores needed" stepper ticks the first N Available cores, and the planner can change the ticks in a list of Available cores only (core, ports at both ends, Calculated loss, Measured loss), then fills Customer (required), Planned date and SRF ID (optional) and presses "Reserve N cores". Closing the box with cores ticked asks to discard. After submit, a closable "Request #N sent" box shows and the new Requested row is highlighted in the Cores table. A route uses the same box in route mode. Submitting it sends a request; nothing is reserved until an admin approves.
+   - Reserving starts from "Reserve on this route" after a Site A to B search (a one-segment reservation is a route between that segment's two sites). The reserve box opens: the planner selects each segment in the box and ticks its Available cores (core, ports at both ends, Calculated loss, Measured loss), "Cores needed per segment" sets N, and "Reserve N cores" is enabled when every segment has N ticked. The planner then fills Customer (required), Planned date and SRF ID (optional). Closing the box with cores ticked asks to discard. After submit, a closable "Request #N sent" box shows and the new Requested row is highlighted in the Cores table. Submitting it sends a request; nothing is reserved until an admin approves.
    - The customer is required. It is picked from a customer table; the Reserve form warns and blocks submission without a customer. Adding a new customer warns about similar existing names, and the admin sees a new-customer flag on the request.
    - Each reservation records the customer, planner, planned date, request date, and the admin who approved or rejected it.
    - Reservations are append-only: no editing in place. A change, approval or release is a new record, and earlier records stay as history.
    - On a segment, only Available cores can be ticked; in use and reserved cores are not in the list.
-   - On a route, the planner enters the cores needed per segment, and the reservation takes that many on every segment, assigned from the first free cores on each segment by default. Changing the cores per segment (a per-segment override) is Later / parked. If any segment has fewer free cores than needed (or is not verified), the option is flagged without a sentence: its lowest-free pill turns red with a warning symbol, it sorts last, and Reserve on the route stays disabled.
+   - On a route, the planner enters the cores needed per segment, the reservation takes that many on every segment, and the planner ticks the cores of each segment (the server no longer picks the first free cores; 3 Nov 2026). Changing the cores per segment (a per-segment override) is Later / parked. If any segment has fewer free cores than needed (or is not verified), the option is flagged without a sentence: its lowest-free pill turns red with a warning symbol, it sorts last, and Reserve on the route stays disabled.
    - Nobody, planner or admin, can book more cores on a segment than its Free figure; the API answers 409.
    - A count-only reservation holds a number of cores on a segment without naming them (`unassigned_cores = N`). It comes from the Excel import (a core count and no Core assignment). It marks no cell, but it lowers Free. An admin later assigns specific cores with the `assign` action (admin only), which adds cores and holds and saves an 'assigned' event. The remaining unassigned count is `unassigned_cores` minus the cores added by 'assigned' events, derived because reservations are insert-only. Assign only adds cores to an unassigned count, so cores are still never corrected or swapped. Releasing a count-only reservation releases its remaining unassigned count with it.
    - A new request holds its cores as Requested until an admin approves or rejects it; approval reserves them and rejection frees them.
-   - Admins are notified of each new request in the app (the amber waiting count on the Approvals tab) and by email; the email moves to v1.1 first if time runs short.
+   - Admins are notified of each new request in the app only (the amber waiting count on the Approvals tab). Email is not built; it waits for SMTP access.
    - Only an admin can approve, reject or release a reservation.
-   - A pending request with mistakes is rejected by the admin, with a reason, and the planner creates a new one.
-   - An approved reservation can be corrected by an admin, only for customer and planned date. The correction needs a reason and is saved as a new 'corrected' event; it replaces what is shown, while the old values stay in history.
+   - A pending request with mistakes is rejected by the admin, with optional Remarks the planner can see, and the planner creates a new one.
+   - An approved reservation can be corrected by an admin, only for customer and planned date. Remarks are optional. The correction is saved as a new 'corrected' event; it replaces what is shown, while the old values stay in history. API only, no screen yet.
    - Cores are never corrected or swapped. Wrong cores mean release and a new request.
-   - A route reservation is one request across all its segments, approved or rejected as a whole; a rejection needs a reason the planner can see.
+   - A route reservation is one request across all its segments, approved or rejected as a whole; a rejection can carry optional Remarks the planner can see.
    - If two planners select the same core, the first request submitted wins; the second planner sees which cores are taken and picks again.
-   - An admin can submit a request too. A different admin approves it when more than one admin exists; with a single admin, that admin approves it. The history shows the approving admin's name in both cases.
-   - Planners track their own requests in the My reservations list (its own tab), with chips All, Stale and Planned in 30 days (and Pending and Rejected), the age in days, and an Action needed count badge. A core's detail shows its reservation history, with Keep and Release (this needs a reservation history endpoint, TASK-077).
+   - An admin can submit a request too. A different admin approves it when more than one admin exists; with a single admin, that admin approves it. The history shows the approving admin's name in both cases. Not enforced yet: the code lets any admin approve or reject their own request even when other admins exist.
+   - Planners track their own requests in the My reservations list (its own tab), with chips All, Action needed, Pending and Stale, the age in days, and an Action needed count badge. A core's detail shows its reservation history, with Keep and Release (the reservation history endpoint, TASK-077, is built).
    - Pending requests never expire; admins see them oldest first with their age, and the Approvals tab shows how many are waiting.
    - A planner can withdraw their own pending request; the withdrawal is saved as a new record and the held cores are freed at once.
 3. As a planner, I want stale reservations flagged and reminded, so that none is forgotten.
    - A reservation is stale 3 months after it was approved. An imported reservation with no reserved date starts at its import date, and the upload preview warns the admin. Keeping it restarts the 3-month clock, and each keep is saved as a new history record.
    - Stale reservations appear in the Stale chip and the Action needed count badge on My reservations; so do reservations hit by an upload conflict or a fiber cut on the segment.
    - The 3-month rule and "today" in the daily digest use the Asia/Kuala_Lumpur time zone.
-   - The planner keeps a stale reservation or sends a release request; only an admin releases it. A release request appears in Approvals and its waiting count, the cores stay Reserved until an admin releases them, and a declined release needs a reason the planner can see.
+   - The planner keeps a stale reservation or sends a release request; only an admin releases it. A release request appears in Approvals and its waiting count, the cores stay Reserved until an admin releases them, and a declined release can carry optional Remarks the planner can see.
    - A release request chooses which segments (cores) of a route reservation to free; the rest stays reserved. Releasing all its cores ends the reservation.
    - Release is not deletion. It adds a 'released' event; the reservation, its cores and all events stay forever, and only the core's lock is freed. The event history is the log.
-   - A daily email digest per planner repeats until each is kept or released; the digest moves to v1.1 first if time runs short, while the in-app list and count badges stay.
+   - A daily email digest per planner repeats until each is kept or released. The digest is not built; the in-app list and count badges are the only reminder for now.
    - The Cores table tags reservations past the stale rule above as "Stale".
 4. As a planner, I want to compare calculated and measured loss per core, so that I can find high-loss cores.
    - Loss is per core. Each core has a Calculated loss, from this formula: Calculated loss (dB) = distance_km x 0.25 + 0.1 x splices + 0.5 x connectors, with splices = distance_km / 4 (exact) and connectors = 2 per segment, rounded to 2 decimals (32.5 km = 9.94 dB); a route sums its segments' values; it is the same for every core on a segment, and a Measured loss, from a physical field test with test type, date and field team. The formula lives in one backend function, so it can change later. Distance comes from the Excel, per segment; a route's distance is the sum of its segments. A segment with no distance has no Calculated loss and shows no distance, never 0 dB.
@@ -120,26 +120,27 @@ To confirm against the mock files arriving 22 October 2026: KMZ lines are named 
 7. As an admin, I want users to sign in with roles, so that reservations and uploads are attributable.
    - Roles: planner and admin. Sign-in starts with local accounts; enterprise SSO is a later option. Admins create accounts and reset passwords; there is no self-signup, and a password change is forced at first login. Accounts are deactivated, never deleted: history keeps the user's name, their pending requests stay in the admin queue, and their stale digests go to all admins.
    - Stays in the MVP, because admin-only approval and release need sign-in, and it is built right after the approval flow so it is never the story left for last.
-   - Admins get admin functions (Approvals and Upload as top tabs, Users) that planners never see, and can use every planner function too.. Users is reached from an admin-only item in the account menu (top right), which opens the users screen.
+   - Admins get admin functions (Approvals and Upload as top tabs, Users) that planners never see, and can use every planner function too. Users is reached from an admin-only item in the account menu (top right), which opens the users screen.
 8. As an admin, I want to upload Excel files, so that data updates without a developer. (KMZ upload and a segment list upload (Link, Distance) are built.)
+   - The Upload screen has the tabs Segments, Sites and Reservations. Segments and Sites list every segment and site (Add, Edit; Segments filters by search, site and route, "No route only" and "Not registered only"), and Download writes the live Sites and Segments as one Excel workbook that the upload reads back. Each segment has a KMZ routes card: its stored route lines (Remove with Undo for 5 seconds; history kept) and an upload of a KMZ for that segment only, where each line shows as new, same or replaces route. The Import KMZ box imports route lines only: each line shows its end distances from the segment's sites and its km against the Excel distance ("km differs" over 10 %), duplicate (repeated in the file) or same (already stored; never stored twice), and an untitled line gets a closest-segment suggestion that applies only when accepted.
    - A separate admin area, outside the planner functions (the Upload tab).
    - Python validates and cleans each file and reports rejected rows. Excel stays manually updated after go-live, so uploads repeat: a re-upload updates existing records and adds new ones without duplicates; segments are matched by their two sites, in either order (two sites have at most one segment), routes by their two end sites, and never import ports from Excel (every reservation row is a count-only reservation).
-   - New measurements are appended to history, never overwritten. Reservations are imported from Excel only until the import is closed. The admin upload area has an optional one-time switch, "Close reservation import". Until it is closed, every upload imports its approved reservation rows whose cores are free; a row whose core is already held is skipped, so re-uploads never duplicate or change a reservation. Reservation rows appear as their own group in the preview, so the admin sees exactly which reservations will be imported before confirming. Closing needs a reason, is saved as a history record and cannot be reopened in the MVP. After it is closed, reservation rows in an uploaded Excel are ignored and listed as a warning in the preview, and new reservations are made only in the dashboard.
+   - New measurements are appended to history, never overwritten. Reservations are imported from Excel only until the import is closed. The admin upload area has an optional one-time switch, "Close reservation import". Until it is closed, every upload imports its approved reservation rows whose cores are free; a row whose core is already held is skipped, so re-uploads never duplicate or change a reservation. Reservation rows appear as their own group in the preview, so the admin sees exactly which reservations will be imported before confirming. Closing takes optional Remarks, is saved as a history record and cannot be reopened in the MVP. After it is closed, reservation rows in an uploaded Excel are ignored and listed as a warning in the preview, and new reservations are made only in the dashboard.
    - Every upload shows a validation report first; nothing is saved until the admin confirms.
-   - **Site master upload (replace-file model).** The site master is its own workbook, separate from the Reservation workbook, and is uploaded on its own. (A one-time load with dashboard editing afterwards is proposed and parked, not decided: see Later / parked item 12.) It has two worksheets: the LRD sites sheet (site_name, latitude_in_decimal, longitude_in_decimal, region, optional Type (Trunk, DC, TOC), other columns) and the DC list sheet (header "DC Name / Link", LRD, lat, long, state, other columns). Every DC is also listed in the site list.
-     - Each worksheet is found by its headers, not its name: the sites sheet is the one with site_name, latitude_in_decimal and longitude_in_decimal; the DC sheet is the one with "DC Name / Link" and LRD. Header matching ignores case and spacing. If no sheet matches, that part is blocked with a clear message naming the expected headers.
-     - The admin uploads the new file. It goes to staging (nothing is written yet) and is compared with the database per sheet: Added (insert), Changed (update, kept as data edit history with the upload as the reason), Missing from the file (marked inactive, never deleted; if a segment or reservation uses it, it stays active and shows a warning) and Problem (Needs review). Sites key on site_name (the 4-letter LRD code); DCs key on "DC Name / Link".
+   - **Site master upload (replace-file model).** The site master is its own workbook, separate from the Reservation workbook, and is uploaded on its own. (A one-time load with dashboard editing afterwards is proposed and parked, not decided: see Later / parked item 12.) It has one Sites sheet (site_name, latitude_in_decimal, longitude_in_decimal, region, optional Type (blank or Trunk = site, DC = data_center, TOC = toc), other columns). The DC list sheet was removed on 16 Nov 2026.
+     - The sheet is found by its headers, not its name: it is the one with site_name, latitude_in_decimal and longitude_in_decimal. Header matching ignores case and spacing. If no sheet matches, the upload is blocked with a clear message naming the expected headers.
+     - The admin uploads the new file. It goes to staging (nothing is written yet) and is compared with the database: Added (insert), Changed (update, kept as data edit history with the upload as the reason), Missing from the file (marked inactive, never deleted; if a segment or reservation uses it, it stays active and shows a warning) and Problem (Needs review). Sites key on site_name.
      - The preview shows summary counts first, then filters Added, Changed, Missing and Problem (about 36,000 site rows). The admin applies it. The applied file becomes the "current file", shown with name, upload date, uploader and row counts. Previous uploads are kept for comparison.
-     - Whole-file checks block that sheet: empty, required headers missing, duplicate keys, or the new sheet has 10% or more fewer rows than the database (the admin can override with a confirmation). A failing DC sheet does not block a good sites sheet.
-     - The DC List sheet and "possible rename" were removed on 16 Nov 2026; a DC List sheet in the workbook is ignored.
+     - Whole-file checks block that sheet: empty, required headers missing, duplicate keys, or the new sheet has 10% or more fewer rows than the database (the admin can override with a confirmation).
+     - The DC List sheet, the LRD link and "possible rename" were removed on 16 Nov 2026; a DC List sheet in the workbook is ignored.
      - The values empty, "TBA", "N/A", "NA", "-" and "TBC" count as blank, not as invalid text.
-     - A DC row links to its site through the LRD column and adds the DC details; it does not create a new place. If its own lat/long is blank or invalid, the DC uses the linked site's coordinates, labelled "location from site <LRD>". If the linked site has no valid coordinates either, the row is Needs review and the DC is not drawn on the map. A site with invalid coordinates is Needs review and not drawn on the map, but segments and routing still work for it.
+     - A site with invalid coordinates is Needs review and not drawn on the map, but segments and routing still work for it.
      - The per-row checks above still apply (coordinate box, region spelling map, unknown region is Needs review). A parser failure never blocks the import and nothing is guessed. A field edited in the dashboard is protected from uploads; the preview shows "edited in dashboard, file differs".
      - Undo of a site master upload is not in the MVP. Previous uploads are kept for comparison; the undo or rollback button is Later / parked.
-     - The Reservation workbook (Reservation sheet) and the site master workbook (sites sheet and DC sheet) are two separate uploads. The sample file holds all four sheets together for convenience only. Each upload is recognised by its sheets' headers, not by file or sheet name.
+     - The Reservation workbook (Reservation sheet) and the site master workbook (Sites sheet) are two separate uploads. The sample file holds all four sheets together for convenience only. Each upload is recognised by its sheets' headers, not by file or sheet name.
    - The customer is required in the Excel too. A reservation row without a customer is Rejected in the preview and not imported; the admin fixes the Excel and uploads again, and the fixed row imports then.
    - A reservation row without a reserved date still imports, with the import date as the start of its stale clock and a warning in the preview.
-   - Every upload row is kept raw in staging with its sheet name and row number, and gets a status: Ready, Needs review or Rejected, with a reason shown in the preview. Needs review means a row the admin must look at before it can import; Rejected means it cannot import until the Excel is fixed. The admin fixes a row in the dashboard with a reason (kept as history and protected from later uploads), or cleans the Excel and uploads again.
+   - Every upload row is kept raw in staging with its sheet name and row number, and gets a status: Ready, Needs review or Rejected, with a reason shown in the preview. Needs review means a row the admin must look at before it can import; Rejected means it cannot import until the Excel is fixed. The admin fixes a row in the dashboard with optional Remarks (kept as history and protected from later uploads), or cleans the Excel and uploads again.
    - Parsing is layered: the raw text is always kept and parsed fields are added on top. A parser failure never blocks the import; the row goes to Needs review.
    - A region spelling variant (for example "Nothern") is mapped to North, Central, South or East Coast. A region value that cannot be mapped goes to Needs review with a reason, never a silent guess.
    - A site or DC with latitude and longitude outside a Southeast Asia box (roughly latitude -11 to 21, longitude 92 to 141; Malaysia is latitude 0.8 to 7.4, longitude 99.6 to 119.3) goes to Needs review, because swapped values, 0,0 and typos would plot in the wrong place and break distances.
@@ -184,12 +185,12 @@ The stack is one choice per layer, packaged with Docker Compose, with a Python A
                             v
  3. FastAPI backend  validate and clean | KMZ conversion (one KMZ line per route)
     (Python)         routing (NetworkX) | reservation rules (3-month stale
-                     check, daily reminder job)
+                     check, daily reminder job: planned, not built)
                             |
               +-------------+--------------+
-              | read and write             | daily digest
+              | read and write             | daily digest (planned)
               v                            v
- 4. PostgreSQL + PostGIS       5. SMTP relay
+ 4. PostgreSQL + PostGIS       5. SMTP relay (planned, not built)
     reservations, customers,      company-domain sender, access TBD
     measurements as history
 
@@ -201,10 +202,10 @@ How to read it:
 
 1. An admin uploads Excel and KMZ files on the Admin page.
 2. The FastAPI backend validates and cleans them, shows a report, and saves only after the admin confirms.
-3. Routing, reservation rules and the daily reminder job all run in the same backend.
+3. Routing, reservation rules run in the same backend (the daily reminder job is planned, not built).
 4. Data is stored in PostgreSQL with PostGIS, and measurements are kept as history.
 5. The React app (planner and admin screens, and the map) reads and writes only through the backend.
-6. The reminder job sends the stale-reservation digest through the SMTP relay.
+6. The reminder job would send the stale-reservation digest through the SMTP relay (planned, not built).
 
 Files enter through the Admin page, the Python API validates and stores them, and the app reads and writes everything through the same API.
 
@@ -214,7 +215,7 @@ Files enter through the Admin page, the Python API validates and stores them, an
 | --- | --- |
 | Frontend | React + TypeScript (Vite), Tailwind CSS; Geist and Geist Mono fonts, self-hosted |
 | Map | MapLibre GL JS with OpenStreetMap data, PMTiles extract capped at zoom 14, self-hosted glyphs, sprites and a light basemap, no external map API |
-| Backend | Python + FastAPI; also handles Excel and KMZ conversion and cleaning, routing with NetworkX, reservation rules and the daily reminder job |
+| Backend | Python + FastAPI; also handles Excel and KMZ conversion and cleaning, routing with NetworkX, reservation rules (the daily reminder job is planned, not built) |
 | Database | PostgreSQL with PostGIS |
 | Deployment | Docker Compose on a company-managed server; the exact host is confirmed with IT before go-live |
 
@@ -225,7 +226,7 @@ Files enter through the Admin page, the Python API validates and stores them, an
 | Excel exports from the source system | Sites (all with latitude and longitude), segments, routes, cores, ports, measurements; schema built from the column headers; after the first import a feed, not the source of truth | Sample workbook received 22 October 2026 (see Sample Excel workbook below); real data not yet available |
 | KMZ files | Route coordinates, one KMZ line per route, matched to Excel; join key TBD | Built: KMZ upload and `app.load_kmz` draw road-shaped lines, matched to segments by the title `AAAA-BBBB` |
 | SMTP relay | Daily stale-reservation email digest; email to admins on each new reservation request | Sender address must be registered under the company domain; access and registration TBD, and they decide whether email ships in the MVP |
-| Daily scheduler | Digest and stale checks | Planned, not built: in-app scheduler (APScheduler) inside the FastAPI container; it records its last run, so a restart never sends the digest twice |
+| Daily scheduler | Digest and stale checks | Planned, not built: a cron entry or a small looping service (APScheduler is not installed); it records its last run, so a restart never sends the digest twice |
 | Authentication | Sign-in and roles | Local accounts first; enterprise SSO later |
 
 **Data Model Foundation**
@@ -288,8 +289,8 @@ All five MVP items are planned for 31 October 2026, about 11 days from this draf
 
 **Phased Rollout**
 
-1. **MVP, by 31 October 2026:** fiber health (cores and ports, reservations and loss per core) and route planning; the MapLibre map page (straight segment lines, plus one mock route with a drawn shape; real KMZ import is later); Reserve cores with admin approval; admin upload with a preview step, including the site master replace-file upload; admin editing of core status, segments and sites; email digest; login and roles. If time runs short, the email digest moves to v1.1 first; the next cut is the MapLibre basemap, with a plain SVG map of sites and straight segment lines as the fallback; after that, segment and site editing moves to v1.1 and core status editing stays. Gate to ship: tested on real exported data.
-2. **v1.1:** email digest and admin request emails if cut or the SMTP relay is not ready (the in-app Action needed list ships first either way); a mini map in the upload step to compare a new KMZ route with existing routes (idea, to decide); verification of reservation data; import of the Monitoring sheet once the planner confirms the data is accurate; parsing of the Port Info text; editing of ports, customers and other data in the app; PMTiles zoom detail review.
+1. **MVP, by 31 October 2026:** fiber health (cores and ports, reservations and loss per core) and route planning; the MapLibre map page (straight segment lines, plus one mock route with a drawn shape; real KMZ import is later); Reserve cores with admin approval; admin upload with a preview step, including the site master replace-file upload; admin editing of core status, segments and sites; email digest; login and roles. If time runs short, the email digest moves to v1.1 first; the next cut is the MapLibre basemap, with a plain SVG map of sites and straight segment lines as the fallback; after that, segment and site editing moves to v1.1 and core status editing stays. Gate to ship: tested on real exported data. Status 26 November 2026: built except the email digest; not live; gate to ship (real data upload) still open.
+2. **v1.1:** email digest and admin request emails if cut or the SMTP relay is not ready (the in-app Action needed list ships first either way); a mini map in the upload step to compare a new KMZ route with existing routes (idea, to decide); verification of reservation data; import of the Monitoring sheet once the planner confirms the data is accurate; parsing of the Port Info text; editing of customers and other data in the app; PMTiles zoom detail review.
 3. **v2.0:** joint closures on the map; scheduled imports; production shipping model.
 
 **Later / parked** (decided or proposed on 26 October 2026; not MVP)
