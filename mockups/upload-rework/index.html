@@ -603,9 +603,9 @@ function historyHtml(kind, open) {
   const rows = HISTORY[kind];
   return `<details class="hist wide" ${open ? "open" : ""}><summary>${CHEV}History (${rows.length})</summary>
     <div class="tbox"><table class="tbl" aria-label="History">
-      <colgroup><col style="width:120px"><col style="width:140px"><col style="width:60px"><col style="width:60px"><col style="width:190px"><col></colgroup>
-      <thead><tr><th>Date</th><th>Field</th><th>From</th><th>To</th><th>By</th><th>Remarks</th></tr></thead>
-      <tbody>${rows.map((row) => `<tr>${row.map((cell) => `<td>${cell}</td>`).join("")}</tr>`).join("")}</tbody></table></div></details>`;
+      <colgroup><col style="width:120px"><col style="width:140px"><col style="width:60px"><col style="width:60px"><col></colgroup>
+      <thead><tr><th>Date</th><th>Field</th><th>From</th><th>To</th><th>By</th></tr></thead>
+      <tbody>${rows.map((row) => `<tr>${row.slice(0, 5).map((cell) => `<td>${cell}</td>`).join("")}</tr>`).join("")}</tbody></table></div></details>`;
 }
 function downloadKmzBox(modal) {
   const total = SEGMENTS.length;
