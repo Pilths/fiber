@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Chevron } from "@/components/Chevron";
 import { Icon } from "@/components/Icon";
 import { KmzFolderTree } from "@/components/KmzFolderTree";
 import { KmzImportMap } from "@/components/KmzImportMap";
@@ -46,18 +47,6 @@ function TriBox({ ticked, total, label, onChange }: {
   return (
     <input ref={box} type="checkbox" aria-label={label} checked={total > 0 && ticked === total}
       onChange={(event) => onChange(event.target.checked)} />
-  );
-}
-
-function Chevron({ open }: { open: boolean }) {
-  let turn = "";
-  if (open) {
-    turn = "rotate-90";
-  }
-  return (
-    <svg viewBox="0 0 16 16" aria-hidden="true" className={`ic transition-transform ${turn}`}>
-      <path d="M6 3.5L10.5 8 6 12.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-    </svg>
   );
 }
 

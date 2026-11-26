@@ -349,8 +349,7 @@ test("planner does not see the Upload tab", async ({ page }) => {
 
 // A KMZ shaped like the real files: site pins and an "ex infra" line are ignored, only "propose route" is read,
 // and the line is matched to its segment by its title.
-// The line runs from DEV Kuala Lumpur DC to DEV Cyberjaya DC with a bend. Preview is real; apply is mocked so the
-// dev road shape of that segment is not replaced.
+// The line runs from DEV Kuala Lumpur DC to DEV Cyberjaya DC with a bend. The test never applies.
 function kmz(folder: string) {
   const path = "101.6869,3.139,0 101.70,3.03,0 101.65,2.9213,0";
   const kml = `<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><Folder>
@@ -364,33 +363,19 @@ function kmz(folder: string) {
 
 async function openKmzTree(page: Page) {
   await signIn(page, "admin1");
-  await page.getByLabel("Upload a KMZ file").setInputFiles(kmz("propose route"));
-  return page.getByRole("group", { name: "Folders" });
+  await page.getByRole("navigation", { name: "Main" }).getByRole("button", { name: "Upload" }).click();
+  await page.getByRole("button", { name: "Import KMZ" }).click();
+  const box = page.getByRole("dialog", { name: "KMZ import" });
+  await box.getByLabel("Upload a KMZ file").setInputFiles(kmz("propose route"));
+  return { box, tree: box.getByRole("group", { name: "Folders" }) };
 }
 
-// Old KMZ tab removed (Upload rework); its card flow has no entry point now. Cover Import KMZ in kmz-import.spec.ts.
-test.fixme("KMZ: preview lists the segment to draw, apply shows the count (apply mocked)", async ({ page }) => {
-  const tree = await openKmzTree(page);
-  await expect(tree.getByRole("checkbox", { name: /propose route/ })).toBeChecked();
-  await page.getByRole("button", { name: "Preview", exact: true }).click();
-  const preview = page.getByTestId("kmz-preview");
-  await expect(preview).toContainText("1 line in folder “propose route”");
-  const toDraw = preview.getByRole("table", { name: "Segments to draw" });
-  const row = toDraw.getByRole("row", { name: /DEV Kuala Lumpur DC - DEV Cyberjaya DC/ });
-  await expect(row).toBeVisible();
-  await page.screenshot({ path: "e2e/screenshots/upload-kmz-preview.png", fullPage: true });
-  await page.route("**/api/admin/kmz/uploads/*/apply", (route) => route.fulfill({ json: { upload_id: 1, shaped: 1 } }));
-  await preview.getByRole("button", { name: "Apply 1 route line" }).click();
-  await expect(page.getByTestId("kmz-result")).toContainText("1 segment line drawn on the map.");
-  await expect(preview).toHaveCount(0);
-});
-
-test.fixme("KMZ: folder tree ticks children, enables folders with any element and needs a tick to preview", async ({ page }) => {
-  const tree = await openKmzTree(page);
+test("KMZ: folder tree ticks children, enables folders with any element and needs a tick to preview", async ({ page }) => {
+  const { box, tree } = await openKmzTree(page);
   const parent = tree.getByRole("checkbox", { name: /Asbuilt Cable E2E/ });
   const exInfra = tree.getByRole("checkbox", { name: /ex infra/ });
   const proposeRoute = tree.getByRole("checkbox", { name: /propose route/ });
-  const previewButton = page.getByRole("button", { name: "Preview", exact: true });
+  const previewButton = box.getByRole("button", { name: "Continue" });
   await expect(tree.getByRole("checkbox", { name: /site/ })).toBeEnabled();
   await expect(parent).not.toBeChecked();
   await proposeRoute.uncheck();

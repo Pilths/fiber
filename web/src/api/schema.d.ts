@@ -871,6 +871,63 @@ export interface paths {
         patch: operations["patch_group_api_admin_kmz_groups__group_id__patch"];
         trace?: never;
     };
+    "/api/admin/kmz/segments/{segment_id}/routes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Segment Routes
+         * @description The segment's visible route lines. Remove and Undo are PATCH /groups/{id} with hidden true / false.
+         */
+        get: operations["segment_routes_api_admin_kmz_segments__segment_id__routes_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/kmz/uploads/{upload_id}/segments/{segment_id}/lines": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Segment Line Statuses
+         * @description Each staged line against this segment's stored routes. Saves nothing.
+         */
+        get: operations["segment_line_statuses_api_admin_kmz_uploads__upload_id__segments__segment_id__lines_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/kmz/groups/{group_id}/kmz": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Group Kmz */
+        get: operations["group_kmz_api_admin_kmz_groups__group_id__kmz_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/uploads": {
         parameters: {
             query?: never;
@@ -1833,6 +1890,11 @@ export interface components {
              * @default []
              */
             groups: components["schemas"]["KmzApplyGroup"][];
+            /**
+             * Per Segment
+             * @default false
+             */
+            per_segment: boolean;
             /** Route Lines */
             route_lines?: components["schemas"]["KmzApplyRouteLine"][] | null;
         };
@@ -2595,6 +2657,13 @@ export interface components {
             /** History */
             history: components["schemas"]["HistoryRow"][];
         };
+        /** SegmentLineStatusOut */
+        SegmentLineStatusOut: {
+            /** Lines */
+            lines: components["schemas"]["StagedLineStatus"][];
+            /** Stored */
+            stored: number[][][];
+        };
         /** SegmentListRow */
         SegmentListRow: {
             /** Id */
@@ -2717,6 +2786,24 @@ export interface components {
             history: components["schemas"]["MeasurementOut"][];
             /** Cores */
             cores: components["schemas"]["CoreLoss"][];
+        };
+        /** SegmentRouteOut */
+        SegmentRouteOut: {
+            /** Id */
+            id: number;
+            /** Folder */
+            folder: string;
+            /** Name */
+            name: string;
+            /** Distance Km */
+            distance_km: number;
+            /** File */
+            file: string;
+            /**
+             * Uploaded
+             * Format: date
+             */
+            uploaded: string;
         };
         /** SegmentSummary */
         SegmentSummary: {
@@ -2885,6 +2972,18 @@ export interface components {
             row_number: number | null;
             /** Reason */
             reason: string | null;
+        };
+        /** StagedLineStatus */
+        StagedLineStatus: {
+            /** Key */
+            key: string;
+            /** Distance Km */
+            distance_km: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "same" | "replaces route" | "new";
         };
         /** StagedOut */
         StagedOut: {
@@ -5146,6 +5245,110 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["KmzGroupListed"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    segment_routes_api_admin_kmz_segments__segment_id__routes_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-dev-user"?: string | null;
+            };
+            path: {
+                segment_id: number;
+            };
+            cookie?: {
+                fiber_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SegmentRouteOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    segment_line_statuses_api_admin_kmz_uploads__upload_id__segments__segment_id__lines_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-dev-user"?: string | null;
+            };
+            path: {
+                upload_id: number;
+                segment_id: number;
+            };
+            cookie?: {
+                fiber_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SegmentLineStatusOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    group_kmz_api_admin_kmz_groups__group_id__kmz_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-dev-user"?: string | null;
+            };
+            path: {
+                group_id: number;
+            };
+            cookie?: {
+                fiber_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

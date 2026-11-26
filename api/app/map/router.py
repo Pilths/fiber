@@ -40,7 +40,10 @@ def segment_kmz(db: DB, segment_id: int) -> Response:
     found = service.segment_kml(db, segment_id)
     if found is None:
         raise HTTPException(404, "Segment not found or has no coordinates")
-    name, kml = found
+    return kmz_response(*found)
+
+
+def kmz_response(name: str, kml: str) -> Response:
     # filename* carries any non-ASCII site name; the plain filename is the ASCII fallback
     ascii_name = name.encode("ascii", "replace").decode().replace('"', "")
     disposition = f'attachment; filename="{ascii_name}.kmz"; filename*=UTF-8\'\'{quote(name)}.kmz'

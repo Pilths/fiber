@@ -3,16 +3,18 @@ import io
 import math
 from typing import Annotated, Literal
 
-from datetime import datetime
+from datetime import date, datetime
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Query, Response, UploadFile
 from pydantic import BaseModel
 
 from app.auth.deps import DB, Admin, require_admin
-from app.ingest import kmz_edit, kmz_route_lines
+from app.ingest import kmz_edit, kmz_route_lines, kmz_segment_routes
 from app.ingest.kmz import DEFAULT_FOLDER, apply_upload, folder_tree, stage_preview
 from app.ingest.upload_file import read_upload
 from app.ingest.uploads import get_upload
+from app.map.router import kmz_response
+from app.map.service import group_kml
 from app.observability import logged_apply
 from app.reservations.schemas import Remarks
 
@@ -141,6 +143,26 @@ class KmzGroupListed(BaseModel):
     upload: KmzGroupUpload
 
 
+class SegmentRouteOut(BaseModel):
+    id: int  # the route group id
+    folder: str
+    name: str
+    distance_km: float
+    file: str
+    uploaded: date
+
+
+class StagedLineStatus(BaseModel):
+    key: str
+    distance_km: float
+    status: Literal["same", "replaces route", "new"]
+
+
+class SegmentLineStatusOut(BaseModel):
+    lines: list[StagedLineStatus]
+    stored: list[list[list[float]]]  # each stored route as [lon, lat] points, for the map
+
+
 class KmzClusterSiteIn(BaseModel):
     site_id: int
     remarks: Remarks = ""
@@ -168,6 +190,7 @@ class KmzApplyRouteLine(BaseModel):
 class KmzApplyIn(BaseModel):
     route_segment_ids: list[int] | None = None  # None = every previewed route line
     groups: list[KmzApplyGroup] = []  # groups not listed are skipped
+    per_segment: bool = False  # the per-segment box: 'same' lines are skipped, earlier routes hidden only if replaced
     route_lines: list[KmzApplyRouteLine] | None = None  # lines saved as drawn on their segment; replaces the title join
 
 
@@ -251,7 +274,7 @@ def apply(db: DB, admin: Admin, upload_id: int, body: KmzApplyIn | None = None) 
     choices = [group.model_dump() for group in body.groups]
     line_choices = [line.model_dump() for line in body.route_lines or []]
     with logged_apply("kmz", upload_id, admin.id):
-        result = apply_upload(db, admin.id, upload_id, body.route_segment_ids, choices, line_choices)
+        result = apply_upload(db, admin.id, upload_id, body.route_segment_ids, choices, line_choices, body.per_segment)
         return KmzApplyOut(upload_id=upload_id, **result)
 
 
@@ -308,3 +331,30 @@ def patch_group(db: DB, admin: Admin, group_id: int, body: KmzGroupPatch) -> Kmz
     group = kmz_edit.edit_group(db, admin.id, group_id, changes, body.remarks)
     db.commit()
     return KmzGroupListed(**group)
+
+
+@router.get("/segments/{segment_id}/routes")
+def segment_routes(db: DB, segment_id: int) -> list[SegmentRouteOut]:
+    """The segment's visible route lines. Remove and Undo are PATCH /groups/{id} with hidden true / false."""
+    rows = kmz_segment_routes.stored_routes(db, segment_id)
+    return [SegmentRouteOut(id=row["id"], folder=row["folder_path"], name=row["name"],
+                            distance_km=row["distance_km"], file=row["filename"], uploaded=row["uploaded"])
+            for row in rows]
+
+
+@router.get("/uploads/{upload_id}/segments/{segment_id}/lines")
+def segment_line_statuses(db: DB, upload_id: int, segment_id: int) -> SegmentLineStatusOut:
+    """Each staged line against this segment's stored routes. Saves nothing."""
+    upload = get_upload(db, upload_id, "kmz")
+    found = kmz_segment_routes.line_statuses(db, segment_id, upload["summary"].get("route_lines", []))
+    stored = [preview_coords(shape) for shape in kmz_segment_routes.stored_shapes(db, segment_id)]
+    return SegmentLineStatusOut(lines=found, stored=stored)
+
+
+@router.get("/groups/{group_id}/kmz", response_class=Response)
+def group_kmz(db: DB, group_id: int) -> Response:
+    found = group_kml(db, group_id)
+    if found is None:
+        raise HTTPException(404, "Route not found")
+    name, kml = found
+    return kmz_response(name, kml)

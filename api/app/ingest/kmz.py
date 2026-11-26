@@ -751,6 +751,7 @@ def apply_upload(
     route_segment_ids: list[int] | None = None,
     group_choices: list[dict] | None = None,
     route_line_choices: list[dict] | None = None,
+    per_segment: bool = False,
 ) -> dict:
     """Save the previewed route lines (all, or only `route_segment_ids`) and the groups the admin chose.
     Returns {"shaped": n, "groups_saved": n, "clusters_created": n}."""
@@ -776,7 +777,7 @@ def apply_upload(
         save_shape_logged(db, admin_id, upload_id, segment, item["coords"])
         saved += 1
     groups_saved, clusters_created = kmz_groups.save_groups(db, admin_id, upload_id, chosen_groups)
-    lines_saved = kmz_route_lines.save_route_lines(db, admin_id, upload_id, chosen_lines)
+    lines_saved = kmz_route_lines.save_route_lines(db, admin_id, upload_id, chosen_lines, per_segment)
     finish_upload(db, upload_id)
     db.commit()
     return {"shaped": saved, "groups_saved": groups_saved, "clusters_created": clusters_created,

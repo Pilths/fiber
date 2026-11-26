@@ -152,7 +152,7 @@ export function useKmzImport(uploadId: number, lines: RouteLine[]) {
       const routeLines = tickedLines.map((line) => ({ key: line.key, segment_id: assigned[line.key].segmentId }));
       const path = { upload_id: uploadId };
       return await api.post("/api/admin/kmz/uploads/{upload_id}/apply", {
-        path, body: { route_lines: routeLines, groups: [] },
+        path, body: { route_lines: routeLines, groups: [], per_segment: false },
       });
     } catch (caught) {
       setError(errorText(caught, "Apply failed. Nothing was changed. Try again."));
