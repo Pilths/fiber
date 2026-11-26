@@ -58,14 +58,13 @@ select.field { appearance: none; padding-right: 30px; cursor: pointer; backgroun
 .st-review { color: var(--amber); font-weight: 600; }
 .st-rej { color: var(--red); font-weight: 600; }
 .tbl { width: 100%; table-layout: fixed; border-collapse: collapse; }
-.tbl th, .tbl td { text-align: left; padding: 4px 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13px; }
-.tbl .l { text-align: left; }
-.tbl .r { text-align: right; }
+.tbl th, .tbl td { text-align: center; padding: 4px 12px; white-space: normal; overflow-wrap: anywhere; overflow: hidden; line-height: 1.3; font-size: 13px; }
+.tbl .l, .tbl .r { text-align: center; }
 .tbl thead th { font-size: 13px; font-weight: 500; color: var(--muted-ink); background: var(--subtle); height: 36px; border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 1; }
 .tbl td, .tbl tbody th { height: 40px; border-bottom: 1px solid var(--rule); }
 .tbl tbody th { font-weight: 600; }
 .tbox { border: 1px solid var(--border); border-radius: 6px; overflow: hidden; background: #fff; }
-.tbl .c { padding: 0 16px; }
+.tbl .c { padding: 0 4px; }
 .chev { width: 24px; height: 24px; border: 0; background: none; border-radius: 4px; display: inline-grid; place-items: center; cursor: pointer; vertical-align: middle; }
 .chev:hover { background: var(--raised); }
 .chev svg { width: 14px; height: 14px; fill: none; stroke: var(--ink); stroke-width: 1.8; transition: transform .12s; }
@@ -102,15 +101,13 @@ select.field { appearance: none; padding-right: 30px; cursor: pointer; backgroun
 .khead { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .khead b { font-weight: 600; font-size: 14px; color: var(--ink); }
 .lines { display: grid; }
-.lrow { display: grid; grid-template-columns: 120px minmax(0, 1fr) 90px 200px 130px 280px; align-items: center; gap: 16px; min-height: 40px; padding: 0 16px; font-size: 13px; border-bottom: 1px solid var(--rule); }
-.lrow > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.lrow > span:nth-child(3) { text-align: right; }
+.lrow { display: grid; grid-template-columns: 110px minmax(0, 1fr) 80px minmax(0, 190px) 120px 260px; align-items: center; gap: 12px; text-align: center; min-height: 40px; padding: 0 16px; font-size: 13px; border-bottom: 1px solid var(--rule); }
+.lrow > span { overflow-wrap: anywhere; line-height: 1.3; padding: 4px 0; }
 .lrow.head { min-height: 36px; color: var(--muted-ink); font-weight: 500; background: var(--subtle); border-bottom-color: var(--border); }
 .lrow.item.removing { background: var(--amber-bg); }
 .lrow.item.removed .t { text-decoration: line-through; }
-.lrow .acts { display: flex; gap: 16px; justify-content: flex-end; align-items: center; }
-.lrow .acts .warn { margin-right: auto; }
-.kempty { padding: 0 16px; }
+.lrow .acts { display: flex; gap: 16px; justify-content: center; align-items: center; }
+.kempty { padding: 0 16px; text-align: center; }
 
 /* Boxes */
 .dim { position: fixed; inset: 0; background: rgb(10 10 10 / .45); z-index: 10; }
@@ -129,11 +126,10 @@ select.field { appearance: none; padding-right: 30px; cursor: pointer; backgroun
 .drop { border: 1px dashed var(--line); background: var(--subtle); border-radius: 6px; padding: 16px; display: flex; align-items: center; gap: 16px; font-size: 13px; }
 .segname { font-size: 16px; font-weight: 600; }
 .flist { border: 1px solid var(--border); border-radius: 6px; }
-.frow { display: grid; grid-template-columns: 16px minmax(0, 1fr) 100px 80px 120px; align-items: center; gap: 16px; height: 40px; padding: 0 16px; font-size: 13px; border-bottom: 1px solid var(--rule); cursor: pointer; }
+.frow { display: grid; grid-template-columns: 16px minmax(0, 1fr) 100px 80px 120px; align-items: center; gap: 12px; min-height: 40px; text-align: center; padding: 0 16px; font-size: 13px; border-bottom: 1px solid var(--rule); cursor: pointer; }
 .frow:last-child { border-bottom: 0; }
-.frow.head { height: 36px; font-size: 13px; color: var(--muted-ink); background: var(--subtle); cursor: default; font-weight: 500; }
-.frow > span:nth-child(4) { text-align: right; }
-.frow > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.frow.head { min-height: 36px; font-size: 13px; color: var(--muted-ink); background: var(--subtle); cursor: default; font-weight: 500; }
+.frow > span { overflow-wrap: anywhere; line-height: 1.3; padding: 4px 0; }
 .frow.on { background: var(--blue-bg); }
 .chips { display: flex; gap: 8px; flex-wrap: wrap; }
 .pscroll { max-height: 440px; overflow: auto; border: 1px solid var(--border); border-radius: 6px; }
@@ -157,7 +153,7 @@ select.field { appearance: none; padding-right: 30px; cursor: pointer; backgroun
 
 <nav class="proto" aria-label="Prototype views">
   <b>Prototype</b>
-  <a href="#segments">Segments</a><a href="#filtered">Filtered</a><a href="#upload-line">Upload KMZ line</a><a href="#edit">Edit segment</a>
+  <a href="#segments">Segments</a><a href="#filtered">Filtered</a><a href="#upload-route">Upload KMZ route</a><a href="#edit">Edit segment</a>
   <a href="#xlsx">segments.xlsx preview</a><a href="#add-segment">Add segment</a><a href="#sites">Sites</a><a href="#add-site">Add site</a><a href="#reservations">Reservations</a>
 </nav>
 
@@ -371,7 +367,7 @@ function renderSegments() {
       <select class="field" style="width:200px" id="seg-site" aria-label="Site">${siteOptions(filter.site, "All sites")}</select>
       ${filter.site ? '<button class="btn btn-sm" type="button" data-open="add-segment">Add segment</button>' : ""}
       <select class="field" style="width:140px" id="seg-route" aria-label="Route"><option value="">All routes</option>${routes.map((route) => `<option ${route === filter.route ? "selected" : ""}>${route}</option>`).join("")}</select></div>
-      <div class="grp"><button class="chip" type="button" id="chip-noline" aria-pressed="${filter.noLine}">No line only</button>
+      <div class="grp"><button class="chip" type="button" id="chip-noline" aria-pressed="${filter.noLine}">No route only</button>
       <button class="chip" type="button" id="chip-notver" aria-pressed="${filter.notRegistered}">Not registered only</button></div>
       <span class="count" id="seg-count"></span>
     </div>
@@ -380,7 +376,7 @@ function renderSegments() {
         <colgroup><col style="width:56px"><col><col style="width:110px"><col style="width:90px"><col style="width:110px"><col style="width:90px">
           <col style="width:150px"><col style="width:120px"><col style="width:100px"><col style="width:80px"></colgroup>
         <thead><tr><th class="c" aria-label="Open"></th><th>Segment</th><th>Type</th><th>Route</th><th>Cluster</th><th class="r">km</th>
-          <th class="r">Registered cores</th><th class="r">Total cores</th><th class="r">Lines</th><th></th></tr></thead>
+          <th class="r">Registered cores</th><th class="r">Total cores</th><th class="r">KMZ routes</th><th></th></tr></thead>
         <tbody id="seg-body"></tbody>
       </table>
     </div>
@@ -392,7 +388,7 @@ function lineRowHtml(segment, line) {
   let cls = "lrow item";
   if (line.state === "removing") {
     cls += " removing";
-    acts = `<span>Remove line?</span><button class="btn btn-sm" type="button" data-confirm-remove="${line.id}">Remove</button>
+    acts = `<span>Remove route?</span><button class="btn btn-sm" type="button" data-confirm-remove="${line.id}">Remove</button>
       <button class="link" type="button" data-cancel-remove="${line.id}">Cancel</button>`;
   } else if (line.state === "removed") {
     cls += " removed";
@@ -403,10 +399,10 @@ function lineRowHtml(segment, line) {
 }
 function expandedHtml(segment) {
   const lines = activeLines(segment);
-  const head = '<div class="lrow head"><span>Folder</span><span>Line</span><span>km</span><span>File</span><span>Uploaded</span><span></span></div>';
-  const body = lines.length ? `<div class="lines">${head}${lines.map((line) => lineRowHtml(segment, line)).join("")}</div>` : '<div class="kempty">No line</div>';
-  return `<tr class="xrow"><td colspan="10"><div class="kcard"><div class="khead"><b>KMZ lines</b>
-    <button class="btn btn-sm" type="button" data-upline="${segment.id}">Upload KMZ line</button></div>${body}</div></td></tr>`;
+  const head = '<div class="lrow head"><span>Folder</span><span>Name</span><span>km</span><span>File</span><span>Uploaded</span><span></span></div>';
+  const body = lines.length ? `<div class="lines">${head}${lines.map((line) => lineRowHtml(segment, line)).join("")}</div>` : '<div class="kempty">No route</div>';
+  return `<tr class="xrow"><td colspan="10"><div class="kcard"><div class="khead"><b>KMZ routes</b>
+    <button class="btn btn-sm" type="button" data-upline="${segment.id}">Upload KMZ route</button></div>${body}</div></td></tr>`;
 }
 function renderSegmentRows() {
   const rows = filteredSegments();
@@ -418,7 +414,7 @@ function renderSegmentRows() {
     const isOpen = state.open.has(segment.id);
     const count = liveLines(segment).length;
     const verified = segment.verified === null ? '<span class="warn">not registered</span>' : segment.verified;
-    const lines = count === 0 ? '<span class="warn">no line</span>' : count;
+    const lines = count === 0 ? '<span class="warn">no route</span>' : count;
     const row = `<tr class="srow${isOpen ? " open" : ""}"><td class="c"><button class="chev" type="button" aria-expanded="${isOpen}" aria-label="Open or close ${segment.link}" data-chev="${segment.id}">${CHEV}</button></td>
       <th scope="row" title="${segment.link}">${segment.link}</th><td>${routeType(segment.a, segment.b)}</td><td>${segment.route}</td><td>${segment.section}</td>
       <td class="r">${segment.km.toFixed(1)}</td><td class="r">${verified}</td><td class="r">${segment.total}</td><td class="r">${lines}</td>
@@ -523,18 +519,18 @@ function uploadLineBox(modal) {
   if (file) {
     const rows = fileLines(segment).map((line) => {
       const on = modal.picked.has(line.key);
-      const note = on && hasLine ? '<span class="warn">replaces line</span>' : "<span></span>";
+      const note = on && hasLine ? '<span class="warn">replaces route</span>' : "<span></span>";
       return `<label class="frow${on ? " on" : ""}"><input type="checkbox" data-fpick="${line.key}" ${on ? "checked" : ""} aria-label="Pick ${line.title}">
         <span title="${line.title}">${line.title}</span><span>${line.folder}</span><span>${line.km.toFixed(1)} km</span>${note}</label>`;
     }).join("");
-    list = `<div class="flist"><div class="frow head"><span></span><span>Line</span><span>Folder</span><span>km</span><span></span></div>${rows}</div>`;
+    list = `<div class="flist"><div class="frow head"><span></span><span>Name</span><span>Folder</span><span>km</span><span></span></div>${rows}</div>`;
   }
   const size = modal.picked.size;
   const body = `<div class="segname">${segment.link}</div>
     <div class="drop"><button class="btn ${file ? "" : "btn-p"}" type="button" id="up-choose">Choose .kmz file</button><span>${file ?? "No file"}</span></div>${list}`;
   const foot = `<span class="count"></span><button class="btn" type="button" data-close>Cancel</button>
-    <button class="btn btn-p" type="button" id="up-add" ${size === 0 ? "disabled" : ""}>Add ${plural(size, "line")}</button>`;
-  return boxShell(640, "Upload KMZ line", body, foot);
+    <button class="btn btn-p" type="button" id="up-add" ${size === 0 ? "disabled" : ""}>Add ${plural(size, "route")}</button>`;
+  return boxShell(640, "Upload KMZ route", body, foot);
 }
 function editBox(modal) {
   const segment = segById(modal.seg);
@@ -647,7 +643,7 @@ function renderModal() {
     $("#modal").innerHTML = "";
     return;
   }
-  const builders = { "upload-line": uploadLineBox, edit: editBox, "add-segment": addSegmentBox, site: siteBox, "import-kmz": importKmzBox, xlsx: xlsxBox };
+  const builders = { "upload-route": uploadLineBox, edit: editBox, "add-segment": addSegmentBox, site: siteBox, "import-kmz": importKmzBox, xlsx: xlsxBox };
   $("#modal").innerHTML = builders[modal.type](modal);
 }
 
@@ -756,7 +752,7 @@ document.addEventListener("click", (event) => {
     const { segment } = lineById(data.export);
     toast(`Exported ${segment.link}.kmz`);
   } else if (data.upline) {
-    state.modal = { type: "upload-line", seg: +data.upline, file: null, picked: new Set() };
+    state.modal = { type: "upload-route", seg: +data.upline, file: null, picked: new Set() };
     renderModal();
   } else if (target.id === "up-choose") {
     state.modal.file = "completed-nov.kmz";
@@ -772,7 +768,7 @@ document.addEventListener("click", (event) => {
     }
     state.open.add(segment.id);
     state.modal = null;
-    toast(`Added ${plural(picked.length, "line")} to ${segment.link}`);
+    toast(`Added ${plural(picked.length, "route")} to ${segment.link}`);
     render();
   } else if (data.edit) {
     state.modal = { type: "edit", seg: +data.edit };
@@ -931,8 +927,8 @@ function applyHash() {
     state.open = new Set();
     state.seg.site = "Cyberjaya DC";
     state.seg.noLine = true;
-  } else if (hash === "upload-line") {
-    state.modal = { type: "upload-line", seg: 1, file: "completed-nov.kmz", picked: new Set(["f0"]) };
+  } else if (hash === "upload-route") {
+    state.modal = { type: "upload-route", seg: 1, file: "completed-nov.kmz", picked: new Set(["f0"]) };
   } else if (hash === "edit") {
     state.modal = { type: "edit", seg: 1 };
   } else if (hash === "xlsx") {
