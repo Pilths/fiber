@@ -139,7 +139,7 @@ select.field { appearance: none; padding-right: 30px; cursor: pointer; backgroun
 .drop { border: 1px dashed var(--line); background: var(--subtle); border-radius: 6px; padding: 16px; display: flex; align-items: center; gap: 16px; font-size: 13px; }
 .segname { font-size: 16px; font-weight: 500; }
 .flist { border: 1px solid var(--border); border-radius: 6px; }
-.frow { display: grid; grid-template-columns: 16px minmax(0, 1fr) 100px 80px 120px; align-items: center; gap: 12px; min-height: 40px; text-align: center; padding: 0 16px; font-size: 14px; border-bottom: 1px solid var(--rule); cursor: pointer; }
+.frow { display: grid; grid-template-columns: 16px minmax(0, 1fr) 90px 70px 120px; align-items: center; gap: 12px; min-height: 40px; text-align: center; padding: 0 16px; font-size: 14px; border-bottom: 1px solid var(--rule); cursor: pointer; }
 .frow:last-child { border-bottom: 0; }
 .frow.head { min-height: 36px; font-size: 12px; color: var(--muted-ink); background: var(--subtle); cursor: default; font-weight: 500; }
 .frow > span { overflow-wrap: anywhere; line-height: 1.3; padding: 4px 0; }
@@ -147,6 +147,31 @@ select.field { appearance: none; padding-right: 30px; cursor: pointer; backgroun
 .chips { display: flex; gap: 8px; flex-wrap: wrap; }
 .pscroll { max-height: 440px; overflow: auto; border: 1px solid var(--border); border-radius: 6px; }
 .toast { position: fixed; right: 24px; bottom: 24px; background: var(--ink); color: #fff; padding: 12px 16px; border-radius: 6px; font-size: 13px; z-index: 20; }
+
+/* Menu, options, map, history */
+.menu { position: relative; display: inline-block; }
+.menu-list { position: absolute; right: 0; top: 100%; margin-top: 4px; background: #fff; border: 1px solid var(--border); border-radius: 6px; min-width: 170px; z-index: 5; padding: 4px; display: grid; }
+.menu-list button { height: 36px; border: 0; background: none; border-radius: 4px; cursor: pointer; font-weight: 500; }
+.menu-list button:hover { background: var(--raised); }
+.opt { display: flex; align-items: center; gap: 8px; min-height: 36px; cursor: pointer; }
+.opt input { width: 16px; height: 16px; accent-color: var(--blue); margin: 0; }
+.upgrid { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 24px; align-items: start; }
+.upleft { display: grid; gap: 16px; min-width: 0; }
+.mapbox { border: 1px solid var(--border); border-radius: 6px; background: var(--map-bg); }
+.mapbox svg { display: block; width: 360px; height: 300px; }
+.mapbox .key { display: flex; justify-content: center; gap: 24px; padding: 8px 0; border-top: 1px solid var(--border); background: #fff; border-radius: 0 0 6px 6px; font-size: 13px; }
+.mapbox .key span { display: inline-flex; align-items: center; gap: 8px; }
+.mapbox .key svg { width: 28px; height: 10px; }
+.rt { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.rt-stored { stroke: var(--ink); stroke-width: 1.5; }
+.rt-new { stroke: var(--blue); stroke-width: 1.5; stroke-dasharray: 6 4; }
+.rt.hl { stroke-width: 4; }
+.hist summary { list-style: none; display: flex; align-items: center; gap: 8px; cursor: pointer; font-weight: 600; height: 32px; }
+.hist summary::-webkit-details-marker { display: none; }
+.hist summary svg { width: 14px; height: 14px; fill: none; stroke: var(--ink); stroke-width: 1.8; transition: transform .12s; }
+.hist[open] summary svg { transform: rotate(90deg); }
+.hist .tbl th, .hist .tbl td { padding: 4px 4px; }
+.hist .tbox { margin-top: 8px; }
 
 /* Reservations */
 .card { background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 24px; display: grid; gap: 16px; max-width: 880px; }
@@ -166,7 +191,7 @@ select.field { appearance: none; padding-right: 30px; cursor: pointer; backgroun
 
 <nav class="proto" aria-label="Prototype views">
   <b>Prototype</b>
-  <a href="#segments">Segments</a><a href="#filtered">Filtered</a><a href="#upload-route">Upload KMZ route</a><a href="#edit">Edit segment</a>
+  <a href="#segments">Segments</a><a href="#filtered">Filtered</a><a href="#upload-route">Upload KMZ route</a><a href="#edit">Edit segment</a><a href="#history">History</a><a href="#download-kmz">Download KMZ</a>
   <a href="#xlsx">segments.xlsx preview</a><a href="#add-segment">Add segment</a><a href="#sites">Sites</a><a href="#add-site">Add site</a><a href="#reservations">Reservations</a>
 </nav>
 
@@ -193,6 +218,7 @@ select.field { appearance: none; padding-right: 30px; cursor: pointer; backgroun
 <script>
 const $ = (selector) => document.querySelector(selector);
 const CHEV = '<svg viewBox="0 0 16 16"><path d="M6 3.5L10.5 8 6 12.5"/></svg>';
+const CHEVDOWN = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6l4 4 4-4"/></svg>';
 const XICON = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 3l10 10M13 3L3 13"/></svg>';
 const plural = (count, word) => count + " " + word + (count === 1 ? "" : "s");
 const PAGE_SIZE = 50;
@@ -294,6 +320,7 @@ const state = {
   sites: { search: "", kind: "", page: 0 },
   open: new Set(),
   modal: null,
+  menu: false,
   reservationClosed: false,
 };
 
@@ -313,7 +340,8 @@ function render() {
   });
   if (state.tab === "segments") {
     $("#bulk").innerHTML = `<button class="btn btn-sm" type="button" data-open="import-kmz">Import KMZ</button>
-      <button class="btn btn-sm" type="button" data-act="download-seg">Download</button>
+      <span class="menu"><button class="btn btn-sm" type="button" data-menu="1" aria-haspopup="menu" aria-expanded="${state.menu}">Download ${CHEVDOWN}</button>
+      ${state.menu ? '<div class="menu-list" role="menu"><button type="button" role="menuitem" data-act="download-seg">segments.xlsx</button><button type="button" role="menuitem" data-open="dl-kmz">KMZ routes</button></div>' : ""}</span>
       <button class="btn btn-sm btn-p" type="button" data-open="xlsx-seg">Upload</button>`;
     renderSegments();
   } else if (state.tab === "sites") {
@@ -522,32 +550,74 @@ function boxShell(width, title, body, foot, labelId = "box-title") {
     <div class="bb">${body}</div><div class="bf">${foot}</div></div>`;
 }
 function fileLines(segment) {
-  const others = SEGMENTS.slice(8, 13);
-  const list = [{ key: "f0", title: segment.link, folder: "Completed", km: +(segment.km * 1.03).toFixed(1) }];
-  others.forEach((other, index) => list.push({ key: "f" + (index + 1), title: other.link, folder: "Completed", km: +(other.km * 1.02).toFixed(1) }));
-  list.push({ key: "f9", title: "Untitled Path", folder: "Completed", km: 6.9 });
-  return list;
+  return [
+    { key: "f0", title: segment.link, folder: "Completed", km: +(segment.km * 1.03).toFixed(1), status: "same" },
+    { key: "f1", title: segment.link, folder: "Phase 2", km: +(segment.km * 1.05).toFixed(1), status: "replaces route" },
+    { key: "f2", title: "Path 12", folder: "Phase 2", km: 6.9, status: "new" },
+  ];
+}
+const ROUTE_PTS = {
+  stored: "50,220 100,205 140,160 190,150 235,105 275,85 310,70",
+  f0: "50,220 100,205 140,160 190,150 235,105 275,85 310,70",
+  f1: "50,220 95,235 150,215 200,180 240,140 280,100 310,70",
+  f2: "50,220 80,170 130,120 190,95 250,60 310,70",
+};
+function mapSvg(modal, segment, lines) {
+  const stored = liveLines(segment).length > 0 ? `<polyline class="rt rt-stored" data-rt="stored" points="${ROUTE_PTS.stored}"/>` : "";
+  const fresh = lines.filter((line) => modal.picked.has(line.key) && line.status !== "same")
+    .map((line) => `<polyline class="rt rt-new" data-rt="${line.key}" points="${ROUTE_PTS[line.key]}"/>`).join("");
+  const hover = lines.filter((line) => !modal.picked.has(line.key) || line.status === "same")
+    .map((line) => `<polyline class="rt rt-new" data-rt="${line.key}" points="${ROUTE_PTS[line.key]}" opacity="0"/>`).join("");
+  const dots = `<circle cx="50" cy="220" r="6" fill="var(--ink)"/><circle cx="310" cy="70" r="6" fill="var(--ink)"/>
+    <text x="50" y="250" text-anchor="start" font-size="13" fill="var(--ink)">${segment.a}</text><text x="310" y="50" text-anchor="end" font-size="13" fill="var(--ink)">${segment.b}</text>`;
+  const key = `<div class="key"><span><svg viewBox="0 0 28 10"><line x1="0" y1="5" x2="28" y2="5" stroke="var(--ink)" stroke-width="1.5"/></svg>Stored</span>
+    <span><svg viewBox="0 0 28 10"><line x1="0" y1="5" x2="28" y2="5" stroke="var(--blue)" stroke-width="1.5" stroke-dasharray="6 4"/></svg>New</span>
+    <span><svg viewBox="0 0 28 10"><circle cx="14" cy="5" r="4" fill="var(--ink)"/></svg>Site</span></div>`;
+  return `<div class="mapbox"><svg viewBox="0 0 360 300" role="img" aria-label="Route map">${stored}${hover}${fresh}${dots}</svg>${key}</div>`;
 }
 function uploadLineBox(modal) {
   const segment = segById(modal.seg);
-  const hasLine = liveLines(segment).length > 0;
   const file = modal.file;
+  const lines = fileLines(segment);
   let list = "";
   if (file) {
-    const rows = fileLines(segment).map((line) => {
+    const rows = lines.map((line) => {
       const on = modal.picked.has(line.key);
-      const note = on && hasLine ? '<span class="warn">replaces route</span>' : "<span></span>";
-      return `<label class="frow${on ? " on" : ""}"><input type="checkbox" data-fpick="${line.key}" ${on ? "checked" : ""} aria-label="Pick ${line.title}">
-        <span title="${line.title}">${line.title}</span><span>${line.folder}</span><span>${line.km.toFixed(1)} km</span>${note}</label>`;
+      const cls = line.status === "new" ? "st-new" : line.status === "same" ? "st-same" : "warn";
+      return `<label class="frow${on ? " on" : ""}" data-row="${line.key}"><input type="checkbox" data-fpick="${line.key}" ${on ? "checked" : ""} aria-label="Pick ${line.title}">
+        <span title="${line.title}">${line.title}</span><span>${line.folder}</span><span>${line.km.toFixed(1)} km</span><span class="${cls}">${line.status}</span></label>`;
     }).join("");
-    list = `<div class="flist"><div class="frow head"><span></span><span>Name</span><span>Folder</span><span>km</span><span></span></div>${rows}</div>`;
+    list = `<div class="flist"><div class="frow head"><span></span><span>Name</span><span>Folder</span><span>km</span><span>Status</span></div>${rows}</div>`;
   }
   const size = modal.picked.size;
-  const body = `<div class="segname">${segment.link}</div>
-    <div class="drop"><button class="btn ${file ? "" : "btn-p"}" type="button" id="up-choose">Choose .kmz file</button><span>${file ?? "No file"}</span></div>${list}`;
+  const body = `<div class="upgrid"><div class="upleft"><div class="segname">${segment.link}</div>
+    <div class="drop"><button class="btn ${file ? "" : "btn-p"}" type="button" id="up-choose">Choose .kmz file</button><span>${file ?? "No file"}</span></div>${list}</div>
+    ${mapSvg(modal, segment, lines)}</div>`;
   const foot = `<span class="count"></span><button class="btn" type="button" data-close>Cancel</button>
     <button class="btn btn-p" type="button" id="up-add" ${size === 0 ? "disabled" : ""}>Add ${plural(size, "route")}</button>`;
-  return boxShell(640, "Upload KMZ route", body, foot);
+  return boxShell(1000, "Upload KMZ route", body, foot);
+}
+const HISTORY = {
+  segment: [["12 Nov 2026", "km", "12.0", "12.4", "admin1", "-"], ["05 Nov 2026", "Registered cores", "-", "48", "upload: segments.xlsx", "-"],
+    ["28 Oct 2026", "Route", "R2", "R1", "admin1", "Renamed"], ["14 Oct 2026", "Total cores", "96", "144", "planner2", "-"]],
+  site: [["19 Nov 2026", "Lat", "3.00110", "3.00210", "admin1", "-"], ["05 Nov 2026", "Type", "Site", "Building", "upload: sites.xlsx", "-"],
+    ["28 Oct 2026", "Name", "Klang", "Klang Hut", "admin1", "Fixed name"]],
+};
+function historyHtml(kind, open) {
+  const rows = HISTORY[kind];
+  return `<details class="hist wide" ${open ? "open" : ""}><summary>${CHEV}History (${rows.length})</summary>
+    <div class="tbox"><table class="tbl" aria-label="History">
+      <colgroup><col style="width:120px"><col style="width:140px"><col style="width:60px"><col style="width:60px"><col style="width:190px"><col></colgroup>
+      <thead><tr><th>Date</th><th>Field</th><th>From</th><th>To</th><th>By</th><th>Remarks</th></tr></thead>
+      <tbody>${rows.map((row) => `<tr>${row.map((cell) => `<td>${cell}</td>`).join("")}</tr>`).join("")}</tbody></table></div></details>`;
+}
+function downloadKmzBox(modal) {
+  const total = SEGMENTS.length;
+  const shown = filteredSegments().length;
+  const body = `<div class="opt-grp"><label class="opt"><input type="radio" name="dl" data-dl="all" ${modal.choice === "all" ? "checked" : ""}>All segments (${total})</label>
+    <label class="opt"><input type="radio" name="dl" data-dl="filtered" ${modal.choice === "filtered" ? "checked" : ""}>Filtered (${shown})</label></div>`;
+  const foot = '<span class="count"></span><button class="btn" type="button" data-close>Cancel</button><button class="btn btn-p" type="button" id="dl-go">Download</button>';
+  return boxShell(480, "Download KMZ routes", body, foot);
 }
 function editBox(modal) {
   const segment = segById(modal.seg);
@@ -561,8 +631,9 @@ function editBox(modal) {
       <label>Total cores<input class="field" id="ed-total" value="${segment.total}" inputmode="numeric"></label>
       <label class="wide">Remarks<textarea class="field" id="ed-remarks"></textarea></label>
       <p class="err wide" id="ed-err" role="alert"></p>
+      ${historyHtml("segment", modal.hist)}
     </div>`;
-  return boxShell(560, "Edit segment", body, '<span class="count"></span><button class="btn" type="button" data-close>Cancel</button><button class="btn btn-p" type="button" id="ed-save">Save</button>');
+  return boxShell(720, "Edit segment", body, '<span class="count"></span><button class="btn" type="button" data-close>Cancel</button><button class="btn btn-p" type="button" id="ed-save">Save</button>');
 }
 function addSegmentBox(modal) {
   const body = `<div class="form">
@@ -582,9 +653,10 @@ function siteBox(modal) {
     <span></span>
     <label>Lat<input class="field" id="si-lat" value="${site.lat}" inputmode="decimal"></label>
     <label>Long<input class="field" id="si-long" value="${site.long}" inputmode="decimal"></label>
-    <p class="err wide" id="si-err" role="alert">${modal.err ?? ""}</p></div>`;
+    <p class="err wide" id="si-err" role="alert">${modal.err ?? ""}</p>
+    ${modal.edit ? historyHtml("site", modal.hist) : ""}</div>`;
   const label = modal.edit ? "Save" : "Add site";
-  return boxShell(560, modal.edit ? "Edit site" : "Add site", body, `<span class="count"></span><button class="btn" type="button" data-close>Cancel</button><button class="btn btn-p" type="button" id="si-save">${label}</button>`);
+  return boxShell(modal.edit ? 720 : 560, modal.edit ? "Edit site" : "Add site", body, `<span class="count"></span><button class="btn" type="button" data-close>Cancel</button><button class="btn btn-p" type="button" id="si-save">${label}</button>`);
 }
 function importKmzBox() {
   const body = `<p><a class="link" href="../kmz-import-v3/index.html" target="_blank" rel="noopener">Open KMZ import</a></p>`;
@@ -660,7 +732,7 @@ function renderModal() {
     $("#modal").innerHTML = "";
     return;
   }
-  const builders = { "upload-route": uploadLineBox, edit: editBox, "add-segment": addSegmentBox, site: siteBox, "import-kmz": importKmzBox, xlsx: xlsxBox };
+  const builders = { "upload-route": uploadLineBox, edit: editBox, "add-segment": addSegmentBox, site: siteBox, "import-kmz": importKmzBox, xlsx: xlsxBox, "dl-kmz": downloadKmzBox };
   $("#modal").innerHTML = builders[modal.type](modal);
 }
 
@@ -691,6 +763,8 @@ document.addEventListener("change", (event) => {
     state.sites.kind = event.target.value;
     state.sites.page = 0;
     renderSiteRows();
+  } else if (event.target.dataset.dl) {
+    state.modal.choice = event.target.dataset.dl;
   } else if (event.target.dataset.fpick) {
     const key = event.target.dataset.fpick;
     if (state.modal.picked.has(key)) {
@@ -705,6 +779,15 @@ document.addEventListener("change", (event) => {
 const removeTimers = {};
 document.addEventListener("click", (event) => {
   const target = event.target.closest("button, [data-close]");
+  if (state.menu && !(target && target.dataset.menu)) {
+    state.menu = false;
+    if (state.tab === "segments") {
+      render();
+    }
+    if (!target || !(target.dataset.open || target.dataset.act)) {
+      return;
+    }
+  }
   if (!target) {
     return;
   }
@@ -714,7 +797,17 @@ document.addEventListener("click", (event) => {
     renderModal();
     return;
   }
-  if (target.id === "chip-noline") {
+  if (data.menu) {
+    state.menu = true;
+    render();
+  } else if (data.open === "dl-kmz") {
+    state.modal = { type: "dl-kmz", choice: filteredSegments().length < SEGMENTS.length ? "filtered" : "all" };
+    renderModal();
+  } else if (target.id === "dl-go") {
+    state.modal = null;
+    renderModal();
+    toast("routes.kmz");
+  } else if (target.id === "chip-noline") {
     state.seg.noLine = !state.seg.noLine;
     state.seg.page = 0;
     target.setAttribute("aria-pressed", state.seg.noLine);
@@ -773,7 +866,7 @@ document.addEventListener("click", (event) => {
     renderModal();
   } else if (target.id === "up-choose") {
     state.modal.file = "completed-nov.kmz";
-    state.modal.picked = new Set(["f0"]);
+    state.modal.picked = new Set(["f1"]);
     renderModal();
   } else if (target.id === "up-add") {
     const segment = segById(state.modal.seg);
@@ -844,6 +937,18 @@ document.addEventListener("click", (event) => {
     renderReservations();
   }
 });
+function highlight(event, on) {
+  const row = event.target.closest && event.target.closest("[data-row]");
+  const path = row && document.querySelector(`[data-rt="${row.dataset.row}"]`);
+  if (path) {
+    path.classList.toggle("hl", on);
+    if (path.getAttribute("opacity")) {
+      path.setAttribute("opacity", on ? "1" : "0");
+    }
+  }
+}
+document.addEventListener("mouseover", (event) => highlight(event, true));
+document.addEventListener("mouseout", (event) => highlight(event, false));
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && state.modal) {
     state.modal = null;
@@ -936,6 +1041,7 @@ function applyHash() {
   const hash = location.hash.slice(1) || "segments";
   document.querySelectorAll(".proto a").forEach((link) => link.classList.toggle("on", link.getAttribute("href") === "#" + hash));
   state.modal = null;
+  state.menu = false;
   state.seg = { search: "", site: "", route: "", noLine: false, notRegistered: false, page: 0 };
   state.sites = { search: "", kind: "", page: 0 };
   state.open = new Set([1]);
@@ -945,9 +1051,15 @@ function applyHash() {
     state.seg.site = "Cyberjaya DC";
     state.seg.noLine = true;
   } else if (hash === "upload-route") {
-    state.modal = { type: "upload-route", seg: 1, file: "completed-nov.kmz", picked: new Set(["f0"]) };
+    state.modal = { type: "upload-route", seg: 1, file: "completed-nov.kmz", picked: new Set(["f1"]) };
   } else if (hash === "edit") {
     state.modal = { type: "edit", seg: 1 };
+  } else if (hash === "history") {
+    state.modal = { type: "edit", seg: 1, hist: true };
+  } else if (hash === "download-kmz") {
+    state.open = new Set();
+    state.seg.site = "Cyberjaya DC";
+    state.modal = { type: "dl-kmz", choice: "filtered" };
   } else if (hash === "xlsx") {
     state.modal = { type: "xlsx", kind: "seg", filter: "all" };
   } else if (hash === "add-segment") {
