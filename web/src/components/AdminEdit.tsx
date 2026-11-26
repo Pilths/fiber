@@ -5,6 +5,7 @@ import { MapElements } from "@/components/MapElements";
 import { PastePortsDialog } from "@/components/PastePortsDialog";
 import { Dialog } from "@/components/upload-parts";
 import { formatDateTime } from "@/lib/format";
+import { SITE_KINDS } from "@/lib/useSiteList";
 import { type SegmentFocus, type Site, useEditSegment, useEditSite } from "@/lib/useAdminEdit";
 import { ignoreFailure } from "@/lib/utils";
 
@@ -15,8 +16,8 @@ type Row = components["schemas"]["HistoryRow"];
 const REGIONS = ["Central", "East Coast", "North", "South"];
 const FIELD: Record<string, string> = {
   distance_km: "Distance (km)", route_type: "Route type", region: "Region", site_a_id: "Site A (id)",
-  site_b_id: "Site B (id)", survey_cores: "Verified cores", cable_size: "Total cores", fiber_cut: "Fiber cut",
-  name: "Name", location: "Location", active: "Active", status: "Status",
+  site_b_id: "Site B (id)", survey_cores: "Registered cores", cable_size: "Total cores", fiber_cut: "Fiber cut",
+  route: "Route", section: "Cluster", kind: "Type", name: "Name", location: "Location", active: "Active", status: "Status",
 };
 const lbl = "lbl mb-1 block text-body! text-foreground!";
 
@@ -146,7 +147,7 @@ export function EditSegmentDialog({ segmentId, focus, onClose, onSaved }: Segmen
             <RegionSelect value={form.region} onChange={setField("region")} hasRegion={!!segment.region} />
             <SitePicker label="Site A" site={siteA} onPick={setSiteA} />
             <SitePicker label="Site B" site={siteB} onPick={setSiteB} />
-            <label><span className={lbl}>Verified cores</span>
+            <label><span className={lbl}>Registered cores</span>
               <span className="flex gap-2">
                 <input ref={surveyInput} className="field" type="number" min="0" step="1" value={form.survey}
                   onChange={setField("survey")} placeholder="Not verified" />
@@ -159,12 +160,22 @@ export function EditSegmentDialog({ segmentId, focus, onClose, onSaved }: Segmen
               <span className={lbl}>Total cores</span>
               <input className="field" type="number" min="1" step="1" value={form.cable} onChange={setField("cable")} />
             </label>
+            <label>
+              <span className={lbl}>Route</span>
+              <input className="field" value={form.route} onChange={setField("route")} />
+            </label>
+            <label>
+              <span className={lbl}>Cluster</span>
+              <input className="field" value={form.section} onChange={setField("section")} />
+            </label>
             <label className="col-span-2 flex items-start gap-2 text-body">
               <input type="checkbox" className="mt-0.5 size-4" checked={form.cut}
                 onChange={(event) => setCut(event.target.checked)} />
               <span className="font-semibold">Fiber cut</span>
             </label>
-            <Remarks value={form.remarks} onChange={setRemarks} autoFocus={focus === "restore"} />
+            {form.cut !== segment.fiber_cut && (
+              <Remarks value={form.remarks} onChange={setRemarks} autoFocus={focus === "restore"} />
+            )}
           </div>
           <Buttons busy={busy} onClose={onClose} left={pasteButton} />
           <EditHistory rows={segment.history} />
@@ -207,18 +218,22 @@ export function EditSiteDialog({ siteId, onClose, onSaved }: {
               <input className="field" type="number" step="any" min="-180" max="180" value={form.lon}
                 onChange={edit.setField("lon")} placeholder="No location" />
             </label>
+            <label>
+              <span className={lbl}>Type</span>
+              <select className="field" value={form.kind} onChange={edit.setField("kind")}>
+                {SITE_KINDS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              </select>
+            </label>
             <RegionSelect value={form.region} onChange={edit.setField("region")} hasRegion={!!site.region} />
             <label className="flex items-center gap-2 self-end pb-2 text-sm">
               <input type="checkbox" className="size-4" checked={form.active}
                 onChange={(event) => edit.setActive(event.target.checked)} />Active
             </label>
-            <p className="col-span-2 -mt-1 text-body text-muted-foreground">
-              {form.active ? "Kind: " + site.kind.replace("_", " ") + "." : (
-                <b className="font-semibold text-amber">
-                  Inactive sites are kept, never deleted. A site used by a segment cannot be deactivated.
-                </b>
-              )}
-            </p>
+            {!form.active && (
+              <p className="col-span-2 -mt-1 text-body font-semibold text-amber">
+                Inactive sites are kept, never deleted. A site used by a segment cannot be deactivated.
+              </p>
+            )}
             <Remarks value={form.remarks} onChange={edit.setRemarks} />
           </div>
           <Buttons busy={edit.busy} onClose={onClose} />

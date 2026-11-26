@@ -23,7 +23,8 @@ SITE_FIELDS = ("site_a_id", "site_b_id")
 
 SEGMENT_SQL = f"""
 SELECT s.id, s.site_a_id, s.site_b_id, a.name AS site_a, b.name AS site_b,
-       {ROUTE_TYPE_SQL} AS route_type, s.region, s.distance_km, s.survey_cores, s.cable_size, s.fiber_cut
+       {ROUTE_TYPE_SQL} AS route_type, s.region, s.distance_km, s.survey_cores, s.cable_size, s.fiber_cut,
+       s.route, s.section
 FROM segments s JOIN sites a ON a.id = s.site_a_id JOIN sites b ON b.id = s.site_b_id
 WHERE s.id = :segment_id
 """
@@ -46,6 +47,18 @@ SELECT 1 FROM segments WHERE id <> :segment_id
   AND least(site_a_id, site_b_id) = least(CAST(:site_a AS bigint), CAST(:site_b AS bigint))
   AND greatest(site_a_id, site_b_id) = greatest(CAST(:site_a AS bigint), CAST(:site_b AS bigint))
 """
+SEGMENT_LIST_SQL = f"""
+SELECT s.id, a.name AS site_a, b.name AS site_b, s.site_a_id, s.site_b_id, {ROUTE_TYPE_SQL} AS route_type,
+       s.route, s.section, s.distance_km, s.survey_cores, s.cable_size,
+       (SELECT count(*) FROM kmz_elements e JOIN kmz_groups g ON g.id = e.group_id
+        WHERE g.segment_id = s.id AND g.route AND g.hidden_at IS NULL AND e.kind = 'line') AS kmz_route_count
+FROM segments s JOIN sites a ON a.id = s.site_a_id JOIN sites b ON b.id = s.site_b_id
+ORDER BY a.name, b.name
+"""
+CREATE_SEGMENT_SQL = """
+INSERT INTO segments (site_a_id, site_b_id, distance_km, route, section)
+VALUES (:site_a, :site_b, :distance_km, :route, :section) RETURNING id
+"""
 ANY_HOLD_SQL = """
 SELECT 1 FROM core_holds h JOIN cores c ON c.id = h.core_id WHERE c.segment_id = :segment_id LIMIT 1
 """
@@ -59,11 +72,41 @@ class SegmentBody(BaseModel):
     remarks: Remarks = ""
     distance_km: Decimal | None = Field(None, ge=0, max_digits=10, decimal_places=3)
     region: str | None = None
+    route: str | None = None
+    section: str | None = None
     site_a_id: int | None = None
     site_b_id: int | None = None
     survey_cores: int | None = Field(None, ge=0)
     cable_size: int | None = Field(None, gt=0)
     fiber_cut: bool | None = None
+
+
+class SegmentListRow(BaseModel):
+    id: int
+    site_a: str
+    site_b: str
+    site_a_id: int
+    site_b_id: int
+    route_type: str
+    route: str | None
+    section: str | None
+    distance_km: Decimal | None
+    survey_cores: int | None
+    cable_size: int
+    kmz_route_count: int
+
+
+class SegmentCreate(BaseModel):
+    site_a_id: int
+    site_b_id: int
+    distance_km: Decimal = Field(gt=0, max_digits=10, decimal_places=3)
+    route: str | None = None
+    section: str | None = None
+    remarks: Remarks = ""
+
+
+class Created(BaseModel):
+    id: int
 
 
 class SegmentEdit(BaseModel):
@@ -78,7 +121,45 @@ class SegmentEdit(BaseModel):
     survey_cores: int | None
     cable_size: int
     fiber_cut: bool
+    route: str | None
+    section: str | None
     history: list[HistoryRow]
+
+
+@router.get("/segments/list")
+def list_segments(db: DB, admin: Admin) -> list[SegmentListRow]:
+    rows = db.execute(text(SEGMENT_LIST_SQL)).mappings()
+    return [SegmentListRow(**row) for row in rows]
+
+
+def _blank_to_none(value: str | None) -> str | None:
+    if value is None:
+        return None
+    return value.strip() or None
+
+
+@router.post("/segments")
+def create_segment(db: DB, admin: Admin, body: SegmentCreate) -> Created:
+    if body.site_a_id == body.site_b_id:
+        raise Invalid("Site A and site B must differ")
+    found = db.execute(text(COUNT_SITES_SQL), {"ids": [body.site_a_id, body.site_b_id]}).scalar_one()
+    if found != 2:
+        raise NotFound("Unknown site")
+    pair = {"segment_id": 0, "site_a": body.site_a_id, "site_b": body.site_b_id}
+    if db.execute(text(OTHER_SEGMENT_SQL), pair).first():
+        raise conflict("These two sites already have a segment.")
+    params = {
+        "site_a": body.site_a_id,
+        "site_b": body.site_b_id,
+        "distance_km": body.distance_km,
+        "route": _blank_to_none(body.route),
+        "section": _blank_to_none(body.section),
+    }
+    new_id = db.execute(text(CREATE_SEGMENT_SQL), params).scalar_one()
+    log_edits(db, admin, "segment", new_id, [("created", None, str(body.distance_km))], body.remarks)
+    db.commit()
+    invalidate_routes()
+    return Created(id=new_id)
 
 
 # The path parameter keeps its name `sid`: the web client's generated types use it.
@@ -155,6 +236,10 @@ def edit_segment(db: DB, admin: Admin, sid: int, body: SegmentBody) -> Edited:
         if error:
             raise Invalid(error)
         new["region"] = region
+    for text_field in ("route", "section"):
+        typed = getattr(body, text_field)
+        if typed is not None:
+            new[text_field] = _blank_to_none(typed)
     changes = {name: value for name, value in new.items() if _differs(name, value, old[name])}
     if not changes:
         raise ServiceError(400, "nothing changed")

@@ -26,7 +26,6 @@ test.use({ viewport: { width: 1440, height: 900 } });
 test("Import KMZ: title line, suggest by location, apply", async ({ page }) => {
   await signIn(page, "admin1");
   await page.getByRole("navigation", { name: "Main" }).getByRole("button", { name: "Upload" }).click();
-  await page.getByRole("tab", { name: "KMZ" }).click();
   await page.getByRole("button", { name: "Import KMZ" }).click();
   const box = page.getByRole("dialog", { name: "KMZ import" });
 

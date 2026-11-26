@@ -20,6 +20,7 @@ from app.db import get_db
 from app.errors import ServiceError
 from app.environment import check_startup_environment
 from app.history import router as history_router
+from app.ingest.export_router import router as export_router
 from app.ingest.kmz_router import router as kmz_router
 from app.ingest.reservation_upload_router import router as reservation_upload_router
 from app.ingest.segment_list_router import router as segment_list_router
@@ -48,6 +49,7 @@ app.include_router(inventory_router)
 app.include_router(reservations_router)
 app.include_router(loss_router)
 app.include_router(site_master_router)
+app.include_router(export_router)
 app.include_router(segment_list_router)
 app.include_router(kmz_router)
 app.include_router(reservation_upload_router)

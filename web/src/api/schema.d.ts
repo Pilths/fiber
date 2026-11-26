@@ -627,6 +627,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/export/fiber-data.xlsx": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Export Fiber Data */
+        get: operations["export_fiber_data_api_admin_export_fiber_data_xlsx_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/segment-list/uploads": {
         parameters: {
             query?: never;
@@ -1024,6 +1041,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/segments/list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Segments */
+        get: operations["list_segments_api_admin_segments_list_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/segments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Segment */
+        post: operations["create_segment_api_admin_segments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/segments/{sid}": {
         parameters: {
             query?: never;
@@ -1054,6 +1105,24 @@ export interface paths {
          * @description Site picker for the segment form: id and name, 20 best matches.
          */
         get: operations["find_sites_api_admin_sites_get"];
+        put?: never;
+        /** Create Site */
+        post: operations["create_site_api_admin_sites_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/sites/list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Sites */
+        get: operations["list_sites_api_admin_sites_list_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1565,6 +1634,11 @@ export interface components {
             /** Routes */
             routes: components["schemas"]["RouteCount"][];
         };
+        /** Created */
+        Created: {
+            /** Id */
+            id: number;
+        };
         /** CurrentOut */
         CurrentOut: {
             current: components["schemas"]["UploadInfo"] | null;
@@ -1677,7 +1751,7 @@ export interface components {
             /** New Value */
             new_value: string | null;
             /** Remarks */
-            remarks: string;
+            remarks: string | null;
             /** User Id */
             user_id: number;
             /** User */
@@ -2404,6 +2478,10 @@ export interface components {
             distance_km?: number | string | null;
             /** Region */
             region?: string | null;
+            /** Route */
+            route?: string | null;
+            /** Section */
+            section?: string | null;
             /** Site A Id */
             site_a_id?: number | null;
             /** Site B Id */
@@ -2414,6 +2492,24 @@ export interface components {
             cable_size?: number | null;
             /** Fiber Cut */
             fiber_cut?: boolean | null;
+        };
+        /** SegmentCreate */
+        SegmentCreate: {
+            /** Site A Id */
+            site_a_id: number;
+            /** Site B Id */
+            site_b_id: number;
+            /** Distance Km */
+            distance_km: number | string;
+            /** Route */
+            route?: string | null;
+            /** Section */
+            section?: string | null;
+            /**
+             * Remarks
+             * @default
+             */
+            remarks: string;
         };
         /** SegmentDetail */
         SegmentDetail: {
@@ -2492,8 +2588,39 @@ export interface components {
             cable_size: number;
             /** Fiber Cut */
             fiber_cut: boolean;
+            /** Route */
+            route: string | null;
+            /** Section */
+            section: string | null;
             /** History */
             history: components["schemas"]["HistoryRow"][];
+        };
+        /** SegmentListRow */
+        SegmentListRow: {
+            /** Id */
+            id: number;
+            /** Site A */
+            site_a: string;
+            /** Site B */
+            site_b: string;
+            /** Site A Id */
+            site_a_id: number;
+            /** Site B Id */
+            site_b_id: number;
+            /** Route Type */
+            route_type: string;
+            /** Route */
+            route: string | null;
+            /** Section */
+            section: string | null;
+            /** Distance Km */
+            distance_km: string | null;
+            /** Survey Cores */
+            survey_cores: number | null;
+            /** Cable Size */
+            cable_size: number;
+            /** Kmz Route Count */
+            kmz_route_count: number;
         };
         /** SegmentLoss */
         SegmentLoss: {
@@ -2695,10 +2822,28 @@ export interface components {
             lat?: number | null;
             /** Lon */
             lon?: number | null;
+            /** Kind */
+            kind?: string | null;
             /** Region */
             region?: string | null;
             /** Active */
             active?: boolean | null;
+        };
+        /** SiteCreate */
+        SiteCreate: {
+            /** Name */
+            name: string;
+            /** Kind */
+            kind: string;
+            /** Lat */
+            lat?: number | null;
+            /** Lon */
+            lon?: number | null;
+            /**
+             * Remarks
+             * @default
+             */
+            remarks: string;
         };
         /** SiteEdit */
         SiteEdit: {
@@ -2718,6 +2863,21 @@ export interface components {
             active: boolean;
             /** History */
             history: components["schemas"]["HistoryRow"][];
+        };
+        /** SiteListRow */
+        SiteListRow: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Kind */
+            kind: string;
+            /** Lat */
+            lat: number | null;
+            /** Lon */
+            lon: number | null;
+            /** Segment Count */
+            segment_count: number;
         };
         /** SkippedOut */
         SkippedOut: {
@@ -4483,6 +4643,39 @@ export interface operations {
             };
         };
     };
+    export_fiber_data_api_admin_export_fiber_data_xlsx_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-dev-user"?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                fiber_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     upload_api_admin_segment_list_uploads_post: {
         parameters: {
             query?: never;
@@ -5338,6 +5531,76 @@ export interface operations {
             };
         };
     };
+    list_segments_api_admin_segments_list_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-dev-user"?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                fiber_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SegmentListRow"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_segment_api_admin_segments_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-dev-user"?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                fiber_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SegmentCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Created"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_segment_api_admin_segments__sid__get: {
         parameters: {
             query?: never;
@@ -5436,6 +5699,76 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     }[];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_site_api_admin_sites_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-dev-user"?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                fiber_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SiteCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Created"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_sites_api_admin_sites_list_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-dev-user"?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                fiber_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SiteListRow"][];
                 };
             };
             /** @description Validation Error */

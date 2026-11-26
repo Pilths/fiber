@@ -78,27 +78,26 @@ test("admin edits segment distance with remarks; the diagram follows; then rever
   const km = page.getByTestId("segment-diagram").getByRole("button", { name: /^Segment / });
   await expect(km).toContainText("18.2 km");
 
-  const edit = async (value: string, remarks: string) => {
+  const edit = async (value: string) => {
     await editSegment(page).click();
     const dlg = page.getByRole("dialog", { name: /^Edit segment/ });
     await dlg.getByLabel("Distance (km)").fill(value);
-    await dlg.getByLabel("Remarks (optional)").fill(remarks);
     return dlg;
   };
-  let dlg = await edit("18.3", "E2E: re-measured route");
+  let dlg = await edit("18.3");
   await dlg.getByText(/^History/).click();
   await page.screenshot({ path: "e2e/screenshots/edit-segment.png" });
   await dlg.getByRole("button", { name: "Save" }).click();
   await expect(dlg).toBeHidden();
   await expect(km).toContainText("18.3 km");
 
-  dlg = await edit("18.2", "E2E: revert");
+  dlg = await edit("18.2");
   await dlg.getByRole("button", { name: "Save" }).click();
   await expect(dlg).toBeHidden();
   await expect(km).toContainText("18.2 km");
   await editSegment(page).click();
   await page.getByRole("dialog", { name: /^Edit segment/ }).getByText(/^History/).click();
-  await expect(page.getByTestId("edit-history").getByRole("listitem").first()).toContainText("Remarks: E2E: revert");
+  await expect(page.getByTestId("edit-history").getByRole("listitem").first()).toContainText("Distance (km): 18.3");
 });
 
 test("lowering the verified core count below taken cores is refused in plain words", async ({ page }) => {
@@ -106,8 +105,7 @@ test("lowering the verified core count below taken cores is refused in plain wor
   await pick(page, KLCJ);
   await editSegment(page).click();
   const dlg = page.getByRole("dialog", { name: /^Edit segment/ });
-  await dlg.getByLabel("Verified cores").fill("1");
-  await dlg.getByLabel("Remarks (optional)").fill("E2E: should be refused");
+  await dlg.getByLabel("Registered cores").fill("1");
   await dlg.getByRole("button", { name: "Save" }).click();
   await expect(dlg.getByRole("alert"))
     .toContainText(/^Cores 2, .* are allocated or have history and cannot be removed/);
