@@ -1,0 +1,547 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KMZ import v3</title>
+<style>
+:root {
+  --ground: #f2f4f7; --ink: #0a0a0a; --muted-ink: #5b6068; --line: #868c96; --rule: #eceef2; --raised: #eceef2;
+  --border: #e2e5ea; --subtle: #f7f8fa; --nav-ink: #3d4046;
+  --blue: #1d5fbf; --blue-bg: #eff5fd; --blue-bd: #bcd2f2;
+  --amber: #b45309; --amber-bg: #fff7ed; --amber-bd: #eec9a0;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body { min-width: 1200px; background: var(--ground); color: var(--ink); font: 14px/1.45 'Geist Variable', 'Geist', system-ui, sans-serif;
+  font-variant-numeric: tabular-nums; -webkit-font-smoothing: antialiased; overflow: hidden; }
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
+input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--blue); flex: none; margin: 0; cursor: pointer; }
+input[type=checkbox]:disabled { cursor: not-allowed; }
+[hidden] { display: none !important; }
+ul { list-style: none; padding: 0; }
+
+/* Prototype bar (not part of the app) */
+.proto { height: 32px; background: #24272c; color: #c9ccd1; display: flex; align-items: center; gap: 4px; padding: 0 12px; font-size: 12px; }
+.proto b { color: #fff; margin-right: 12px; font-weight: 600; }
+.proto a { color: #c9ccd1; text-decoration: none; padding: 4px 8px; border-radius: 4px; }
+.proto a:hover { background: #3a3e45; }
+.proto a.on { background: #fff; color: var(--ink); font-weight: 600; }
+
+/* App behind the box */
+.top { height: 60px; background: #fff; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 32px; padding: 0 24px; }
+.top b { font-size: 16px; }
+.top nav { display: flex; gap: 20px; color: var(--nav-ink); font-weight: 500; }
+.top nav .on { color: var(--ink); font-weight: 600; }
+.dim { position: fixed; inset: 0; background: rgb(10 10 10 / .45); }
+
+/* Shared */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 36px; padding: 0 16px; border: 1px solid var(--line); border-radius: 6px; background: #fff; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.btn:hover { background: var(--raised); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn-p { background: var(--ink); border-color: var(--ink); color: #fff; }
+.btn-p:hover { background: #2c2c2c; }
+.btn-sm { height: 32px; padding: 0 12px; }
+.link { color: var(--blue); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; background: none; border: 0; padding: 0; font-size: 13px; }
+.field { width: 100%; height: 36px; padding: 0 12px; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
+.field::placeholder { color: var(--muted-ink); opacity: 1; }
+select.field { appearance: none; padding-right: 30px; cursor: pointer; background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 6l4 4 4-4' fill='none' stroke='%235b6068' stroke-width='1.5'/%3E%3C/svg%3E") no-repeat right 8px center / 16px; }
+.chip { height: 32px; padding: 0 12px; border: 1px solid var(--line); border-radius: 6px; background: #fff; font-size: 13px; cursor: pointer; display: inline-flex; align-items: center; }
+.chip[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: #fff; }
+.warn { color: var(--amber); font-weight: 600; }
+.muted { color: var(--muted-ink); }
+.tbl { width: 100%; table-layout: fixed; border-collapse: collapse; }
+.tbl th, .tbl td { text-align: center; padding: 4px 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13px; }
+.tbl thead th { font-size: 12px; font-weight: 500; color: var(--muted-ink); background: var(--subtle); height: 36px; border-bottom: 1px solid var(--border); }
+.tbl td, .tbl tbody th { height: 40px; border-bottom: 1px solid var(--rule); }
+.tbl tbody tr:last-child > * { border-bottom: 0; }
+.tbl tbody th { font-weight: 600; }
+.tbox { border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+.chev { width: 24px; height: 24px; border: 0; background: none; border-radius: 4px; display: grid; place-items: center; cursor: pointer; flex: none; }
+.chev:hover { background: var(--raised); }
+.chev svg { width: 14px; height: 14px; fill: none; stroke: var(--muted-ink); stroke-width: 1.8; transition: transform .12s; }
+.chev[aria-expanded="true"] svg { transform: rotate(90deg); }
+.chev-pad { width: 24px; flex: none; }
+
+/* Box */
+.box { position: fixed; left: 50%; top: calc(50% + 16px); transform: translate(-50%, -50%); width: 1240px; height: calc(100vh - 64px); background: #fff; border-radius: 8px;
+  border: 1px solid var(--border); display: grid; grid-template-rows: auto minmax(0, 1fr) auto; overflow: hidden; }
+.bh { display: flex; align-items: center; gap: 32px; padding: 16px 20px; border-bottom: 1px solid var(--border); }
+.bh h1 { font-size: 18px; font-weight: 600; }
+.steps { display: flex; align-items: center; gap: 12px; flex: 1; }
+.steps li { display: inline-flex; align-items: center; gap: 12px; }
+.steps i { font-style: normal; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 600; border: 1px solid var(--line); background: #fff; }
+.steps li[aria-current="step"] { font-weight: 600; }
+.steps li[aria-current="step"] i { background: var(--ink); border-color: var(--ink); color: #fff; }
+.steps .sep { width: 32px; height: 1px; background: var(--line); }
+.x { width: 32px; height: 32px; border: 0; border-radius: 6px; background: none; cursor: pointer; display: grid; place-items: center; }
+.x:hover { background: var(--raised); }
+.bf { display: flex; align-items: center; gap: 16px; padding: 14px 20px; border-top: 1px solid var(--border); }
+.bf .count { flex: 1; text-align: right; font-size: 13px; }
+
+/* Upload step */
+.up { padding: 20px; display: grid; gap: 16px; align-content: start; max-width: 760px; overflow: auto; }
+.drop { border: 1px dashed var(--line); background: var(--subtle); border-radius: 6px; padding: 14px 16px; display: flex; align-items: center; gap: 16px; font-size: 13px; }
+.fh { display: flex; align-items: center; gap: 16px; }
+.fh h2 { flex: 1; font-size: 14px; font-weight: 600; }
+.tree li > div { display: flex; align-items: center; gap: 4px; height: 32px; font-size: 13px; }
+.tree label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.tree .sub { padding-left: 24px; }
+
+/* Select step */
+.sel { display: grid; grid-template-columns: 760px 1fr; height: 100%; min-height: 0; }
+.left { border-right: 1px solid var(--border); display: flex; flex-direction: column; min-height: 0; }
+.lh { padding: 16px 20px 12px; display: grid; gap: 10px; }
+.lh .row { display: flex; align-items: center; gap: 16px; }
+.lh h2 { font-size: 14px; font-weight: 600; flex: 1; }
+.list { overflow-y: auto; flex: 1; padding: 0 20px 16px; }
+.seg { display: flex; align-items: center; gap: 8px; height: 40px; font-size: 13px; }
+.seg .name { font-weight: 600; flex: 1; font-size: 14px; }
+.els { padding: 0 0 8px 32px; display: grid; gap: 4px; }
+.el { display: grid; grid-template-columns: 16px minmax(0, 1fr) 86px 140px 210px 80px; align-items: center; gap: 8px; height: 34px; padding: 0 8px; border-radius: 6px; border: 1px solid transparent; font-size: 13px; }
+.el > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.el .fold, .el .ev { color: var(--muted-ink); }
+.el .ev b { color: var(--amber); font-weight: 600; margin-left: 4px; }
+.src { text-align: right; color: var(--muted-ink); }
+.el.sug { border: 1px dashed var(--blue); background: var(--blue-bg); font-weight: 600; }
+.el.sug .src { color: var(--blue); }
+.el .src.dup { color: var(--amber); font-weight: 600; }
+.addbtn { margin-top: 4px; justify-self: start; }
+.nmsec { margin-top: 12px; border: 1px solid var(--amber-bd); background: var(--amber-bg); border-radius: 6px; }
+.nm-h { display: flex; align-items: center; gap: 12px; padding: 8px 12px; }
+.nm-h h3 { font-size: 14px; font-weight: 600; flex: 1; }
+.nm-h [role=status] { font-size: 13px; }
+.nm-r { display: grid; grid-template-columns: minmax(0, 1fr) 90px 330px; align-items: center; gap: 12px; padding: 6px 12px; font-size: 13px; border-top: 1px solid var(--amber-bd); }
+.nm-r > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nm-r .field { height: 32px; font-size: 13px; }
+.closest { display: flex; align-items: center; gap: 8px; }
+.closest span { flex: 1; white-space: nowrap; height: 32px; display: flex; align-items: center; gap: 8px; padding: 0 10px; border: 1px dashed var(--blue); border-radius: 6px; background: var(--blue-bg); font-weight: 600; }
+.closest span i { font-style: normal; margin-left: auto; color: var(--blue); }
+
+.right { display: flex; flex-direction: column; min-height: 0; padding: 16px 20px; gap: 12px; }
+.right h2 { font-size: 14px; font-weight: 600; }
+.map { flex: 1; min-height: 0; width: 100%; border: 1px solid var(--border); border-radius: 6px; background: var(--subtle); display: block; }
+.legend { display: flex; gap: 24px; font-size: 13px; }
+.legend span { display: inline-flex; align-items: center; gap: 8px; }
+
+/* Add from file */
+.add { display: flex; flex-direction: column; gap: 12px; min-height: 0; flex: 1; }
+.add .chips { display: flex; gap: 8px; }
+.add .tree-box { flex: 1; min-height: 0; overflow: auto; border: 1px solid var(--border); border-radius: 6px; padding: 8px; }
+.add .tree-box li li { display: flex; align-items: center; gap: 12px; height: 30px; font-size: 13px; }
+.add .tree-box li li span { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.add .tree-box li li .warn { flex: none; }
+.add .af { display: flex; align-items: center; gap: 12px; border-top: 1px solid var(--border); padding-top: 12px; }
+.add .af b { flex: 1; }
+
+/* Confirm */
+.conf { padding: 20px; display: grid; gap: 12px; align-content: start; max-width: 860px; overflow: auto; }
+.conf h2 { font-size: 14px; font-weight: 600; }
+.sugw { color: var(--blue); font-weight: 700; margin-left: 8px; }
+</style>
+</head>
+<body>
+
+<nav class="proto" aria-label="Prototype views">
+  <b>Prototype</b>
+  <a href="#upload">Upload</a><a href="#select">Select</a><a href="#notmatched">Not matched</a><a href="#confirm">Confirm</a>
+</nav>
+
+<header class="top">
+  <b>Fiber Dashboard</b>
+  <nav><span>Inventory</span><span>My reservations</span><span>Approvals</span><span class="on">Upload</span></nav>
+</header>
+
+<div class="dim"></div>
+
+<div class="box" id="box" role="dialog" aria-modal="true" aria-labelledby="kmz-title">
+  <div class="bh">
+    <h1 id="kmz-title">KMZ import</h1>
+    <ol class="steps" aria-label="Steps">
+      <li data-step="upload"><i>1</i>Upload</li>
+      <li data-step="select"><span class="sep"></span><i>2</i>Select</li>
+      <li data-step="confirm"><span class="sep"></span><i>3</i>Confirm</li>
+    </ol>
+    <button class="x" type="button" aria-label="Close"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 3l10 10M13 3L3 13"/></svg></button>
+  </div>
+
+  <section data-view="upload">
+    <div class="up">
+      <div class="drop"><button class="btn btn-p" type="button">Choose .kmz file</button><span>BBBB.kmz</span></div>
+      <p>Name lines Site A-Site B to match automatically.</p>
+      <div class="fh"><h2>Folders</h2>
+        <button class="link" type="button" id="f-all">Select all</button><button class="link" type="button" id="f-none">Clear</button></div>
+      <ul class="tree" id="folders"></ul>
+    </div>
+  </section>
+
+  <section data-view="select" hidden>
+    <div class="sel">
+      <div class="left">
+        <div class="lh">
+          <div class="row">
+            <h2 id="sel-title">Segments in BBBB.kmz</h2>
+            <button class="link" type="button" id="all">Select all</button>
+            <button class="link" type="button" id="clear">Clear</button>
+            <button class="link" type="button" id="collapse">Collapse</button>
+          </div>
+          <input class="field" type="search" id="search" placeholder="Search segments" aria-label="Search segments">
+        </div>
+        <div class="list" id="list"></div>
+      </div>
+      <div class="right" id="right"></div>
+    </div>
+  </section>
+
+  <section data-view="confirm" hidden>
+    <div class="conf">
+      <h2>BBBB.kmz</h2>
+      <div class="tbox">
+        <table class="tbl" aria-label="Lines to apply">
+          <colgroup><col style="width:30%"><col style="width:30%"><col style="width:40%"></colgroup>
+          <thead><tr><th>Segment</th><th>Lines</th><th>Note</th></tr></thead>
+          <tbody id="conf-rows"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <div class="bf">
+    <button class="btn" type="button" id="back">Back</button>
+    <span class="count" id="count"></span>
+    <button class="btn btn-p" type="button" id="next">Continue</button>
+  </div>
+</div>
+
+<script>
+const $ = (selector) => document.querySelector(selector);
+
+// Fake site positions (map viewBox 560 x 520).
+const SITES = { S01: [70, 90], S02: [220, 160], S03: [300, 230], S04: [430, 280], S05: [130, 380], S06: [320, 440], S07: [500, 370], S08: [460, 90], S09: [530, 180] };
+const SEGMENTS = ["S01-S02", "S02-S03", "S03-S04", "S05-S06", "S06-S07", "S04-S07", "S07-S08", "S08-S09", "S02-S09"];
+const SHAPED = new Set(["S05-S06", "S02-S03"]);
+
+// Lines in BBBB.kmz. source: title | suggested | added | duplicate; seg null = not matched.
+const LINES = [
+  { id: "l1", name: "S01-S02", folder: "Route / Completed", seg: "S01-S02", source: "title", ends: [20, 35], km: 12.4, excel: 12.0, d: "M70 90 C 120 110, 170 130, 220 160" },
+  { id: "l2", name: "Path 7", folder: "Route / Phase 2", seg: "S01-S02", source: "suggested", ends: [40, 120], km: 12.9, excel: 12.0, d: "M74 100 C 92 150, 170 190, 214 172" },
+  { id: "l3", name: "S02-S03", folder: "Route / Completed", seg: "S02-S03", source: "title", ends: [15, 25], km: 10.2, excel: 10.0, d: "M220 160 C 250 176, 270 212, 300 230" },
+  { id: "l4", name: "S03-S04", folder: "Route / Completed", seg: "S03-S04", source: "title", ends: [10, 30], km: 15.2, excel: 15.0, d: "M300 230 C 350 270, 390 280, 430 280" },
+  { id: "l5", name: "S03-S04", folder: "Route / Phase 2", seg: "S03-S04", source: "duplicate", ends: [10, 30], km: 15.2, excel: 15.0, d: "M300 230 C 350 270, 390 280, 430 280" },
+  { id: "l6", name: "S05-S06", folder: "Route / Completed", seg: "S05-S06", source: "title", ends: [25, 60], km: 9.8, excel: 6.1, d: "M130 380 C 180 400, 260 420, 320 440" },
+  { id: "l7", name: "S06-S07", folder: "Route / Phase 2", seg: "S06-S07", source: "title", ends: [30, 45], km: 21.0, excel: 20.5, d: "M320 440 C 390 422, 450 410, 500 370" },
+  { id: "n1", name: "S01-S02X", folder: "Route / Phase 2", seg: null, reason: "no segment", closest: "S01-S02", ends: [30, 15], km: 12.6, excel: 12.0, d: "M72 84 C 130 66, 192 98, 226 152" },
+  { id: "n2", name: "Untitled Path", folder: "Route / Completed", seg: null, reason: "no title", near: "S08-S09", ends: [55, 80], km: 6.9, excel: 6.5, d: "M462 96 C 500 104, 512 150, 528 176" },
+  { id: "n3", name: "S08-S10", folder: "Route / Phase 2", seg: null, reason: "no segment", d: "M530 180 C 518 220, 528 250, 542 290" },
+];
+const ticked = new Set(LINES.filter((line) => line.seg && line.source !== "duplicate").map((line) => line.id));
+const open = new Set(["S01-S02", "S03-S04", "S05-S06"]);
+const FOLDERS = [{ name: "Route", children: [["Completed", "5 lines"], ["Phase 2", "5 lines"]] }, { name: "Poles", count: "38 points", empty: true }];
+const pickedFolders = new Set(["Completed", "Phase 2", "Route"]);
+let addTo = null;
+let suggestMessage = "";
+
+const CHEV = '<svg viewBox="0 0 16 16"><path d="M6 3.5L10.5 8 6 12.5"/></svg>';
+const plural = (count, word) => count + " " + word + (count === 1 ? "" : "s");
+const byId = (id) => LINES.find((line) => line.id === id);
+const segNames = () => [...new Set(LINES.filter((line) => line.seg).map((line) => line.seg))]
+  .sort((a, b) => SEGMENTS.indexOf(a) - SEGMENTS.indexOf(b));
+
+/* ---------- Upload step ---------- */
+function renderFolders() {
+  const row = (name, count, empty, chev) => `<div>${chev}<label><input type="checkbox" data-folder="${name}" ${pickedFolders.has(name) ? "checked" : ""} ${empty ? "disabled" : ""}>
+    <span style="font-weight:500">${name}</span><span class="muted">${count}</span></label></div>`;
+  $("#folders").innerHTML = FOLDERS.map((folder) => {
+    if (folder.children) {
+      const kids = folder.children.map(([name, count]) => `<li>${row(name, count, false, '<span class="chev-pad"></span>')}</li>`).join("");
+      return `<li>${row(folder.name, "10 lines", false, `<button class="chev" type="button" aria-expanded="true" aria-label="Open or close ${folder.name}">${CHEV}</button>`)}<ul class="sub">${kids}</ul></li>`;
+    }
+    return `<li>${row(folder.name, folder.count, folder.empty, '<span class="chev-pad"></span>')}</li>`;
+  }).join("");
+}
+$("#folders").addEventListener("change", (event) => {
+  const name = event.target.dataset.folder;
+  const names = name === "Route" ? ["Route", "Completed", "Phase 2"] : [name];
+  names.forEach((item) => (event.target.checked ? pickedFolders.add(item) : pickedFolders.delete(item)));
+  renderFolders();
+  renderFooter();
+});
+$("#f-all").addEventListener("click", () => { ["Route", "Completed", "Phase 2"].forEach((name) => pickedFolders.add(name)); renderFolders(); renderFooter(); });
+$("#f-none").addEventListener("click", () => { pickedFolders.clear(); renderFolders(); renderFooter(); });
+
+/* ---------- Select step: list ---------- */
+function evidence(line) {
+  let text = `${line.km.toFixed(1)} km · Excel ${line.excel.toFixed(1)}`;
+  if (Math.abs(line.km - line.excel) / line.excel > 0.1) {
+    text += "<b>km differs</b>";
+  }
+  return text;
+}
+function lineRow(line) {
+  const cls = line.source === "suggested" ? "el sug" : "el";
+  const srcCls = line.source === "duplicate" ? "src dup" : "src";
+  return `<label class="${cls}" data-line="${line.id}">
+    <input type="checkbox" aria-label="Include ${line.name}" data-tick="${line.id}" ${ticked.has(line.id) ? "checked" : ""}>
+    <span title="${line.name}">${line.name}</span><span class="fold" title="${line.folder}">${line.folder.split(" / ").pop()}</span>
+    <span class="ev">ends ${line.ends[0]} m · ${line.ends[1]} m</span><span class="ev">${evidence(line)}</span><span class="${srcCls}">${line.source}</span></label>`;
+}
+function segmentRow(seg) {
+  const lines = LINES.filter((line) => line.seg === seg);
+  const on = lines.filter((line) => ticked.has(line.id)).length;
+  const isOpen = open.has(seg);
+  const note = SHAPED.has(seg) ? '<span class="warn">· replaces line</span>' : "";
+  const body = isOpen ? `<div class="els">${lines.map(lineRow).join("")}<button class="btn btn-sm addbtn" type="button" data-add="${seg}">+ Add from file</button></div>` : "";
+  return `<div class="seg"><input type="checkbox" aria-label="Include ${seg}" data-segtick="${seg}" ${on === lines.length ? "checked" : ""} data-ind="${on > 0 && on < lines.length}">
+      <button class="chev" type="button" aria-expanded="${isOpen}" aria-label="Open or close ${seg}" data-chev="${seg}">${CHEV}</button>
+      <span class="name">${seg}</span><span>${plural(lines.length, "line")}</span>${note}</div>${body}`;
+}
+function unmatchedSection() {
+  const unmatched = LINES.filter((line) => !line.seg);
+  if (unmatched.length === 0) {
+    return "";
+  }
+  const options = SEGMENTS.map((seg) => `<option>${seg}</option>`).join("");
+  let html = `<section class="nmsec" aria-labelledby="nm-h"><div class="nm-h"><h3 id="nm-h">Not matched (${unmatched.length})</h3>
+    <span role="status">${suggestMessage}</span><button class="btn btn-sm" type="button" id="suggest">Suggest by location</button></div>`;
+  for (const line of unmatched) {
+    let pick = `<select class="field" aria-label="Segment for ${line.name}" data-assign="${line.id}"><option value="">-</option>${options}</select>`;
+    if (line.closest) {
+      pick = `<div class="closest"><span>closest: ${line.closest}<i>suggested</i></span>
+        <button class="btn btn-sm" type="button" data-accept="${line.id}">Accept</button></div>`;
+    }
+    html += `<div class="nm-r"><span title="${line.name}">${line.name}</span><span class="warn">${line.reason}</span>${pick}</div>`;
+  }
+  return html + "</section>";
+}
+function renderList() {
+  const query = $("#search").value.trim().toLowerCase();
+  const segs = segNames();
+  $("#sel-title").textContent = `Segments in BBBB.kmz (${segs.length})`;
+  const shown = segs.filter((seg) => seg.toLowerCase().includes(query) || LINES.some((line) => line.seg === seg && line.name.toLowerCase().includes(query)));
+  $("#list").innerHTML = shown.map(segmentRow).join("") + unmatchedSection();
+  document.querySelectorAll("[data-ind]").forEach((box) => { box.indeterminate = box.dataset.ind === "true"; });
+}
+
+/* ---------- Select step: right side (map preview or Add from file) ---------- */
+const STROKE = {
+  picked: 'stroke="#1d5fbf" stroke-width="3.5"',
+  suggested: 'stroke="#1d5fbf" stroke-width="3.5" stroke-dasharray="9 6"',
+  left: 'stroke="#5b6068" stroke-width="3" stroke-dasharray="0.1 7"',
+};
+function styleOf(line) {
+  if (!line.seg || !ticked.has(line.id)) {
+    return "left";
+  }
+  return line.source === "suggested" ? "suggested" : "picked";
+}
+function legendLine(style, label) {
+  return `<span><svg width="32" height="8" aria-hidden="true"><line x1="1" y1="4" x2="31" y2="4" ${STROKE[style]} stroke-linecap="round"/></svg>${label}</span>`;
+}
+function mapPreview() {
+  const order = ["left", "suggested", "picked"];
+  const lines = [...LINES].sort((a, b) => order.indexOf(styleOf(a)) - order.indexOf(styleOf(b)))
+    .map((line) => `<path d="${line.d}" fill="none" ${STROKE[styleOf(line)]} stroke-linecap="round"/>`).join("");
+  const sites = Object.entries(SITES).map(([name, [x, y]]) => {
+    const right = x > 280;
+    return `<circle cx="${x}" cy="${y}" r="6" fill="#0a0a0a" stroke="#fff" stroke-width="2"/>
+      <text x="${right ? x - 9 : x + 9}" y="${y - 9}" text-anchor="${right ? "end" : "start"}" font-size="13" font-weight="600" paint-order="stroke" stroke="#fff" stroke-width="3">${name}</text>`;
+  }).join("");
+  return `<h2>Map preview</h2>
+    <svg class="map" viewBox="0 0 560 520" role="img" aria-label="Map preview of the lines">${lines}${sites}</svg>
+    <div class="legend">${legendLine("picked", "Picked")}${legendLine("suggested", "Suggested")}${legendLine("left", "Left out")}</div>`;
+}
+const addState = { search: "", onlyUnmatched: false, picked: new Set() };
+function addPanel() {
+  const query = addState.search.trim().toLowerCase();
+  const shown = LINES.filter((line) => (!addState.onlyUnmatched || !line.seg) && (line.name.toLowerCase().includes(query) || line.folder.toLowerCase().includes(query)));
+  const folders = [...new Set(shown.map((line) => line.folder))];
+  const tree = folders.map((folder) => {
+    const lines = shown.filter((line) => line.folder === folder).map((line) => {
+      const here = line.seg === addTo;
+      const moves = line.seg && !here ? `<span class="warn">moves from ${line.seg}</span>` : "";
+      return `<li><input type="checkbox" aria-label="Pick ${line.name}" data-pick="${line.id}" ${here || addState.picked.has(line.id) ? "checked" : ""} ${here ? "disabled" : ""}><span>${line.name}</span>${moves}</li>`;
+    }).join("");
+    const count = shown.filter((line) => line.folder === folder).length;
+    return `<li><div class="seg"><button class="chev" type="button" aria-expanded="true" aria-label="Open or close ${folder}">${CHEV}</button>
+      <span class="name">${folder}</span><span class="muted">${plural(count, "line")}</span></div><ul style="padding-left:32px">${lines}</ul></li>`;
+  }).join("") || '<p class="muted" style="padding:8px">No lines</p>';
+  const size = addState.picked.size;
+  return `<section class="add" aria-labelledby="add-h"><h2 id="add-h">Add to ${addTo}</h2>
+    <input class="field" type="search" id="add-search" placeholder="Search the whole file" aria-label="Search the whole file" value="${addState.search}">
+    <div class="chips"><button class="chip" type="button" data-only="false" aria-pressed="${!addState.onlyUnmatched}">All</button>
+      <button class="chip" type="button" data-only="true" aria-pressed="${addState.onlyUnmatched}">Not matched</button></div>
+    <div class="tree-box"><ul>${tree}</ul></div>
+    <div class="af"><b>${size} selected</b><button class="btn" type="button" id="add-cancel">Cancel</button>
+      <button class="btn btn-p" type="button" id="add-go" ${size === 0 ? "disabled" : ""}>Add ${plural(size, "line")}</button></div></section>`;
+}
+function renderRight() {
+  $("#right").innerHTML = addTo ? addPanel() : mapPreview();
+}
+$("#right").addEventListener("input", (event) => {
+  if (event.target.id === "add-search") {
+    addState.search = event.target.value;
+    renderRight();
+    $("#add-search").focus();
+    $("#add-search").setSelectionRange(addState.search.length, addState.search.length);
+  }
+});
+$("#right").addEventListener("change", (event) => {
+  const id = event.target.dataset.pick;
+  if (id) {
+    addState.picked.has(id) ? addState.picked.delete(id) : addState.picked.add(id);
+    renderRight();
+  }
+});
+$("#right").addEventListener("click", (event) => {
+  const only = event.target.closest("[data-only]");
+  if (only) {
+    addState.onlyUnmatched = only.dataset.only === "true";
+    renderRight();
+  }
+  if (event.target.id === "add-cancel") {
+    closeAdd();
+  }
+  if (event.target.id === "add-go") {
+    addState.picked.forEach((id) => assign(id, addTo, "added"));
+    closeAdd();
+  }
+});
+function closeAdd() {
+  addTo = null;
+  addState.picked.clear();
+  addState.search = "";
+  refresh();
+}
+
+/* ---------- Select step: actions ---------- */
+function assign(id, seg, source) {
+  const line = byId(id);
+  line.seg = seg;
+  line.source = source;
+  line.ends = line.ends || [70, 90];
+  line.km = line.km || 6.0;
+  line.excel = line.excel || 6.5;
+  ticked.add(id);
+  open.add(seg);
+}
+$("#list").addEventListener("change", (event) => {
+  const target = event.target;
+  if (target.dataset.tick) {
+    target.checked ? ticked.add(target.dataset.tick) : ticked.delete(target.dataset.tick);
+  }
+  if (target.dataset.segtick) {
+    LINES.filter((line) => line.seg === target.dataset.segtick).forEach((line) => (target.checked ? ticked.add(line.id) : ticked.delete(line.id)));
+  }
+  if (target.dataset.assign && target.value) {
+    assign(target.dataset.assign, target.value, "added");
+  }
+  refresh();
+});
+$("#list").addEventListener("click", (event) => {
+  const chev = event.target.closest("[data-chev]");
+  if (chev) {
+    const seg = chev.dataset.chev;
+    open.has(seg) ? open.delete(seg) : open.add(seg);
+    renderList();
+  }
+  const accept = event.target.closest("[data-accept]");
+  if (accept) {
+    const line = byId(accept.dataset.accept);
+    assign(line.id, line.closest, "suggested");
+    refresh();
+  }
+  const add = event.target.closest("[data-add]");
+  if (add) {
+    addTo = add.dataset.add;
+    renderRight();
+  }
+  if (event.target.id === "suggest") {
+    // Only rows still on "-" get a suggestion; a closest-name row keeps its own.
+    const found = LINES.filter((line) => !line.seg && !line.closest && line.near);
+    found.forEach((line) => assign(line.id, line.near, "suggested"));
+    suggestMessage = `${plural(found.length, "suggestion")} found`;
+    refresh();
+  }
+});
+$("#search").addEventListener("input", renderList);
+$("#all").addEventListener("click", () => { LINES.filter((line) => line.seg).forEach((line) => ticked.add(line.id)); refresh(); });
+$("#clear").addEventListener("click", () => { ticked.clear(); refresh(); });
+$("#collapse").addEventListener("click", () => { open.clear(); renderList(); });
+
+/* ---------- Confirm ---------- */
+function tickedLines() {
+  return LINES.filter((line) => line.seg && ticked.has(line.id));
+}
+function renderConfirm() {
+  const lines = tickedLines();
+  $("#conf-rows").innerHTML = segNames().filter((seg) => lines.some((line) => line.seg === seg)).map((seg) => {
+    const mine = lines.filter((line) => line.seg === seg);
+    const suggested = mine.filter((line) => line.source === "suggested").length;
+    const note = SHAPED.has(seg) ? '<span class="warn">replaces line</span>' : "-";
+    return `<tr><th scope="row">${seg}</th><td>${mine.length}${suggested ? `<span class="sugw">${suggested} suggested</span>` : ""}</td><td>${note}</td></tr>`;
+  }).join("");
+}
+
+/* ---------- Box frame ---------- */
+const STEPS = ["upload", "select", "confirm"];
+let step = "upload";
+function renderFooter() {
+  const lines = tickedLines();
+  const suggested = lines.filter((line) => line.source === "suggested").length;
+  const picked = lines.length - suggested;
+  const segs = new Set(lines.map((line) => line.seg)).size;
+  const unmatched = LINES.filter((line) => !line.seg).length;
+  $("#count").textContent = step === "upload" ? "" : `${plural(segs, "segment")} · ${plural(lines.length, "line")} · ${unmatched} not matched`;
+  $("#next").textContent = "Continue";
+  $("#next").disabled = step === "upload" ? !pickedFolders.has("Completed") && !pickedFolders.has("Phase 2") : lines.length === 0;
+  if (step === "confirm") {
+    $("#next").textContent = suggested ? `Apply ${picked} + ${suggested} suggested` : `Apply ${plural(picked, "line")}`;
+  }
+}
+function refresh() {
+  renderList();
+  renderRight();
+  renderConfirm();
+  renderFooter();
+}
+function showStep(name) {
+  step = name;
+  document.querySelectorAll("[data-view]").forEach((view) => { view.hidden = view.dataset.view !== name; });
+  document.querySelectorAll("[data-step]").forEach((item) => {
+    item.toggleAttribute("aria-current", item.dataset.step === name);
+    if (item.dataset.step === name) {
+      item.setAttribute("aria-current", "step");
+    }
+  });
+  $("#back").hidden = name === "upload";
+  renderFooter();
+}
+$("#next").addEventListener("click", () => {
+  if (step !== "confirm") {
+    location.hash = "#" + STEPS[STEPS.indexOf(step) + 1];
+  }
+});
+$("#back").addEventListener("click", () => { location.hash = "#" + STEPS[Math.max(0, STEPS.indexOf(step) - 1)]; });
+
+/* ---------- Routing ---------- */
+function route() {
+  const view = location.hash.slice(1) || "upload";
+  document.querySelectorAll(".proto a").forEach((link) => link.classList.toggle("on", link.getAttribute("href") === "#" + view));
+  if (view === "notmatched") {
+    open.clear();
+    open.add("S01-S02");
+    refresh();
+    showStep("select");
+    $("#list").scrollTop = $("#list").scrollHeight;
+    return;
+  }
+  showStep(view);
+}
+renderFolders();
+refresh();
+window.addEventListener("hashchange", route);
+route();
+</script>
+</body>
+</html>
