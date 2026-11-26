@@ -7,14 +7,20 @@
 <style>
 :root {
   --ground: #f2f4f7; --ink: #0a0a0a; --muted-ink: #5b6068; --line: #868c96; --rule: #eceef2; --raised: #eceef2;
-  --border: #e2e5ea; --subtle: #f7f8fa; --nav-ink: #3d4046;
   --blue: #1d5fbf; --blue-bg: #eff5fd; --blue-bd: #bcd2f2;
+  --green: #1a7f4b; --green-bg: #ecfdf3; --green-bd: #b7e4c7;
   --amber: #b45309; --amber-bg: #fff7ed; --amber-bd: #eec9a0;
-  --green: #1a7f4b; --red: #b42318;
+  --red: #b42318; --red-bg: #fef3f2; --red-bd: #f1b4ad;
+  --res: #272a30; --use: #50555d; --ns: #6b7079;
+  --subtle: #f7f8fa; --nav-ink: #3d4046; --map-bg: #eef1f5;
+  --background: #fff; --foreground: var(--ink); --card: #fff; --card-foreground: var(--ink);
+  --primary: var(--ink); --primary-foreground: #fff; --secondary: #e4e7ec;
+  --muted: var(--raised); --muted-foreground: var(--muted-ink); --accent: var(--blue-bg);
+  --destructive: var(--red); --border: #e2e5ea; --input: var(--line); --ring: var(--blue); --radius: 6px;
 }
 * { box-sizing: border-box; margin: 0; }
 html, body { height: 100%; }
-body { min-width: 1200px; background: var(--ground); color: var(--ink); font: 14px/1.45 'Geist Variable', 'Geist', system-ui, sans-serif;
+body { min-width: 1200px; background: var(--ground); color: var(--ink); font: 14px/1.45 'Geist Variable', system-ui, sans-serif;
   font-variant-numeric: tabular-nums; -webkit-font-smoothing: antialiased; overflow: hidden; }
 button, input, select, textarea { font: inherit; color: inherit; }
 :focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
@@ -23,10 +29,10 @@ input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--blue); fle
 ul { list-style: none; padding: 0; }
 
 /* Prototype bar (not part of the app) */
-.proto { height: 32px; background: #24272c; color: #c9ccd1; display: flex; align-items: center; gap: 8px; padding: 0 16px; font-size: 13px; }
-.proto b { color: #fff; margin-right: 12px; font-weight: 600; }
-.proto a { color: #c9ccd1; text-decoration: none; padding: 4px 8px; border-radius: 4px; }
-.proto a:hover { background: #3a3e45; }
+.proto { height: 32px; background: var(--res); color: var(--raised); display: flex; align-items: center; gap: 8px; padding: 0 16px; font-size: 13px; }
+.proto b { color: var(--primary-foreground); margin-right: 12px; font-weight: 600; }
+.proto a { color: var(--raised); text-decoration: none; padding: 4px 8px; border-radius: 4px; }
+.proto a:hover { background: var(--use); }
 .proto a.on { background: #fff; color: var(--ink); font-weight: 600; }
 
 .top { height: 60px; padding-bottom: 0; background: #fff; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 32px; padding: 0 24px; }
@@ -38,14 +44,14 @@ ul { list-style: none; padding: 0; }
 /* Shared */
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 36px; padding: 0 16px; border: 1px solid var(--line); border-radius: 6px; background: #fff; font-weight: 600; cursor: pointer; white-space: nowrap; }
 .btn:hover { background: var(--raised); }
-.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn:disabled { background: #fff; color: var(--muted-ink); border-color: var(--border); cursor: not-allowed; }
 .btn-p { background: var(--ink); border-color: var(--ink); color: #fff; }
 .btn-p:hover { background: #2c2c2c; }
 .btn-sm { height: 32px; padding: 0 12px; font-size: 13px; }
 .link { color: var(--blue); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; background: none; border: 0; padding: 0; font-size: 14px; }
 .field { width: 100%; height: 36px; padding: 0 12px; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
 textarea.field { height: 72px; padding: 8px 12px; resize: vertical; }
-.field::placeholder { color: var(--nav-ink); opacity: 1; }
+.field::placeholder { color: var(--muted-ink); opacity: 1; }
 .field[aria-invalid="true"] { border-color: var(--red); }
 select.field { appearance: none; padding-right: 30px; cursor: pointer; background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 6l4 4 4-4' fill='none' stroke='%235b6068' stroke-width='1.5'/%3E%3C/svg%3E") no-repeat right 8px center / 16px; }
 .chip { height: 32px; padding: 0 12px; border: 1px solid var(--line); border-radius: 6px; background: #fff; font-size: 13px; cursor: pointer; display: inline-flex; align-items: center; white-space: nowrap; }
@@ -59,9 +65,9 @@ select.field { appearance: none; padding-right: 30px; cursor: pointer; backgroun
 .st-review { color: var(--amber); font-weight: 600; }
 .st-rej { color: var(--red); font-weight: 600; }
 .tbl { width: 100%; table-layout: fixed; border-collapse: collapse; }
-.tbl th, .tbl td { text-align: center; padding: 4px 12px; white-space: normal; overflow-wrap: anywhere; overflow: hidden; line-height: 1.3; font-size: 14px; }
+.tbl th, .tbl td { text-align: center; padding: 4px 16px; white-space: normal; overflow-wrap: anywhere; overflow: hidden; line-height: 1.3; font-size: 14px; }
 .tbl .l, .tbl .r { text-align: center; }
-.tbl thead th { font-size: 13px !important; font-weight: 500; color: var(--muted-ink); background: var(--subtle); height: 36px; border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 1; }
+.tbl thead th { font-size: 12px !important; font-weight: 500; color: var(--muted-ink); background: var(--subtle); height: 36px; border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 1; }
 .tbl td, .tbl tbody th { height: 40px; border-bottom: 1px solid var(--rule); }
 .tbl tbody th { font-weight: 500; }
 .tbox { border: 1px solid var(--border); border-radius: 6px; overflow: hidden; background: #fff; }
@@ -75,7 +81,7 @@ select.field { appearance: none; padding-right: 30px; cursor: pointer; backgroun
 .page { height: calc(100vh - 92px); display: flex; flex-direction: column; padding: 16px 24px 16px; gap: 16px; }
 .subbar { display: flex; align-items: flex-end; gap: 16px; border-bottom: 1px solid var(--border); }
 .subtabs { display: flex; gap: 4px; flex: 1; }
-.subtabs button { height: 40px; margin-bottom: -1px; border: 0; border-bottom: 2px solid transparent; background: none; padding: 0 16px; font-weight: 500; color: var(--nav-ink); cursor: pointer; }
+.subtabs button { height: 40px; margin-bottom: -1px; border: 0; border-bottom: 2px solid transparent; background: none; padding: 0 16px; font-weight: 500; color: var(--muted-ink); cursor: pointer; }
 .subtabs button:hover { color: var(--ink); }
 .subtabs button[aria-selected="true"] { border-color: var(--ink); color: var(--ink); font-weight: 600; }
 .subbar .bulk { display: flex; gap: 8px; padding-bottom: 6px; }
@@ -91,7 +97,7 @@ select.field { appearance: none; padding-right: 30px; cursor: pointer; backgroun
 .toolbar .field { width: auto; }
 .toolbar .count { margin-left: auto; font-weight: 600; }
 .tscroll { flex: 1; min-height: 0; overflow: auto; border: 1px solid var(--border); border-radius: 6px; background: #fff; }
-.tscroll .tbl tbody tr.srow:hover > * { background: #fafbfc; }
+.tscroll .tbl tbody tr.srow:hover > * { background: var(--subtle); }
 .tscroll .tbl tbody tr.srow.open > * { background: var(--blue-bg); border-bottom-color: var(--blue-bd); }
 .pager { height: 52px; display: flex; align-items: center; gap: 8px; flex: none; }
 .pager .info { flex: 1; font-size: 13px; }
@@ -110,7 +116,7 @@ select.field { appearance: none; padding-right: 30px; cursor: pointer; backgroun
 .lines { display: grid; }
 .lrow { display: grid; grid-template-columns: 1fr 1.5fr .7fr 1.5fr 1fr 1.6fr; align-items: center; gap: 12px; text-align: center; min-height: 40px; padding: 0 16px; font-size: 14px; border-bottom: 1px solid var(--rule); }
 .lrow > span { overflow-wrap: anywhere; line-height: 1.3; padding: 4px 0; }
-.lrow.head { font-size: 13px; min-height: 36px; color: var(--muted-ink); font-weight: 500; background: var(--subtle); border-bottom-color: var(--border); }
+.lrow.head { font-size: 12px; min-height: 36px; color: var(--muted-ink); font-weight: 500; background: var(--subtle); border-bottom-color: var(--border); }
 .lrow.item.removing { background: var(--amber-bg); }
 .lrow.item.removed .t { text-decoration: line-through; }
 .lrow .acts { display: flex; flex-wrap: wrap; gap: 4px 16px; justify-content: center; align-items: center; }
@@ -135,7 +141,7 @@ select.field { appearance: none; padding-right: 30px; cursor: pointer; backgroun
 .flist { border: 1px solid var(--border); border-radius: 6px; }
 .frow { display: grid; grid-template-columns: 16px minmax(0, 1fr) 100px 80px 120px; align-items: center; gap: 12px; min-height: 40px; text-align: center; padding: 0 16px; font-size: 14px; border-bottom: 1px solid var(--rule); cursor: pointer; }
 .frow:last-child { border-bottom: 0; }
-.frow.head { min-height: 36px; font-size: 13px; color: var(--muted-ink); background: var(--subtle); cursor: default; font-weight: 500; }
+.frow.head { min-height: 36px; font-size: 12px; color: var(--muted-ink); background: var(--subtle); cursor: default; font-weight: 500; }
 .frow > span { overflow-wrap: anywhere; line-height: 1.3; padding: 4px 0; }
 .frow.on { background: var(--blue-bg); }
 .chips { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -380,7 +386,7 @@ function renderSegments() {
     <div class="tscroll" id="seg-scroll">
       <table class="tbl" aria-label="Segments">
         <colgroup><col style="width:56px"><col><col style="width:110px"><col style="width:90px"><col style="width:110px"><col style="width:90px">
-          <col style="width:150px"><col style="width:120px"><col style="width:100px"><col style="width:80px"></colgroup>
+          <col style="width:150px"><col style="width:120px"><col style="width:120px"><col style="width:80px"></colgroup>
         <thead><tr><th class="c" aria-label="Open"></th><th>Segment</th><th>Type</th><th>Route</th><th>Cluster</th><th class="r">km</th>
           <th class="r">Registered cores</th><th class="r">Total cores</th><th class="r">KMZ routes</th><th></th></tr></thead>
         <tbody id="seg-body"></tbody>
@@ -419,8 +425,8 @@ function renderSegmentRows() {
   $("#seg-body").innerHTML = shown.map((segment) => {
     const isOpen = state.open.has(segment.id);
     const count = liveLines(segment).length;
-    const verified = segment.verified === null ? '<span class="warn">not registered</span>' : segment.verified;
-    const lines = count === 0 ? '<span class="warn">no route</span>' : count;
+    const verified = segment.verified === null ? '-' : segment.verified;
+    const lines = count === 0 ? '-' : count;
     const row = `<tr class="srow${isOpen ? " open" : ""}"><td class="c"><button class="chev" type="button" aria-expanded="${isOpen}" aria-label="Open or close ${segment.link}" data-chev="${segment.id}">${CHEV}</button></td>
       <th scope="row" title="${segment.link}">${segment.link}</th><td>${routeType(segment.a, segment.b)}</td><td>${segment.route}</td><td>${segment.section}</td>
       <td class="r">${segment.km.toFixed(1)}</td><td class="r">${verified}</td><td class="r">${segment.total}</td><td class="r">${lines}</td>
@@ -469,7 +475,7 @@ function renderSiteRows() {
   filter.page = Math.min(filter.page, pages - 1);
   $("#site-count").textContent = plural(rows.length, "site");
   $("#site-body").innerHTML = rows.slice(filter.page * PAGE_SIZE, (filter.page + 1) * PAGE_SIZE).map((site) => `<tr>
-    <th scope="row">${site.name}</th><td>${site.kind}</td><td class="r">${site.lat}</td><td class="r">${site.long}</td>
+    <th scope="row">${site.name}</th><td>${site.kind}</td><td class="r">${site.lat || "-"}</td><td class="r">${site.long || "-"}</td>
     <td class="r"><button class="link" type="button" data-site-jump="${site.name}" aria-label="${segmentCount(site.name)} segments at ${site.name}">${segmentCount(site.name)}</button></td>
     <td class="r"><button class="link" type="button" data-site-edit="${site.name}">Edit</button></td></tr>`).join("")
     || '<tr><td colspan="6" class="empty">No sites</td></tr>';
@@ -551,7 +557,7 @@ function editBox(modal) {
       <label>Route<input class="field" id="ed-route" value="${segment.route}"></label>
       <label>Cluster<input class="field" id="ed-section" value="${segment.section}"></label>
       <span></span>
-      <label>Registered cores<input class="field" id="ed-ver" value="${segment.verified ?? ""}" inputmode="numeric" placeholder="not registered"></label>
+      <label>Registered cores<input class="field" id="ed-ver" value="${segment.verified ?? ""}" inputmode="numeric" placeholder="-"></label>
       <label>Total cores<input class="field" id="ed-total" value="${segment.total}" inputmode="numeric"></label>
       <label class="wide">Remarks<textarea class="field" id="ed-remarks"></textarea></label>
       <p class="err wide" id="ed-err" role="alert"></p>
@@ -639,7 +645,7 @@ function xlsxBox(modal) {
   const body = `<div class="drop"><button class="btn" type="button">Choose .xlsx file</button><span>${fileName}</span></div>
     <div class="chips">${chip("all", `All ${rows.length}`)}${chip("new", `new ${counts.new}`)}${chip("changed", `changed ${counts.changed}`)}${chip("same", `same ${counts.same}`)}${chip("review", `needs review ${counts.review}`)}</div>
     <div class="pscroll"><table class="tbl" aria-label="Preview rows">
-      <colgroup><col style="width:70px"><col style="width:240px"><col style="width:130px"><col></colgroup>
+      <colgroup><col style="width:70px"><col style="width:240px"><col style="width:160px"><col></colgroup>
       <thead><tr><th class="r">Row</th><th>${what}</th><th>Status</th><th>Change</th></tr></thead>
       <tbody>${shown.map((row) => `<tr><td class="r">${row.row}</td><td>${row.name}</td><td class="st-${row.status}">${STATUS_WORD[row.status]}</td><td>${row.change || "-"}</td></tr>`).join("")}</tbody>
     </table></div>`;
