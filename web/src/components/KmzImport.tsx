@@ -6,12 +6,18 @@ import { KmzImportMap } from "@/components/KmzImportMap";
 import { Dialog, FilePick, Note } from "@/components/upload-parts";
 import { plural } from "@/lib/format";
 import { useKmzUpload, type KmzStaged } from "@/lib/useKmzUpload";
-import { unmatchedReason, useKmzImport, type KmzImport, type RouteLine } from "@/lib/useKmzImport";
+import { metres, unmatchedReason, useKmzImport, type KmzImport, type RouteLine } from "@/lib/useKmzImport";
 
 const KMZ = { accept: ".kmz,application/vnd.google-earth.kmz", button: "Choose .kmz file" };
 const STEPS = ["Upload", "Select", "Confirm"] as const;
 type Step = (typeof STEPS)[number];
-const SOURCE_CLASS = { title: "text-muted-foreground", suggested: "font-semibold text-blue", added: "text-muted-foreground" };
+const SOURCE_CLASS = {
+  title: "text-muted-foreground",
+  suggested: "font-semibold text-blue",
+  added: "text-muted-foreground",
+  same: "text-muted-foreground",
+  duplicate: "font-semibold text-amber",
+};
 
 function Steps({ current }: { current: Step }) {
   return (
@@ -50,8 +56,29 @@ function TriBox({ ticked, total, label, onChange }: {
   );
 }
 
+function kmText(line: RouteLine): string {
+  if (line.km == null) {
+    return "-";
+  }
+  if (line.excel_km == null) {
+    return `${line.km.toFixed(1)} km`;
+  }
+  return `${line.km.toFixed(1)} km · Excel ${line.excel_km.toFixed(1)}`;
+}
+
+function sourceWord(line: RouteLine, source: keyof typeof SOURCE_CLASS): keyof typeof SOURCE_CLASS | "same" | "duplicate" {
+  if (line.same) {
+    return "same";
+  }
+  if (line.duplicate) {
+    return "duplicate";
+  }
+  return source;
+}
+
 function LineRow({ line, state }: { line: RouteLine; state: KmzImport }) {
   const source = state.assigned[line.key].source;
+  const word = sourceWord(line, source);
   let rowClass = "";
   if (source === "suggested") {
     rowClass = "rounded-md border border-dashed border-blue bg-blue-bg font-semibold";
@@ -60,9 +87,16 @@ function LineRow({ line, state }: { line: RouteLine; state: KmzImport }) {
     <li className={`flex items-center gap-3 px-2 py-1.5 text-body ${rowClass}`} data-testid={`kmz-line-${line.name}`}>
       <input type="checkbox" aria-label={`Include ${line.name}`} checked={state.ticked.has(line.key)}
         onChange={(event) => state.setTick([line.key], event.target.checked)} />
-      <span className="min-w-0 flex-1 truncate" title={line.name}>{line.name}</span>
-      <span className="truncate text-muted-foreground" title={line.folder_path}>{line.folder_path}</span>
-      <span className={`w-20 text-right ${SOURCE_CLASS[source]}`}>{source}</span>
+      <span className="min-w-16 flex-1 truncate" title={line.name}>{line.name}</span>
+      <span className="max-w-24 truncate text-muted-foreground" title={line.folder_path}>{line.folder_path}</span>
+      <span className="whitespace-nowrap text-center text-muted-foreground">
+        {line.end_a_m == null ? "-" : `ends ${metres(line.end_a_m)} · ${metres(line.end_b_m)}`}
+      </span>
+      <span className="whitespace-nowrap text-center text-muted-foreground">
+        {kmText(line)}
+        {line.km_differs && <b className="ml-2 text-amber">km differs</b>}
+      </span>
+      <span className={`w-20 text-right ${SOURCE_CLASS[word]}`}>{word}</span>
     </li>
   );
 }
@@ -86,7 +120,7 @@ function SegmentRow({ segmentId, state, open, onOpenClose, onAdd }: {
         </button>
         <span className="min-w-0 flex-1 truncate font-semibold">{name}</span>
         <span>{plural(lines.length, "line")}</span>
-        {segment?.shaped && <span className="font-semibold text-amber">· replaces line</span>}
+        {segment?.shaped && <span className="font-semibold text-amber">· replaces route</span>}
       </div>
       {open && (
         <div className="pb-2 pl-8">
@@ -119,14 +153,28 @@ function Unmatched({ state }: { state: KmzImport }) {
       </div>
       <ul>
         {state.unmatched.map((line) => (
-          <li key={line.key} className="flex items-center gap-3 border-t border-amber-bd px-3 py-1.5 text-body">
-            <span className="min-w-0 flex-1 truncate" title={line.name}>{line.name}</span>
+          <li key={line.key} className="flex flex-wrap items-center gap-3 border-t border-amber-bd px-3 py-1.5 text-body">
+            <span className="min-w-24 flex-1 truncate" title={line.name}>{line.name}</span>
             <span className="font-semibold text-amber">{unmatchedReason(line)}</span>
-            <select className="field w-56" value="" aria-label={`Segment for ${line.name}`}
-              onChange={(event) => state.assign([line.key], Number(event.target.value))}>
-              <option value="">-</option>
-              {options.map((segment) => <option key={segment.id} value={segment.id}>{segment.name}</option>)}
-            </select>
+            {line.closest_segment_id != null && (
+              <>
+                <span className="flex-none rounded-md border border-dashed border-blue bg-blue-bg px-2 py-1 font-semibold">
+                  closest: {state.segments.get(line.closest_segment_id)?.name ?? `Segment ${line.closest_segment_id}`}
+                  <span className="ml-2 text-blue">suggested</span>
+                </span>
+                <button type="button" className="btn btn-sm" aria-label={`Accept closest for ${line.name}`}
+                  onClick={() => state.accept(line)}>
+                  Accept
+                </button>
+              </>
+            )}
+            {line.closest_segment_id == null && (
+              <select className="field w-56" value="" aria-label={`Segment for ${line.name}`}
+                onChange={(event) => state.assign([line.key], Number(event.target.value))}>
+                <option value="">-</option>
+                {options.map((segment) => <option key={segment.id} value={segment.id}>{segment.name}</option>)}
+              </select>
+            )}
           </li>
         ))}
       </ul>
@@ -215,7 +263,7 @@ function AddFromFile({ state, segmentId, onDone }: { state: KmzImport; segmentId
         </ul>
       </div>
       <div className="flex items-center gap-3 border-t pt-3">
-        <span className="flex-1 font-semibold">{picked.size} selected</span>
+        <span className="flex-1" />
         <button type="button" className="btn" onClick={onDone}>Cancel</button>
         <button type="button" className="btn btn-p" disabled={picked.size === 0} onClick={add}>
           Add {plural(picked.size, "line")}
@@ -301,7 +349,7 @@ function ConfirmStep({ state, filename }: { state: KmzImport; filename: string }
               const suggested = lines.filter((line) => state.assigned[line.key].source === "suggested").length;
               let note = <>-</>;
               if (segment?.shaped) {
-                note = <span className="font-semibold text-amber">replaces line</span>;
+                note = <span className="font-semibold text-amber">replaces route</span>;
               }
               return (
                 <tr key={segmentId}>

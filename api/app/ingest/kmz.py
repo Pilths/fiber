@@ -514,7 +514,11 @@ def route_lines_in_folders(
                 continue
             pair = pair_from_title(element["name"])
             segment_id = None if pair is None else segment_ids.get(frozenset(pair))
+            folder_pair = pair_from_title(folder_path.split(" / ")[-1])
+            closest_id = segment_ids.get(frozenset(folder_pair)) if segment_id is None and folder_pair else None
             route_lines.append({
+                "closest_segment_id": closest_id,
+                "closest_by": None if closest_id is None else "folder",
                 "key": f"{folder_id}:{index}",
                 "name": element["name"],
                 "folder_path": folder_path,
@@ -706,6 +710,7 @@ def stage_preview(
         raw_groups = groups_in_folders(io.BytesIO(data), folder_ids, route_pairs_of(db))
         groups = kmz_groups.describe_groups(db, raw_groups)
         route_lines = route_lines_in_folders(io.BytesIO(data), folder_ids, segment_ids_by_pair(db))
+        kmz_route_lines.add_evidence(db, route_lines)
     else:
         lines, folders_found = parse_lines(io.BytesIO(data), folder)
     result = {"shaped": [], "skipped": []}
@@ -751,7 +756,6 @@ def apply_upload(
     route_segment_ids: list[int] | None = None,
     group_choices: list[dict] | None = None,
     route_line_choices: list[dict] | None = None,
-    per_segment: bool = False,
 ) -> dict:
     """Save the previewed route lines (all, or only `route_segment_ids`) and the groups the admin chose.
     Returns {"shaped": n, "groups_saved": n, "clusters_created": n}."""
@@ -777,7 +781,7 @@ def apply_upload(
         save_shape_logged(db, admin_id, upload_id, segment, item["coords"])
         saved += 1
     groups_saved, clusters_created = kmz_groups.save_groups(db, admin_id, upload_id, chosen_groups)
-    lines_saved = kmz_route_lines.save_route_lines(db, admin_id, upload_id, chosen_lines, per_segment)
+    lines_saved = kmz_route_lines.save_route_lines(db, admin_id, upload_id, chosen_lines)
     finish_upload(db, upload_id)
     db.commit()
     return {"shaped": saved, "groups_saved": groups_saved, "clusters_created": clusters_created,

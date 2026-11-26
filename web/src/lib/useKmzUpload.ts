@@ -280,7 +280,6 @@ export function useKmzUpload(fixed?: FixedTarget) {
   const canApply = !missingTarget && routeCount + chosenGroups.length > 0;
 
   const applyBody = () => ({
-    per_segment: false,
     route_segment_ids: [...routeIds],
     groups: chosenGroups.map(([key, choice]) => {
       const targetId = pickedId(choice, lists);

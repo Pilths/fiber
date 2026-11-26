@@ -47,6 +47,22 @@ async function loadNetwork(): Promise<{ segments: Map<number, SegmentInfo>; site
   return { segments, sites };
 }
 
+// A line equal to a stored route, or drawn twice in the file, starts unticked.
+export function startsTicked(line: RouteLine): boolean {
+  return !line.same && !line.duplicate;
+}
+
+// Metres under 1000 as "35 m", else km.
+export function metres(value: number | null | undefined): string {
+  if (value == null) {
+    return "-";
+  }
+  if (value < 1000) {
+    return `${value} m`;
+  }
+  return `${(value / 1000).toFixed(1)} km`;
+}
+
 function titleAssignments(lines: RouteLine[]): Record<string, Assignment> {
   const assigned: Record<string, Assignment> = {};
   for (const line of lines) {
@@ -57,11 +73,15 @@ function titleAssignments(lines: RouteLine[]): Record<string, Assignment> {
   return assigned;
 }
 
+function titledTicked(lines: RouteLine[]): string[] {
+  return lines.filter((line) => line.suggested_segment_id != null && startsTicked(line)).map((line) => line.key);
+}
+
 // Select step state: which segment each line goes to, and which lines are ticked. Lines with a segment from their
 // title start ticked; nothing is saved until apply.
 export function useKmzImport(uploadId: number, lines: RouteLine[]) {
   const [assigned, setAssigned] = useState<Record<string, Assignment>>(() => titleAssignments(lines));
-  const [ticked, setTicked] = useState<Set<string>>(() => new Set(Object.keys(titleAssignments(lines))));
+  const [ticked, setTicked] = useState<Set<string>>(() => new Set(titledTicked(lines)));
   const [segments, setSegments] = useState<Map<number, SegmentInfo>>(new Map());
   const [sites, setSites] = useState<Map<number, SitePoint>>(new Map());
   const [busy, setBusy] = useState(false);
@@ -110,6 +130,15 @@ export function useKmzImport(uploadId: number, lines: RouteLine[]) {
     setTick(keys, true);
   };
 
+  // Accept on a closest suggestion: the line goes under that segment as "suggested" and is ticked.
+  const accept = (line: RouteLine) => {
+    if (line.closest_segment_id == null) {
+      return;
+    }
+    setAssigned({ ...assigned, [line.key]: { segmentId: line.closest_segment_id, source: "suggested" } });
+    setTick([line.key], startsTicked(line));
+  };
+
   // Fills only lines still without a segment; never overwrites a title or a pick.
   const suggestByLocation = async () => {
     setBusy(true);
@@ -152,7 +181,7 @@ export function useKmzImport(uploadId: number, lines: RouteLine[]) {
       const routeLines = tickedLines.map((line) => ({ key: line.key, segment_id: assigned[line.key].segmentId }));
       const path = { upload_id: uploadId };
       return await api.post("/api/admin/kmz/uploads/{upload_id}/apply", {
-        path, body: { route_lines: routeLines, groups: [], per_segment: false },
+        path, body: { route_lines: routeLines, groups: [] },
       });
     } catch (caught) {
       setError(errorText(caught, "Apply failed. Nothing was changed. Try again."));
@@ -164,7 +193,7 @@ export function useKmzImport(uploadId: number, lines: RouteLine[]) {
   };
 
   return {
-    lines, assigned, ticked, segments, sites, segmentOrder, linesOf, unmatched, setTick, assign,
+    lines, assigned, ticked, segments, sites, segmentOrder, linesOf, unmatched, setTick, assign, accept,
     suggestByLocation, tickedLines, suggestedCount, tickedSegments, apply, busy, error,
   };
 }

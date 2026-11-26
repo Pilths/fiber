@@ -78,7 +78,7 @@ export function useUploadRoute(segmentId: number, siteIds: number[]) {
       const routeLines = [...ticked].map((key) => ({ key, segment_id: segmentId }));
       const path = { upload_id: staged.upload_id };
       await api.post("/api/admin/kmz/uploads/{upload_id}/apply", {
-        path, body: { route_lines: routeLines, groups: [], per_segment: true },
+        path, body: { route_lines: routeLines, groups: [] },
       });
       return true;
     } catch (caught) {
