@@ -415,7 +415,7 @@ function renderSegments() {
       <table class="tbl" aria-label="Segments">
         <colgroup><col style="width:56px"><col><col style="width:110px"><col style="width:90px"><col style="width:110px"><col style="width:90px">
           <col style="width:150px"><col style="width:120px"><col style="width:120px"><col style="width:80px"></colgroup>
-        <thead><tr><th class="c" aria-label="Open"></th><th>Segment</th><th>Type</th><th>Route</th><th>Cluster</th><th class="r">km</th>
+        <thead><tr><th class="c" aria-label="Open"></th><th>Segment</th><th>Type</th><th>Route</th><th>Cluster</th><th class="r">Distance</th>
           <th class="r">Registered cores</th><th class="r">Total cores</th><th class="r">KMZ routes</th><th></th></tr></thead>
         <tbody id="seg-body"></tbody>
       </table>
@@ -439,7 +439,7 @@ function lineRowHtml(segment, line) {
 }
 function expandedHtml(segment) {
   const lines = activeLines(segment);
-  const head = '<div class="lrow head"><span>Folder</span><span>Name</span><span>km</span><span>File</span><span>Uploaded</span><span></span></div>';
+  const head = '<div class="lrow head"><span>Folder</span><span>Name</span><span>Distance</span><span>File</span><span>Uploaded</span><span></span></div>';
   const body = lines.length ? `<div class="lines">${head}${lines.map((line) => lineRowHtml(segment, line)).join("")}</div>` : '<div class="kempty">No route</div>';
   return `<tr class="xrow"><td colspan="10"><div class="kcard"><div class="khead"><b>KMZ routes</b>
     <button class="btn btn-sm" type="button" data-upline="${segment.id}">Upload KMZ route</button></div>${body}</div></td></tr>`;
@@ -457,7 +457,7 @@ function renderSegmentRows() {
     const lines = count === 0 ? '-' : count;
     const row = `<tr class="srow${isOpen ? " open" : ""}"><td class="c"><button class="chev" type="button" aria-expanded="${isOpen}" aria-label="Open or close ${segment.link}" data-chev="${segment.id}">${CHEV}</button></td>
       <th scope="row" title="${segment.link}">${segment.link}</th><td>${routeType(segment.a, segment.b)}</td><td>${segment.route}</td><td>${segment.section}</td>
-      <td class="r">${segment.km.toFixed(1)}</td><td class="r">${verified}</td><td class="r">${segment.total}</td><td class="r">${lines}</td>
+      <td class="r">${segment.km.toFixed(1)} km</td><td class="r">${verified}</td><td class="r">${segment.total}</td><td class="r">${lines}</td>
       <td class="r"><button class="link" type="button" data-edit="${segment.id}">Edit</button></td></tr>`;
     return row + (isOpen ? expandedHtml(segment) : "");
   }).join("") || '<tr><td colspan="10" class="empty">No segments</td></tr>';
@@ -487,8 +487,8 @@ function renderSites() {
     </div>
     <div class="tscroll">
       <table class="tbl" aria-label="Sites">
-        <colgroup><col><col style="width:160px"><col style="width:160px"><col style="width:160px"><col style="width:140px"><col style="width:100px"></colgroup>
-        <thead><tr><th>Name</th><th>Type</th><th class="r">Lat</th><th class="r">Long</th><th class="r">Segments</th><th></th></tr></thead>
+        <colgroup><col style="width:260px"><col style="width:130px"><col style="width:130px"><col style="width:130px"><col style="width:120px"><col style="width:90px"><col></colgroup>
+        <thead><tr><th>Name</th><th>Type</th><th class="r">Lat</th><th class="r">Long</th><th class="r">Segments</th><th></th><th aria-hidden="true"></th></tr></thead>
         <tbody id="site-body"></tbody>
       </table>
     </div>
@@ -505,8 +505,8 @@ function renderSiteRows() {
   $("#site-body").innerHTML = rows.slice(filter.page * PAGE_SIZE, (filter.page + 1) * PAGE_SIZE).map((site) => `<tr>
     <th scope="row">${site.name}</th><td>${site.kind}</td><td class="r">${site.lat || "-"}</td><td class="r">${site.long || "-"}</td>
     <td class="r"><button class="link" type="button" data-site-jump="${site.name}" aria-label="${segmentCount(site.name)} segments at ${site.name}">${segmentCount(site.name)}</button></td>
-    <td class="r"><button class="link" type="button" data-site-edit="${site.name}">Edit</button></td></tr>`).join("")
-    || '<tr><td colspan="6" class="empty">No sites</td></tr>';
+    <td class="r"><button class="link" type="button" data-site-edit="${site.name}">Edit</button></td><td></td></tr>`).join("")
+    || '<tr><td colspan="7" class="empty">No sites</td></tr>';
   $("#site-pager").innerHTML = pager(rows.length, filter.page, "sites");
 }
 
@@ -583,7 +583,7 @@ function uploadLineBox(modal) {
       return `<label class="frow${on ? " on" : ""}" data-row="${line.key}"><input type="checkbox" data-fpick="${line.key}" ${on ? "checked" : ""} aria-label="Pick ${line.title}">
         <span title="${line.title}">${line.title}</span><span>${line.folder}</span><span>${line.km.toFixed(1)} km</span><span class="${cls}">${line.status}</span></label>`;
     }).join("");
-    list = `<div class="flist"><div class="frow head"><span></span><span>Name</span><span>Folder</span><span>km</span><span>Status</span></div>${rows}</div>`;
+    list = `<div class="flist"><div class="frow head"><span></span><span>Name</span><span>Folder</span><span>Distance</span><span>Status</span></div>${rows}</div>`;
   }
   const size = modal.picked.size;
   const body = `<div class="upgrid"><div class="upleft"><div class="segname">${segment.link}</div>
@@ -594,7 +594,7 @@ function uploadLineBox(modal) {
   return boxShell(1000, "Upload KMZ route", body, foot);
 }
 const HISTORY = {
-  segment: [["12 Nov 2026", "km", "12.0", "12.4", "admin1", "-"], ["05 Nov 2026", "Registered cores", "-", "48", "upload: segments.xlsx", "-"],
+  segment: [["12 Nov 2026", "Distance", "12.0 km", "12.4 km", "admin1", "-"], ["05 Nov 2026", "Registered cores", "-", "48", "upload: segments.xlsx", "-"],
     ["28 Oct 2026", "Route", "R2", "R1", "admin1", "Renamed"], ["14 Oct 2026", "Total cores", "96", "144", "admin2", "-"]],
   site: [["19 Nov 2026", "Lat", "3.00110", "3.00210", "admin1", "-"], ["05 Nov 2026", "Type", "Site", "Building", "upload: sites.xlsx", "-"],
     ["28 Oct 2026", "Name", "Klang", "Klang Hut", "admin1", "Fixed name"]],
@@ -619,13 +619,12 @@ function editBox(modal) {
   const segment = segById(modal.seg);
   const body = `<div class="segname">${segment.link}</div>
     <div class="form">
-      <label>km<input class="field" id="ed-km" value="${segment.km.toFixed(1)}" inputmode="decimal"></label>
+      <label>Distance (km)<input class="field" id="ed-km" value="${segment.km.toFixed(1)}" inputmode="decimal"></label>
       <label>Route<input class="field" id="ed-route" value="${segment.route}"></label>
       <label>Cluster<input class="field" id="ed-section" value="${segment.section}"></label>
       <span></span>
       <label>Registered cores<input class="field" id="ed-ver" value="${segment.verified ?? ""}" inputmode="numeric" placeholder="-"></label>
       <label>Total cores<input class="field" id="ed-total" value="${segment.total}" inputmode="numeric"></label>
-      <label class="wide">Remarks<textarea class="field" id="ed-remarks"></textarea></label>
       <p class="err wide" id="ed-err" role="alert"></p>
       ${historyHtml("segment", modal.hist)}
     </div>`;
@@ -635,7 +634,7 @@ function addSegmentBox(modal) {
   const body = `<div class="form">
     <label>Site A<select class="field" id="as-a">${siteOptions(modal.a, "-")}</select></label>
     <label>Site B<select class="field" id="as-b">${siteOptions("", "-")}</select></label>
-    <label>km<input class="field" id="as-km" inputmode="decimal"></label>
+    <label>Distance (km)<input class="field" id="as-km" inputmode="decimal"></label>
     <label>Route<input class="field" id="as-route" placeholder="R1"></label>
     <label>Cluster<input class="field" id="as-section"></label>
     <p class="err wide" id="as-err" role="alert"></p></div>`;
@@ -676,7 +675,7 @@ function buildPreview(kind) {
       let change = "";
       if ([1, 4, 9, 17, 23, 31, 40, 55, 71].includes(index)) {
         status = "changed";
-        change = index % 3 === 0 ? `km ${segment.km.toFixed(1)} → ${(segment.km + 0.6).toFixed(1)}`
+        change = index % 3 === 0 ? `Distance ${segment.km.toFixed(1)} → ${(segment.km + 0.6).toFixed(1)} km`
           : index % 3 === 1 ? `Registered cores ${segment.verified ?? "-"} → 72` : `Route ${segment.route} → R${(index % 9) + 1}A`;
       }
       rows.push({ row: index + 2, name: segment.link, status, change });
@@ -962,7 +961,7 @@ function saveEdit() {
   const verified = verifiedText === "" ? null : Number(verifiedText);
   const total = Number($("#ed-total").value);
   if (!(km > 0)) {
-    $("#ed-err").textContent = "km must be above 0";
+    $("#ed-err").textContent = "Distance must be above 0";
     return;
   }
   if (!Number.isInteger(total) || total <= 0) {
@@ -996,7 +995,7 @@ function saveNewSegment() {
     return;
   }
   if (!(km > 0)) {
-    error.textContent = "km must be above 0";
+    error.textContent = "Distance must be above 0";
     return;
   }
   const segment = addSegment(a, b, { km, verified: null, total: 144, lines: 0 });
