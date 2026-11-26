@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { signIn } from "./helpers";
 import { zip } from "./xlsx";
 
@@ -27,56 +27,60 @@ function kmz(extraShift = 0) {
 
 test.use({ viewport: { width: 1440, height: 900 } });
 
-test("Import KMZ: title line, suggest by location, apply", async ({ page }) => {
-  await signIn(page, "admin1");
+async function openSelect(page: Page, extraShift: number) {
   await page.getByRole("navigation", { name: "Main" }).getByRole("button", { name: "Upload" }).click();
   await page.getByRole("button", { name: "Import KMZ" }).click();
   const box = page.getByRole("dialog", { name: "KMZ import" });
-
-  await box.getByLabel("Upload a KMZ file").setInputFiles(kmz());
+  await box.getByLabel("Upload a KMZ file").setInputFiles(kmz(extraShift));
   await expect(box.getByRole("checkbox", { name: /propose route/ })).toBeChecked();
   await box.getByRole("button", { name: "Continue" }).click();
+  return box;
+}
 
-  const segment = box.getByTestId(`kmz-segment-${SEGMENT}`);
-  await expect(segment.getByTestId("kmz-line-DEV Cyberjaya DC-DEV Klang Hut")).toContainText("title");
-  const unmatched = box.getByRole("region", { name: /^Not matched/ });
-  await expect(unmatched).toContainText("Untitled Path");
-  await expect(unmatched).toContainText("no title");
+test("Import KMZ: titled line is Ready, Accept moves the closest line to Ready, Add 2 routes applies", async ({ page }) => {
+  await signIn(page, "admin1");
+  const box = await openSelect(page, 0);
+  const toCheck = box.getByRole("region", { name: "To check" });
+  const ready = box.getByRole("region", { name: "Ready" });
+  await expect(ready).toContainText("DEV Cyberjaya DC-DEV Klang Hut");
+  await expect(ready.getByTestId("kmz-line-DEV Cyberjaya DC-DEV Klang Hut")).toContainText(/new|Route Replaced/);
+  await expect(ready.getByTestId("kmz-line-DEV Cyberjaya DC-DEV Klang Hut")).not.toContainText(/\d+ m|km/);
+  await expect(toCheck).toContainText("Untitled Path");
+  await expect(toCheck).toContainText(SEGMENT);
+  await expect(box.getByRole("button", { name: "Add 1 route" })).toBeEnabled();
 
-  await box.getByRole("button", { name: "Suggest by location" }).click();
-  await expect(segment.getByTestId("kmz-line-Untitled Path")).toContainText("suggested");
-  await expect(segment).toContainText("2 lines");
-  await expect(box.getByTestId("kmz-import-counts")).toHaveText("1 segment · 2 lines · 0 not matched");
+  await toCheck.getByRole("button", { name: "Accept closest for Untitled Path" }).click();
+  await expect(box.getByRole("region", { name: "To check" })).toHaveCount(0);
+  await expect(ready.getByTestId("kmz-line-Untitled Path")).toContainText(SEGMENT);
   if (SHOT) {
     await page.screenshot({ path: SHOT });
   }
 
-  await box.getByRole("button", { name: "Continue" }).click();
-  await expect(box.getByRole("table", { name: "Lines to apply" })).toContainText(SEGMENT);
-  await box.getByRole("button", { name: "Apply 1 + 1 suggested" }).click();
+  await box.getByRole("button", { name: "Add 2 routes" }).click();
   await expect(box).toHaveCount(0);
   await expect(page.getByTestId("kmz-import-result")).toContainText("2 route lines drawn on the map");
 });
 
-test("Import KMZ: closest suggestion is only applied after Accept, ends and km show", async ({ page }) => {
+test("Import KMZ: hovering a row highlights its line, Skipped holds same lines until ticked", async ({ page }) => {
   await signIn(page, "admin1");
-  await page.getByRole("navigation", { name: "Main" }).getByRole("button", { name: "Upload" }).click();
-  await page.getByRole("button", { name: "Import KMZ" }).click();
-  const box = page.getByRole("dialog", { name: "KMZ import" });
-  await box.getByLabel("Upload a KMZ file").setInputFiles(kmz(600));
-  await box.getByRole("button", { name: "Continue" }).click();
+  const box = await openSelect(page, 600);
+  const ready = box.getByRole("region", { name: "Ready" });
+  const row = ready.getByTestId("kmz-line-DEV Cyberjaya DC-DEV Klang Hut");
+  await row.hover();
+  await expect(box.locator("[data-hover=true]")).toHaveCount(1);
+  await box.getByRole("button", { name: "Back" }).hover();
+  await expect(box.locator("[data-hover=true]")).toHaveCount(0);
 
-  const segment = box.getByTestId(`kmz-segment-${SEGMENT}`);
-  const unmatched = box.getByRole("region", { name: /^Not matched/ });
-  await expect(segment).toContainText("1 line");
-  await expect(unmatched).toContainText(`closest: ${SEGMENT}`);
-  await expect(box.getByTestId("kmz-line-DEV Cyberjaya DC-DEV Klang Hut")).toContainText(/ends \d+ m · \d+ m/);
-  if (process.env.KMZ_SHOT_V3) {
-    await page.screenshot({ path: process.env.KMZ_SHOT_V3 });
-  }
+  // Applying this file twice makes the second copy "same".
+  await box.getByRole("region", { name: "To check" }).getByRole("button", { name: /^Accept closest/ }).click();
+  await box.getByRole("button", { name: "Add 2 routes" }).click();
+  await expect(box).toHaveCount(0);
 
-  await unmatched.getByRole("button", { name: "Accept closest for Untitled Path" }).click();
-  await expect(segment).toContainText("2 lines");
-  await expect(segment.getByTestId("kmz-line-Untitled Path")).toContainText("suggested");
-  await expect(box.getByTestId("kmz-import-counts")).toHaveText("1 segment · 2 lines · 0 not matched");
+  const again = await openSelect(page, 600);
+  const skipped = again.getByRole("region", { name: "Skipped" });
+  await expect(skipped).toContainText("(2)");
+  await skipped.getByRole("button", { name: "Show or hide Skipped" }).click();
+  await expect(skipped).toContainText("same");
+  await skipped.getByRole("checkbox").first().click();
+  await expect(again.getByRole("region", { name: "Ready" }).getByRole("checkbox")).toHaveCount(1);
 });

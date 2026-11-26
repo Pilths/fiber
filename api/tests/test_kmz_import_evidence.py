@@ -1,5 +1,4 @@
-"""KMZ import box evidence per line: end distances, km vs Excel, duplicate, closest suggestion, same."""
-from sqlalchemy import text
+"""KMZ import box evidence per line: duplicate, closest suggestion, same."""
 from test_kmz_segment_routes import apply_picks
 from test_kmz_upload import URL, admin, segments, stage  # noqa: F401 (fixtures)
 from test_load_kmz import EJH1_TO_RINI, RINI_TO_OKID, folder_xml, line_xml, write_kmz
@@ -11,15 +10,6 @@ def stage_folders(client, tmp_path, *folders):
     ids = [str(index) for index in range(len(folders))]
     body = stage(client, path.read_bytes(), folder_ids=ids).json()
     return body, {line["key"]: line for line in body["route_lines"]}
-
-
-def test_end_distance_and_km_against_excel(client, db, admin, segments, tmp_path):
-    db.execute(text("UPDATE segments SET distance_km = 1 WHERE id = :s"), {"s": segments[0]})
-    _, lines = stage_folders(client, tmp_path, ("a", [line_xml(EJH1_TO_RINI, "EJH1-RINI")]))
-    line = lines["0:0"]
-    assert line["end_a_m"] == 0 and line["end_b_m"] == 0
-    assert line["km"] > 3 and line["excel_km"] == 1 and line["km_differs"] is True
-    assert line["same"] is False and line["duplicate"] is False
 
 
 def test_duplicate_across_folders(client, db, admin, segments, tmp_path):
@@ -41,7 +31,8 @@ def test_closest_suggestion_by_location_and_folder(client, db, admin, segments, 
     assert lines["0:0"]["suggested_segment_id"] is None
     _, lines = stage_folders(client, tmp_path, ("misc", [line_xml(shifted, "Path 7")]))
     assert lines["0:0"]["closest_by"] == "location" and lines["0:0"]["closest_segment_id"] == segments[1]
-    assert 0 < lines["0:0"]["end_a_m"] < 100 and lines["0:0"]["suggested_segment_id"] is None
+    assert lines["0:0"]["suggested_segment_id"] is None
+    assert "end_a_m" not in lines["0:0"] and "km" not in lines["0:0"]
 
 
 def test_same_as_stored_route_is_flagged_and_never_stored_twice(client, db, admin, segments, tmp_path):

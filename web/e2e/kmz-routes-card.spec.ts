@@ -34,7 +34,7 @@ test("KMZ routes card: upload one route, Remove with Undo, Remove and wait", asy
   await box.getByLabel("Upload a KMZ route file").setInputFiles(kmz());
   const line = box.getByTestId(`route-line-${ROUTE}`);
   await expect(line).toContainText("Card folder");
-  await expect(line).toContainText(/new|replaces route/);
+  await expect(line).toContainText(/new|Route Replaced/);
   await box.getByRole("button", { name: "Add 1 route" }).click();
   await expect(box).toHaveCount(0);
 

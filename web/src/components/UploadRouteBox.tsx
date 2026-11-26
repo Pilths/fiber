@@ -10,6 +10,7 @@ const STATUS_CLASS: Record<LineStatus["status"], string> = {
   "replaces route": "font-semibold text-amber",
   new: "font-semibold text-green",
 };
+const STATUS_LABEL: Record<LineStatus["status"], string> = { same: "same", "replaces route": "Route Replaced", new: "new" };
 
 type Staged = NonNullable<ReturnType<typeof useUploadRoute>["staged"]>;
 
@@ -39,7 +40,7 @@ function LineRows({ staged, statuses, state }: {
               <td title={name}>{name}</td>
               <td title={line?.folder_path}>{line?.folder_path || "-"}</td>
               <td className="num">{status.distance_km.toFixed(1)} km</td>
-              <td className={STATUS_CLASS[status.status]}>{status.status}</td>
+              <td className={STATUS_CLASS[status.status]}>{STATUS_LABEL[status.status]}</td>
             </tr>
           );
         })}

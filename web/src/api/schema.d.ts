@@ -2100,19 +2100,6 @@ export interface components {
             closest_segment_id?: number | null;
             /** Closest By */
             closest_by?: ("location" | "folder") | null;
-            /** End A M */
-            end_a_m?: number | null;
-            /** End B M */
-            end_b_m?: number | null;
-            /** Km */
-            km?: number | null;
-            /** Excel Km */
-            excel_km?: number | null;
-            /**
-             * Km Differs
-             * @default false
-             */
-            km_differs: boolean;
             /**
              * Same
              * @default false

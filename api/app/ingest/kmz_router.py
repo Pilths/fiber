@@ -67,11 +67,6 @@ class KmzRouteLineOut(BaseModel):
     suggested_by: Literal["title"] | None
     closest_segment_id: int | None = None  # a suggestion for a line with no matching title; never applied unasked
     closest_by: Literal["location", "folder"] | None = None
-    end_a_m: int | None = None  # metres from the segment's site A (and B) to the nearer line end
-    end_b_m: int | None = None
-    km: float | None = None
-    excel_km: float | None = None  # the segment's Excel distance
-    km_differs: bool = False  # km and Excel km differ by more than 10 %
     same: bool = False  # the shape equals a route already stored on the segment
     duplicate: bool = False  # the same shape appeared earlier in the file (another folder)
     coords: list[list[float]] = []  # [lon, lat] thinned to at most PREVIEW_VERTICES, for the map preview
