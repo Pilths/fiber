@@ -1,8 +1,8 @@
 """KMZ route lines stored as drawn: each line is assigned to a segment by the admin. No joining, no cutting, no km.
 
 A route line is a kmz_groups row with route = true (on a segment) holding one 'line' kmz_elements row. A segment may
-have several. The preview lists every line with a suggestion from its title; suggest_by_location adds suggestions
-from where the line ends lie. Nothing here is saved before apply.
+have several. The preview lists every line with a suggestion from its title, its folder or where its ends lie.
+Nothing here is saved before apply.
 """
 import json
 
@@ -14,7 +14,6 @@ from app.errors import Invalid
 from app.ingest.kmz_groups import INSERT_ELEMENT_SQL, target_must_exist
 from app.ingest.kmz_segment_routes import line_statuses
 
-NEAR_METRES = 200
 # The segment whose two sites both lie within :near metres of the two line ends (either way round); the smaller
 # summed distance wins.
 NEAREST_SEGMENT_SQL = """
@@ -92,16 +91,6 @@ def add_evidence(db: Session, route_lines: list[dict]) -> None:
         if segment_id is not None:
             compared = line_statuses(db, segment_id, [{"key": line["key"], "geometry": line["geometry"]}])[0]
             line["same"] = compared["status"] == "same"
-
-
-def suggest_by_location(db: Session, route_lines: list[dict]) -> list[dict]:
-    """[{key, segment_id, suggested_by: 'location'}] for the lines that have a segment. Saves nothing."""
-    suggestions = []
-    for line in route_lines:
-        segment_id = nearest_segment_id(db, line["geometry"], NEAR_METRES)
-        if segment_id is not None:
-            suggestions.append({"key": line["key"], "segment_id": segment_id, "suggested_by": "location"})
-    return suggestions
 
 
 def check_route_lines(db: Session, staged_lines: list[dict], choices: list[dict]) -> list[dict]:

@@ -47,17 +47,6 @@ def shaped_none(db):
     return not any(f["properties"].get("shaped") for f in map_segments(Session(bind=db))["features"])
 
 
-def test_suggest_by_location(client, db, admin, segments, tmp_path):
-    upload_id = preview(client, tmp_path)["upload_id"]
-    response = client.post(f"{URL}/uploads/{upload_id}/suggest-by-location")
-    assert response.status_code == 200
-    found = {item["key"]: item for item in response.json()}
-    assert found["0:2"] == {"key": "0:2", "segment_id": segments[1], "suggested_by": "location"}
-    assert found["0:0"]["segment_id"] == segments[0]
-    assert "0:3" not in found
-    assert one(db, "SELECT count(*) FROM kmz_groups") == 0
-
-
 def test_apply_several_lines_on_one_segment_drawn_and_exported(client, db, admin, segments, tmp_path):
     body = preview(client, tmp_path)
     picks = [{"key": "0:0", "segment_id": segments[0]}, {"key": "0:1", "segment_id": segments[0]}]
@@ -113,10 +102,6 @@ def test_export_without_route_group_is_the_old_line(client, db, admin, segments)
     name, kml = segment_kml(Session(bind=db), segments[0])
     assert kml.count("<LineString>") == 1
     assert kml.count("<Point>") == 2
-
-
-def test_suggest_by_location_needs_admin(client, db, segments):
-    assert client.post(f"{URL}/uploads/1/suggest-by-location").status_code in (401, 403)
 
 
 def test_route_group_moves_only_to_a_segment(client, db, admin, segments, tmp_path):

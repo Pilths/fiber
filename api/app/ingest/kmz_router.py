@@ -72,12 +72,6 @@ class KmzRouteLineOut(BaseModel):
     coords: list[list[float]] = []  # [lon, lat] thinned to at most PREVIEW_VERTICES, for the map preview
 
 
-class KmzLocationSuggestion(BaseModel):
-    key: str
-    segment_id: int
-    suggested_by: Literal["location"]
-
-
 class KmzUploadOut(BaseModel):
     upload_id: int
     filename: str
@@ -279,14 +273,6 @@ def apply(db: DB, admin: Admin, upload_id: int, body: KmzApplyIn | None = None) 
     with logged_apply("kmz", upload_id, admin.id):
         result = apply_upload(db, admin.id, upload_id, body.route_segment_ids, choices, line_choices)
         return KmzApplyOut(upload_id=upload_id, **result)
-
-
-@router.post("/uploads/{upload_id}/suggest-by-location")
-def suggest_by_location(db: DB, upload_id: int) -> list[KmzLocationSuggestion]:
-    """Segments whose two sites lie near the two ends of each staged line. Saves nothing."""
-    upload = get_upload(db, upload_id, "kmz")
-    route_lines = upload["summary"].get("route_lines", [])
-    return [KmzLocationSuggestion(**item) for item in kmz_route_lines.suggest_by_location(db, route_lines)]
 
 
 @router.get("/clusters")
