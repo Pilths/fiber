@@ -34,12 +34,15 @@ function segmentForm(segment: SegmentEdit, focus?: SegmentFocus) {
     region: segment.region ?? "",
     survey: optionalText(segment.survey_cores),
     cable: String(segment.cable_size),
+    route: segment.route ?? "",
+    section: segment.section ?? "",
     remarks: "",
     cut: focus !== "restore" && segment.fiber_cut,
   };
 }
 
 type SegmentForm = ReturnType<typeof segmentForm>;
+const EMPTY_SEGMENT = { distance_km: null, region: null, survey_cores: null, cable_size: 0, fiber_cut: false } as SegmentEdit;
 
 // Only changed fields are sent.
 function segmentChanges(segment: SegmentEdit, form: SegmentForm, siteA: Site, siteB: Site) {
@@ -50,6 +53,12 @@ function segmentChanges(segment: SegmentEdit, form: SegmentForm, siteA: Site, si
   }
   if (form.region && form.region !== segment.region) {
     body.region = form.region;
+  }
+  if (form.route.trim() !== (segment.route ?? "")) {
+    body.route = form.route.trim();
+  }
+  if (form.section.trim() !== (segment.section ?? "")) {
+    body.section = form.section.trim();
   }
   if (siteA.id !== segment.site_a_id) {
     body.site_a_id = siteA.id;
@@ -95,7 +104,7 @@ function useSave(onClose: () => void, onSaved: () => void) {
 export function useEditSegment(segmentId: number, focus: SegmentFocus | undefined, onClose: () => void,
   onSaved: () => void) {
   const [segment, setSegment] = useState<SegmentEdit | null>(null);
-  const [form, setForm] = useState({ distance: "", region: "", survey: "", cable: "", remarks: "", cut: false });
+  const [form, setForm] = useState<SegmentForm>(segmentForm(EMPTY_SEGMENT));
   const [siteA, setSiteA] = useState<Site | null>(null);
   const [siteB, setSiteB] = useState<Site | null>(null);
   const [pasting, setPasting] = useState(false);
@@ -131,7 +140,7 @@ export function useEditSegment(segmentId: number, focus: SegmentFocus | undefine
     }
   }, [segment, focus]);
 
-  const setField = (key: "distance" | "region" | "survey" | "cable") => (event: InputEvent) => {
+  const setField = (key: "distance" | "region" | "survey" | "cable" | "route" | "section") => (event: InputEvent) => {
     setForm((old) => ({ ...old, [key]: event.target.value }));
   };
   const setCut = (cut: boolean) => {
@@ -169,6 +178,7 @@ function siteForm(site: SiteEdit) {
     lat: optionalText(site.lat),
     lon: optionalText(site.lon),
     region: site.region ?? "",
+    kind: site.kind,
     active: site.active,
     remarks: "",
   };
@@ -190,6 +200,9 @@ function siteChanges(site: SiteEdit, form: SiteForm) {
   if (form.region && form.region !== site.region) {
     body.region = form.region;
   }
+  if (form.kind !== site.kind) {
+    body.kind = form.kind;
+  }
   if (form.active !== site.active) {
     body.active = form.active;
   }
@@ -198,7 +211,7 @@ function siteChanges(site: SiteEdit, form: SiteForm) {
 
 export function useEditSite(siteId: number, onClose: () => void, onSaved: () => void) {
   const [site, setSite] = useState<SiteEdit | null>(null);
-  const [form, setForm] = useState({ name: "", lat: "", lon: "", region: "", active: true, remarks: "" });
+  const [form, setForm] = useState({ name: "", lat: "", lon: "", region: "", kind: "site", active: true, remarks: "" });
   const { error, setError, busy, save } = useSave(onClose, onSaved);
 
   useEffect(() => {
@@ -221,7 +234,7 @@ export function useEditSite(siteId: number, onClose: () => void, onSaved: () => 
     };
   }, [siteId, setError]);
 
-  const setField = (key: "name" | "lat" | "lon" | "region") => (event: InputEvent) => {
+  const setField = (key: "name" | "lat" | "lon" | "region" | "kind") => (event: InputEvent) => {
     setForm((old) => ({ ...old, [key]: event.target.value }));
   };
   const setActive = (active: boolean) => {

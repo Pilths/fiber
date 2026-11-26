@@ -32,7 +32,7 @@ class HistoryRow(BaseModel):
     field: str
     old_value: str | None
     new_value: str | None
-    remarks: str
+    remarks: str | None  # blank remarks are stored as NULL
     user_id: int
     user: str
     at: Any
