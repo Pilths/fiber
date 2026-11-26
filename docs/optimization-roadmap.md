@@ -1,6 +1,6 @@
 # Optimization roadmap
 
-Last verified: 2026-11-20, commit b4e4393
+Last verified: 2026-11-26
 
 Written 17 November 2026, status updated 20 November 2026 from the architecture reviews of branch `dev` (architecture baseline, risk review, PostgreSQL and
 PostGIS review, FastAPI review). Complexity: S is under a day, M a few days, L weeks.
@@ -42,11 +42,10 @@ depend on a local `.env`.
 Action for each machine: add `ALLOW_DEV_HEADER=1` to your `.env` if you call the API with an `X-Dev-User` header
 (curl, scripts). The web app signs in with the login form and does not need it. `.env.example` has the line.
 
-Left alone on purpose: `SESSION_SECRET` is in `.env.example` but nothing reads it (sessions are random tokens hashed in
-the `sessions` table). The guard does not check it, so it does not force a value nobody uses. Decide later whether to
-delete the variable.
+`SESSION_SECRET` was deleted from `.env.example` (owner decision, 24 November 2026): nothing read it, sessions are
+random tokens hashed in the `sessions` table.
 
-Still open from the risk review: containers run as root (item 9b below). The missing TLS proxy is an owner decision
+From the risk review: containers ran as root. Item 9b is done on `main` (`USER fiber` in `api/Dockerfile`); `dev` still runs as root. The missing TLS proxy is an owner decision
 (plain HTTP, 18 November 2026).
 
 ### 4. Logging (done)
@@ -68,7 +67,7 @@ This is also the data for roadmap item 14: the slow-request lines show whether t
 | 6 | Foreign-key indexes | migration `0005_foreign_key_indexes.py` |
 | 7 | Segment updates sorted by id in the apply loops | `_segment_id_order` in `segment_list.py` and `reservation_upload.py` |
 | 8 | Login throttle per username and address | `api/tests/test_login_throttle.py` |
-| 9 | Production profile: `main` runs `db` and `api`, FastAPI serves the built web app, no reload, no source mounts. TLS proxy dropped by owner decision (18 November 2026). Non-root `USER` is still open (see Open) | CLAUDE.md "Production", `docker-compose.yml` per branch |
+| 9 | Production profile: `main` runs `db` and `api`, FastAPI serves the built web app, no reload, no source mounts. TLS proxy dropped by owner decision (18 November 2026). Non-root `USER` is done on `main` only (see 9b) | CLAUDE.md "Production", `docker-compose.yml` per branch |
 | 10 | Upload apply re-checks Free under segment locks; `lock_timeout`; lock errors map to 409 | `set_lock_timeout` in `app/db.py`, used by `ingest/uploads.py` and `site_master/apply.py` |
 | 11 | More concurrency tests | `api/tests/test_reservation_races.py`, commit `db47cd9` |
 | 12 | Env reads in one place | `api/app/environment.py`, commit `c1b8fc7` |
@@ -83,12 +82,8 @@ Short term:
 
 | # | Change | Benefit | Risk | Complexity | ROI |
 |---|---|---|---|---|---|
-| 9b | Non-root `USER` in `api/Dockerfile` (no `USER` line today) | Containers stop running as root | Low (bind-mount ownership on dev) | S | Medium |
+| 9b | Non-root `USER` in `api/Dockerfile`: done on `main` (`USER fiber`); the `dev` Dockerfile still has no `USER` line | Containers stop running as root | Low (bind-mount ownership on dev) | S | Medium |
 | 14 | Measure the map endpoints with the slow-request log; cache only if needed | Avoids tuning on a guess | None | S | Medium |
-
-Not started, needs an owner decision:
-
-- Whether to delete `SESSION_SECRET` from `.env.example` (nothing reads it).
 
 ## Long term (6-12 months), all open
 
@@ -110,6 +105,6 @@ a repository or DDD layer; rate-limit infrastructure beyond item 8.
 
 ## Order of work
 
-1. Item 9b (non-root `USER`), then check that bind-mounted source and the `backups/` folder still write.
+1. Item 9b (non-root `USER`): done on `main`; `dev` still runs as root. If `dev` gets it, check that bind-mounted source and the `backups/` folder still write.
 2. Item 14 once the slow-request log has a week of data; item 18 only if more than one worker is planned.
 3. Item 19 when SMTP access is decided. Items 20 to 23 after production goes live.

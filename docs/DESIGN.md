@@ -1,6 +1,6 @@
 # Fiber Dashboard design
 
-Last verified: 2026-11-20, commit b4e4393
+Last verified: 2026-11-26, branch main commit b6f032a
 
 The single place for how the UI looks and where information goes. Read it before any UI or mock work.
 Binding owner rules live in `CLAUDE.md` "UI rules"; this file does not repeat them.
@@ -26,8 +26,8 @@ Source of truth: `web/src/index.css`. Summary:
 - Colour only where it carries meaning: blue #1d5fbf (primary), green #1a7f4b (measured loss deviation, "x of N" complete),
   amber #b45309 on #fff7ed (Requested, stale, warnings), red #b42318 on #fef3f2 (cut, zero free ("Full"), short
   route leg, errors), slate (In service), dark ink (Reserved).
-- Map: data center a square, TOC a triangle, trunk site a diamond (see section 3 for the current build). Line weight by route type:
-  Trunk thick, Metro thin dashed. Each segment line carries a free-core number chip.
+- Map: data center a square, TOC a triangle, trunk site a diamond (see section 3 for the current build). Line colours and patterns:
+  see section 3. Each segment line carries a free-core number chip.
 
 ## 3. Information architecture (agreed 1 Nov 2026, mock "8 Final")
 
@@ -107,7 +107,7 @@ Never label a value just "Loss": always "Calculated loss" or "Measured loss".
 ### Later
 
 Sites and data centres: when `sites.details` has data, the segment list gets a Segments | Sites switch and a site
-gets its own detail view (Overview, Racks, 3D). Global search: results grouped as Customers, Segments, Cores; a core result opens its segment and highlights the row; a customer result shows the customer on the map (customer mode, section 3).
+gets its own detail view (Overview, Racks, 3D).
 
 ## 4. Patterns (agreed)
 

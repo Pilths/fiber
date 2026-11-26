@@ -1,6 +1,6 @@
 # Fiber Dashboard: Build Workflow (PRD to Review)
 
-Last verified: 2026-11-20, commit b4e4393
+Last verified: 2026-11-26
 
 How to use this file: Claude (chat or Claude Code) reads it to know which step the project is on, which tool to use, and what the output of each step is. Update the status checklist at the bottom as steps finish.
 
@@ -64,7 +64,7 @@ The order builds the last-to-be-cut items first.
 - Session 6: Loss warning levels per core (green 0 to 3%, amber 3 to 7%, red 7 to 10%). The form is open: chart, small scrollable list, or both. A route shows x of y segments measured. No distance shown instead of 0 dB. Shown per core in core details and the reserve box, not on the map or the segment diagram. UI session.
 - Session 7: Admin upload in three steps: Upload, Preview, Confirm. Protected edits, first import of reservations, upload log. Also the site master replace-file upload (its own workbook, separate from the Reservation workbook; sites and DC sheets found by headers; Added, Changed, Missing, Problem; current file).
 - Session 8: Admin editing. Core status first (stays in MVP), then segment and site details (third cut).
-- Session 9: NetworkX routing. Up to 3 options, Optimise for shortest distance or most free cores.
+- Session 9: NetworkX routing. Up to 5 options, Optimise for shortest distance or most free cores.
 - Session 10: Inventory page (the home page: map, segment list, segment diagram, Cores table, reserve box, route ribbon, URL hash selection, reservation history endpoint), map time-boxed. Segments are straight lines; one mock route with a drawn shape (TASK-084) proves the shape path. Fall back to a plain SVG map of sites and straight segment lines, without a basemap, if it overruns (second cut).
 - Session 11: Email digest, admin request emails and the in-app scheduler (first cut).
 
@@ -108,13 +108,12 @@ Do not create a separate agent per phase. Make an agent only when it needs a dif
 - Loss coverage counts segments with a reading.
 - Layout is decided (26 October): one map page as the home, top bar navigation, no left sidebar, desktop only, light theme only. The PRD, Design decisions, holds the details.
 - Decided 26 October: loss shows per core (core details, reserve box); Users is in the account menu (admin only); KMZ shapes are now built (title `AAAA-BBBB`); no site master undo in the MVP (previous uploads kept); the site master is a separate workbook from the Reservation workbook.
-- Admins can edit fiber cut on a segment (cut or restore), segment details and site details. The daily job is an in-app scheduler (APScheduler) that records its last run.
+- Admins can edit fiber cut on a segment (cut or restore), segment details and site details. The daily job is a cron entry or a small looping service (planned, not built) that records its last run.
 
 ## Still open
 
-- Whether two sites can have more than one segment of the same route type (to confirm with the data owners).
 - SMTP relay access.
-- Whether the UI rework (TASK-073 to TASK-075) moves earlier than Phase 11 (RISK-010); whether real rows have blank core assignments (run `app.load_data` on the real file; `excel_check` was removed 16 Nov 2026); how an upload may "modify" a reservation. Full list: `docs/plan.md`, section 9.
+- Whether real rows have blank core assignments (run `app.load_data` on the real file; `excel_check` was removed 16 Nov 2026); how an upload may "modify" a reservation. Full list: `docs/plan.md`, section 9.
 
 ## Install notes
 
@@ -130,6 +129,6 @@ Do not create a separate agent per phase. Make an agent only when it needs a dif
 - [ ] Step 3: Risk spike (moved: map spike runs before Session 10)
 - [x] Step 4: Tickets (skipped by decision: task tables in `docs/plan.md` replace tickets)
 - [x] Step 5: CLAUDE.md and docs/PRD.md (21 October 2026)
-- [ ] Step 6: Build loop (sessions 0 to 11). Done: Sessions 0 to 10 (login, loss, uploads incl. site master, segment list and KMZ, admin editing, routing, map page; status as of 20 November 2026, see `docs/architecture.md`). Not built: Session 11 (email digest and scheduler, waits for SMTP access). Left: TASK-062 (real data upload, the gate to ship), TASK-064 (manual width check and timed planner test). Hardening follows `docs/optimization-roadmap.md`.
+- [ ] Step 6: Build loop (sessions 0 to 11). Done: Sessions 0 to 10 (login, loss, uploads incl. site master, segment list and KMZ, admin editing, routing, map page; status as of 26 November 2026, see `docs/architecture.md`). Not live yet: `main` is the go-live branch, still in development. Not built: Session 11 (email digest and scheduler, waits for SMTP access). Left: TASK-062 (real data upload, the gate to ship), TASK-064 (manual width check and timed planner test). Hardening follows `docs/optimization-roadmap.md`.
 - [ ] Step 7: UI quality (per UI session)
 - [ ] Step 8: Review (per session)
