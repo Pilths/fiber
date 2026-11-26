@@ -29,10 +29,11 @@ ul { list-style: none; padding: 0; }
 .proto a:hover { background: #3a3e45; }
 .proto a.on { background: #fff; color: var(--ink); font-weight: 600; }
 
-.top { height: 60px; background: #fff; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 32px; padding: 0 24px; }
+.top { height: 60px; padding-bottom: 0; background: #fff; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 32px; padding: 0 24px; }
 .top b { font-size: 16px; }
 .top nav { display: flex; gap: 20px; color: var(--nav-ink); font-weight: 500; }
-.top nav .on { color: var(--ink); font-weight: 600; }
+.top nav span { padding: 21px 0 19px; border-bottom: 2px solid transparent; }
+.top nav .on { color: var(--ink); font-weight: 600; border-bottom-color: var(--ink); }
 
 /* Shared */
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 36px; padding: 0 16px; border: 1px solid var(--line); border-radius: 6px; background: #fff; font-weight: 600; cursor: pointer; white-space: nowrap; }
@@ -41,7 +42,7 @@ ul { list-style: none; padding: 0; }
 .btn-p { background: var(--ink); border-color: var(--ink); color: #fff; }
 .btn-p:hover { background: #2c2c2c; }
 .btn-sm { height: 32px; padding: 0 12px; font-size: 13px; }
-.link { color: var(--blue); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; background: none; border: 0; padding: 0; font-size: 13px; }
+.link { color: var(--blue); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; background: none; border: 0; padding: 0; font-size: 14px; }
 .field { width: 100%; height: 36px; padding: 0 12px; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
 textarea.field { height: 72px; padding: 8px 12px; resize: vertical; }
 .field::placeholder { color: var(--nav-ink); opacity: 1; }
@@ -58,11 +59,11 @@ select.field { appearance: none; padding-right: 30px; cursor: pointer; backgroun
 .st-review { color: var(--amber); font-weight: 600; }
 .st-rej { color: var(--red); font-weight: 600; }
 .tbl { width: 100%; table-layout: fixed; border-collapse: collapse; }
-.tbl th, .tbl td { text-align: center; padding: 4px 12px; white-space: normal; overflow-wrap: anywhere; overflow: hidden; line-height: 1.3; font-size: 13px; }
+.tbl th, .tbl td { text-align: center; padding: 4px 12px; white-space: normal; overflow-wrap: anywhere; overflow: hidden; line-height: 1.3; font-size: 14px; }
 .tbl .l, .tbl .r { text-align: center; }
-.tbl thead th { font-size: 13px; font-weight: 500; color: var(--muted-ink); background: var(--subtle); height: 36px; border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 1; }
+.tbl thead th { font-size: 13px !important; font-weight: 500; color: var(--muted-ink); background: var(--subtle); height: 36px; border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 1; }
 .tbl td, .tbl tbody th { height: 40px; border-bottom: 1px solid var(--rule); }
-.tbl tbody th { font-weight: 600; }
+.tbl tbody th { font-weight: 500; }
 .tbox { border: 1px solid var(--border); border-radius: 6px; overflow: hidden; background: #fff; }
 .tbl .c { padding: 0 4px; }
 .chev { width: 24px; height: 24px; border: 0; background: none; border-radius: 4px; display: inline-grid; place-items: center; cursor: pointer; vertical-align: middle; }
@@ -71,16 +72,21 @@ select.field { appearance: none; padding-right: 30px; cursor: pointer; backgroun
 .chev[aria-expanded="true"] svg { transform: rotate(90deg); }
 
 /* Page */
-.page { height: calc(100vh - 92px); display: flex; flex-direction: column; padding: 16px 24px 0; gap: 16px; }
+.page { height: calc(100vh - 92px); display: flex; flex-direction: column; padding: 16px 24px 16px; gap: 16px; }
 .subbar { display: flex; align-items: flex-end; gap: 16px; border-bottom: 1px solid var(--border); }
 .subtabs { display: flex; gap: 4px; flex: 1; }
 .subtabs button { height: 40px; margin-bottom: -1px; border: 0; border-bottom: 2px solid transparent; background: none; padding: 0 16px; font-weight: 500; color: var(--nav-ink); cursor: pointer; }
 .subtabs button:hover { color: var(--ink); }
 .subtabs button[aria-selected="true"] { border-color: var(--ink); color: var(--ink); font-weight: 600; }
-.subbar .bulk { display: flex; gap: 8px; padding-bottom: 4px; }
-.subbar .btn-sm { padding: 0 16px; }
+.subbar .bulk { display: flex; gap: 8px; padding-bottom: 6px; }
+.subbar .btn-sm { padding: 0 16px; height: 34px; }
 .panel { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 16px; }
-.toolbar { display: flex; align-items: center; gap: 16px; }
+.panel:has(.tscroll) { gap: 0; background: #fff; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.panel:has(.tscroll) .tscroll { border: 0; border-radius: 0; border-top: 1px solid var(--border); }
+.panel:has(.tscroll) .pager { padding: 0 16px; border-top: 1px solid var(--border); background: var(--subtle); }
+#seg-pager, #site-pager { flex: none; }
+.toolbar { display: flex; align-items: center; gap: 24px; padding: 12px 16px; }
+.toolbar .sep { width: 1px; height: 24px; background: var(--border); }
 .toolbar .btn-sm, .toolbar .chip { padding: 0 16px; height: 36px; }
 .toolbar .field { width: auto; }
 .toolbar .count { margin-left: auto; font-weight: 600; }
@@ -97,17 +103,18 @@ select.field { appearance: none; padding-right: 30px; cursor: pointer; backgroun
 
 /* Expanded segment */
 .tbl tr.xrow > td { height: auto; padding: 16px; white-space: normal; background: var(--subtle); border-bottom: 1px solid var(--border); overflow: visible; }
-.kcard { background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 16px; display: grid; gap: 16px; max-width: 1120px; }
+.pager .info { font-size: 13px; }
+.kcard { box-sizing: border-box; background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 16px; display: grid; gap: 16px; width: 100%; }
 .khead { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .khead b { font-weight: 600; font-size: 14px; color: var(--ink); }
 .lines { display: grid; }
-.lrow { display: grid; grid-template-columns: 110px minmax(0, 1fr) 80px minmax(0, 190px) 120px 260px; align-items: center; gap: 12px; text-align: center; min-height: 40px; padding: 0 16px; font-size: 13px; border-bottom: 1px solid var(--rule); }
+.lrow { display: grid; grid-template-columns: 1fr 1.5fr .7fr 1.5fr 1fr 1.6fr; align-items: center; gap: 12px; text-align: center; min-height: 40px; padding: 0 16px; font-size: 14px; border-bottom: 1px solid var(--rule); }
 .lrow > span { overflow-wrap: anywhere; line-height: 1.3; padding: 4px 0; }
-.lrow.head { min-height: 36px; color: var(--muted-ink); font-weight: 500; background: var(--subtle); border-bottom-color: var(--border); }
+.lrow.head { font-size: 13px; min-height: 36px; color: var(--muted-ink); font-weight: 500; background: var(--subtle); border-bottom-color: var(--border); }
 .lrow.item.removing { background: var(--amber-bg); }
 .lrow.item.removed .t { text-decoration: line-through; }
-.lrow .acts { display: flex; gap: 16px; justify-content: center; align-items: center; }
-.kempty { padding: 0 16px; text-align: center; }
+.lrow .acts { display: flex; flex-wrap: wrap; gap: 4px 16px; justify-content: center; align-items: center; }
+.kempty { padding: 8px 16px; text-align: center; }
 
 /* Boxes */
 .dim { position: fixed; inset: 0; background: rgb(10 10 10 / .45); z-index: 10; }
@@ -124,9 +131,9 @@ select.field { appearance: none; padding-right: 30px; cursor: pointer; backgroun
 .form label { display: grid; gap: 8px; font-size: 13px; font-weight: 500; }
 .form .wide { grid-column: 1 / -1; }
 .drop { border: 1px dashed var(--line); background: var(--subtle); border-radius: 6px; padding: 16px; display: flex; align-items: center; gap: 16px; font-size: 13px; }
-.segname { font-size: 16px; font-weight: 600; }
+.segname { font-size: 16px; font-weight: 500; }
 .flist { border: 1px solid var(--border); border-radius: 6px; }
-.frow { display: grid; grid-template-columns: 16px minmax(0, 1fr) 100px 80px 120px; align-items: center; gap: 12px; min-height: 40px; text-align: center; padding: 0 16px; font-size: 13px; border-bottom: 1px solid var(--rule); cursor: pointer; }
+.frow { display: grid; grid-template-columns: 16px minmax(0, 1fr) 100px 80px 120px; align-items: center; gap: 12px; min-height: 40px; text-align: center; padding: 0 16px; font-size: 14px; border-bottom: 1px solid var(--rule); cursor: pointer; }
 .frow:last-child { border-bottom: 0; }
 .frow.head { min-height: 36px; font-size: 13px; color: var(--muted-ink); background: var(--subtle); cursor: default; font-weight: 500; }
 .frow > span { overflow-wrap: anywhere; line-height: 1.3; padding: 4px 0; }
@@ -301,15 +308,14 @@ function render() {
   if (state.tab === "segments") {
     $("#bulk").innerHTML = `<button class="btn btn-sm" type="button" data-open="import-kmz">Import KMZ</button>
       <button class="btn btn-sm" type="button" data-act="download-seg">Download</button>
-      <button class="btn btn-sm" type="button" data-open="xlsx-seg">Upload</button>`;
+      <button class="btn btn-sm btn-p" type="button" data-open="xlsx-seg">Upload</button>`;
     renderSegments();
   } else if (state.tab === "sites") {
     $("#bulk").innerHTML = `<button class="btn btn-sm" type="button" data-open="add-site">Add site</button>
       <button class="btn btn-sm" type="button" data-act="download-sites">Download</button>
-      <button class="btn btn-sm" type="button" data-open="xlsx-sites">Upload</button>`;
+      <button class="btn btn-sm btn-p" type="button" data-open="xlsx-sites">Upload</button>`;
     renderSites();
   } else {
-    $("#bulk").innerHTML = "";
     renderReservations();
   }
   renderModal();
@@ -367,7 +373,7 @@ function renderSegments() {
       <select class="field" style="width:200px" id="seg-site" aria-label="Site">${siteOptions(filter.site, "All sites")}</select>
       ${filter.site ? '<button class="btn btn-sm" type="button" data-open="add-segment">Add segment</button>' : ""}
       <select class="field" style="width:140px" id="seg-route" aria-label="Route"><option value="">All routes</option>${routes.map((route) => `<option ${route === filter.route ? "selected" : ""}>${route}</option>`).join("")}</select></div>
-      <div class="grp"><button class="chip" type="button" id="chip-noline" aria-pressed="${filter.noLine}">No route only</button>
+      <span class="sep"></span><div class="grp"><button class="chip" type="button" id="chip-noline" aria-pressed="${filter.noLine}">No route only</button>
       <button class="chip" type="button" id="chip-notver" aria-pressed="${filter.notRegistered}">Not registered only</button></div>
       <span class="count" id="seg-count"></span>
     </div>
@@ -472,30 +478,35 @@ function renderSiteRows() {
 
 /* ---------- Reservations ---------- */
 const RES = { file: null, applied: false, confirming: false };
+function resBulk() {
+  if (state.reservationClosed) {
+    return "";
+  }
+  return `<button class="btn btn-sm" type="button" id="res-choose">Choose .xlsx file</button>
+    <button class="btn btn-sm" type="button" id="res-switch">Close reservation import</button>
+    <button class="btn btn-sm btn-p" type="button" id="res-apply" ${RES.file && !RES.applied ? "" : "disabled"}>${RES.applied ? "Imported 3" : "Import 3"}</button>`;
+}
 function renderReservations() {
-  const preview = RES.file ? `
-    <div class="tbox"><table class="tbl" aria-label="Reservation rows">
-      <colgroup><col style="width:80px"><col style="width:280px"><col><col style="width:90px"><col style="width:160px"></colgroup>
-      <thead><tr><th class="r">Row</th><th>Segment</th><th>Customer</th><th class="r">Cores</th><th>Status</th></tr></thead>
-      <tbody>
-        <tr><td class="r">2</td><td>KLG Hut-Klang Hut</td><td>Customer A</td><td class="r">4</td><td class="st-new">Ready</td></tr>
-        <tr><td class="r">3</td><td>Cyberjaya DC-Bangsar DC</td><td>Customer B</td><td class="r">2</td><td class="st-new">Ready</td></tr>
-        <tr><td class="r">4</td><td>S14-S15</td><td>Customer C</td><td class="r">8</td><td class="st-new">Ready</td></tr>
-        <tr><td class="r">5</td><td>S99-S15</td><td>Customer D</td><td class="r">2</td><td class="st-review">Needs review</td></tr>
-        <tr><td class="r">6</td><td>S20-S21</td><td>-</td><td class="r">2</td><td class="st-rej">Rejected</td></tr>
-      </tbody></table></div>
-    <div class="row" style="display:flex;gap:16px;align-items:center"><span style="flex:1;display:flex;gap:16px"><span>3 Ready</span><span>1 Needs review</span><span>1 Rejected</span></span>
-      <button class="btn btn-p" type="button" id="res-apply" ${RES.applied || state.reservationClosed ? "disabled" : ""}>${RES.applied ? "Imported 3" : "Import 3"}</button></div>` : "";
-  const confirm = RES.confirming ? `<div class="confirmbar"><b>Close reservation import?</b>
+  $("#bulk").innerHTML = resBulk();
+  const rows = RES.file && !state.reservationClosed ? `
+        <tr><td>2</td><td>KLG Hut-Klang Hut</td><td>Customer A</td><td>4</td><td class="st-new">Ready</td></tr>
+        <tr><td>3</td><td>Cyberjaya DC-Bangsar DC</td><td>Customer B</td><td>2</td><td class="st-new">Ready</td></tr>
+        <tr><td>4</td><td>S14-S15</td><td>Customer C</td><td>8</td><td class="st-new">Ready</td></tr>
+        <tr><td>5</td><td>S99-S15</td><td>Customer D</td><td>2</td><td class="st-review">Needs review</td></tr>
+        <tr><td>6</td><td>S20-S21</td><td>-</td><td>2</td><td class="st-rej">Rejected</td></tr>` : `<tr><td colspan="5" class="empty">${state.reservationClosed ? "Import closed" : "No file"}</td></tr>`;
+  const confirm = RES.confirming ? `<div class="confirmbar" style="margin:16px;"><b>Close reservation import?</b>
       <label style="display:grid;gap:8px;font-size:13px;font-weight:500">Remarks<input class="field" id="res-remarks"></label>
-      <div class="row" style="gap:8px"><button class="btn btn-p btn-sm" type="button" id="res-close-yes">Close import</button><button class="btn btn-sm" type="button" id="res-close-no">Cancel</button></div></div>` : "";
-  $("#panel").innerHTML = `<div class="card">
-    <h2>Reservation workbook</h2>
-    ${state.reservationClosed ? '<p class="warn">Import closed</p>' : `<div class="drop"><button class="btn btn-p" type="button" id="res-choose">Choose .xlsx file</button><span>${RES.file ?? "No file"}</span></div>`}
-    ${state.reservationClosed ? "" : preview}
-    <div class="swrow"><span class="lbl" id="sw-lbl">Close reservation import</span><span>${state.reservationClosed ? "closed" : "open"}</span>
-      <button class="switch" type="button" role="switch" aria-labelledby="sw-lbl" aria-checked="${state.reservationClosed}" id="res-switch" ${state.reservationClosed ? "disabled" : ""}></button></div>
-    ${confirm}</div>`;
+      <div class="row"><button class="btn btn-p btn-sm" type="button" id="res-close-yes">Close import</button><button class="btn btn-sm" type="button" id="res-close-no">Cancel</button></div></div>` : "";
+  const counts = RES.file && !state.reservationClosed ? '<span class="st-new">3 Ready</span><span class="st-review">1 Needs review</span><span class="st-rej">1 Rejected</span>' : "";
+  $("#panel").innerHTML = `
+    <div class="toolbar"><span style="font-weight:600">${state.reservationClosed ? "Import closed" : RES.file ?? "No file"}</span><span class="sep"></span><div class="grp" style="gap:24px">${counts}</div>
+      <span class="count">${RES.file && !state.reservationClosed ? "5 rows" : ""}</span></div>
+    ${confirm}
+    <div class="tscroll"><table class="tbl" aria-label="Reservation rows">
+      <colgroup><col style="width:100px"><col><col><col style="width:140px"><col style="width:200px"></colgroup>
+      <thead><tr><th>Row</th><th>Segment</th><th>Customer</th><th>Cores</th><th>Status</th></tr></thead>
+      <tbody>${rows}</tbody></table></div>
+    <div class="pager"><span class="info">${RES.file && !state.reservationClosed ? "1-5 of 5" : "0-0 of 0"}</span></div>`;
 }
 
 /* ---------- Boxes ---------- */
@@ -571,7 +582,7 @@ function siteBox(modal) {
 }
 function importKmzBox() {
   const body = `<p><a class="link" href="../kmz-import-v3/index.html" target="_blank" rel="noopener">Open KMZ import</a></p>`;
-  return boxShell(560, "Import KMZ", body, '<span class="count"></span><button class="btn" type="button" data-close>Close</button>');
+  return boxShell(560, "Import KMZ", body, '<span class="count"></span><button class="btn btn-p" type="button" data-close>Close</button>');
 }
 
 const PREVIEWS = {};
