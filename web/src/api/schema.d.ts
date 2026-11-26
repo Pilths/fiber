@@ -746,26 +746,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/admin/kmz/uploads/{upload_id}/suggest-by-location": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Suggest By Location
-         * @description Segments whose two sites lie near the two ends of each staged line. Saves nothing.
-         */
-        post: operations["suggest_by_location_api_admin_kmz_uploads__upload_id__suggest_by_location_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/admin/kmz/clusters": {
         parameters: {
             query?: never;
@@ -2072,18 +2052,6 @@ export interface components {
              */
             created_at: string;
         };
-        /** KmzLocationSuggestion */
-        KmzLocationSuggestion: {
-            /** Key */
-            key: string;
-            /** Segment Id */
-            segment_id: number;
-            /**
-             * Suggested By
-             * @constant
-             */
-            suggested_by: "location";
-        };
         /** KmzRouteLineOut */
         KmzRouteLineOut: {
             /** Key */
@@ -2100,19 +2068,6 @@ export interface components {
             closest_segment_id?: number | null;
             /** Closest By */
             closest_by?: ("location" | "folder") | null;
-            /** End A M */
-            end_a_m?: number | null;
-            /** End B M */
-            end_b_m?: number | null;
-            /** Km */
-            km?: number | null;
-            /** Excel Km */
-            excel_km?: number | null;
-            /**
-             * Km Differs
-             * @default false
-             */
-            km_differs: boolean;
             /**
              * Same
              * @default false
@@ -5008,41 +4963,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["KmzApplyOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    suggest_by_location_api_admin_kmz_uploads__upload_id__suggest_by_location_post: {
-        parameters: {
-            query?: never;
-            header?: {
-                "x-dev-user"?: string | null;
-            };
-            path: {
-                upload_id: number;
-            };
-            cookie?: {
-                fiber_session?: string | null;
-            };
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["KmzLocationSuggestion"][];
                 };
             };
             /** @description Validation Error */

@@ -1,8 +1,8 @@
 """KMZ route lines stored as drawn: each line is assigned to a segment by the admin. No joining, no cutting, no km.
 
 A route line is a kmz_groups row with route = true (on a segment) holding one 'line' kmz_elements row. A segment may
-have several. The preview lists every line with a suggestion from its title; suggest_by_location adds suggestions
-from where the line ends lie. Nothing here is saved before apply.
+have several. The preview lists every line with a suggestion from its title, its folder or where its ends lie.
+Nothing here is saved before apply.
 """
 import json
 
@@ -14,7 +14,6 @@ from app.errors import Invalid
 from app.ingest.kmz_groups import INSERT_ELEMENT_SQL, target_must_exist
 from app.ingest.kmz_segment_routes import line_statuses
 
-NEAR_METRES = 200
 # The segment whose two sites both lie within :near metres of the two line ends (either way round); the smaller
 # summed distance wins.
 NEAREST_SEGMENT_SQL = """
@@ -34,30 +33,7 @@ WITH ends AS (
 )
 SELECT id FROM totals WHERE total IS NOT NULL ORDER BY total, id LIMIT 1
 """
-# How far each site of a segment lies from the nearer line end (the better of the two pairings), and the segment's
-# Excel distance. With :segment_id null every segment competes; :near limits each end distance.
-END_DISTANCES_SQL = """
-WITH ends AS (
-    SELECT ST_SetSRID(ST_MakePoint(:first_lon, :first_lat), 4326)::geography AS first_end,
-           ST_SetSRID(ST_MakePoint(:last_lon, :last_lat), 4326)::geography AS last_end
-), distances AS (
-    SELECT s.id, s.distance_km,
-           ST_Distance(a.geom::geography, e.first_end) AS a_first, ST_Distance(b.geom::geography, e.last_end) AS b_last,
-           ST_Distance(a.geom::geography, e.last_end) AS a_last, ST_Distance(b.geom::geography, e.first_end) AS b_first
-    FROM segments s JOIN sites a ON a.id = s.site_a_id JOIN sites b ON b.id = s.site_b_id, ends e
-    WHERE CAST(:segment_id AS integer) IS NULL OR s.id = :segment_id
-), paired AS (
-    SELECT id, distance_km,
-           CASE WHEN a_first + b_last <= a_last + b_first THEN a_first ELSE a_last END AS a_metres,
-           CASE WHEN a_first + b_last <= a_last + b_first THEN b_last ELSE b_first END AS b_metres
-    FROM distances
-)
-SELECT id, distance_km, a_metres, b_metres FROM paired
-WHERE a_metres <= :near AND b_metres <= :near ORDER BY a_metres + b_metres, id LIMIT 1
-"""
 CLOSEST_METRES = 1000
-KM_DIFFERS_SHARE = 0.1
-NO_LIMIT_METRES = 1e12
 INSERT_ROUTE_GROUP_SQL = """
 INSERT INTO kmz_groups (upload_id, name, folder_path, segment_id, route, colour_mode, created_by)
 VALUES (:upload_id, :name, :folder_path, :segment_id, true, 'theme', :user_id)
@@ -84,10 +60,20 @@ def geometry_key(geometry: dict) -> str:
     return json.dumps(geometry["coordinates"], default=lambda value: round(value, 6))
 
 
+def nearest_segment_id(db: Session, geometry: dict, near: int) -> int | None:
+    first_end, last_end = line_ends(geometry)
+    parameters = {
+        "first_lon": first_end[0], "first_lat": first_end[1],
+        "last_lon": last_end[0], "last_lat": last_end[1],
+        "near": near,
+    }
+    return db.execute(text(NEAREST_SEGMENT_SQL), parameters).scalar()
+
+
 def add_evidence(db: Session, route_lines: list[dict]) -> None:
-    """Adds to each line (in place): end distances and km against the segment it is aimed at (its title segment, else
-    a closest suggestion), 'km_differs', 'same' (as the KMZ routes card reads it) and 'duplicate' (the same shape
-    already seen earlier in the file). Lines with no segment but a folder suggestion already carry closest_*."""
+    """Adds to each line (in place): 'duplicate' (the same shape already seen earlier in the file), a closest
+    suggestion by location when it has no title segment and no folder suggestion, and 'same' (equal to a route stored
+    on its segment, as the KMZ routes card reads it). No distances are reported."""
     seen_shapes = set()
     for line in route_lines:
         line.setdefault("closest_segment_id", None)
@@ -95,43 +81,16 @@ def add_evidence(db: Session, route_lines: list[dict]) -> None:
         shape = geometry_key(line["geometry"])
         line["duplicate"] = shape in seen_shapes
         seen_shapes.add(shape)
-        first_end, last_end = line_ends(line["geometry"])
-        parameters = {
-            "first_lon": first_end[0], "first_lat": first_end[1], "last_lon": last_end[0], "last_lat": last_end[1],
-            "segment_id": line["suggested_segment_id"] or line["closest_segment_id"], "near": NO_LIMIT_METRES,
-        }
-        if parameters["segment_id"] is None:
-            parameters["near"] = CLOSEST_METRES
-        found = db.execute(text(END_DISTANCES_SQL), parameters).mappings().first()
-        line.update(end_a_m=None, end_b_m=None, km=None, excel_km=None, km_differs=False, same=False)
-        if found is None:
-            continue
-        segment_id = found["id"]
+        line["same"] = False
         if line["suggested_segment_id"] is None and line["closest_segment_id"] is None:
-            line["closest_segment_id"] = segment_id
-            line["closest_by"] = "location"
-        compared = line_statuses(db, segment_id, [{"key": line["key"], "geometry": line["geometry"]}])[0]
-        excel_km = None if found["distance_km"] is None else float(found["distance_km"])
-        line.update(end_a_m=round(found["a_metres"]), end_b_m=round(found["b_metres"]), km=compared["distance_km"],
-                    excel_km=excel_km, same=compared["status"] == "same")
-        if excel_km:
-            line["km_differs"] = abs(compared["distance_km"] - excel_km) / excel_km > KM_DIFFERS_SHARE
-
-
-def suggest_by_location(db: Session, route_lines: list[dict]) -> list[dict]:
-    """[{key, segment_id, suggested_by: 'location'}] for the lines that have a segment. Saves nothing."""
-    suggestions = []
-    for line in route_lines:
-        first_end, last_end = line_ends(line["geometry"])
-        parameters = {
-            "first_lon": first_end[0], "first_lat": first_end[1],
-            "last_lon": last_end[0], "last_lat": last_end[1],
-            "near": NEAR_METRES,
-        }
-        segment_id = db.execute(text(NEAREST_SEGMENT_SQL), parameters).scalar()
+            closest_id = nearest_segment_id(db, line["geometry"], CLOSEST_METRES)
+            if closest_id is not None:
+                line["closest_segment_id"] = closest_id
+                line["closest_by"] = "location"
+        segment_id = line["suggested_segment_id"] or line["closest_segment_id"]
         if segment_id is not None:
-            suggestions.append({"key": line["key"], "segment_id": segment_id, "suggested_by": "location"})
-    return suggestions
+            compared = line_statuses(db, segment_id, [{"key": line["key"], "geometry": line["geometry"]}])[0]
+            line["same"] = compared["status"] == "same"
 
 
 def check_route_lines(db: Session, staged_lines: list[dict], choices: list[dict]) -> list[dict]:
