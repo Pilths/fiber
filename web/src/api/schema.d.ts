@@ -1890,11 +1890,6 @@ export interface components {
              * @default []
              */
             groups: components["schemas"]["KmzApplyGroup"][];
-            /**
-             * Per Segment
-             * @default false
-             */
-            per_segment: boolean;
             /** Route Lines */
             route_lines?: components["schemas"]["KmzApplyRouteLine"][] | null;
         };
@@ -2101,6 +2096,33 @@ export interface components {
             suggested_segment_id: number | null;
             /** Suggested By */
             suggested_by: "title" | null;
+            /** Closest Segment Id */
+            closest_segment_id?: number | null;
+            /** Closest By */
+            closest_by?: ("location" | "folder") | null;
+            /** End A M */
+            end_a_m?: number | null;
+            /** End B M */
+            end_b_m?: number | null;
+            /** Km */
+            km?: number | null;
+            /** Excel Km */
+            excel_km?: number | null;
+            /**
+             * Km Differs
+             * @default false
+             */
+            km_differs: boolean;
+            /**
+             * Same
+             * @default false
+             */
+            same: boolean;
+            /**
+             * Duplicate
+             * @default false
+             */
+            duplicate: boolean;
             /**
              * Coords
              * @default []

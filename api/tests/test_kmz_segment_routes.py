@@ -13,7 +13,7 @@ def stage_lines(client, tmp_path, *lines):
 
 def apply_picks(client, upload_id, segment_id, keys):
     picks = [{"key": key, "segment_id": segment_id} for key in keys]
-    return client.post(f"{URL}/uploads/{upload_id}/apply", json={"route_lines": picks, "per_segment": True})
+    return client.post(f"{URL}/uploads/{upload_id}/apply", json={"route_lines": picks})
 
 
 def statuses(client, upload_id, segment_id):

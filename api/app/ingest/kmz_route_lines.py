@@ -34,6 +34,30 @@ WITH ends AS (
 )
 SELECT id FROM totals WHERE total IS NOT NULL ORDER BY total, id LIMIT 1
 """
+# How far each site of a segment lies from the nearer line end (the better of the two pairings), and the segment's
+# Excel distance. With :segment_id null every segment competes; :near limits each end distance.
+END_DISTANCES_SQL = """
+WITH ends AS (
+    SELECT ST_SetSRID(ST_MakePoint(:first_lon, :first_lat), 4326)::geography AS first_end,
+           ST_SetSRID(ST_MakePoint(:last_lon, :last_lat), 4326)::geography AS last_end
+), distances AS (
+    SELECT s.id, s.distance_km,
+           ST_Distance(a.geom::geography, e.first_end) AS a_first, ST_Distance(b.geom::geography, e.last_end) AS b_last,
+           ST_Distance(a.geom::geography, e.last_end) AS a_last, ST_Distance(b.geom::geography, e.first_end) AS b_first
+    FROM segments s JOIN sites a ON a.id = s.site_a_id JOIN sites b ON b.id = s.site_b_id, ends e
+    WHERE CAST(:segment_id AS integer) IS NULL OR s.id = :segment_id
+), paired AS (
+    SELECT id, distance_km,
+           CASE WHEN a_first + b_last <= a_last + b_first THEN a_first ELSE a_last END AS a_metres,
+           CASE WHEN a_first + b_last <= a_last + b_first THEN b_last ELSE b_first END AS b_metres
+    FROM distances
+)
+SELECT id, distance_km, a_metres, b_metres FROM paired
+WHERE a_metres <= :near AND b_metres <= :near ORDER BY a_metres + b_metres, id LIMIT 1
+"""
+CLOSEST_METRES = 1000
+KM_DIFFERS_SHARE = 0.1
+NO_LIMIT_METRES = 1e12
 INSERT_ROUTE_GROUP_SQL = """
 INSERT INTO kmz_groups (upload_id, name, folder_path, segment_id, route, colour_mode, created_by)
 VALUES (:upload_id, :name, :folder_path, :segment_id, true, 'theme', :user_id)
@@ -53,6 +77,45 @@ def line_ends(geometry: dict) -> tuple[list[float], list[float]]:
     if geometry["type"] == "MultiLineString":
         return coordinates[0][0], coordinates[-1][-1]
     return coordinates[0], coordinates[-1]
+
+
+def geometry_key(geometry: dict) -> str:
+    """The shape rounded to about 10 cm, to tell the same line drawn in two folders."""
+    return json.dumps(geometry["coordinates"], default=lambda value: round(value, 6))
+
+
+def add_evidence(db: Session, route_lines: list[dict]) -> None:
+    """Adds to each line (in place): end distances and km against the segment it is aimed at (its title segment, else
+    a closest suggestion), 'km_differs', 'same' (as the KMZ routes card reads it) and 'duplicate' (the same shape
+    already seen earlier in the file). Lines with no segment but a folder suggestion already carry closest_*."""
+    seen_shapes = set()
+    for line in route_lines:
+        line.setdefault("closest_segment_id", None)
+        line.setdefault("closest_by", None)
+        shape = geometry_key(line["geometry"])
+        line["duplicate"] = shape in seen_shapes
+        seen_shapes.add(shape)
+        first_end, last_end = line_ends(line["geometry"])
+        parameters = {
+            "first_lon": first_end[0], "first_lat": first_end[1], "last_lon": last_end[0], "last_lat": last_end[1],
+            "segment_id": line["suggested_segment_id"] or line["closest_segment_id"], "near": NO_LIMIT_METRES,
+        }
+        if parameters["segment_id"] is None:
+            parameters["near"] = CLOSEST_METRES
+        found = db.execute(text(END_DISTANCES_SQL), parameters).mappings().first()
+        line.update(end_a_m=None, end_b_m=None, km=None, excel_km=None, km_differs=False, same=False)
+        if found is None:
+            continue
+        segment_id = found["id"]
+        if line["suggested_segment_id"] is None and line["closest_segment_id"] is None:
+            line["closest_segment_id"] = segment_id
+            line["closest_by"] = "location"
+        compared = line_statuses(db, segment_id, [{"key": line["key"], "geometry": line["geometry"]}])[0]
+        excel_km = None if found["distance_km"] is None else float(found["distance_km"])
+        line.update(end_a_m=round(found["a_metres"]), end_b_m=round(found["b_metres"]), km=compared["distance_km"],
+                    excel_km=excel_km, same=compared["status"] == "same")
+        if excel_km:
+            line["km_differs"] = abs(compared["distance_km"] - excel_km) / excel_km > KM_DIFFERS_SHARE
 
 
 def suggest_by_location(db: Session, route_lines: list[dict]) -> list[dict]:
@@ -111,16 +174,12 @@ def drop_same_and_hide_old(db: Session, admin_id: int, upload_id: int, to_save: 
 
 
 def save_route_lines(
-    db: Session, admin_id: int, upload_id: int, to_save: list[dict], per_segment: bool = False
+    db: Session, admin_id: int, upload_id: int, to_save: list[dict]
 ) -> int:
     """One route group with one line element per pick, as drawn. Returns how many lines were saved.
-    The segment's earlier route lines are hidden first, so the new import replaces them. With per_segment, only
-    a "replaces route" line hides them and a "same" line is skipped."""
-    if per_segment:
-        to_save = drop_same_and_hide_old(db, admin_id, upload_id, to_save)
-    else:
-        for segment_id in sorted({pick["segment_id"] for pick in to_save}):
-            hide_old_route_groups(db, admin_id, upload_id, segment_id)
+    A line equal to a stored route ("same") is never saved again; the earlier routes are hidden only when a saved
+    line replaces them."""
+    to_save = drop_same_and_hide_old(db, admin_id, upload_id, to_save)
     for pick in to_save:
         line = pick["line"]
         parameters = {

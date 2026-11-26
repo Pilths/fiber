@@ -13,9 +13,13 @@ function line(name: string, points: number[][]) {
   return `<Placemark><name>${name}</name><LineString><coordinates>${text}</coordinates></LineString></Placemark>`;
 }
 
-function kmz() {
-  const titled = line("DEV Cyberjaya DC-DEV Klang Hut", [[101.65, 2.9213], [101.55, 2.95], [101.445, 3.0449]]);
-  const untitled = line("Untitled Path", [[101.4451, 3.0448], [101.52, 3.02], [101.6499, 2.9214]]);
+// The dev database keeps what earlier runs applied, and an identical line would show as "same": each run shifts
+// the lines by up to about 100 m, and the two tests by different amounts.
+function kmz(extraShift = 0) {
+  const shift = ((stamp % 500) + extraShift) * 0.000002;
+  const move = (points: number[][]) => points.map(([lon, lat]) => [lon + shift, lat]);
+  const titled = line("DEV Cyberjaya DC-DEV Klang Hut", move([[101.65, 2.9213], [101.55, 2.95], [101.445, 3.0449]]));
+  const untitled = line("Untitled Path", move([[101.4451, 3.0448], [101.52, 3.02], [101.6499, 2.9214]]));
   const kml = `<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document>
 <Folder><name>propose route</name>${titled}${untitled}</Folder></Document></kml>`;
   return { name: `e2e-import-${stamp}.kmz`, mimeType: "application/vnd.google-earth.kmz", buffer: zip([["doc.kml", kml]]) };
@@ -52,4 +56,27 @@ test("Import KMZ: title line, suggest by location, apply", async ({ page }) => {
   await box.getByRole("button", { name: "Apply 1 + 1 suggested" }).click();
   await expect(box).toHaveCount(0);
   await expect(page.getByTestId("kmz-import-result")).toContainText("2 route lines drawn on the map");
+});
+
+test("Import KMZ: closest suggestion is only applied after Accept, ends and km show", async ({ page }) => {
+  await signIn(page, "admin1");
+  await page.getByRole("navigation", { name: "Main" }).getByRole("button", { name: "Upload" }).click();
+  await page.getByRole("button", { name: "Import KMZ" }).click();
+  const box = page.getByRole("dialog", { name: "KMZ import" });
+  await box.getByLabel("Upload a KMZ file").setInputFiles(kmz(600));
+  await box.getByRole("button", { name: "Continue" }).click();
+
+  const segment = box.getByTestId(`kmz-segment-${SEGMENT}`);
+  const unmatched = box.getByRole("region", { name: /^Not matched/ });
+  await expect(segment).toContainText("1 line");
+  await expect(unmatched).toContainText(`closest: ${SEGMENT}`);
+  await expect(box.getByTestId("kmz-line-DEV Cyberjaya DC-DEV Klang Hut")).toContainText(/ends \d+ m · \d+ m/);
+  if (process.env.KMZ_SHOT_V3) {
+    await page.screenshot({ path: process.env.KMZ_SHOT_V3 });
+  }
+
+  await unmatched.getByRole("button", { name: "Accept closest for Untitled Path" }).click();
+  await expect(segment).toContainText("2 lines");
+  await expect(segment.getByTestId("kmz-line-Untitled Path")).toContainText("suggested");
+  await expect(box.getByTestId("kmz-import-counts")).toHaveText("1 segment · 2 lines · 0 not matched");
 });

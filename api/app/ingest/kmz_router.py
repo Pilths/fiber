@@ -65,6 +65,15 @@ class KmzRouteLineOut(BaseModel):
     folder_path: str
     suggested_segment_id: int | None
     suggested_by: Literal["title"] | None
+    closest_segment_id: int | None = None  # a suggestion for a line with no matching title; never applied unasked
+    closest_by: Literal["location", "folder"] | None = None
+    end_a_m: int | None = None  # metres from the segment's site A (and B) to the nearer line end
+    end_b_m: int | None = None
+    km: float | None = None
+    excel_km: float | None = None  # the segment's Excel distance
+    km_differs: bool = False  # km and Excel km differ by more than 10 %
+    same: bool = False  # the shape equals a route already stored on the segment
+    duplicate: bool = False  # the same shape appeared earlier in the file (another folder)
     coords: list[list[float]] = []  # [lon, lat] thinned to at most PREVIEW_VERTICES, for the map preview
 
 
@@ -190,7 +199,6 @@ class KmzApplyRouteLine(BaseModel):
 class KmzApplyIn(BaseModel):
     route_segment_ids: list[int] | None = None  # None = every previewed route line
     groups: list[KmzApplyGroup] = []  # groups not listed are skipped
-    per_segment: bool = False  # the per-segment box: 'same' lines are skipped, earlier routes hidden only if replaced
     route_lines: list[KmzApplyRouteLine] | None = None  # lines saved as drawn on their segment; replaces the title join
 
 
@@ -274,7 +282,7 @@ def apply(db: DB, admin: Admin, upload_id: int, body: KmzApplyIn | None = None) 
     choices = [group.model_dump() for group in body.groups]
     line_choices = [line.model_dump() for line in body.route_lines or []]
     with logged_apply("kmz", upload_id, admin.id):
-        result = apply_upload(db, admin.id, upload_id, body.route_segment_ids, choices, line_choices, body.per_segment)
+        result = apply_upload(db, admin.id, upload_id, body.route_segment_ids, choices, line_choices)
         return KmzApplyOut(upload_id=upload_id, **result)
 
 
