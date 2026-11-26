@@ -511,7 +511,7 @@ function renderSiteRows() {
 }
 
 /* ---------- Reservations ---------- */
-const RES = { file: null, applied: false, confirming: false };
+const RES = { file: null, applied: false };
 function resBulk() {
   if (state.reservationClosed) {
     return "";
@@ -528,14 +528,10 @@ function renderReservations() {
         <tr><td>4</td><td>S14-S15</td><td>Customer C</td><td>8</td><td class="st-new">Ready</td></tr>
         <tr><td>5</td><td>S99-S15</td><td>Customer D</td><td>2</td><td class="st-review">Needs review</td></tr>
         <tr><td>6</td><td>S20-S21</td><td>-</td><td>2</td><td class="st-rej">Rejected</td></tr>` : `<tr><td colspan="5" class="empty">${state.reservationClosed ? "Import closed" : "No file"}</td></tr>`;
-  const confirm = RES.confirming ? `<div class="confirmbar" style="margin:16px;"><b>Close reservation import?</b>
-      <label style="display:grid;gap:8px;font-size:13px;font-weight:500">Remarks<input class="field" id="res-remarks"></label>
-      <div class="row"><button class="btn btn-p btn-sm" type="button" id="res-close-yes">Close import</button><button class="btn btn-sm" type="button" id="res-close-no">Cancel</button></div></div>` : "";
   const counts = RES.file && !state.reservationClosed ? '<span class="st-new">3 Ready</span><span class="st-review">1 Needs review</span><span class="st-rej">1 Rejected</span>' : "";
   $("#panel").innerHTML = `
     <div class="toolbar"><span style="font-weight:600">${state.reservationClosed ? "Import closed" : RES.file ?? "No file"}</span><span class="sep"></span><div class="grp" style="gap:24px">${counts}</div>
       <span class="count">${RES.file && !state.reservationClosed ? "5 rows" : ""}</span></div>
-    ${confirm}
     <div class="tscroll"><table class="tbl" aria-label="Reservation rows">
       <colgroup><col style="width:100px"><col><col><col style="width:140px"><col style="width:200px"></colgroup>
       <thead><tr><th>Row</th><th>Segment</th><th>Customer</th><th>Cores</th><th>Status</th></tr></thead>
@@ -599,7 +595,7 @@ function uploadLineBox(modal) {
 }
 const HISTORY = {
   segment: [["12 Nov 2026", "km", "12.0", "12.4", "admin1", "-"], ["05 Nov 2026", "Registered cores", "-", "48", "upload: segments.xlsx", "-"],
-    ["28 Oct 2026", "Route", "R2", "R1", "admin1", "Renamed"], ["14 Oct 2026", "Total cores", "96", "144", "planner2", "-"]],
+    ["28 Oct 2026", "Route", "R2", "R1", "admin1", "Renamed"], ["14 Oct 2026", "Total cores", "96", "144", "admin2", "-"]],
   site: [["19 Nov 2026", "Lat", "3.00110", "3.00210", "admin1", "-"], ["05 Nov 2026", "Type", "Site", "Building", "upload: sites.xlsx", "-"],
     ["28 Oct 2026", "Name", "Klang", "Klang Hut", "admin1", "Fixed name"]],
 };
@@ -659,8 +655,13 @@ function siteBox(modal) {
   return boxShell(modal.edit ? 720 : 560, modal.edit ? "Edit site" : "Add site", body, `<span class="count"></span><button class="btn" type="button" data-close>Cancel</button><button class="btn btn-p" type="button" id="si-save">${label}</button>`);
 }
 function importKmzBox() {
-  const body = `<p><a class="link" href="../kmz-import-v3/index.html" target="_blank" rel="noopener">Open KMZ import</a></p>`;
+  const body = "<p>KMZ import box (v3)</p>";
   return boxShell(560, "Import KMZ", body, '<span class="count"></span><button class="btn btn-p" type="button" data-close>Close</button>');
+}
+function closeImportBox() {
+  const body = `<div class="form"><label class="wide">Remarks<input class="field" id="res-remarks"></label></div>`;
+  const foot = '<span class="count"></span><button class="btn" type="button" data-close>Cancel</button><button class="btn btn-p" type="button" id="res-close-yes">Close import</button>';
+  return boxShell(480, "Close reservation import?", body, foot);
 }
 
 const PREVIEWS = {};
@@ -732,7 +733,7 @@ function renderModal() {
     $("#modal").innerHTML = "";
     return;
   }
-  const builders = { "upload-route": uploadLineBox, edit: editBox, "add-segment": addSegmentBox, site: siteBox, "import-kmz": importKmzBox, xlsx: xlsxBox, "dl-kmz": downloadKmzBox };
+  const builders = { "upload-route": uploadLineBox, edit: editBox, "add-segment": addSegmentBox, site: siteBox, "import-kmz": importKmzBox, xlsx: xlsxBox, "dl-kmz": downloadKmzBox, "res-close": closeImportBox };
   $("#modal").innerHTML = builders[modal.type](modal);
 }
 
@@ -926,15 +927,13 @@ document.addEventListener("click", (event) => {
     RES.applied = true;
     renderReservations();
   } else if (target.id === "res-switch") {
-    RES.confirming = true;
-    renderReservations();
-  } else if (target.id === "res-close-no") {
-    RES.confirming = false;
-    renderReservations();
+    state.modal = { type: "res-close" };
+    renderModal();
   } else if (target.id === "res-close-yes") {
-    RES.confirming = false;
+    state.modal = null;
     state.reservationClosed = true;
     renderReservations();
+    renderModal();
   }
 });
 function highlight(event, on) {
