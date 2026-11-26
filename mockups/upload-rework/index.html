@@ -441,14 +441,14 @@ function renderSites() {
   $("#panel").innerHTML = `
     <div class="toolbar">
       <div class="grp"><input class="field" style="width:280px" type="search" id="site-search" placeholder="Search sites" aria-label="Search sites" value="${filter.search}">
-      <select class="field" style="width:160px" id="site-kind" aria-label="Kind"><option value="">All kinds</option>
+      <select class="field" style="width:160px" id="site-kind" aria-label="Type"><option value="">All types</option>
         ${["Site", "Building", "DC", "TOC"].map((kind) => `<option ${kind === filter.kind ? "selected" : ""}>${kind}</option>`).join("")}</select></div>
       <span class="count" id="site-count"></span>
     </div>
     <div class="tscroll">
       <table class="tbl" aria-label="Sites">
         <colgroup><col><col style="width:160px"><col style="width:160px"><col style="width:160px"><col style="width:140px"><col style="width:100px"></colgroup>
-        <thead><tr><th>Name</th><th>Kind</th><th class="r">Lat</th><th class="r">Long</th><th class="r">Segments</th><th></th></tr></thead>
+        <thead><tr><th>Name</th><th>Type</th><th class="r">Lat</th><th class="r">Long</th><th class="r">Segments</th><th></th></tr></thead>
         <tbody id="site-body"></tbody>
       </table>
     </div>
@@ -561,7 +561,7 @@ function siteBox(modal) {
   const site = modal.edit ? SITES.find((item) => item.name === modal.edit) : { name: modal.name ?? "", kind: "Site", lat: "", long: "" };
   const body = `<div class="form">
     <label class="wide">Name<input class="field" id="si-name" value="${modal.nameDraft ?? site.name}" ${modal.err ? 'aria-invalid="true" aria-describedby="si-err"' : ""}></label>
-    <label>Kind<select class="field" id="si-kind">${["Site", "Building", "DC", "TOC"].map((kind) => `<option ${kind === site.kind ? "selected" : ""}>${kind}</option>`).join("")}</select></label>
+    <label>Type<select class="field" id="si-kind">${["Site", "Building", "DC", "TOC"].map((kind) => `<option ${kind === site.kind ? "selected" : ""}>${kind}</option>`).join("")}</select></label>
     <span></span>
     <label>Lat<input class="field" id="si-lat" value="${site.lat}" inputmode="decimal"></label>
     <label>Long<input class="field" id="si-long" value="${site.long}" inputmode="decimal"></label>
@@ -602,7 +602,7 @@ function buildPreview(kind) {
       let change = "";
       if ([3, 12, 27, 44, 60].includes(index)) {
         status = "changed";
-        change = index % 2 ? `Kind ${site.kind} → Building` : `Lat ${site.lat} → ${(+site.lat + 0.002).toFixed(5)}`;
+        change = index % 2 ? `Type ${site.kind} → Building` : `Lat ${site.lat} → ${(+site.lat + 0.002).toFixed(5)}`;
       }
       rows.push({ row: index + 2, name: site.name, status, change });
     });
