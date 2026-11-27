@@ -137,7 +137,7 @@ At present:
 
 | In Scope | Out of Scope |
 | --- | --- |
-| Sign-in, forced and voluntary password change, and sign-out | Enterprise single sign-on |
+| Sign-in and sign-out | Enterprise single sign-on |
 | User account management by admins: creation, password reset, deactivation and activation | Email alerts for new requests |
 | Inventory: map, map filters, Site A to B route planner, segment diagram, Cores table and core details | Daily email digest of stale reservations |
 | Header search by customer, segment or core, and customer view on the map | Correction of customer or planned date on an approved reservation |
@@ -149,9 +149,9 @@ At present:
 | Admin editing of segments and sites, including Region, fiber cut and restoration | Sites and data centres view (site details and racks) |
 | Port assignment for a single core and Paste ports for a segment end | Undo of a site master upload |
 | Calculated loss and Measured loss per core with warning levels, and recording of Measured loss tests | One-time site master load |
-| Excel uploads for Sites, Segments and Reservations, and closure of the reservation import | Monitoring sheet import |
+| Excel uploads for Sites, Segments and Reservations, closure of the reservation import, and Excel download of Sites and Segments | Monitoring sheet import |
 | KMZ import of route lines assigned to segments and displayed on the map | Interpretation of the free-text Port Info column |
-| Map elements from KMZ: display, hiding, recolouring, reassignment and addition from KMZ | Joint closures on the map |
+| Map elements from KMZ: display, hiding, reassignment and addition from KMZ | Joint closures on the map |
 | KMZ download of a segment | Dark theme |
 | Visible history of reservations, cores, edits and Measured loss tests | Mobile and tablet use |
 
@@ -179,11 +179,10 @@ At present:
 **MUST Have**
 
 1. FR-001: The system MUST require users to sign in with a username and password. Self-registration MUST NOT be available.
-2. FR-002: The system MUST require users to change a new or reset password at their next sign-in, and MUST allow users to change their own password from the account menu.
-3. FR-003: The system MUST allow admins to create planner and admin accounts. The temporary password MUST be displayed only once.
-4. FR-004: The system MUST allow admins to reset passwords and to deactivate or activate accounts. A deactivated user MUST NOT be able to sign in, and their name MUST remain in the history.
-5. FR-005: The system MUST throttle repeated failed sign-in attempts for the same username.
-6. FR-006: The system MUST NOT display admin screens (Approvals, Upload and Users) to planners.
+2. FR-002: The system MUST allow admins to create planner and admin accounts.
+3. FR-003: The system MUST allow admins to reset passwords and to deactivate or activate accounts. A deactivated user MUST NOT be able to sign in, and their name MUST remain in the history.
+4. FR-004: The system MUST regulate repeated failed sign-in attempts for the same username.
+5. FR-005: The system MUST NOT display admin screens (Approvals, Upload and Users) to planners.
 
 **NICE to Have**
 
@@ -193,21 +192,21 @@ At present:
 
 **MUST Have**
 
-1. FR-007: Each segment MUST connect two sites, and any two sites MUST be connected by no more than one segment.
-2. FR-008: Each segment MUST display one core for each verified core. A segment without a verified core count MUST be shown as "Not verified" and MUST NOT be available for reservation.
-3. FR-009: Each core MUST hold one of the following statuses: Available, Requested, Reserved or In service.
-4. FR-010: The map MUST display each segment as a line labelled with its Free to reserve figure. Where a route line exists, the segment MUST follow it; otherwise, a straight line between its sites MUST be shown.
-5. FR-011: The header search MUST return customers, segments (entered as "A-B" in either order) and cores. Selecting a customer MUST highlight that customer's segments on the map.
-6. FR-012: The selected segment or route MUST be retained in the page link so that it can be shared.
+1. FR-006: Each segment MUST connect two sites, and any two sites MUST be connected by no more than one segment.
+2. FR-007: Each segment MUST display one core for each verified core. A segment without a verified core count MUST be shown as blank and MUST NOT be available for reservation.
+3. FR-008: Each core MUST hold one of the following statuses: Available, Requested, Reserved or In service.
+4. FR-009: The map MUST display each segment as a line labelled with the number of available cores that can be reserved. Where a route line exists, the segment MUST follow it; otherwise, a straight line between its sites MUST be shown.
+5. FR-010: The header search MUST return customers, segments (entered as "A-B" in either order) and cores. Selecting a customer MUST highlight that customer's segments on the map.
+6. FR-011: The selected segment or route MUST be retained in the page link so that it can be shared.
 
 #### 6.2.3 Route Planning
 
 **MUST Have**
 
-1. FR-013: The system MUST allow a planner to enter Site A, Site B and the number of cores required per segment, and to select either Shortest distance or Most free cores.
-2. FR-014: The system MUST present up to five route options, each showing its segments, total distance in km, Calculated loss and lowest Free to reserve figure. The most suitable option MUST be labelled "Best match".
-3. FR-015: An option with insufficient free cores or an unverified segment MUST be marked, placed last in the list and excluded from reservation.
-4. FR-016: Segments marked as cut MUST NOT be used in route options.
+1. FR-012: The system MUST allow a planner to enter Site A, Site B and the number of cores required per segment, and to select either Shortest distance or Most free cores.
+2. FR-013: The system MUST present up to five route options, each showing its segments, total distance in km, Calculated loss and lowest Free to reserve figure. The most suitable option MUST be labelled "Best match".
+3. FR-014: An option with insufficient free cores or an unverified segment MUST be marked, placed last in the list and excluded from reservation.
+4. FR-015: Segments marked as cut MUST NOT be used in route options.
 
 **NICE to Have**
 
@@ -217,11 +216,11 @@ At present:
 
 **MUST Have**
 
-1. FR-017: A reservation MUST begin from "Reserve on this route", where the planner selects exactly the required number of Available cores on every segment of the route.
-2. FR-018: A customer MUST be specified for each request, while the planned date and SRF ID MUST be optional. When a new customer is added, the system MUST warn of similar existing names.
-3. FR-019: A submitted request MUST hold its cores as Requested. No core MUST be reserved until an admin approves the request.
-4. FR-020: Where two planners select the same core, the system MUST accept the first request and inform the second planner which cores are no longer available.
-5. FR-021: A route reservation MUST be recorded as a single request across all of its segments.
+1. FR-016: A reservation MUST begin from "Reserve on this route", where the planner selects exactly the required number of Available cores on every segment of the route.
+2. FR-017: A customer, SRF ID and Opportunity ID MUST be specified for each request, while the planned date MUST be optional. **[Review: the current build has SRF ID as optional and no Opportunity ID field]** When a new customer is added, the system MUST warn of similar existing names.
+3. FR-018: A submitted request MUST hold its cores as Requested. No core MUST be reserved until an admin approves the request.
+4. FR-019: Where two planners select the same core, the system MUST accept the first request and inform the second planner which cores are no longer available.
+5. FR-020: A route reservation MUST be recorded as a single request across all of its segments.
 
 **NICE to Have**
 
@@ -231,10 +230,10 @@ At present:
 
 **MUST Have**
 
-1. FR-022: The Approvals tab MUST list pending requests and release requests in order of age, oldest first, with a waiting count shown on the tab.
-2. FR-023: The system MUST allow an admin to approve or reject a pending request as a whole. Approved cores MUST become Reserved, and rejected cores MUST become Available.
-3. FR-024: The system MUST allow a planner to withdraw their own pending request, after which its cores MUST immediately become Available.
-4. FR-025: Pending requests MUST NOT expire.
+1. FR-021: The Approvals tab MUST list pending requests and release requests in order of age, oldest first, with a waiting count shown on the tab.
+2. FR-022: The system MUST allow an admin to approve or reject a pending request as a whole. Approved cores MUST become Reserved, and rejected cores MUST become Available.
+3. FR-023: The system MUST allow a planner to withdraw their own pending request, after which its cores MUST immediately become Available.
+4. FR-024: Pending requests MUST NOT expire.
 
 **NICE to Have**
 
@@ -244,9 +243,9 @@ At present:
 
 **MUST Have**
 
-1. FR-026: An approved reservation MUST be marked as Stale when three months have passed since its last approval or retention, unless a release request is pending.
-2. FR-027: Stale reservations MUST appear under the Stale chip, in the Action needed list, as a count badge on the My reservations tab, and in the Cores table.
-3. FR-028: The Keep action MUST be available only for stale reservations, to the requesting planner or an admin. Retaining a reservation MUST restart the three-month period.
+1. FR-025: An approved reservation MUST be marked as Stale when three months have passed since its last approval or retention, unless a release request is pending.
+2. FR-026: Stale reservations MUST appear under the Stale filter, in the Action needed list, as a count badge on the My reservations tab, and in the Cores table.
+3. FR-027: The Keep action MUST be available only for stale reservations, to the requesting planner or an admin. Retaining a reservation MUST restart the three-month period.
 
 **NICE to Have**
 
@@ -256,9 +255,9 @@ At present:
 
 **MUST Have**
 
-1. FR-029: The system MUST allow a planner to request the release of selected cores from their own approved reservation. These cores MUST remain Reserved until an admin decides, and only one release request MUST be pending at any time.
-2. FR-030: The system MUST allow an admin to release selected cores from any approved reservation directly, or to decline a release request.
-3. FR-031: A release MUST free only the selected cores, while the reservation and its history MUST be retained. Releasing all cores MUST end the reservation.
+1. FR-028: The system MUST allow a planner to request the release of selected cores from their own approved reservation. These cores MUST remain Reserved until an admin decides, and only one release request MUST be pending at any time.
+2. FR-029: The system MUST allow an admin to release selected cores from any approved reservation directly, or to decline a release request.
+3. FR-030: A release MUST free only the selected cores, while the reservation and its history MUST be retained. Releasing all cores MUST end the reservation.
 
 **NICE to Have**
 
@@ -268,18 +267,19 @@ At present:
 
 **MUST Have**
 
-1. FR-032: Each reservation row imported from Excel MUST be recorded as a count-only reservation, which holds a number of cores on a segment without identifying specific cores.
-2. FR-033: Count-only reservations MUST appear as an "Unassigned" group in the Cores table and MUST reduce the Free to reserve figure.
-3. FR-034: The system MUST allow an admin to assign Available cores to an approved count-only reservation, up to the number that remains unassigned. Incorrectly assigned cores MUST be released and requested again.
+1. FR-031: Each reservation row imported from Excel MUST be recorded as a count-only reservation, which holds a number of cores on a segment without identifying specific cores.
+2. FR-032: Count-only reservations MUST appear as an "Unassigned" group in the Cores table and MUST reduce the Free to reserve figure.
+3. FR-033: The system MUST allow an admin to assign Available cores to an approved count-only reservation, up to the number that remains unassigned. Incorrectly assigned cores MUST be released and requested again.
 
 #### 6.2.9 My Reservations and Action Needed
 
 **MUST Have**
 
-1. FR-035: Planners MUST see only their own reservations, filtered by the chips All, Action needed, Pending and Stale.
-2. FR-036: The Action needed list MUST include stale reservations, pending release requests and reservations on cut segments.
-3. FR-037: Admins MUST additionally have an Action needed view covering the reservations of all planners.
-4. FR-038: Each reservation MUST display its age in days and only the actions permitted to the viewer.
+1. FR-034: Planners MUST see only their own reservations, which can be filtered by All, Action needed, Pending and Stale.
+2. FR-035: The Action needed list MUST include stale reservations, pending release requests and reservations on cut segments.
+3. FR-036: Admins MUST additionally have an Action needed view covering the reservations of all planners.
+4. FR-037: Each reservation MUST display its age in days and only the actions permitted to the viewer.
+5. FR-038: The system MUST allow an admin to download the current Sites and Segments as an Excel workbook, in the same format accepted by the upload.
 
 **NICE to Have**
 
@@ -289,10 +289,10 @@ At present:
 
 **MUST Have**
 
-1. FR-039: The system MUST allow an admin to edit a segment's sites, distance, Region, verified core count and Total cores.
+1. FR-039: The system MUST allow an admin to edit a segment's sites, distance, Region, cores secured and Total cores.
 2. FR-040: The system MUST allow an admin to edit a site's name, Region and coordinates. Site names MUST NOT contain the character "-".
 3. FR-041: The system MUST refuse a reduction of the verified core count where it would leave too few Available cores for count-only reservations.
-4. FR-042: The system MUST allow an admin to mark a segment as cut and to restore it. Reservations on a cut segment MUST be added to the Action needed list.
+4. FR-042: The system MUST allow an admin to mark a segment as cut and to restore it. A cut applies to the whole segment, which then has no cores available to reserve. Reservations on a cut segment MUST be added to the Action needed list.
 5. FR-043: The system MUST allow an admin to set the ports of a single core, or to paste a port column for a segment end with a preview beforehand. Port labels MUST follow the format FDF1-MOD2-T3-P5 or ODF1-P5 and MUST be unique within each site.
 
 **NICE to Have**
@@ -316,7 +316,7 @@ At present:
 3. FR-049: The Sites upload MUST mark a missing site as inactive rather than deleting it, and MUST block a file containing 10% or more fewer rows than the dashboard unless the admin confirms.
 4. FR-050: The Segments upload MUST create and update segments between known sites. A row referring to an unknown site MUST be marked Needs review, and a blank cell MUST NOT clear an existing value.
 5. FR-051: The Reservations upload MUST import each row as a count-only reservation and MUST NOT change an existing reservation.
-6. FR-052: The system MUST allow an admin to close the reservation import once. After closure, new reservations MUST be created only in the dashboard.
+6. FR-052: The system MUST allow an admin to close the reservation import once. After closure, new reservations MUST be created only in the dashboard. **[Review: check against the planned Excel export of reservations]**
 
 **NICE to Have**
 
@@ -329,10 +329,10 @@ At present:
 **MUST Have**
 
 1. FR-053: The system MUST allow an admin to upload a KMZ file and select the folders to be read. No data MUST be saved until the admin applies the import.
-2. FR-054: Each line MUST be listed with a suggested segment, derived from its title or from the location of its end points. The admin MUST be able to confirm, change or exclude each line.
+2. FR-054: Each line MUST be listed with a suggested **[Review]** segment, derived from its title or from the location of its end points. The admin MUST be able to confirm, change or exclude each line.
 3. FR-055: An applied line MUST be stored as drawn against the selected segment. A segment MAY hold more than one route line.
 4. FR-056: A KMZ upload MUST NOT create or delete a segment, nor change its distance, cores or route type.
-5. FR-057: Other KMZ folders MUST be stored as map elements attached to a segment or site. The admin MUST be able to show, hide, recolour, reassign or add them from the Edit segment and Edit site screens.
+5. FR-057: Other KMZ folders MUST be stored as map elements attached to a segment or site. The admin MUST be able to show, hide, reassign or add them from the Edit segment and Edit site screens.
 6. FR-058: Map elements MUST NOT be deleted; they MAY only be hidden. Every change MUST be recorded in the history.
 7. FR-059: The system MUST allow any user to download the selected segment as a KMZ file for use in Google Earth.
 
@@ -362,7 +362,7 @@ At present:
 
 1. FR-060: Loss MUST be recorded against a core rather than the whole cable, and MUST be labelled as either "Calculated loss" or "Measured loss".
 2. FR-061: Calculated loss MUST be derived from the segment distance using the agreed formula (one splice every 4 km and two connectors per segment). The loss of a route MUST be the sum of its segments. Where no distance is recorded, no Calculated loss MUST be shown, rather than 0 dB.
-3. FR-062: The system MUST allow an admin to record a Measured loss test for a core, comprising the value in dB, test date, test type and field team. Tests MUST be added to the history and MUST NOT overwrite earlier results.
+3. FR-062: The system MUST allow an admin to record a Measured loss test for a core, comprising the value in dB, test date and test type. Tests MUST be added to the history and MUST NOT overwrite earlier results.
 4. FR-063: Loss MUST be displayed in core details and the Reserve box, and MUST NOT be displayed on the map or the segment diagram.
 5. FR-064: Each Measured loss MUST display a warning level according to its deviation above the Calculated loss:
 
@@ -374,13 +374,11 @@ At present:
 | Above 10% | Off-scale | Red cross |
 
 6. FR-065: Route type MUST be derived from the two end sites and MUST NOT be entered manually: two data centres = DC-DC; a data centre and a TOC = DC-TOC; a data centre and any other site = Metro; all other cases = Trunk.
-7. FR-066: A fiber cut MUST apply to the whole segment. A cut segment MUST have a Free to reserve figure of zero and MUST NOT be used in route options.
 
 **NICE to Have**
 
 * Measured loss coverage view
 * Extended loss view
-* Configurable warning bands
 
 ### 6.5 Timeline Requirements
 
@@ -400,11 +398,10 @@ At present:
 | 3 | Are email notifications (new request alerts and the stale digest) required for go-live? | Business Owner, IT | [TBC] |
 | 4 | Is a correction screen required for the customer or planned date? | Business Owner | [TBC] |
 | 5 | Is a Measured loss coverage view required? | Business Owner | [TBC] |
-| 6 | Should the loss warning bands be configurable? | Business Owner | [TBC] |
-| 7 | Should the site master move to a one-time load? | Site master owner team | [TBC] |
-| 8 | Do production reservation rows contain blank or incomplete core assignments? | Data owner | [TBC] |
-| 9 | Which title format will the KMZ drawing team adopt for route lines? | Data owner | [TBC] |
-| 10 | Which data retention and compliance rules apply? | IT | [TBC] |
+| 6 | Should the site master move to a one-time load? | Site master owner team | [TBC] |
+| 7 | Do production reservation rows contain blank or incomplete core assignments? | Data owner | [TBC] |
+| 8 | Which title format will the KMZ drawing team adopt for route lines? | Data owner | [TBC] |
+| 9 | Which data retention and compliance rules apply? | IT | [TBC] |
 
 ---
 
@@ -428,7 +425,7 @@ A score of 15 or above (Impact × Possibility) is considered high.
 | System knowledge is held by a single developer | 4 | 3 | Hand over this document, the requirements and the decisions log |
 | An admin may approve their own request | 3 | 3 | Confirm the rule (6.6, item 2) and review approvals in the history in the interim |
 | Without email, new requests and stale reservations may be overlooked | 3 | 3 | Require users to review the dashboard daily and confirm the email requirement (6.6, item 3) |
-| KMZ line titles may not match site names | 2 | 4 | Use location-based suggestions and agree a title format (6.6, item 9) |
+| KMZ line titles may not match site names | 2 | 4 | Use location-based suggestions and agree a title format (6.6, item 8) |
 | An incorrect customer or date may be recorded on an approved reservation | 2 | 3 | Release and request the cores again, and confirm the need for a correction screen (6.6, item 4) |
 
 ---
@@ -519,8 +516,8 @@ This document sets out the business requirements for the Fiber Dashboard. Upon a
 
 * Actors: Admin, User
 * Steps:
-  1. The admin creates an account, and the temporary password is displayed once.
-  2. The user signs in and is required to change the password.
+  1. The admin creates an account.
+  2. The user signs in.
   3. The admin may reset a password, or deactivate or activate an account.
 * End states: active user; deactivated user (unable to sign in, with history retained).
 
@@ -547,6 +544,7 @@ This document sets out the business requirements for the Fiber Dashboard. Upon a
 | Remarks | An optional free-text note recorded with an edit or event |
 | Needs review | An upload row that requires admin review before it can be saved |
 | SRF ID | [Definition required: service request reference] |
+| Opportunity ID | [Definition required] |
 | KMZ | A Google Earth file containing points, lines and areas |
 | Route line | A KMZ line stored against a segment and displayed on the map |
 | Map element | A KMZ folder attached to a segment or site and displayed on the map |
