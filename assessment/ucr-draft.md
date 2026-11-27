@@ -115,6 +115,7 @@ At present:
 
 ### 4.3 Current Issues / Limitations
 
+* Fragmented data: reservations, sites, routes and loss readings are held in separate Excel workbooks and KMZ files, with no single view
 * Manual maintenance of workbooks by a single person who processes every reservation
 * Manual calculation of available cores
 * No reminder for aged reservations
